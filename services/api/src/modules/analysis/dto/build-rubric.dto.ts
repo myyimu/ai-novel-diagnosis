@@ -29,7 +29,14 @@ export class BuildRubricDto {
 
   @ApiProperty({
     description: "Genre used to tune the critique rubric.",
-    enum: ["xuanhuan", "urban", "romance", "suspense", "infinite-flow", "other"],
+    enum: [
+      "xuanhuan",
+      "urban",
+      "romance",
+      "suspense",
+      "infinite-flow",
+      "other",
+    ],
     example: "xuanhuan",
   })
   @IsIn(["xuanhuan", "urban", "romance", "suspense", "infinite-flow", "other"])
@@ -74,7 +81,8 @@ export class BuildRubricDto {
   readingMode!: string;
 
   @ApiProperty({
-    description: "More specific market category, such as 都市神医 or 追妻火葬场.",
+    description:
+      "More specific market category, such as 都市神医 or 追妻火葬场.",
     example: "都市神医",
   })
   @IsString()
@@ -100,7 +108,8 @@ export class BuildRubricDto {
   tags!: string[];
 
   @ApiProperty({
-    description: "Visible keywords that may appear in title, intro, or chapter text.",
+    description:
+      "Visible keywords that may appear in title, intro, or chapter text.",
     example: ["退婚", "银针", "豪门千金"],
   })
   @IsArray()
@@ -116,7 +125,8 @@ export class BuildRubricDto {
   implicitExpectations!: string[];
 
   @ApiProperty({
-    description: "Optional title or synopsis promise to compare against chapter delivery.",
+    description:
+      "Optional title or synopsis promise to compare against chapter delivery.",
     required: false,
     example: "退婚当天，我用九根银针救下豪门千金",
   })

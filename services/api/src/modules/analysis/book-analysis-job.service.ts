@@ -4,16 +4,34 @@ import {
   NotFoundException,
   type OnModuleInit,
 } from "@nestjs/common";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
 import { BookPreprocessResult } from "./text-preprocessor.service";
 
-export type BookAnalysisJobStatus = "queued" | "running" | "succeeded" | "failed";
+export type BookAnalysisJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed";
 
 export interface BookAnalysisJobProgress {
   stage: "queued" | "preprocess" | "map" | "reduce" | "succeeded" | "failed";
   current: number;
   total: number;
   message: string;
+}
+
+export interface BookAnalysisPartialResult {
+  partial: true;
+  type: "book-map-reduce-partial";
+  stage: "map" | "reduce" | "failed";
+  savedAt: string;
+  mapCount: number;
+  totalChapters: number;
+  artifactDir: string;
+  chapterMaps: unknown[];
+  notice: string;
 }
 
 export interface BookAnalysisJobSnapshot {
@@ -33,6 +51,7 @@ export interface BookAnalysisJobSnapshot {
   preprocessing?: Omit<BookPreprocessResult, "chapters"> & {
     chapters: Array<Omit<BookPreprocessResult["chapters"][number], "text">>;
   };
+  partialResult?: BookAnalysisPartialResult;
   result?: unknown;
   error?: string;
 }
@@ -43,6 +62,9 @@ interface StoredBookAnalysisJob extends BookAnalysisJobSnapshot {}
 export class BookAnalysisJobService implements OnModuleInit {
   private readonly logger = new Logger(BookAnalysisJobService.name);
   private readonly jobs = new Map<string, StoredBookAnalysisJob>();
+  private readonly storageRoot =
+    process.env.ANALYSIS_STORAGE_DIR?.trim() ||
+    join(process.cwd(), ".local", "analysis");
 
   constructor(private readonly repository: AnalysisPersistenceRepository) {}
 
@@ -123,10 +145,49 @@ export class BookAnalysisJobService implements OnModuleInit {
     const job = this.read(jobId);
     job.preprocessing = {
       cleaning: preprocessing.cleaning,
-      chapters: preprocessing.chapters.map(({ text: _text, ...chapter }) => chapter),
+      chapters: preprocessing.chapters.map(
+        ({ text: _text, ...chapter }) => chapter,
+      ),
     };
     job.updatedAt = new Date().toISOString();
-    await this.repository.updateJob(jobId, { preprocessing: job.preprocessing });
+    await this.repository.updateJob(jobId, {
+      preprocessing: job.preprocessing,
+    });
+  }
+
+  async recordChapterMap(input: {
+    jobId: string;
+    chapterMap: unknown;
+    chapterMaps: unknown[];
+    totalChapters: number;
+  }) {
+    const job = this.read(input.jobId);
+    const mapCount = input.chapterMaps.length;
+    const artifactDir = join(this.storageRoot, "jobs", input.jobId, "maps");
+    await mkdir(artifactDir, { recursive: true });
+    await writeFile(
+      join(artifactDir, `${String(mapCount).padStart(4, "0")}.json`),
+      JSON.stringify(input.chapterMap, null, 2),
+      "utf8",
+    );
+
+    const now = new Date().toISOString();
+    job.partialResult = {
+      partial: true,
+      type: "book-map-reduce-partial",
+      stage: "map",
+      savedAt: now,
+      mapCount,
+      totalChapters: input.totalChapters,
+      artifactDir,
+      chapterMaps: input.chapterMaps,
+      notice:
+        "这是整书拆解的中间结果。任务失败时可用于查看已完成章节，后续可扩展为断点续跑或半成品导出。",
+    };
+    job.updatedAt = now;
+    await this.repository.updateJob(input.jobId, {
+      partialResult: job.partialResult,
+    });
   }
 
   async complete(jobId: string, result: unknown) {
@@ -157,6 +218,13 @@ export class BookAnalysisJobService implements OnModuleInit {
     job.finishedAt = now;
     job.updatedAt = now;
     job.error = error instanceof Error ? error.message : String(error);
+    if (job.partialResult) {
+      job.partialResult = {
+        ...job.partialResult,
+        stage: "failed",
+        savedAt: now,
+      };
+    }
     job.progress = {
       stage: "failed",
       current: job.progress.current,
@@ -166,6 +234,7 @@ export class BookAnalysisJobService implements OnModuleInit {
     await this.repository.updateJob(jobId, {
       status: job.status,
       progress: job.progress,
+      partialResult: job.partialResult,
       error: job.error,
       finishedAt: now,
     });

@@ -1,0 +1,44 @@
+# Monorepo-level CI. The per-project workflows are kept for targeted checks;
+# this job catches root, workspace, and cross-package changes.
+name: CI - workspace
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "services/**"
+      - "packages/**"
+      - ".github/workflows/ci.yml"
+      - "one.manifest.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    paths:
+      - "apps/**"
+      - "services/**"
+      - "packages/**"
+      - ".github/workflows/ci.yml"
+      - "one.manifest.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run workspace CI
+        run: pnpm run ci

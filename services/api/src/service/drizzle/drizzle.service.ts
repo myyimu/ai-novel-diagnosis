@@ -144,6 +144,7 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         "input_summary" jsonb NOT NULL,
         "progress" jsonb NOT NULL,
         "preprocessing" jsonb,
+        "partial_result" jsonb,
         "result" jsonb,
         "error" text,
         "created_at" timestamp(3) DEFAULT now() NOT NULL,
@@ -151,6 +152,10 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         "started_at" timestamp(3),
         "finished_at" timestamp(3)
       )
+    `);
+    await this.db.execute(sql`
+      ALTER TABLE "book_analysis_jobs"
+      ADD COLUMN IF NOT EXISTS "partial_result" jsonb
     `);
   }
 }

@@ -5,6 +5,8 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
@@ -16,8 +18,13 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { type Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
 import { AnalysisService } from "./analysis.service";
+import {
+  type BookExportFormat,
+  type BookExportMode,
+} from "./book-export.service";
 import { AnalyzeBookDto } from "./dto/analyze-book.dto";
 import { BuildRubricDto } from "./dto/build-rubric.dto";
 import { CreateBookJobFromUploadDto } from "./dto/create-book-job-from-upload.dto";
@@ -41,7 +48,9 @@ export class AnalysisController {
   @Post("preview")
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: "Preview chapter scoring without a real LLM provider" })
+  @ApiOperation({
+    summary: "Preview chapter scoring without a real LLM provider",
+  })
   @ApiResponse({ status: 200, description: "Structured preview score" })
   preview(@Body() body: PreviewAnalysisDto) {
     return this.analysisService.previewScore(body);
@@ -66,7 +75,10 @@ export class AnalysisController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: "Build a critique rubric from a reference chapter" })
-  @ApiResponse({ status: 200, description: "Reference analysis and generated rubric" })
+  @ApiResponse({
+    status: 200,
+    description: "Reference analysis and generated rubric",
+  })
   buildRubric(@Body() body: BuildRubricDto) {
     return this.analysisService.buildRubric(body);
   }
@@ -86,15 +98,20 @@ export class AnalysisController {
   @ApiOperation({
     summary: "Synchronously analyze a full novel text with map-reduce",
   })
-  @ApiResponse({ status: 200, description: "Book-level asset extraction report" })
-  analyzeBook(@Body() body: AnalyzeBookDto) {
+  @ApiResponse({
+    status: 200,
+    description: "Book-level asset extraction report",
+  })
+  analyzeBook(@Body() body: AnalyzeBookDto): Promise<unknown> {
     return this.analysisService.analyzeBook(body);
   }
 
   @Post("book/preprocess")
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: "Clean TXT content and split it into chapter segments" })
+  @ApiOperation({
+    summary: "Clean TXT content and split it into chapter segments",
+  })
   preprocessBook(@Body() body: PreprocessBookDto) {
     return this.analysisService.preprocessBook(body);
   }
@@ -112,6 +129,37 @@ export class AnalysisController {
   @ApiOperation({ summary: "Read async book analysis job status" })
   getBookAnalysisJob(@Param("jobId") jobId: string) {
     return this.analysisService.getBookAnalysisJob(jobId);
+  }
+
+  @Get("book/jobs")
+  @Public()
+  @ApiOperation({ summary: "List recent book analysis jobs" })
+  listBookAnalysisJobs(@Query("limit") limit?: string) {
+    return this.analysisService.listBookAnalysisJobs(
+      limit ? Number(limit) : undefined,
+    );
+  }
+
+  @Get("book/jobs/:jobId/export")
+  @Public()
+  @ApiOperation({ summary: "Export a succeeded book analysis job" })
+  async exportBookAnalysisJob(
+    @Param("jobId") jobId: string,
+    @Query("format") format: BookExportFormat = "markdown",
+    @Query("mode") mode: BookExportMode = "notes",
+    @Res() response: Response,
+  ) {
+    const exported = await this.analysisService.exportBookAnalysisJob(
+      jobId,
+      format,
+      mode,
+    );
+    response.setHeader("content-type", exported.contentType);
+    response.setHeader(
+      "content-disposition",
+      `attachment; filename*=UTF-8''${encodeURIComponent(exported.filename)}`,
+    );
+    response.send(exported.content);
   }
 
   @Post("book/uploads")
@@ -150,15 +198,28 @@ export class AnalysisController {
 
   @Get("book/uploads/:uploadId")
   @Public()
-  @ApiOperation({ summary: "Read uploaded TXT preprocessing and chapter preview" })
+  @ApiOperation({
+    summary: "Read uploaded TXT preprocessing and chapter preview",
+  })
   getBookUpload(@Param("uploadId") uploadId: string) {
     return this.analysisService.getBookUpload(uploadId);
+  }
+
+  @Get("book/uploads")
+  @Public()
+  @ApiOperation({ summary: "List recent uploaded TXT files" })
+  listBookUploads(@Query("limit") limit?: string) {
+    return this.analysisService.listBookUploads(
+      limit ? Number(limit) : undefined,
+    );
   }
 
   @Post("book/uploads/:uploadId/jobs")
   @HttpCode(202)
   @Public()
-  @ApiOperation({ summary: "Create an async map-reduce job from an uploaded TXT" })
+  @ApiOperation({
+    summary: "Create an async map-reduce job from an uploaded TXT",
+  })
   createBookAnalysisJobFromUpload(
     @Param("uploadId") uploadId: string,
     @Body() body: CreateBookJobFromUploadDto,

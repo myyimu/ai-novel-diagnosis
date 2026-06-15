@@ -27,14 +27,22 @@ export class AnalyzeBookDto {
 
   @ApiProperty({
     description: "Genre used to frame the book-level analysis.",
-    enum: ["xuanhuan", "urban", "romance", "suspense", "infinite-flow", "other"],
+    enum: [
+      "xuanhuan",
+      "urban",
+      "romance",
+      "suspense",
+      "infinite-flow",
+      "other",
+    ],
     example: "xuanhuan",
   })
   @IsIn(["xuanhuan", "urban", "romance", "suspense", "infinite-flow", "other"])
   genre!: string;
 
   @ApiProperty({
-    description: "Full or partial novel text. MVP is synchronous; keep samples moderate.",
+    description:
+      "Full or partial novel text. MVP is synchronous; keep samples moderate.",
   })
   @IsString()
   @MinLength(500)

@@ -1,0 +1,136 @@
+# AI小说第一步
+
+AI Novel First Step 是一个本地部署的 AI 小说拆解与质检工具。它的目标不是代写小说，而是帮助新手先拆解成熟样本，生成可参考的写作标准，再检查自己的章节哪里好、哪里差、怎么改。
+
+> Alpha 阶段：当前适合本地试用、功能验证和收集反馈，不建议直接作为生产服务暴露到公网。
+
+## 适合解决什么问题
+
+- 不知道热榜网文到底好在哪里。
+- 不知道自己写的章节哪里有效、哪里空转。
+- 不知道目标平台、读者、分类、关键词会怎样影响章节判断。
+- 想把成熟样本拆成 Rubric，再用同一套标准质检自己的稿子。
+- 想上传整本 TXT，拆出世界观、人物、故事线、大事纪和可导出的写作资产。
+
+## 主要功能
+
+- 单章拆评：拆解成熟参考章节，生成评分 Rubric。
+- 章节质检：按 Rubric 给自己的章节评分，输出证据、短板和改文提示词。
+- 平台画像：支持目标平台、目标读者、阅读场景、分类、主题、标签和关键词。
+- 数据辅助：支持展现量、点击率、阅读 30s/60s、触底率、追更率等表现归因。
+- 整书拆解：上传 TXT，清洗文本、章节切分、异步 Map-Reduce 拆书。
+- 中间结果留存：每章 map 完成后写入本地文件，token 不足或任务失败时不至于白跑。
+- 导出中心：支持 Markdown、JSON、Tavern 角色卡、World Book、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包和 Do Not Copy 清单。
+- 原创化导出：可选择原作拆解笔记或抽象、去标识化后的原创化素材包。
+
+## 技术栈
+
+- Monorepo: One CLI
+- Web: Next.js
+- API: NestJS
+- DB: PostgreSQL / PGlite fallback
+- Package manager: pnpm
+- Model provider: BYOK, OpenAI-compatible
+
+## 支持的模型接入
+
+默认采用用户自带 Key，不持久化保存 API Key。
+
+- mock：本地演示和自动化验证。
+- DeepSeek。
+- 豆包 / 火山方舟。
+- 阿里云百炼 / 通义千问。
+- Ollama 本地模型。
+- 自定义 OpenAI-compatible 接口。
+
+## 本地启动
+
+```bash
+pnpm install
+pnpm run dev:dry-run
+pnpm run dev
+```
+
+`pnpm run dev` 由 One CLI 接管，会按 `one.manifest.json` 中的项目定义启动 `web`、`api` 和 `ai-core`。
+
+单独启动某个项目：
+
+```bash
+pnpm run dev:web
+pnpm run dev:api
+pnpm run dev:core
+```
+
+默认本地地址：
+
+```text
+Web: http://localhost:3001
+API: http://localhost:3000/api/v1
+```
+
+## Workspace
+
+- `apps/web`: Next.js 控制台。
+- `services/api`: NestJS API，负责文本清洗、章节切分、异步任务、整书拆解和导出。
+- `packages/ai-core`: 共享类型、评分指标和分析契约。
+
+## 本地数据
+
+默认不配置 `DATABASE_URL` 时，API 会使用 `.local/pglite` 作为本地开发数据库。
+
+上传文本和整书拆解中间结果默认保存在：
+
+```text
+.local/analysis
+```
+
+其中整书任务的章节 map 会写入：
+
+```text
+.local/analysis/jobs/{jobId}/maps/
+```
+
+`.local` 已被 `.gitignore` 忽略，不应提交上传文本、模型输出或本地数据库。
+
+## Quality Gates
+
+```bash
+pnpm run check
+pnpm run test
+pnpm run build
+pnpm run ci
+```
+
+`check` 会运行各项目的 lint 和格式检查；格式检查只覆盖代码和配置文件，避免修改 One CLI 生成的 `CLAUDE.md` / `AGENTS.md`。
+
+## 当前限制
+
+- 这是 Alpha / MVP，不保证 AI 拆解和评分完全准确。
+- 中间结果已经留存，但断点续跑和半成品导出 UI 还未完整实现。
+- 真实 PostgreSQL 部署时，如果 schema 有变化，需要运行 `pnpm --filter api db:push` 或生成迁移。
+- 当前没有账号系统，更适合本地单人部署。
+- 工具只提供拆解、学习、质检和导出能力；用户需要自行确认上传文本和导出素材的使用权与风险边界。
+
+## 推荐 GitHub Topics
+
+```text
+ai-novel
+webnovel
+novel-analysis
+novel-critique
+writing-tools
+local-first
+byok
+nextjs
+nestjs
+one-cli
+```
+
+## One CLI
+
+工作区真实状态以 `one.manifest.json` 为准。常用命令：
+
+```bash
+one dev --dry-run -o json
+one container info -o json
+```

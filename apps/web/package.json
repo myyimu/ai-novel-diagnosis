@@ -2,15 +2,14 @@
 	"name": "web",
 	"version": "0.1.0",
 	"private": true,
-	"packageManager": "pnpm@10.14.0",
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
-		"format": "oxfmt --check .",
-		"format:fix": "oxfmt --write .",
+		"format": "oxfmt --check package.json next.config.ts postcss.config.mjs components.json tsconfig.json src",
+		"format:fix": "oxfmt --write package.json next.config.ts postcss.config.mjs components.json tsconfig.json src",
 		"check": "pnpm run lint && pnpm run format",
 		"check:fix": "pnpm run lint:fix && pnpm run format:fix"
 	},
@@ -54,5 +53,6 @@
 		"*.{json,md,css,scss,html,yml,yaml}": [
 			"oxfmt --write --no-error-on-unmatched-pattern"
 		]
-	}
+	},
+	"packageManager": "pnpm@10.14.0"
 }

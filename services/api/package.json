@@ -5,38 +5,37 @@
   "description": "Local API for 新手AI小说第一步.",
   "license": "UNLICENSED",
   "author": "",
-  "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:debug": "node --experimental-vm-modules --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest.js --runInBand",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
     "lint": "oxlint .",
-    "format": "oxfmt --check .",
+    "format": "oxfmt --check package.json nest-cli.json tsconfig.json tsconfig.build.json drizzle.config.ts src test drizzle",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "ts-node drizzle/seed.ts",
     "lint:fix": "oxlint --fix .",
-    "format:fix": "oxfmt --write .",
+    "format:fix": "oxfmt --write package.json nest-cli.json tsconfig.json tsconfig.build.json drizzle.config.ts src test drizzle",
     "check": "pnpm run lint && pnpm run format",
     "check:fix": "pnpm run lint:fix && pnpm run format:fix"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.13",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.1.13",
     "@nestjs/swagger": "^11.2.6",
-    "@electric-sql/pglite": "^0.2.17",
     "@willsoto/nestjs-prometheus": "^6.0.2",
     "axios": "^1.13.5",
     "class-transformer": "^0.5.1",
@@ -101,5 +100,6 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     }
-  }
+  },
+  "packageManager": "pnpm@10.14.0"
 }

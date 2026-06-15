@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -32,7 +36,9 @@ export class BookUploadService {
     private readonly textPreprocessor: TextPreprocessorService,
   ) {}
 
-  async createUpload(input: CreateUploadInput): Promise<AnalysisUploadSnapshot> {
+  async createUpload(
+    input: CreateUploadInput,
+  ): Promise<AnalysisUploadSnapshot> {
     if (!input.file?.buffer?.length) {
       throw new BadRequestException("TXT file is required.");
     }
@@ -86,8 +92,11 @@ export class BookUploadService {
   }
 
   toPublicUpload(upload: AnalysisUploadSnapshot) {
-    const { rawTextPath: _rawTextPath, normalizedTextPath: _normalizedTextPath, ...safe } =
-      upload;
+    const {
+      rawTextPath: _rawTextPath,
+      normalizedTextPath: _normalizedTextPath,
+      ...safe
+    } = upload;
     return safe;
   }
 }

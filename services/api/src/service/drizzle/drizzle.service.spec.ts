@@ -16,10 +16,14 @@ describe("DrizzleService", () => {
       delete process.env.DATABASE_URL;
     });
 
-    it("constructs without throwing and exposes a usable db handle", () => {
+    it("constructs without throwing and exposes a usable db handle", async () => {
       const svc = new DrizzleService();
-      expect(svc.db).toBeDefined();
-      expect(svc.isConfigured()).toBe(false);
+      try {
+        expect(svc.db).toBeDefined();
+        expect(svc.isConfigured()).toBe(false);
+      } finally {
+        await svc.onModuleDestroy();
+      }
     });
 
     it("onModuleInit bootstraps the schema in-memory", async () => {
@@ -42,10 +46,14 @@ describe("DrizzleService", () => {
       process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:1/test";
     });
 
-    it("constructs the Postgres driver and marks itself configured", () => {
+    it("constructs the Postgres driver and marks itself configured", async () => {
       const svc = new DrizzleService();
-      expect(svc.db).toBeDefined();
-      expect(svc.isConfigured()).toBe(true);
+      try {
+        expect(svc.db).toBeDefined();
+        expect(svc.isConfigured()).toBe(true);
+      } finally {
+        await svc.onModuleDestroy();
+      }
     });
   });
 
@@ -54,9 +62,13 @@ describe("DrizzleService", () => {
       process.env.DATABASE_URL = "   ";
     });
 
-    it("is treated as empty and falls back to PGlite", () => {
+    it("is treated as empty and falls back to PGlite", async () => {
       const svc = new DrizzleService();
-      expect(svc.isConfigured()).toBe(false);
+      try {
+        expect(svc.isConfigured()).toBe(false);
+      } finally {
+        await svc.onModuleDestroy();
+      }
     });
   });
 });

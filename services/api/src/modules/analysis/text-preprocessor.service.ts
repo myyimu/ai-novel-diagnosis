@@ -58,7 +58,10 @@ export class TextPreprocessorService {
       .trim();
   }
 
-  private splitChapters(text: string, maxChapterChars: number): ChapterSegment[] {
+  private splitChapters(
+    text: string,
+    maxChapterChars: number,
+  ): ChapterSegment[] {
     const headingPattern =
       /^\s*((?:第[零〇一二两三四五六七八九十百千万\d]+[章节回卷部集][^\n]{0,60})|(?:Chapter\s+\d+[^\n]{0,60})|(?:\d{1,4}[、.．]\s*[^\n]{1,60}))\s*$/gim;
     const matches = [...text.matchAll(headingPattern)].filter(
@@ -101,7 +104,12 @@ export class TextPreprocessorService {
 
     return segments.flatMap((segment) =>
       segment.charCount > maxChapterChars
-        ? this.autoChunk(segment.text, maxChapterChars, segment.title, segment.order)
+        ? this.autoChunk(
+            segment.text,
+            maxChapterChars,
+            segment.title,
+            segment.order,
+          )
         : [segment],
     );
   }
@@ -116,7 +124,11 @@ export class TextPreprocessorService {
       .split(/\n{2,}/)
       .map((item) => item.trim())
       .filter(Boolean);
-    const chunks: Array<{ text: string; startOffset: number; endOffset: number }> = [];
+    const chunks: Array<{
+      text: string;
+      startOffset: number;
+      endOffset: number;
+    }> = [];
     let current = "";
     let startOffset = 0;
     let cursor = 0;
@@ -148,7 +160,8 @@ export class TextPreprocessorService {
     return chunks.map((chunk, index) =>
       this.createSegment({
         order: baseOrder ? baseOrder + index : index + 1,
-        title: chunks.length === 1 ? titlePrefix : `${titlePrefix} ${index + 1}`,
+        title:
+          chunks.length === 1 ? titlePrefix : `${titlePrefix} ${index + 1}`,
         text: chunk.text,
         startOffset: chunk.startOffset,
         endOffset: chunk.endOffset,

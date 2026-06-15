@@ -17,9 +17,8 @@ import { Toaster } from "@/components/ui/sonner";
 
 export async function generateMetadata(): Promise<Metadata> {
 	return {
-		title: "新手AI小说第一步 | AI网文点评官",
-		description:
-			"本地部署的 AI 网文拆书、评分与改稿质检工具，适合新手学习怎么用 AI 写小说。",
+		title: "AI小说第一步 | AI Novel First Step",
+		description: "本地部署的 AI 网文拆书、评分与改稿质检工具，适合新手学习怎么用 AI 写小说。",
 	};
 }
 

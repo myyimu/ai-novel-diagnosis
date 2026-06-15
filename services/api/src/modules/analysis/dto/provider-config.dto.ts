@@ -32,7 +32,8 @@ export class ProviderConfigDto {
   kind!: "mock" | "openai-compatible";
 
   @ApiPropertyOptional({
-    description: "OpenAI-compatible base URL, for example Volcengine Ark or DeepSeek.",
+    description:
+      "OpenAI-compatible base URL, for example Volcengine Ark or DeepSeek.",
     example: "https://ark.cn-beijing.volces.com/api/v3",
   })
   @IsOptional()
@@ -40,7 +41,8 @@ export class ProviderConfigDto {
   baseUrl?: string;
 
   @ApiPropertyOptional({
-    description: "User-owned API key. The MVP sends it per request and does not persist it.",
+    description:
+      "User-owned API key. The MVP sends it per request and does not persist it.",
     example: "sk-...",
   })
   @IsOptional()

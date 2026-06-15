@@ -51,6 +51,7 @@ export const bookAnalysisJobs = pgTable("book_analysis_jobs", {
   inputSummary: jsonb("input_summary").notNull(),
   progress: jsonb("progress").notNull(),
   preprocessing: jsonb("preprocessing"),
+  partialResult: jsonb("partial_result"),
   result: jsonb("result"),
   error: text("error"),
   createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),

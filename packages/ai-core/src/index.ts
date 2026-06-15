@@ -1,18 +1,6 @@
-export type Genre =
-  | "xuanhuan"
-  | "urban"
-  | "romance"
-  | "suspense"
-  | "infinite-flow"
-  | "other";
+export type Genre = "xuanhuan" | "urban" | "romance" | "suspense" | "infinite-flow" | "other";
 
-export type ProviderKind =
-  | "mock"
-  | "openai-compatible"
-  | "ollama"
-  | "doubao"
-  | "deepseek"
-  | "qwen";
+export type ProviderKind = "mock" | "openai-compatible" | "ollama" | "doubao" | "deepseek" | "qwen";
 
 export interface LLMProviderConfig {
   id: string;

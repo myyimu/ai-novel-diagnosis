@@ -3,6 +3,7 @@ import { AnalysisController } from "./analysis.controller";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
 import { AnalysisService } from "./analysis.service";
 import { BookAnalysisJobService } from "./book-analysis-job.service";
+import { BookExportService } from "./book-export.service";
 import { BookUploadService } from "./book-upload.service";
 import { ModelProviderService } from "./model-provider.service";
 import { TextPreprocessorService } from "./text-preprocessor.service";
@@ -13,6 +14,7 @@ import { TextPreprocessorService } from "./text-preprocessor.service";
     AnalysisService,
     AnalysisPersistenceRepository,
     BookAnalysisJobService,
+    BookExportService,
     BookUploadService,
     ModelProviderService,
     TextPreprocessorService,

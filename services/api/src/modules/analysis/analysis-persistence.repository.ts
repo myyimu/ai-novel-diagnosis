@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { DrizzleService } from "@/service/drizzle/drizzle.service";
 import {
   analysisUploads,
@@ -56,7 +56,9 @@ export class AnalysisPersistenceRepository {
     return this.uploadSnapshot(row);
   }
 
-  async getUpload(uploadId: string): Promise<AnalysisUploadSnapshot | undefined> {
+  async getUpload(
+    uploadId: string,
+  ): Promise<AnalysisUploadSnapshot | undefined> {
     const [row] = await this.drizzle.db
       .select()
       .from(analysisUploads)
@@ -64,6 +66,16 @@ export class AnalysisPersistenceRepository {
       .limit(1);
 
     return row ? this.uploadSnapshot(row) : undefined;
+  }
+
+  async listUploads(limit = 20): Promise<AnalysisUploadSnapshot[]> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(analysisUploads)
+      .orderBy(desc(analysisUploads.created))
+      .limit(Math.min(Math.max(limit, 1), 100));
+
+    return rows.map((row) => this.uploadSnapshot(row));
   }
 
   async createJob(
@@ -80,6 +92,7 @@ export class AnalysisPersistenceRepository {
         inputSummary: job.inputSummary,
         progress: job.progress,
         preprocessing: job.preprocessing,
+        partialResult: job.partialResult,
         result: job.result,
         error: job.error,
         createdAt: new Date(job.createdAt),
@@ -102,12 +115,23 @@ export class AnalysisPersistenceRepository {
     return row ? this.jobSnapshot(row) : undefined;
   }
 
+  async listJobs(limit = 20): Promise<BookAnalysisJobSnapshot[]> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(bookAnalysisJobs)
+      .orderBy(desc(bookAnalysisJobs.createdAt))
+      .limit(Math.min(Math.max(limit, 1), 100));
+
+    return rows.map((row) => this.jobSnapshot(row));
+  }
+
   async updateJob(
     jobId: string,
     patch: Partial<{
       status: BookAnalysisJobStatus;
       progress: BookAnalysisJobProgress;
       preprocessing: BookAnalysisJobSnapshot["preprocessing"];
+      partialResult: BookAnalysisJobSnapshot["partialResult"];
       result: unknown;
       error: string | null;
       startedAt: string | null;
@@ -120,7 +144,10 @@ export class AnalysisPersistenceRepository {
 
     if (patch.status !== undefined) values.status = patch.status;
     if (patch.progress !== undefined) values.progress = patch.progress;
-    if (patch.preprocessing !== undefined) values.preprocessing = patch.preprocessing;
+    if (patch.preprocessing !== undefined)
+      values.preprocessing = patch.preprocessing;
+    if (patch.partialResult !== undefined)
+      values.partialResult = patch.partialResult;
     if (patch.result !== undefined) values.result = patch.result;
     if (patch.error !== undefined) values.error = patch.error;
     if (patch.startedAt !== undefined) {
@@ -145,7 +172,8 @@ export class AnalysisPersistenceRepository {
       .update(bookAnalysisJobs)
       .set({
         status: "failed",
-        error: "服务重启后无法继续未完成任务。请重新提交，用户模型 Key 不会持久化保存。",
+        error:
+          "服务重启后无法继续未完成任务。请重新提交，用户模型 Key 不会持久化保存。",
         progress: {
           stage: "failed",
           current: 0,
@@ -186,7 +214,10 @@ export class AnalysisPersistenceRepository {
       finishedAt: row.finishedAt?.toISOString(),
       inputSummary: row.inputSummary as BookAnalysisJobSnapshot["inputSummary"],
       progress: row.progress as BookAnalysisJobProgress,
-      preprocessing: row.preprocessing as BookAnalysisJobSnapshot["preprocessing"],
+      preprocessing:
+        row.preprocessing as BookAnalysisJobSnapshot["preprocessing"],
+      partialResult:
+        row.partialResult as BookAnalysisJobSnapshot["partialResult"],
       result: row.result,
       error: row.error ?? undefined,
     };

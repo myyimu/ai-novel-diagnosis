@@ -12,6 +12,7 @@ export interface ProviderPreset {
   kind: ProviderConfigDto["kind"];
   baseUrl: string;
   model: string;
+  modelOptions?: string[];
   jsonMode: boolean;
   needsApiKey: boolean;
 }
@@ -23,6 +24,7 @@ const providerPresets: ProviderPreset[] = [
     kind: "openai-compatible",
     baseUrl: "",
     model: "",
+    modelOptions: [],
     jsonMode: false,
     needsApiKey: true,
   },
@@ -32,6 +34,7 @@ const providerPresets: ProviderPreset[] = [
     kind: "openai-compatible",
     baseUrl: "https://api.deepseek.com/v1",
     model: "deepseek-chat",
+    modelOptions: ["deepseek-chat", "deepseek-reasoner"],
     jsonMode: false,
     needsApiKey: true,
   },
@@ -41,15 +44,32 @@ const providerPresets: ProviderPreset[] = [
     kind: "openai-compatible",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     model: "doubao-seed-1-6",
+    modelOptions: ["doubao-seed-1-6"],
     jsonMode: false,
     needsApiKey: true,
   },
   {
     id: "qwen",
-    label: "通义千问",
+    label: "阿里云百炼/通义千问",
     kind: "openai-compatible",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     model: "qwen-plus",
+    modelOptions: [
+      "qwen-plus",
+      "qwen-plus-latest",
+      "qwen3-max",
+      "qwen3-max-preview",
+      "qwen-max",
+      "qwen-max-latest",
+      "qwen-flash",
+      "qwen-turbo",
+      "qwen-turbo-latest",
+      "qwen3.5-plus",
+      "qwen3.5-flash",
+      "qwen3-coder-plus",
+      "qwen3-coder-flash",
+      "qwq-plus",
+    ],
     jsonMode: false,
     needsApiKey: true,
   },
@@ -59,6 +79,7 @@ const providerPresets: ProviderPreset[] = [
     kind: "openai-compatible",
     baseUrl: "http://localhost:11434/v1",
     model: "qwen2.5:7b",
+    modelOptions: ["qwen2.5:7b", "qwen3:8b", "llama3.1:8b"],
     jsonMode: false,
     needsApiKey: false,
   },
@@ -104,7 +125,9 @@ export class ModelProviderService {
   async chat(provider: ProviderConfigDto, messages: ProviderMessage[]) {
     const resolved = this.resolve(provider);
     if (resolved.kind === "mock") {
-      throw new BadRequestException("Mock provider does not support chat calls.");
+      throw new BadRequestException(
+        "Mock provider does not support chat calls.",
+      );
     }
 
     return this.callOpenAICompatible(resolved, messages);
@@ -179,7 +202,9 @@ export class ModelProviderService {
     };
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      throw new BadRequestException("Provider response did not include message content.");
+      throw new BadRequestException(
+        "Provider response did not include message content.",
+      );
     }
 
     return content;
