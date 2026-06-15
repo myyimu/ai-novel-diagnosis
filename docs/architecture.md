@@ -73,9 +73,15 @@ Performance Snapshot 当前覆盖：
 
 ## Book Asset Analysis
 
-整书拆解接口：`POST /api/v1/analysis/book`
+整书拆解接口：
 
-MVP 支持粘贴或上传 TXT 后同步拆解，输出：
+- `POST /api/v1/analysis/book/uploads`: 上传 TXT，保存原始文本和清洗文本，返回章节切分预览。
+- `GET /api/v1/analysis/book/uploads/:uploadId`: 读取上传记录和章节预览。
+- `POST /api/v1/analysis/book/uploads/:uploadId/jobs`: 基于已上传 TXT 创建整书 Map-Reduce 异步任务。
+- `GET /api/v1/analysis/book/jobs/:jobId`: 查询任务状态、进度、结果或失败原因。
+- `POST /api/v1/analysis/book`: 兼容旧同步调用，内部也走 Map-Reduce 核心。
+
+MVP 支持上传 TXT 后先预览章节切分，再启动整书拆解任务，输出：
 
 - 世界观：世界规则、能力体系、地点、势力、专有名词风险。
 - 人物：角色原型、性格底色、欲望、创伤、能力功能、原创化角色卡。
@@ -90,16 +96,15 @@ MVP 支持粘贴或上传 TXT 后同步拆解，输出：
 
 产品原则：工具不预设用户意图，允许同时保留“原作拆解笔记”和“原创化导出包”。原作拆解笔记用于读书笔记、学习分析、合法授权素材整理或个人私用角色扮演；原创化导出包用于低风险迁移。界面必须明确风险提示，默认不鼓励未授权商业化复制原作姓名、专有名词、人物关系网、关键事件链或世界历史具体事件。
 
-后续需要把同步接口升级为：
-
 ```text
 TXT 上传
--> 清洗/切章
+-> 保存 raw.txt 和 normalized.txt
+-> 清洗/切章预览
+-> 用户确认后创建 book_analysis_jobs
 -> 每章 Map 分析
--> 分卷 Reduce 归纳
--> 全书 Global 汇总
--> 资产库入库
--> 图谱/时间线/世界书导出
+-> 全书 Reduce 归纳
+-> 任务结果持久化
+-> 图谱/时间线/世界书展示和导出
 ```
 
 ## Model Provider
@@ -108,10 +113,10 @@ TXT 上传
 
 - `mock`: 本地开发和自动化测试。
 - `openai-compatible`: 兼容 OpenAI 风格接口的远程或本地模型。
-- `ollama`: 本地模型。
-- `doubao` / `deepseek` / `qwen`: 作为预设配置，本质仍走统一 Provider 接口。
+- 供应商预设：`deepseek`、`doubao`、`qwen`、`ollama`、`custom`。
+- `doubao` / `deepseek` / `qwen` / `ollama` 本质仍走统一 `ModelProviderService`，对业务层暴露 `chat()` 和 `test()`。
 
-后端只保存加密后的 Key；日志不得打印 Key、正文全文和模型原始响应。
+用户 Key 随请求进入本地 API，不持久化；日志不得打印 Key、正文全文和模型原始响应。后续如果做本地模型配置保存，需要先实现本地加密存储和显式授权。
 
 ## API Skeleton
 
@@ -120,10 +125,15 @@ TXT 上传
 - `POST /api/v1/analysis/provider/test`: 测试 mock 或 OpenAI-compatible Provider。
 - `POST /api/v1/analysis/rubric`: 从成熟章节生成原则和 Rubric。
 - `POST /api/v1/analysis/score`: 用 Rubric 质检用户章节。
+- `POST /api/v1/analysis/book/preprocess`: 直接对文本做清洗和章节切分预览。
+- `POST /api/v1/analysis/book/uploads`: 上传 TXT 并生成持久化章节预览。
+- `GET /api/v1/analysis/book/uploads/:uploadId`: 读取上传预览。
+- `POST /api/v1/analysis/book/uploads/:uploadId/jobs`: 从上传文本创建整书异步任务。
+- `GET /api/v1/analysis/book/jobs/:jobId`: 查询整书异步任务状态。
 
-当前 MVP 先采用同步接口验证评分质量；Provider Key 随本次请求进入本地 API，不持久化。后续要把同步分析拆成异步任务，并把模型配置改为本地加密存储。
+Provider Key 随本次请求进入本地 API，不持久化。任务状态、清洗预览和结果会持久化；如果服务重启时任务仍处于 `queued` 或 `running`，系统会把任务标记为 `failed` 并要求用户重新提交，因为恢复远程模型任务需要用户重新提供 Key。
 
-后续要把同步 preview 拆成异步任务：
+后续可把当前本地任务执行器替换为 Redis/BullMQ Worker：
 
 ```text
 analysis_jobs
@@ -135,10 +145,10 @@ analysis_jobs
 
 ## Storage Plan
 
-- PostgreSQL: 用户项目、章节、评分表、报告、模型配置密文。
+- PGlite/PostgreSQL: 用户项目、上传记录、章节预览、任务状态、评分表、报告。
 - pgvector: 原则库、同题材案例检索。
-- Redis: 异步任务队列和短期任务状态。
-- MinIO: 原始上传文件和导出报告。
+- Redis: 后续承接分布式异步任务队列和短期任务状态。
+- Local FS / MinIO: 原始上传文件、清洗后文本和导出报告。MVP 默认使用 `.local/analysis`。
 
 ## Naming
 

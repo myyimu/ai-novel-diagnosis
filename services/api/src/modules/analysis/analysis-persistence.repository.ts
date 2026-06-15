@@ -1,0 +1,194 @@
+import { Injectable } from "@nestjs/common";
+import { eq, inArray } from "drizzle-orm";
+import { DrizzleService } from "@/service/drizzle/drizzle.service";
+import {
+  analysisUploads,
+  bookAnalysisJobs,
+  type AnalysisUploadSelect,
+  type BookAnalysisJobSelect,
+} from "@/service/drizzle/schema";
+import {
+  type BookAnalysisJobProgress,
+  type BookAnalysisJobSnapshot,
+  type BookAnalysisJobStatus,
+} from "./book-analysis-job.service";
+import { type BookPreprocessResult } from "./text-preprocessor.service";
+
+export interface AnalysisUploadSnapshot {
+  id: string;
+  title: string;
+  genre: string;
+  originalFilename: string;
+  rawTextPath: string;
+  normalizedTextPath: string;
+  rawLength: number;
+  cleanedLength: number;
+  chapterCount: number;
+  preprocessing: BookPreprocessResult;
+  createdAt: string;
+  updatedAt: string;
+}
+
+@Injectable()
+export class AnalysisPersistenceRepository {
+  constructor(private readonly drizzle: DrizzleService) {}
+
+  async createUpload(input: {
+    title: string;
+    genre: string;
+    originalFilename: string;
+    rawTextPath: string;
+    normalizedTextPath: string;
+    rawLength: number;
+    cleanedLength: number;
+    chapterCount: number;
+    preprocessing: BookPreprocessResult;
+  }): Promise<AnalysisUploadSnapshot> {
+    const [row] = await this.drizzle.db
+      .insert(analysisUploads)
+      .values({
+        ...input,
+        preprocessing: input.preprocessing,
+        updated: new Date(),
+      })
+      .returning();
+
+    return this.uploadSnapshot(row);
+  }
+
+  async getUpload(uploadId: string): Promise<AnalysisUploadSnapshot | undefined> {
+    const [row] = await this.drizzle.db
+      .select()
+      .from(analysisUploads)
+      .where(eq(analysisUploads.id, uploadId))
+      .limit(1);
+
+    return row ? this.uploadSnapshot(row) : undefined;
+  }
+
+  async createJob(
+    job: BookAnalysisJobSnapshot,
+    uploadId?: string,
+  ): Promise<BookAnalysisJobSnapshot> {
+    const [row] = await this.drizzle.db
+      .insert(bookAnalysisJobs)
+      .values({
+        id: job.id,
+        uploadId,
+        type: job.type,
+        status: job.status,
+        inputSummary: job.inputSummary,
+        progress: job.progress,
+        preprocessing: job.preprocessing,
+        result: job.result,
+        error: job.error,
+        createdAt: new Date(job.createdAt),
+        updatedAt: new Date(job.updatedAt),
+        startedAt: job.startedAt ? new Date(job.startedAt) : undefined,
+        finishedAt: job.finishedAt ? new Date(job.finishedAt) : undefined,
+      })
+      .returning();
+
+    return this.jobSnapshot(row);
+  }
+
+  async getJob(jobId: string): Promise<BookAnalysisJobSnapshot | undefined> {
+    const [row] = await this.drizzle.db
+      .select()
+      .from(bookAnalysisJobs)
+      .where(eq(bookAnalysisJobs.id, jobId))
+      .limit(1);
+
+    return row ? this.jobSnapshot(row) : undefined;
+  }
+
+  async updateJob(
+    jobId: string,
+    patch: Partial<{
+      status: BookAnalysisJobStatus;
+      progress: BookAnalysisJobProgress;
+      preprocessing: BookAnalysisJobSnapshot["preprocessing"];
+      result: unknown;
+      error: string | null;
+      startedAt: string | null;
+      finishedAt: string | null;
+    }>,
+  ): Promise<BookAnalysisJobSnapshot | undefined> {
+    const values: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+
+    if (patch.status !== undefined) values.status = patch.status;
+    if (patch.progress !== undefined) values.progress = patch.progress;
+    if (patch.preprocessing !== undefined) values.preprocessing = patch.preprocessing;
+    if (patch.result !== undefined) values.result = patch.result;
+    if (patch.error !== undefined) values.error = patch.error;
+    if (patch.startedAt !== undefined) {
+      values.startedAt = patch.startedAt ? new Date(patch.startedAt) : null;
+    }
+    if (patch.finishedAt !== undefined) {
+      values.finishedAt = patch.finishedAt ? new Date(patch.finishedAt) : null;
+    }
+
+    const [row] = await this.drizzle.db
+      .update(bookAnalysisJobs)
+      .set(values)
+      .where(eq(bookAnalysisJobs.id, jobId))
+      .returning();
+
+    return row ? this.jobSnapshot(row) : undefined;
+  }
+
+  async markInterruptedJobsFailed() {
+    const now = new Date();
+    await this.drizzle.db
+      .update(bookAnalysisJobs)
+      .set({
+        status: "failed",
+        error: "服务重启后无法继续未完成任务。请重新提交，用户模型 Key 不会持久化保存。",
+        progress: {
+          stage: "failed",
+          current: 0,
+          total: 1,
+          message: "服务重启后任务已中断，请重新提交。",
+        },
+        updatedAt: now,
+        finishedAt: now,
+      })
+      .where(inArray(bookAnalysisJobs.status, ["queued", "running"]));
+  }
+
+  private uploadSnapshot(row: AnalysisUploadSelect): AnalysisUploadSnapshot {
+    return {
+      id: row.id,
+      title: row.title,
+      genre: row.genre,
+      originalFilename: row.originalFilename,
+      rawTextPath: row.rawTextPath,
+      normalizedTextPath: row.normalizedTextPath,
+      rawLength: row.rawLength,
+      cleanedLength: row.cleanedLength,
+      chapterCount: row.chapterCount,
+      preprocessing: row.preprocessing as BookPreprocessResult,
+      createdAt: row.created.toISOString(),
+      updatedAt: row.updated.toISOString(),
+    };
+  }
+
+  private jobSnapshot(row: BookAnalysisJobSelect): BookAnalysisJobSnapshot {
+    return {
+      id: row.id,
+      type: "book-map-reduce-analysis",
+      status: row.status as BookAnalysisJobStatus,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      startedAt: row.startedAt?.toISOString(),
+      finishedAt: row.finishedAt?.toISOString(),
+      inputSummary: row.inputSummary as BookAnalysisJobSnapshot["inputSummary"],
+      progress: row.progress as BookAnalysisJobProgress,
+      preprocessing: row.preprocessing as BookAnalysisJobSnapshot["preprocessing"],
+      result: row.result,
+      error: row.error ?? undefined,
+    };
+  }
+}

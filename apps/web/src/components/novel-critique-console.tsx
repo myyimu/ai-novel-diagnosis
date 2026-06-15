@@ -16,8 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type ProviderKind = "mock" | "openai-compatible";
+type ProviderPresetId = "custom" | "deepseek" | "doubao" | "qwen" | "ollama";
 
 interface ProviderForm {
+	preset: ProviderPresetId;
 	kind: ProviderKind;
 	baseUrl: string;
 	apiKey: string;
@@ -25,6 +27,59 @@ interface ProviderForm {
 	temperature: number;
 	jsonMode: boolean;
 }
+
+const providerPresets: Record<
+	ProviderPresetId,
+	{
+		label: string;
+		kind: ProviderKind;
+		baseUrl: string;
+		model: string;
+		jsonMode: boolean;
+		needsApiKey: boolean;
+	}
+> = {
+	custom: {
+		label: "自定义",
+		kind: "openai-compatible",
+		baseUrl: "",
+		model: "",
+		jsonMode: false,
+		needsApiKey: true,
+	},
+	deepseek: {
+		label: "DeepSeek",
+		kind: "openai-compatible",
+		baseUrl: "https://api.deepseek.com/v1",
+		model: "deepseek-chat",
+		jsonMode: false,
+		needsApiKey: true,
+	},
+	doubao: {
+		label: "豆包/火山方舟",
+		kind: "openai-compatible",
+		baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+		model: "doubao-seed-1-6",
+		jsonMode: false,
+		needsApiKey: true,
+	},
+	qwen: {
+		label: "通义千问",
+		kind: "openai-compatible",
+		baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+		model: "qwen-plus",
+		jsonMode: false,
+		needsApiKey: true,
+	},
+	ollama: {
+		label: "Ollama 本地模型",
+		kind: "openai-compatible",
+		baseUrl: "http://localhost:11434/v1",
+		model: "qwen2.5:7b",
+		jsonMode: false,
+		needsApiKey: false,
+	},
+};
 
 interface ApiEnvelope<T> {
 	code: number;
@@ -252,6 +307,67 @@ interface BookAnalysisResult {
 		higherRiskUse: string[];
 		userResponsibility: string;
 	};
+	preprocessing?: BookPreprocessingPreview;
+	mapReduce?: {
+		strategy: string;
+		mapCount: number;
+		chapterMaps: Array<{
+			chapterId: string;
+			order: number;
+			title: string;
+			summary: string;
+			plotFunction: string;
+			hook: string;
+		}>;
+		reducerNote: string;
+	};
+}
+
+interface BookPreprocessingPreview {
+	cleaning: {
+		rawLength: number;
+		cleanedLength: number;
+		paragraphCount: number;
+		removedNoise: string[];
+	};
+	chapters: Array<{
+		id: string;
+		order: number;
+		title: string;
+		charCount: number;
+		wordCount: number;
+		startOffset: number;
+		endOffset: number;
+		splitBy: "heading" | "auto-chunk";
+	}>;
+}
+
+interface BookAnalysisJob {
+	id: string;
+	type: "book-map-reduce-analysis";
+	status: "queued" | "running" | "succeeded" | "failed";
+	progress: {
+		stage: "queued" | "preprocess" | "map" | "reduce" | "succeeded" | "failed";
+		current: number;
+		total: number;
+		message: string;
+	};
+	preprocessing?: BookPreprocessingPreview;
+	result?: BookAnalysisResult;
+	error?: string;
+}
+
+interface BookUploadPreview {
+	id: string;
+	title: string;
+	genre: string;
+	originalFilename: string;
+	rawLength: number;
+	cleanedLength: number;
+	chapterCount: number;
+	preprocessing: BookPreprocessingPreview;
+	createdAt: string;
+	updatedAt: string;
 }
 
 const apiBaseUrl =
@@ -310,8 +426,37 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 	return payload.data;
 }
 
+async function postForm<T>(path: string, body: FormData): Promise<T> {
+	const response = await fetch(`${apiBaseUrl}${path}`, {
+		method: "POST",
+		body,
+	});
+
+	const payload = (await response.json()) as ApiEnvelope<T>;
+	if (!response.ok || payload.code !== 0) {
+		throw new Error(payload.message || `Request failed: ${response.status}`);
+	}
+
+	return payload.data;
+}
+
+async function getJson<T>(path: string): Promise<T> {
+	const response = await fetch(`${apiBaseUrl}${path}`);
+	const payload = (await response.json()) as ApiEnvelope<T>;
+	if (!response.ok || payload.code !== 0) {
+		throw new Error(payload.message || `Request failed: ${response.status}`);
+	}
+
+	return payload.data;
+}
+
+function wait(ms: number) {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export function NovelCritiqueConsole() {
 	const [provider, setProvider] = useState<ProviderForm>({
+		preset: "deepseek",
 		kind: "mock",
 		baseUrl: "https://api.deepseek.com/v1",
 		apiKey: "",
@@ -346,17 +491,21 @@ export function NovelCritiqueConsole() {
 	const [bookTitle, setBookTitle] = useState("示例长篇小说");
 	const [bookGenre, setBookGenre] = useState("xuanhuan");
 	const [bookText, setBookText] = useState(defaultBookText);
+	const [bookFile, setBookFile] = useState<File | null>(null);
+	const [bookUpload, setBookUpload] = useState<BookUploadPreview | null>(null);
 	const [rubricResult, setRubricResult] = useState<RubricResult | null>(null);
 	const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
 	const [bookAnalysisResult, setBookAnalysisResult] =
 		useState<BookAnalysisResult | null>(null);
+	const [bookJob, setBookJob] = useState<BookAnalysisJob | null>(null);
 	const [status, setStatus] = useState<string>("mock 模式可直接验证流程");
 	const [loading, setLoading] = useState<
-		"provider" | "rubric" | "score" | "book" | null
+		"provider" | "rubric" | "score" | "upload" | "book" | null
 	>(null);
 
 	const providerPayload = useMemo(
 		() => ({
+			preset: provider.preset,
 			kind: provider.kind,
 			baseUrl: provider.baseUrl,
 			apiKey: provider.apiKey,
@@ -380,6 +529,19 @@ export function NovelCritiqueConsole() {
 		} finally {
 			setLoading(null);
 		}
+	}
+
+	function applyProviderPreset(presetId: ProviderPresetId) {
+		const preset = providerPresets[presetId];
+		setProvider((current) => ({
+			...current,
+			preset: presetId,
+			kind: preset.kind,
+			baseUrl: preset.baseUrl,
+			model: preset.model,
+			jsonMode: preset.jsonMode,
+			apiKey: preset.needsApiKey ? current.apiKey : "",
+		}));
 	}
 
 	async function buildRubric() {
@@ -454,20 +616,84 @@ export function NovelCritiqueConsole() {
 
 	async function analyzeBook() {
 		setLoading("book");
-		setStatus("正在拆解整本小说资产...");
+		setBookAnalysisResult(null);
+		setBookJob(null);
+		setStatus("正在准备上传文本并创建整书异步拆解任务...");
 		try {
-			const result = await postJson<BookAnalysisResult>("/analysis/book", {
-				provider: providerPayload,
-				title: bookTitle,
-				genre: bookGenre,
-				text: bookText,
-			});
-			setBookAnalysisResult(result);
-			setStatus(`整书拆解完成：${result.characters.length} 张角色卡`);
+			const upload = bookUpload ?? (await uploadBookForPreview(false));
+			const createdUploadJob = await postJson<BookAnalysisJob>(
+				`/analysis/book/uploads/${upload.id}/jobs`,
+				{
+					provider: providerPayload,
+				},
+			);
+			setBookJob(createdUploadJob);
+			setStatus(`任务已创建：${createdUploadJob.id}`);
+
+			let latestJob = createdUploadJob;
+			for (let attempt = 0; attempt < 120; attempt += 1) {
+				await wait(1000);
+				latestJob = await getJson<BookAnalysisJob>(
+					`/analysis/book/jobs/${createdUploadJob.id}`,
+				);
+				setBookJob(latestJob);
+				setStatus(latestJob.progress.message);
+
+				if (latestJob.status === "succeeded") {
+					if (latestJob.result) {
+						setBookAnalysisResult(latestJob.result);
+						setStatus(
+							`整书拆解完成：${latestJob.result.characters.length} 张角色卡，${latestJob.result.mapReduce?.mapCount ?? 0} 个章节 map`,
+						);
+					}
+					return;
+				}
+
+				if (latestJob.status === "failed") {
+					throw new Error(latestJob.error || "整书拆解任务失败");
+				}
+			}
+
+			throw new Error("整书拆解任务仍在运行，请稍后查询 job 状态。");
 		} catch (error) {
 			setStatus((error as Error).message);
 		} finally {
 			setLoading(null);
+		}
+	}
+
+	async function uploadBookForPreview(manageLoading = true) {
+		if (manageLoading) {
+			setLoading("upload");
+		}
+		setBookAnalysisResult(null);
+		setBookJob(null);
+		setStatus("正在上传 TXT 并生成章节预览...");
+		try {
+			const formData = new FormData();
+			const file =
+				bookFile ??
+				new File([bookText], `${bookTitle || "novel"}.txt`, {
+					type: "text/plain",
+				});
+			formData.append("file", file);
+			formData.append("title", bookTitle);
+			formData.append("genre", bookGenre);
+
+			const upload = await postForm<BookUploadPreview>(
+				"/analysis/book/uploads",
+				formData,
+			);
+			setBookUpload(upload);
+			setStatus(`章节预览完成：${upload.chapterCount} 个章节片段`);
+			return upload;
+		} catch (error) {
+			setStatus((error as Error).message);
+			throw error;
+		} finally {
+			if (manageLoading) {
+				setLoading(null);
+			}
 		}
 	}
 
@@ -477,8 +703,12 @@ export function NovelCritiqueConsole() {
 		}
 
 		const text = await file.text();
+		setBookFile(file);
 		setBookTitle(file.name.replace(/\.[^.]+$/, ""));
 		setBookText(text);
+		setBookUpload(null);
+		setBookAnalysisResult(null);
+		setBookJob(null);
 	}
 
 	return (
@@ -551,9 +781,9 @@ export function NovelCritiqueConsole() {
 						</Button>
 					</div>
 
-					<div className="mt-5 grid gap-4 md:grid-cols-2">
+					<div className="mt-5 grid gap-4 md:grid-cols-3">
 						<div className="space-y-2">
-							<Label>Provider</Label>
+							<Label>模式</Label>
 							<select
 								className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
 								value={provider.kind}
@@ -569,12 +799,29 @@ export function NovelCritiqueConsole() {
 							</select>
 						</div>
 						<div className="space-y-2">
+							<Label>供应商预设</Label>
+							<select
+								className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+								value={provider.preset}
+								onChange={(event) =>
+									applyProviderPreset(event.target.value as ProviderPresetId)
+								}
+							>
+								{Object.entries(providerPresets).map(([id, preset]) => (
+									<option key={id} value={id}>
+										{preset.label}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className="space-y-2">
 							<Label>Model</Label>
 							<Input
 								value={provider.model}
 								onChange={(event) =>
 									setProvider((current) => ({
 										...current,
+										preset: "custom",
 										model: event.target.value,
 									}))
 								}
@@ -587,6 +834,7 @@ export function NovelCritiqueConsole() {
 								onChange={(event) =>
 									setProvider((current) => ({
 										...current,
+										preset: "custom",
 										baseUrl: event.target.value,
 									}))
 								}
@@ -603,7 +851,11 @@ export function NovelCritiqueConsole() {
 										apiKey: event.target.value,
 									}))
 								}
-								placeholder="mock 模式可留空"
+								placeholder={
+									providerPresets[provider.preset].needsApiKey
+										? "用户自己的 API Key，不会保存"
+										: "本地模型可留空"
+								}
 							/>
 						</div>
 					</div>
@@ -868,12 +1120,26 @@ export function NovelCritiqueConsole() {
 							<Network className="size-5 text-primary" />
 							<h2 className="text-lg font-semibold">7. 整书 TXT 拆解</h2>
 						</div>
-						<Button onClick={analyzeBook} disabled={loading !== null}>
-							{loading === "book" ? (
-								<Loader2 className="mr-2 size-4 animate-spin" />
-							) : null}
-							拆解整书
-						</Button>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								variant="outline"
+								onClick={() =>
+									void uploadBookForPreview().catch(() => undefined)
+								}
+								disabled={loading !== null}
+							>
+								{loading === "upload" ? (
+									<Loader2 className="mr-2 size-4 animate-spin" />
+								) : null}
+								上传并预览章节
+							</Button>
+							<Button onClick={analyzeBook} disabled={loading !== null}>
+								{loading === "book" ? (
+									<Loader2 className="mr-2 size-4 animate-spin" />
+								) : null}
+								启动整书拆解
+							</Button>
+						</div>
 					</div>
 					<div className="mt-5 grid gap-4 md:grid-cols-[1fr_180px]">
 						<div className="space-y-2">
@@ -914,6 +1180,8 @@ export function NovelCritiqueConsole() {
 					/>
 				</section>
 
+				<BookUploadPreviewPanel upload={bookUpload} />
+				<BookJobPanel job={bookJob} />
 				<BookAnalysisPanel result={bookAnalysisResult} />
 			</section>
 		</div>
@@ -1134,6 +1402,125 @@ function ScorePanel({ scoreResult }: { scoreResult: ScoreResult | null }) {
 	);
 }
 
+function BookUploadPreviewPanel({ upload }: { upload: BookUploadPreview | null }) {
+	if (!upload) {
+		return null;
+	}
+
+	return (
+		<section className="rounded-md border border-border bg-card p-5">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<div className="flex items-center gap-2">
+						<FileText className="size-5 text-primary" />
+						<h2 className="text-lg font-semibold">TXT 上传与章节预览</h2>
+					</div>
+					<p className="mt-2 text-xs text-muted-foreground">{upload.id}</p>
+				</div>
+				<span className="rounded-md border border-border px-3 py-1 text-sm">
+					{upload.chapterCount} 个章节片段
+				</span>
+			</div>
+			<div className="mt-5 grid gap-3 text-sm sm:grid-cols-4">
+				<div className="rounded-md border border-border bg-background p-3">
+					<p className="text-muted-foreground">文件名</p>
+					<p className="mt-1 truncate font-medium">{upload.originalFilename}</p>
+				</div>
+				<div className="rounded-md border border-border bg-background p-3">
+					<p className="text-muted-foreground">原始字符</p>
+					<p className="mt-1 text-lg font-semibold">{upload.rawLength}</p>
+				</div>
+				<div className="rounded-md border border-border bg-background p-3">
+					<p className="text-muted-foreground">清洗后字符</p>
+					<p className="mt-1 text-lg font-semibold">{upload.cleanedLength}</p>
+				</div>
+				<div className="rounded-md border border-border bg-background p-3">
+					<p className="text-muted-foreground">段落</p>
+					<p className="mt-1 text-lg font-semibold">
+						{upload.preprocessing.cleaning.paragraphCount}
+					</p>
+				</div>
+			</div>
+			<div className="mt-4 max-h-72 overflow-auto rounded-md border border-border bg-background text-sm">
+				{upload.preprocessing.chapters.map((chapter) => (
+					<div
+						key={chapter.id}
+						className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"
+					>
+						<span>
+							{chapter.order}. {chapter.title}
+						</span>
+						<span className="text-xs text-muted-foreground">
+							{chapter.charCount} 字符 · {chapter.splitBy}
+						</span>
+					</div>
+				))}
+			</div>
+		</section>
+	);
+}
+
+function BookJobPanel({ job }: { job: BookAnalysisJob | null }) {
+	if (!job) {
+		return null;
+	}
+
+	const percent =
+		job.progress.total > 0
+			? Math.round((job.progress.current / job.progress.total) * 100)
+			: 0;
+
+	return (
+		<section className="rounded-md border border-border bg-card p-5">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<div className="flex items-center gap-2">
+						<Network className="size-5 text-primary" />
+						<h2 className="text-lg font-semibold">整书拆解任务</h2>
+					</div>
+					<p className="mt-2 text-xs text-muted-foreground">{job.id}</p>
+				</div>
+				<span className="rounded-md border border-border px-3 py-1 text-sm">
+					{job.status}
+				</span>
+			</div>
+			<div className="mt-5">
+				<div className="h-2 overflow-hidden rounded-full bg-secondary">
+					<div
+						className="h-full bg-primary transition-all"
+						style={{ width: `${Math.min(100, percent)}%` }}
+					/>
+				</div>
+				<p className="mt-3 text-sm text-muted-foreground">
+					{job.progress.message}
+				</p>
+			</div>
+			{job.preprocessing ? (
+				<div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+					<div className="rounded-md border border-border bg-background p-3">
+						<p className="text-muted-foreground">清洗后字符</p>
+						<p className="mt-1 text-lg font-semibold">
+							{job.preprocessing.cleaning.cleanedLength}
+						</p>
+					</div>
+					<div className="rounded-md border border-border bg-background p-3">
+						<p className="text-muted-foreground">段落数</p>
+						<p className="mt-1 text-lg font-semibold">
+							{job.preprocessing.cleaning.paragraphCount}
+						</p>
+					</div>
+					<div className="rounded-md border border-border bg-background p-3">
+						<p className="text-muted-foreground">章节片段</p>
+						<p className="mt-1 text-lg font-semibold">
+							{job.preprocessing.chapters.length}
+						</p>
+					</div>
+				</div>
+			) : null}
+		</section>
+	);
+}
+
 function BookAnalysisPanel({ result }: { result: BookAnalysisResult | null }) {
 	if (!result) {
 		return (
@@ -1174,6 +1561,71 @@ function BookAnalysisPanel({ result }: { result: BookAnalysisResult | null }) {
 						</p>
 					</div>
 				</div>
+				{result.preprocessing ? (
+					<div className="mt-5 rounded-md border border-border bg-background p-4 text-sm">
+						<p className="font-semibold">文本清洗 + 章节切分</p>
+						<div className="mt-3 grid gap-3 md:grid-cols-4">
+							<p>
+								<span className="text-muted-foreground">原始字符：</span>
+								{result.preprocessing.cleaning.rawLength}
+							</p>
+							<p>
+								<span className="text-muted-foreground">清洗后：</span>
+								{result.preprocessing.cleaning.cleanedLength}
+							</p>
+							<p>
+								<span className="text-muted-foreground">段落：</span>
+								{result.preprocessing.cleaning.paragraphCount}
+							</p>
+							<p>
+								<span className="text-muted-foreground">章节片段：</span>
+								{result.preprocessing.chapters.length}
+							</p>
+						</div>
+						<div className="mt-4 max-h-48 overflow-auto rounded-md border border-border bg-card">
+							{result.preprocessing.chapters.map((chapter) => (
+								<div
+									key={chapter.id}
+									className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"
+								>
+									<span>
+										{chapter.order}. {chapter.title}
+									</span>
+									<span className="text-xs text-muted-foreground">
+										{chapter.charCount} 字符 · {chapter.splitBy}
+									</span>
+								</div>
+							))}
+						</div>
+					</div>
+				) : null}
+				{result.mapReduce ? (
+					<div className="mt-5 rounded-md border border-border bg-background p-4 text-sm">
+						<div className="flex items-center justify-between gap-3">
+							<p className="font-semibold">Map-Reduce 整书拆解</p>
+							<span>{result.mapReduce.mapCount} 个 map</span>
+						</div>
+						<p className="mt-2 text-muted-foreground">
+							{result.mapReduce.reducerNote}
+						</p>
+						<div className="mt-4 grid gap-3 md:grid-cols-2">
+							{result.mapReduce.chapterMaps.slice(0, 6).map((chapter) => (
+								<div
+									key={chapter.chapterId}
+									className="rounded-md border border-border bg-card p-3"
+								>
+									<p className="font-medium">
+										{chapter.order}. {chapter.title}
+									</p>
+									<p className="mt-2 text-muted-foreground">
+										{chapter.summary}
+									</p>
+									<p className="mt-2">钩子：{chapter.hook}</p>
+								</div>
+							))}
+						</div>
+					</div>
+				) : null}
 			</div>
 
 			<div className="grid gap-6 xl:grid-cols-2">

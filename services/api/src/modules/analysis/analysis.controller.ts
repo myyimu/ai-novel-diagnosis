@@ -1,9 +1,27 @@
-import { Body, Controller, Get, HttpCode, Post } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Public } from "@/core/decorators/public.decorators";
 import { AnalysisService } from "./analysis.service";
 import { AnalyzeBookDto } from "./dto/analyze-book.dto";
 import { BuildRubricDto } from "./dto/build-rubric.dto";
+import { CreateBookJobFromUploadDto } from "./dto/create-book-job-from-upload.dto";
+import { PreprocessBookDto } from "./dto/preprocess-book.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import { TestProviderDto } from "./dto/provider-config.dto";
@@ -37,6 +55,13 @@ export class AnalysisController {
     return this.analysisService.testProvider(body.provider);
   }
 
+  @Get("provider/presets")
+  @Public()
+  @ApiOperation({ summary: "List provider presets for BYOK model setup" })
+  getProviderPresets() {
+    return this.analysisService.getProviderPresets();
+  }
+
   @Post("rubric")
   @HttpCode(200)
   @Public()
@@ -58,9 +83,89 @@ export class AnalysisController {
   @Post("book")
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: "Analyze a full novel text into reusable writing assets" })
+  @ApiOperation({
+    summary: "Synchronously analyze a full novel text with map-reduce",
+  })
   @ApiResponse({ status: 200, description: "Book-level asset extraction report" })
   analyzeBook(@Body() body: AnalyzeBookDto) {
     return this.analysisService.analyzeBook(body);
+  }
+
+  @Post("book/preprocess")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: "Clean TXT content and split it into chapter segments" })
+  preprocessBook(@Body() body: PreprocessBookDto) {
+    return this.analysisService.preprocessBook(body);
+  }
+
+  @Post("book/jobs")
+  @HttpCode(202)
+  @Public()
+  @ApiOperation({ summary: "Create an async book map-reduce analysis job" })
+  createBookAnalysisJob(@Body() body: AnalyzeBookDto) {
+    return this.analysisService.createBookAnalysisJob(body);
+  }
+
+  @Get("book/jobs/:jobId")
+  @Public()
+  @ApiOperation({ summary: "Read async book analysis job status" })
+  getBookAnalysisJob(@Param("jobId") jobId: string) {
+    return this.analysisService.getBookAnalysisJob(jobId);
+  }
+
+  @Post("book/uploads")
+  @HttpCode(201)
+  @Public()
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["file", "genre"],
+      properties: {
+        file: { type: "string", format: "binary" },
+        title: { type: "string" },
+        genre: { type: "string", example: "xuanhuan" },
+      },
+    },
+  })
+  @ApiOperation({ summary: "Upload a TXT novel and preview chapter splitting" })
+  uploadBook(
+    @UploadedFile() file: { originalname?: string; buffer?: Buffer },
+    @Body() body: { title?: string; genre?: string },
+  ) {
+    return this.analysisService.uploadBookFile({
+      title: body.title,
+      genre: body.genre || "other",
+      file,
+    });
+  }
+
+  @Get("book/uploads/:uploadId")
+  @Public()
+  @ApiOperation({ summary: "Read uploaded TXT preprocessing and chapter preview" })
+  getBookUpload(@Param("uploadId") uploadId: string) {
+    return this.analysisService.getBookUpload(uploadId);
+  }
+
+  @Post("book/uploads/:uploadId/jobs")
+  @HttpCode(202)
+  @Public()
+  @ApiOperation({ summary: "Create an async map-reduce job from an uploaded TXT" })
+  createBookAnalysisJobFromUpload(
+    @Param("uploadId") uploadId: string,
+    @Body() body: CreateBookJobFromUploadDto,
+  ) {
+    return this.analysisService.createBookAnalysisJobFromUpload({
+      uploadId,
+      provider: body.provider,
+    });
   }
 }
