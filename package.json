@@ -1,0 +1,25 @@
+{
+  "name": "ai-novel-first-step",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter web --filter api dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r --if-present test",
+    "prepare": "husky",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@changesets/cli": "latest",
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
+    "husky": "latest"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "esbuild"
+    ]
+  }
+}

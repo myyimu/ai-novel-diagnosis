@@ -1,0 +1,362 @@
+<!-- one ai-guides:start -->
+# Codex 工作区 AI 指南
+
+本段内容由 One CLI 基于项目模板为 `AGENTS.md` 自动生成。请优先修改模板 AI 片段，或通过 `one add` 刷新；不要直接手改这段受管内容。
+
+## 工作区
+
+- 根目录：`C:\Users\Legion\Documents\disassemble\ai-novel-first-step`
+- AI 提供方：`codex`
+- 模板分组数：3
+
+## nestjs-api
+
+适用项目：
+- `services/api`
+
+# nestjs-api — Agent Guide
+
+NestJS-based API service. Stack: **NestJS + TypeScript (strict) + class-validator + Drizzle ORM + Jest + structured logging**.
+
+## Project layout
+
+```
+src/
+├── main.ts                   # bootstrap
+├── app.module.ts             # root module
+├── core/
+│   ├── config/               # ConfigModule + configuration registry
+│   ├── exceptions/           # BusinessException + error codes
+│   ├── filters/              # HttpExceptionFilter (consistent JSON response)
+│   ├── interceptors/         # logging, response shaping
+│   └── guards/, pipes/       # cross-cutting concerns
+├── modules/<feature>/
+│   ├── <feature>.module.ts   # declarative wiring only
+│   ├── <feature>.controller.ts # HTTP routing only — ≤ 50 lines per controller
+│   ├── <feature>.service.ts    # business logic — stateless singleton
+│   ├── dto/                    # DTO classes with class-validator decorators
+│   └── *.spec.ts               # unit tests (next to source)
+├── dao/repositories/         # The ONLY layer touching Drizzle / DB
+└── shared/utils/             # pure helpers
+test/                         # *.e2e-spec.ts — real HTTP layer
+```
+
+## Architecture boundaries — NEVER violate
+
+- **Controller**: HTTP routing + parameter parsing only. ≤ 50 lines. No business logic, no DB access. Inject services and call them.
+- **Service**: All business logic lives here. Stateless, singleton scope. Inject repositories and other services. Never reach into HTTP, never call another controller.
+- **Repository** (`src/dao/repositories/`): The only layer that touches Drizzle / the database. Returns typed entities, never raw rows. Never expose ORM types upward.
+- **Module** (`src/modules/<feature>/`): Declarative wiring only. No logic in the module file itself.
+- Cross-cutting concerns (auth, logging, validation, metrics) belong in **Interceptors / Guards / Pipes / Filters** — never sprinkled across services.
+
+## Engineering discipline — mandatory
+
+These steps are mandatory before declaring any change "done". Not suggestions.
+
+1. `pnpm typecheck` exits 0
+2. `pnpm lint` exits 0
+3. `pnpm test` passes — and any new code must come with new tests
+4. Stage files explicitly with `git add <file>`. Never `git add -A` — it picks up `.env`, `dist/`, debug files.
+5. Conventional commit message: `feat(auth): add JWT refresh endpoint`. One commit = one logical change.
+6. Never commit secrets. Use `one secrets set <KEY> --env <env>`.
+7. Run any destructive operation with `--dry-run` first.
+
+If any fails, stop. Read the failure, fix the underlying problem, then re-run.
+
+## Testing conventions
+
+- Unit tests: `<name>.spec.ts` next to source. Use `Test.createTestingModule` from `@nestjs/testing`.
+- Mock external dependencies (DB, HTTP, FS) — never real IO in unit tests.
+- **Do NOT mock your own services**. If a test "needs" to mock another service in the same module, the design is wrong — fix the design.
+- E2E tests: `test/*.e2e-spec.ts` — real HTTP layer.
+- Every new controller endpoint requires: 1 happy path + 1 401/403 (if guarded) + 1 400 (validation error).
+- Test names: `should <do something> when <condition>`.
+- Coverage target: `src/modules/` 80% branch, `src/dao/` 60%.
+
+## Code style
+
+**DTOs and validation**
+
+- Every external input must be a DTO class (not an inline `{ a: string }`).
+- Validate with `class-validator`: `@IsString()`, `@IsEmail()`, `@IsInt() @Min(0)`, etc.
+- Output is a DTO or typed response interface — never return raw entities (entities leak `password_hash`, internal FKs, etc.).
+
+**Error handling**
+
+- Domain errors → `BusinessException(code, message, context?)` from `src/core/exceptions/`. Code is machine-readable, message is for humans, context is structured.
+- HTTP errors → NestJS built-ins (`NotFoundException`, `BadRequestException`, `UnauthorizedException`).
+- `HttpExceptionFilter` normalizes all errors. Trust it — don't write your own response shaping in controllers.
+- ❌ NEVER `throw new Error("...")` (no code, no recovery hint).
+- ❌ NEVER `try { ... } catch (e) { /* swallow */ }`. Every error either handled meaningfully or rethrown.
+
+**Logging**
+
+- Inject NestJS `Logger` (or pino if configured). NEVER `console.log/error/warn`.
+- Structured logs: `logger.log({ user_id, action: 'auth.login' }, 'user logged in')` — not `'user ' + id + ' logged in'`.
+- Hot path code: don't log large objects.
+- Levels: `debug` for dev, `log/info` for business events, `warn` for recoverable anomalies, `error` for unrecoverable.
+
+**Types**
+
+- TypeScript `strict` mode is on. Keep it.
+- ❌ NEVER `any`. Use `unknown` and narrow.
+- Public methods must have explicit return types.
+- `type` for unions/intersections; `interface` for classes/extension.
+
+**Configuration**
+
+- Inject `ConfigService` from `@nestjs/config`. NEVER `process.env.X` in business code.
+- Every env var registered in `src/core/config/configuration.ts` with default + validation.
+- Secrets always go through `one secrets`, never raw `.env`.
+
+## Anti-patterns — do not do these
+
+- ❌ SQL strings in services. Use the repository.
+- ❌ Controller calling another controller. Inject the relevant service.
+- ❌ `process.env.X` in business code. Use `ConfigService`.
+- ❌ Hand-rolled DI (passing dependencies through constructors manually). Use NestJS providers.
+- ❌ Returning `null` to mean "not found" without context. Throw a typed exception.
+- ❌ Catching errors and returning `null` / `undefined` / `false`. Errors must propagate with context.
+- ❌ `console.log` in committed code.
+- ❌ Tests that mock the system under test.
+- ❌ Skipping validation because "this endpoint is internal".
+
+## Quality gates — every box checked before declaring done
+
+- [ ] `pnpm typecheck` exits 0
+- [ ] `pnpm lint` exits 0
+- [ ] `pnpm test` passes
+- [ ] New code paths have new spec files
+- [ ] No `console.log/error` introduced
+- [ ] No `any` introduced
+- [ ] No swallowed errors
+- [ ] No `process.env` reads outside `core/config`
+- [ ] Commit message conventional
+- [ ] `git status --short` shows only intentional files
+- [ ] No `.env` / `dist/` / `*.log` / `.DS_Store` staged
+
+## nextjs-app
+
+适用项目：
+- `apps/web`
+
+# nextjs-app — Agent Guide
+
+SSR / RSC Next.js app with App Router. Stack: **Next.js 16 + React 19 + TypeScript + shadcn/ui + Tailwind CSS v4 + next-themes + SWR + Zustand + sonner + axios**.
+
+The homepage at `src/app/page.tsx` is intentionally minimal (Vue/React-scaffold style). Don't bring back demo galleries — extend by composing the pre-wired infrastructure below.
+
+## Project layout
+
+```
+src/
+├── api/                 # Pure functions + request keys (e.g. api/hello.ts: helloKey + getHello)
+├── app/                 # App Router segments
+│   ├── layout.tsx       # Root layout — ThemeProvider + <Toaster />
+│   ├── page.tsx         # Home (this is the welcome screen)
+│   ├── api/<feature>/route.ts # Route handlers (server-side endpoints)
+│   ├── global-error.tsx # Error boundary at the app root
+│   └── globals.css      # Tailwind entry + @theme inline mapping
+├── components/
+│   ├── ui/              # shadcn primitives — atoms
+│   ├── theme-provider.tsx, theme-toggle.tsx  # next-themes integration
+│   └── (your own)       # molecules / sections
+├── lib/
+│   ├── http.ts          # Axios instance (client-side SWR fetcher)
+│   ├── server-data.ts   # Server-side data helper (use in async server components)
+│   └── utils.ts         # cn() + createStore() (zustand + devtools)
+├── stores/              # Zustand slices (create per-feature)
+└── styles/tokens.css    # Design tokens — CSS variables, light + dark
+```
+
+## Pre-wired infrastructure — DO import, DON'T recreate
+
+| Need | Where |
+|------|-------|
+| Theme toggle | `next-themes` via `<ThemeProvider>` in `app/layout.tsx`; UI in `components/theme-toggle.tsx` |
+| Toast notifications | `import { toast } from "sonner"`; `<Toaster />` is mounted in layout |
+| Client HTTP | `http` from `@/lib/http` (axios) |
+| Server HTTP | `getHello`, etc. from `@/api/<feature>.ts` (use in server components or route handlers) |
+| SSR data | `getHelloData` from `@/lib/server-data` — call inside an `async` server component |
+| Store helper | `createStore(creator, name)` from `@/lib/utils` — wraps zustand + devtools in dev |
+| Global error | `app/global-error.tsx` (Next's RSC error boundary) |
+| Class merging | `cn()` from `@/lib/utils` |
+
+## Server vs client components
+
+- Default to **server components**. Add `"use client"` only when you need state, effects, or browser APIs.
+- SWR, Zustand, sonner all require `"use client"` — split files at the boundary.
+- Don't import server-only utilities (`fs`, `next/headers`) into client components.
+
+## Atomic design (advisory — physical folders NOT enforced)
+
+| Layer | Where | Examples |
+|-------|-------|----------|
+| atoms | `src/components/ui/` | Button, Card, Badge, Input |
+| molecules | `src/components/` | Compose atoms |
+| organisms | `src/components/sections/` (create when needed) | Page-level blocks |
+| pages | `src/app/<route>/page.tsx` | App Router pages |
+
+## Design tokens — use Tailwind utilities, never hex/rgb
+
+Tokens are defined in `src/styles/tokens.css` (oklch color space) and imported via `@theme inline` in `globals.css`.
+
+| Concern | Use these classes |
+|---------|-------------------|
+| Surface | `bg-background`, `bg-card`, `bg-popover`, `bg-muted` |
+| Text | `text-foreground`, `text-muted-foreground`, `text-primary` |
+| Border | `border-border`, `border-input` |
+| Accent | `bg-primary`, `bg-secondary`, `bg-destructive` |
+| Sidebar | `bg-sidebar`, `text-sidebar-foreground` etc. |
+
+❌ DON'T write hex/rgb. If you need a new color, add a CSS variable to `tokens.css` first.
+
+## Common patterns
+
+**Server component with SSR data**
+
+```tsx
+// app/page.tsx
+export default async function HomePage() {
+  const data = await getHelloData();
+  return <pre>{JSON.stringify(data, null, 2)}</pre>;
+}
+```
+
+**Client component with SWR**
+
+```tsx
+"use client";
+import useSWR from "swr";
+import { helloKey, getHello } from "@/api/hello";
+export default function ClientHello() {
+  const { data, error } = useSWR(helloKey, getHello);
+  // ...
+}
+```
+
+**Counter store**
+
+```ts
+// src/stores/counter.ts
+import { createStore } from "@/lib/utils";
+export const useCounterStore = createStore<{ count: number; inc: () => void }>(
+  (set) => ({ count: 0, inc: () => set((s) => ({ count: s.count + 1 })) }),
+  "counter",
+);
+```
+
+**Toast**
+
+```tsx
+"use client";
+import { toast } from "sonner";
+toast.success("Saved", { description: "Draft updated" });
+```
+
+**Route handler**
+
+```ts
+// app/api/hello/route.ts
+import { NextResponse } from "next/server";
+export async function GET() {
+  return NextResponse.json({ message: "hello" });
+}
+```
+
+## Quality gates
+
+```bash
+pnpm lint          # oxlint
+pnpm check         # lint + format
+pnpm build         # next build (runs typecheck)
+```
+
+All must pass before declaring a change complete.
+
+## ts-library
+
+适用项目：
+- `packages/ai-core`
+
+# ts-library — Agent Guide
+
+Publishable TypeScript library. Stack: **TypeScript (strict) + tsdown (build) + vitest (test) + oxlint + oxfmt**.
+
+## Project layout
+
+```
+src/
+├── index.ts            # public entry point — only export what's stable
+└── index.test.ts       # tests next to source
+
+package.json            # name + version + exports map (this is the contract)
+tsdown.config.ts        # build config (ESM + CJS + .d.ts)
+tsconfig.json           # strict mode on
+vitest.config.ts        # test runner config
+```
+
+## Library contract — these are the rules
+
+A library is a public API. Every exported symbol is a promise.
+
+- **Only export what's intentional.** Re-exports from `src/index.ts` are the public API. Internals stay un-exported.
+- **Semantic versioning is non-negotiable.** Breaking changes bump major. New features bump minor. Bugfixes bump patch. Use `pnpm changeset` to record changes.
+- **Type definitions ship.** `tsdown` produces `.d.ts`. If a type changes, that's an API change.
+- **Don't depend on runtime conveniences that consumers don't have.** No Node-only APIs unless the library is Node-only (declared in `package.json#engines`).
+- **Don't ship dev-only code.** Test files, fixtures, source maps to `dist/` only when intentional.
+
+## Engineering discipline — mandatory
+
+1. `pnpm typecheck` exits 0
+2. `pnpm lint` exits 0
+3. `pnpm test` passes — and any new public API must come with tests
+4. `pnpm build` produces `dist/` cleanly
+5. Run `pnpm changeset` for any user-visible change — semver bump + changelog entry.
+6. Stage explicitly: `git add <file>`. Never `git add -A`.
+7. Conventional commit messages.
+
+## Testing conventions
+
+- Tests live next to source as `<name>.test.ts`. Vitest auto-discovers them.
+- Test the **public API** (what `src/index.ts` exports), not internal helpers.
+- Avoid mocking — pure functions don't need it. Inject collaborators when impurity is unavoidable.
+- `pnpm test:coverage` to check coverage gaps before publishing.
+
+## Code style
+
+- TypeScript `strict` mode is on. Keep it.
+- ❌ NEVER `any`. Use `unknown` and narrow, or generics.
+- ❌ NEVER ship side effects from import. The library should be tree-shakable.
+- ❌ NEVER add a runtime dependency without considering bundle-size impact for consumers.
+- ✅ Every exported function / class / type has a JSDoc with at least a one-line summary + `@example` for non-trivial APIs.
+- ✅ Prefer narrow types: `string` is rarely the right type — use a branded type or literal union.
+
+## Adding a new public API
+
+1. Implement in `src/<feature>.ts`.
+2. Add tests in `src/<feature>.test.ts` (happy path + edge cases + error cases).
+3. Re-export from `src/index.ts`.
+4. Run `pnpm typecheck && pnpm test && pnpm build`.
+5. `pnpm changeset` → describe the change in the prompt.
+6. Commit including the `.changeset/*.md` file.
+
+## Publishing
+
+```bash
+pnpm changeset version    # bumps package.json + writes CHANGELOG.md
+pnpm changeset publish    # publishes to npm (after CI gate passes)
+```
+
+## Quality gates
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+```
+
+All must pass before declaring a change complete.
+
+<!-- one ai-guides:end -->

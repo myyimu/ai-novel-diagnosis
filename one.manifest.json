@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "workspace": {
+    "id": "ai-novel-first-step-a3e2cd",
+    "name": "ai-novel-first-step"
+  },
+  "environments": {
+    "names": [
+      "dev",
+      "staging",
+      "prod"
+    ],
+    "default": "dev"
+  },
+  "domains": {
+    "env": {
+      "kind": "dotenv"
+    }
+  },
+  "projects": [
+    {
+      "name": "web",
+      "relativeDir": "apps/web",
+      "templateId": "nextjs-app",
+      "toolchain": "node",
+      "buildVersion": "0.1.0",
+      "packageManager": "pnpm",
+      "domains": {
+        "container": {
+          "kind": "docker"
+        },
+        "deploy": {
+          "kind": "kustomize"
+        },
+        "dev": {
+          "command": "pnpm run dev"
+        }
+      }
+    },
+    {
+      "name": "ai-core",
+      "relativeDir": "packages/ai-core",
+      "templateId": "ts-library",
+      "toolchain": "node",
+      "buildVersion": "0.1.0",
+      "packageManager": "pnpm",
+      "domains": {
+        "dev": {
+          "command": "pnpm run dev"
+        }
+      }
+    },
+    {
+      "name": "api",
+      "relativeDir": "services/api",
+      "templateId": "nestjs-api",
+      "toolchain": "node",
+      "buildVersion": "0.1.0",
+      "packageManager": "pnpm",
+      "domains": {
+        "container": {
+          "kind": "docker"
+        },
+        "deploy": {
+          "kind": "kustomize"
+        },
+        "dev": {
+          "command": "pnpm run start:dev"
+        }
+      }
+    }
+  ]
+}
