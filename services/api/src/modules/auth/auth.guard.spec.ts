@@ -9,7 +9,6 @@ describe("AuthGuard", () => {
   let guard: AuthGuard;
   let jwtService: JwtService;
   let reflector: Reflector;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -44,7 +43,6 @@ describe("AuthGuard", () => {
     guard = module.get(AuthGuard);
     jwtService = module.get(JwtService);
     reflector = module.get(Reflector);
-    configService = module.get(ConfigService);
   });
 
   function createMockContext(path: string, authorization?: string) {

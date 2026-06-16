@@ -81,15 +81,13 @@ describe("UserRepository", () => {
       const mockCountFrom = jest.fn().mockResolvedValue([{ total: 0 }]);
 
       let selectCallCount = 0;
-      drizzleService.db.select = jest
-        .fn()
-        .mockImplementation((...args: any[]) => {
-          selectCallCount++;
-          if (selectCallCount === 1) {
-            return { from: mockFrom };
-          }
-          return { from: mockCountFrom };
-        });
+      drizzleService.db.select = jest.fn().mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return { from: mockFrom };
+        }
+        return { from: mockCountFrom };
+      });
 
       const result = await repository.findAll(1, 20);
 

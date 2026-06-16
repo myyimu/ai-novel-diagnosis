@@ -14,7 +14,13 @@ export class AuthService {
     try {
       const payload = this.jwtService.verify(token, { ignoreExpiration: true });
       // 只保留业务字段，去除 JWT 元数据（iat、exp 等），重新签发
-      const { iat, exp, nbf, jti, ...cleanPayload } = payload;
+      const {
+        iat: _iat,
+        exp: _exp,
+        nbf: _nbf,
+        jti: _jti,
+        ...cleanPayload
+      } = payload;
       return this.jwtService.sign(cleanPayload);
     } catch {
       throw new UnauthorizedException("Invalid token");
