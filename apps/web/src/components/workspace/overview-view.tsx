@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
+import type { QuickReviewResult } from "@/stores/workspace-store";
 
 interface OverviewStep {
 	label: string;
@@ -37,9 +38,13 @@ interface OverviewScoreResult {
 
 interface OverviewViewProps {
 	nextAction: OverviewNextAction;
-	providerKind: "mock" | "openai-compatible" | "ai-horde";
+	providerKind: "mock" | "openai-compatible";
 	providerLabel: string;
 	providerModel: string;
+	quickLoading: boolean;
+	quickElapsedSeconds: number;
+	quickReviewResult: QuickReviewResult | null;
+	chapterText: string;
 	chapterCompletion: number;
 	nextChapterAction: string;
 	referenceTitle: string;
@@ -57,10 +62,12 @@ interface OverviewViewProps {
 	competitionNotes: string;
 	bookTitle: string;
 	bookCompletion: number;
-	chapterText: string;
-	quickLoading: boolean;
 	onChapterTextChange: (value: string) => void;
 	onRunQuickExperience: () => void;
+	onUseExampleChapter: () => void;
+	onOpenModel: () => void;
+	onOpenCritique: () => void;
+	onOpenBook: () => void;
 	onOpenView: (view: string) => void;
 }
 
@@ -129,7 +136,7 @@ function NextActionPanel({
 	onOpenView,
 }: {
 	action: OverviewNextAction;
-	providerKind: "mock" | "openai-compatible" | "ai-horde";
+	providerKind: "mock" | "openai-compatible";
 	onOpenView: (view: string) => void;
 }) {
 	return (
@@ -168,6 +175,10 @@ export function OverviewView({
 	providerKind,
 	providerLabel,
 	providerModel,
+	quickLoading,
+	quickElapsedSeconds,
+	quickReviewResult,
+	chapterText,
 	chapterCompletion,
 	nextChapterAction,
 	referenceTitle,
@@ -185,14 +196,29 @@ export function OverviewView({
 	competitionNotes,
 	bookTitle,
 	bookCompletion,
-	chapterText,
-	quickLoading,
 	onChapterTextChange,
 	onRunQuickExperience,
+	onUseExampleChapter,
+	onOpenModel,
+	onOpenCritique,
+	onOpenBook,
 	onOpenView,
 }: OverviewViewProps) {
 	return (
 		<div className="space-y-6">
+			<QuickExperiencePanel
+				chapterText={chapterText}
+				providerLabel={providerLabel}
+				loading={quickLoading}
+				elapsedSeconds={quickElapsedSeconds}
+				quickReviewResult={quickReviewResult}
+				onChapterTextChange={onChapterTextChange}
+				onRun={onRunQuickExperience}
+				onUseExample={onUseExampleChapter}
+				onOpenModel={onOpenModel}
+				onOpenCritique={onOpenCritique}
+				onOpenBook={onOpenBook}
+			/>
 			<NextActionPanel
 				action={nextAction}
 				providerKind={providerKind}
@@ -228,7 +254,7 @@ export function OverviewView({
 					description={
 						scoreResult
 							? scoreResult.nextRevisionMove
-							: "生成评分标准（Rubric）后可开始章节质检。"
+							: "生成评分标准后可开始章节质检。"
 					}
 				/>
 				<DashboardMetric
@@ -244,18 +270,6 @@ export function OverviewView({
 					description={`${researchSourceCount} 个资料资产 · ${graphNodeCount} 个图谱节点`}
 				/>
 			</section>
-
-			<QuickExperiencePanel
-				chapterText={chapterText}
-				providerLabel={providerLabel}
-				loading={quickLoading}
-				scoreSummary={scoreResult ? `${scoreResult.totalScore}/10` : undefined}
-				revisionMove={scoreResult?.nextRevisionMove}
-				onChapterTextChange={onChapterTextChange}
-				onRun={onRunQuickExperience}
-				onOpenModel={() => onOpenView("provider")}
-				onOpenCritique={() => onOpenView("chapter")}
-			/>
 
 			<section className="rounded-md border border-border bg-card p-5">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -357,7 +371,7 @@ export function OverviewView({
 						<p className="mt-2 text-sm leading-6 text-muted-foreground">
 							{scoreResult
 								? scoreResult.weakestPoint
-								: "还没有评分报告。完成评分标准（Rubric）后，工作台会显示总分、最大短板和下一步改法。"}
+								: "还没有评分报告。完成评分标准后，工作台会显示总分、最大短板和下一步改法。"}
 						</p>
 					</div>
 					<div className="flex flex-wrap gap-2">

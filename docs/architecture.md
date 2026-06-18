@@ -7,7 +7,7 @@
 - `apps/web`: Next.js 控制台，负责拆书样本、章节评分、模型配置和报告展示。
 - `services/api`: NestJS API，负责项目、文本、模型配置、任务与报告接口。
 - `packages/ai-core`: 共享类型、评分指标、Provider 抽象和分析流水线契约。
-- `docker-compose.yml`: 本地部署入口，预留 PostgreSQL、Redis、MinIO、API、Web。
+- `docker-compose.yml`: 本地部署入口，启动 PostgreSQL、API、Web；Redis 和 MinIO 只作为后续扩展方向，不在默认 compose 中启动。
 
 ## Frontend Information Architecture
 
@@ -163,7 +163,7 @@ Provider Key 随本次请求进入本地 API，不持久化。任务状态、清
 
 ```text
 analysis_jobs
--> Redis Queue
+-> 本地任务执行器
 -> analysis_worker
 -> llm_provider
 -> reports
@@ -173,8 +173,8 @@ analysis_jobs
 
 - PGlite/PostgreSQL: 用户项目、上传记录、章节预览、任务状态、评分表、报告。
 - pgvector: 原则库、同题材案例检索。
-- Redis: 后续承接分布式异步任务队列和短期任务状态。
-- Local FS / MinIO: 原始上传文件、清洗后文本和导出报告。MVP 默认使用 `.local/analysis`。
+- Redis: 后续承接分布式异步任务队列和短期任务状态，当前未接入运行时代码。
+- Local FS: 原始上传文件、清洗后文本和导出报告。MVP 默认使用 `.local/analysis`，MinIO 作为后续对象存储扩展方向。
 
 ## Naming
 

@@ -30,6 +30,7 @@
     "check:fix": "pnpm run lint:fix && pnpm run format:fix"
   },
   "dependencies": {
+    "@ai-novel-first-step/ai-core": "workspace:*",
     "@electric-sql/pglite": "^0.2.17",
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.3",

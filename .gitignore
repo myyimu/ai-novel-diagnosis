@@ -19,3 +19,8 @@ logs
 .DS_Store
 .env.*
 !.env.example
+
+# editor / IDE local state
+.idea/
+.vscode/
+*.iml

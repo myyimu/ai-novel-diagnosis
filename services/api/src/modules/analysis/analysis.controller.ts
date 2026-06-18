@@ -33,6 +33,7 @@ import { CreateBookJobFromUploadDto } from "./dto/create-book-job-from-upload.dt
 import { InferReferenceProfileDto } from "./dto/infer-reference-profile.dto";
 import { PreprocessBookDto } from "./dto/preprocess-book.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
+import { QuickReviewDto } from "./dto/quick-review.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import { TestProviderDto } from "./dto/provider-config.dto";
 import { ResearchLibraryService } from "./research-library.service";
@@ -63,6 +64,17 @@ export class AnalysisController {
     return this.analysisService.previewScore(body);
   }
 
+  @Post("quick-review")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Quick single-pass chapter review for first-time users",
+  })
+  @ApiResponse({ status: 200, description: "Structured quick review" })
+  quickReview(@Body() body: QuickReviewDto) {
+    return this.analysisService.quickReview(body);
+  }
+
   @Post("provider/test")
   @HttpCode(200)
   @Public()
@@ -76,13 +88,6 @@ export class AnalysisController {
   @ApiOperation({ summary: "List provider presets for BYOK model setup" })
   getProviderPresets() {
     return this.analysisService.getProviderPresets();
-  }
-
-  @Get("provider/horde-models")
-  @Public()
-  @ApiOperation({ summary: "List currently available AI Horde text models" })
-  getHordeTextModels() {
-    return this.analysisService.getHordeTextModels();
   }
 
   @Post("reference/profile")

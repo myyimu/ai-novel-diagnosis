@@ -5,10 +5,14 @@ WORKDIR /workspace
 RUN corepack enable
 
 COPY package.json ./
-COPY pnpm-lock.yaml* package-lock.json* yarn.lock* ./
-RUN pnpm install
+COPY pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml* ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/ai-core/package.json packages/ai-core/package.json
+COPY services/api/package.json services/api/package.json
+RUN HUSKY=0 pnpm install --frozen-lockfile
 
 COPY . .
 
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm run dev -- --hostname 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "pnpm --filter web dev -- --hostname 0.0.0.0 --port 3000"]

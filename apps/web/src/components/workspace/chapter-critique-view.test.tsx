@@ -4,9 +4,18 @@ import { ChapterCritiqueView, ScorePanel } from "./chapter-critique-view";
 
 const baseProps = {
 	loading: null,
+	providerLabel: "本地演示",
+	quickLoading: false,
+	quickElapsedSeconds: 0,
+	quickReviewResult: null,
 	importReferenceFile: vi.fn(),
 	onInferReferenceProfile: vi.fn(),
 	onReferenceTextChange: vi.fn(),
+	onRunQuickExperience: vi.fn(),
+	onUseExampleChapter: vi.fn(),
+	onUseExampleReference: vi.fn(),
+	onOpenModel: vi.fn(),
+	onOpenBook: vi.fn(),
 	onBuildRubric: vi.fn(),
 	onScoreChapter: vi.fn(),
 	onPlatformStrategyChange: vi.fn(),
@@ -17,6 +26,7 @@ describe("ChapterCritiqueView", () => {
 	it("renders the chapter critique workflow from workspace store state", () => {
 		const html = renderToStaticMarkup(<ChapterCritiqueView {...baseProps} />);
 
+		expect(html).toContain("快速点评");
 		expect(html).toContain("平台风格画像");
 		expect(html).toContain("导入成熟章节");
 		expect(html).toContain("AI 识别的市场定位");

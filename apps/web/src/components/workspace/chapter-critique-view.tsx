@@ -15,10 +15,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
 import {
 	aiSelfTests,
 	type AiSelfTestId,
 	type ReferenceProfileProgressItem,
+	type QuickReviewResult,
 	type RubricResult,
 	type ScoreProgressItem,
 	type ScoreProgressStatus,
@@ -57,9 +59,18 @@ type ChapterDraftPatch = Partial<Pick<WorkspaceStore, "chapterTitle" | "chapterT
 
 export interface ChapterCritiqueViewProps {
 	loading: ChapterLoadingState;
+	providerLabel: string;
+	quickLoading: boolean;
+	quickElapsedSeconds: number;
+	quickReviewResult: QuickReviewResult | null;
 	importReferenceFile: (event: ChangeEvent<HTMLInputElement>) => void;
 	onInferReferenceProfile: (text: string, fileName?: string) => void;
 	onReferenceTextChange: (value: string) => void;
+	onRunQuickExperience: () => void;
+	onUseExampleChapter: () => void;
+	onUseExampleReference: () => void;
+	onOpenModel: () => void;
+	onOpenBook: () => void;
 	onBuildRubric: () => void;
 	onScoreChapter: () => void;
 	onPlatformStrategyChange: (patch: PlatformStrategyPatch) => void;
@@ -232,9 +243,18 @@ function PlatformStrategyFields({
 
 export function ChapterCritiqueView({
 	loading,
+	providerLabel,
+	quickLoading,
+	quickElapsedSeconds,
+	quickReviewResult,
 	importReferenceFile,
 	onInferReferenceProfile,
 	onReferenceTextChange,
+	onRunQuickExperience,
+	onUseExampleChapter,
+	onUseExampleReference,
+	onOpenModel,
+	onOpenBook,
 	onBuildRubric,
 	onScoreChapter,
 	onPlatformStrategyChange,
@@ -471,15 +491,36 @@ export function ChapterCritiqueView({
 		<>
 			<WorkflowGuide
 				steps={[
+					"先做快速点评",
 					"校准平台和读者",
 					"导入成熟章节",
 					"AI 识别定位",
-					"生成 Rubric",
+					"生成评分标准",
 					"质检自己的章节",
 				]}
-				note="单章点评不是文学奖评分，而是检查目标读者是否愿意继续读。市场定位优先由 AI 从参考章节识别，你只需要校正明显不准的地方。"
+				note="章节质检先用快速点评判断方向，再用评分标准做完整评分；两者共用同一份章节正文，避免重复填内容。"
 			/>
-			<section className="rounded-md border border-border bg-card p-5">
+			<QuickExperiencePanel
+				chapterText={chapterText}
+				providerLabel={providerLabel}
+				loading={quickLoading}
+				elapsedSeconds={quickElapsedSeconds}
+				quickReviewResult={quickReviewResult}
+				onChapterTextChange={(value) => onChapterDraftChange({ chapterText: value })}
+				onRun={onRunQuickExperience}
+				onUseExample={onUseExampleChapter}
+				onOpenModel={onOpenModel}
+				onOpenCritique={() =>
+					document
+						.getElementById("full-chapter-critique")
+						?.scrollIntoView({ behavior: "smooth", block: "start" })
+				}
+				onOpenBook={onOpenBook}
+			/>
+			<section
+				id="full-chapter-critique"
+				className="rounded-md border border-border bg-card p-5"
+			>
 				<div className="flex items-center gap-2">
 					<Sparkles className="size-5 text-primary" />
 					<h2 className="text-lg font-semibold">
@@ -553,9 +594,14 @@ export function ChapterCritiqueView({
 			</section>
 
 			<section className="rounded-md border border-border bg-card p-5">
-				<div className="flex items-center gap-2">
-					<BookOpenCheck className="size-5 text-primary" />
-					<h2 className="text-lg font-semibold">3. 导入成熟章节</h2>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<div className="flex items-center gap-2">
+						<BookOpenCheck className="size-5 text-primary" />
+						<h2 className="text-lg font-semibold">3. 导入成熟章节</h2>
+					</div>
+					<Button type="button" variant="outline" onClick={onUseExampleReference}>
+						填入示例参考章节
+					</Button>
 				</div>
 
 				<div className="mt-5 grid gap-4">
@@ -661,7 +707,7 @@ export function ChapterCritiqueView({
 							{loading === "rubric" ? (
 								<Loader2 className="mr-2 size-4 animate-spin" />
 							) : null}
-							生成 Rubric
+							生成评分标准
 						</Button>
 					</div>
 				</div>
@@ -872,7 +918,7 @@ function RubricPanel({ rubricResult }: { rubricResult: RubricResult | null }) {
 		<div className="rounded-md border border-border bg-card p-5">
 			<div className="flex items-center gap-2">
 				<Sparkles className="size-5 text-primary" />
-				<h2 className="text-lg font-semibold">评分标准（Rubric）</h2>
+				<h2 className="text-lg font-semibold">评分标准</h2>
 			</div>
 			{rubricResult ? (
 				<div className="mt-5 space-y-5">
@@ -961,7 +1007,7 @@ function RubricPanel({ rubricResult }: { rubricResult: RubricResult | null }) {
 				</div>
 			) : (
 				<p className="mt-5 text-sm text-muted-foreground">
-					生成评分标准（Rubric）后，这里会展示可迁移原则和评分指标。
+					生成评分标准后，这里会展示可迁移原则和评分指标。
 				</p>
 			)}
 		</div>
@@ -1263,7 +1309,7 @@ export function ScorePanel({
 								<p>共情：{scoreResult.selfTestFit.emotionDiagnosis}</p>
 								<p>设定复盘：{scoreResult.selfTestFit.settingRecapDiagnosis}</p>
 								<p>删句：{scoreResult.selfTestFit.deleteSentenceDiagnosis}</p>
-								<p>AI 味：{scoreResult.selfTestFit.aiTraceDiagnosis}</p>
+								<p>自然度：{scoreResult.selfTestFit.aiTraceDiagnosis}</p>
 							</div>
 							{scoreResult.selfTestFit.promptAddons.length ? (
 								<div className="mt-3">

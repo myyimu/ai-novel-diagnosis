@@ -685,31 +685,33 @@ export function LibraryView({
 
 			<section className="grid gap-6 xl:grid-cols-3">
 				<div className="rounded-md border border-border bg-card p-5">
-					<h2 className="text-lg font-semibold">下一步补图谱</h2>
+					<h2 className="text-lg font-semibold">完善图谱视图</h2>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
-						先从整书拆解产物生成“人物关系 + 事件链 + 伏笔表”的稳定视图，后面再做可视化。
+						整书拆解已经会提取人物、关系、事件和伏笔。下一步会把这些结果整理成更稳定的人物关系表、事件链和伏笔表。
 					</p>
 					<Button className="mt-4" onClick={() => onOpenView("book")}>
 						导入或拆解整书
 					</Button>
 				</div>
 				<div className="rounded-md border border-border bg-card p-5">
-					<h2 className="text-lg font-semibold">下一步补解释评分</h2>
+					<h2 className="text-lg font-semibold">强化解释评分</h2>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
-						用参考章节生成评分标准（Rubric），再让每个分数绑定原文证据和可执行改稿
-						Prompt。
+						单章点评已经支持
+						评分标准、分数、证据和改稿建议。后续会继续加强每个分数与原文证据、改稿
+						Prompt 的绑定。
 					</p>
 					<Button className="mt-4" onClick={() => onOpenView("chapter")}>
 						去单章点评
 					</Button>
 				</div>
 				<div className="rounded-md border border-border bg-card p-5">
-					<h2 className="text-lg font-semibold">下一步补横向对比</h2>
+					<h2 className="text-lg font-semibold">积累横向对比样本</h2>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
-						先积累 2 本以上已拆解样本，再比较共同规律、偏离平均值的卖点和可重组方向。
+						先到历史任务打开 2
+						本以上已完成整书拆解的样本，再比较共同规律、偏离平均值的卖点和可重组方向。
 					</p>
 					<Button className="mt-4" onClick={() => onOpenView("history")}>
-						查看样本历史
+						查看历史任务
 					</Button>
 				</div>
 			</section>

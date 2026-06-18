@@ -8,6 +8,7 @@ import { BuildRubricDto } from "./dto/build-rubric.dto";
 import { PreprocessBookDto } from "./dto/preprocess-book.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { ProviderConfigDto } from "./dto/provider-config.dto";
+import { QuickReviewDto } from "./dto/quick-review.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import {
   BookPreprocessResult,
@@ -110,6 +111,47 @@ const baseRubricMetrics = [
     },
   },
   {
+    id: "opening-promise",
+    name: "开局承诺强度",
+    description: "开头是否快速交代主角处境、核心矛盾、失败代价和继续读的理由。",
+    scale: {
+      low: "0-3：开头只铺背景或寒暄，读者不知道为什么要继续看。",
+      medium: "4-6：有冲突或卖点，但目标、代价、期待不够早或不够清楚。",
+      high: "7-10：前段就给出强冲突、明确代价和可追读的问题。",
+    },
+  },
+  {
+    id: "pleasure-structure",
+    name: "爽点结构完整度",
+    description: "爽点是否完成压制、蓄力、反击、兑现和余波，而不是只写结果。",
+    scale: {
+      low: "0-3：直接给主角胜利或奖励，缺少前置压迫和情绪释放。",
+      medium: "4-6：有爽点，但对手压力、反击收益或余波推动不足。",
+      high: "7-10：压迫具体、反击成立、兑现有力度，余波能推动下一章。",
+    },
+  },
+  {
+    id: "hook-rotation",
+    name: "钩子轮换与回收",
+    description:
+      "章节钩子是否轮换悬念、危机、反转、期待、情感或信息揭示，并在后续有回收可能。",
+    scale: {
+      low: "0-3：自然收尾或重复同一种断章，下一章没有清楚承接点。",
+      medium: "4-6：有钩子，但类型单一、强度一般或回收承诺不清。",
+      high: "7-10：钩子类型明确，强度匹配章节位置，并给下一章前段留下回收点。",
+    },
+  },
+  {
+    id: "prose-naturalness",
+    name: "文本自然度",
+    description: "语言是否避免模板化升华、空泛排比、同质句式和旁观者讲解腔。",
+    scale: {
+      low: "0-3：大量空泛判断、模板句、同质化表达，角色和场景缺少专属细节。",
+      medium: "4-6：整体可读，但局部有机械总结、情绪标签或说明腔。",
+      high: "7-10：表达贴合角色和场景，句式有变化，细节具体且不油腻。",
+    },
+  },
+  {
     id: "character-drive",
     name: "人物驱动力",
     description: "主角行动是否来自明确欲望、恐惧、承诺或价值判断。",
@@ -199,6 +241,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "章节末要有清楚升级或新问题",
     language: "信息清楚，设定和行动逻辑要站得住",
     setupTolerance: "中等",
+    pleasureDensity: "小爽点约1500字一个，大爽点约5000字一个，重逻辑支撑",
+    dataPriority: "首章完读、收藏/书架、下一章点击、前三章留存、追更",
   },
   fanqie: {
     pace: "快节奏",
@@ -206,6 +250,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "高",
     language: "白话、短句、情绪明确",
     setupTolerance: "低",
+    pleasureDensity: "高密度爽点，约800字一个小释放，类型要轮换",
+    dataPriority: "点击、有效阅读、30秒阅读、触底/完读、加书架、追更",
   },
   jinjiang: {
     pace: "中节奏，重人物关系推进",
@@ -213,6 +259,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "中高，偏关系变化和情感悬念",
     language: "情绪辨识度和人物声音要强",
     setupTolerance: "中等",
+    pleasureDensity: "以关系推进和情感兑现为主，不宜连续硬打脸",
+    dataPriority: "收藏、评论反馈、首章完读、关系钩子、追更",
   },
   qimao: {
     pace: "快节奏",
@@ -220,6 +268,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "高",
     language: "直白、场景转换快",
     setupTolerance: "低",
+    pleasureDensity: "高频传统爽点，需用代价和反转避免疲劳",
+    dataPriority: "点击、有效阅读、完读/触底、加书架、追更",
   },
   "wechat-short": {
     pace: "极快节奏",
@@ -227,6 +277,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "极高",
     language: "极低理解成本，开头必须迅速进入冲突",
     setupTolerance: "极低",
+    pleasureDensity: "约500字一个小刺激点，付费点前必须堆足情绪债",
+    dataPriority: "点击、全文完读、平均阅读进度、付费解锁",
   },
   other: {
     pace: "按题材和目标读者调整",
@@ -234,6 +286,8 @@ const platformProfiles: Record<string, Record<string, string>> = {
     hookDensity: "中等",
     language: "清楚优先",
     setupTolerance: "中等",
+    pleasureDensity: "按题材、平台和读者反馈校准",
+    dataPriority: "先收集点击、完读、收藏/加书架和追读数据",
   },
 };
 
@@ -317,6 +371,171 @@ export class AnalysisService {
     };
   }
 
+  async quickReview(input: QuickReviewDto) {
+    const provider = this.resolveQuickReviewProvider(input.provider);
+    if (provider.kind === "mock") {
+      return this.mockQuickReview(input);
+    }
+
+    const textSample =
+      input.chapterText.trim().length <= 7000
+        ? input.chapterText.trim()
+        : `${input.chapterText.trim().slice(0, 5200)}\n\n……中间内容省略……\n\n${input.chapterText.trim().slice(-1600)}`;
+
+    const content = await this.modelProviders.chat(
+      provider,
+      [
+        {
+          role: "system",
+          content:
+            "你是资深中文网文编辑。读完章节后给出快速点评。只返回合法 JSON，不使用 Markdown，不解释过程。",
+        },
+        {
+          role: "user",
+          content: `请阅读以下章节，给出快速点评。
+
+章节标题：${input.title || "未提供"}
+类型：${input.genre || "请自行判断"}
+
+章节正文：
+${textSample}
+
+严格返回这个 JSON 结构：
+{
+  "title": "章节标题（如正文有标题则用正文的）",
+  "genre": "xuanhuan | urban | romance | suspense | infinite-flow | other",
+  "positioning": "一句话定位这章在市场上的位置",
+  "sellingPoints": ["本章 2-3 个主要卖点"],
+  "mainProblem": "本章最大的一个问题，不超过 50 字",
+  "actionableFixes": ["3 条可执行的改稿建议，每条不超过 40 字"],
+  "readyForFullReview": true或false,
+  "readyReason": "是否适合做完整评分的一句话理由",
+  "quickScore": 6.5,
+  "confidence": 0.8
+}
+
+要求：
+1. genre 只能选 xuanhuan、urban、romance、suspense、infinite-flow、other 之一。
+2. quickScore 是 0-10 分，代表网文追读吸引力的快速估分。
+3. actionableFixes 必须是具体可执行的改法，不要空洞建议。
+4. confidence 是 0 到 1 的数字，文本太短时降低。
+5. 每个字段都要简短，确保完整 JSON 可以在 512 token 内返回。`,
+        },
+      ],
+      { maxOutputTokens: 1400 },
+    );
+
+    return this.normalizeQuickReviewResult(this.parseJson(content), input);
+  }
+
+  private normalizeQuickReviewResult(result: unknown, input: QuickReviewDto) {
+    const source =
+      result && typeof result === "object"
+        ? (result as Record<string, unknown>)
+        : {};
+    const requestedGenre = this.normalizeQuickReviewGenre(input.genre);
+
+    return {
+      title: this.asText(source.title) || input.title || "未命名章节",
+      genre:
+        this.normalizeQuickReviewGenre(source.genre) ||
+        requestedGenre ||
+        "other",
+      positioning:
+        this.asText(source.positioning) ||
+        "模型没有返回明确定位，请重试或进入完整点评。",
+      sellingPoints: this.asTextList(source.sellingPoints).slice(0, 4),
+      mainProblem:
+        this.asText(source.mainProblem) ||
+        "模型没有返回明确问题，请重试或进入完整点评。",
+      actionableFixes: this.asTextList(source.actionableFixes).slice(0, 4),
+      readyForFullReview:
+        typeof source.readyForFullReview === "boolean"
+          ? source.readyForFullReview
+          : input.chapterText.trim().length >= 300,
+      readyReason:
+        this.asText(source.readyReason) ||
+        "如果结果不完整，建议重试一次或进入完整评分。",
+      quickScore: this.clampNumber(source.quickScore, 0, 10, 0),
+      confidence: this.clampNumber(source.confidence, 0, 1, 0.5),
+    };
+  }
+
+  private normalizeQuickReviewGenre(value: unknown) {
+    const genre = this.asText(value).toLowerCase();
+    if (
+      [
+        "xuanhuan",
+        "urban",
+        "romance",
+        "suspense",
+        "infinite-flow",
+        "other",
+      ].includes(genre)
+    ) {
+      return genre;
+    }
+    if (genre === "xuanhua" || genre === "fantasy") return "xuanhuan";
+    return "";
+  }
+
+  private asText(value: unknown): string {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  private asTextList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => this.asText(item))
+      .filter((item) => item.length > 0);
+  }
+
+  private clampNumber(
+    value: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+  ): number {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, numeric));
+  }
+
+  private resolveQuickReviewProvider(
+    provider?: ProviderConfigDto,
+  ): ProviderConfigDto {
+    if (provider?.kind) {
+      return provider;
+    }
+
+    return {
+      preset: "shared-gpu",
+      kind: "openai-compatible",
+    };
+  }
+
+  private mockQuickReview(input: QuickReviewDto) {
+    const textLength = input.chapterText.trim().length;
+    const quickScore = textLength >= 300 ? 6.2 : 5.4;
+
+    return {
+      title: input.title || "未命名章节",
+      genre: this.normalizeQuickReviewGenre(input.genre) || "other",
+      positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
+      sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
+      mainProblem: "演示模式不会判断真实剧情质量。",
+      actionableFixes: [
+        "切换共享站或付费模型后重试快速点评。",
+        "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
+        "需要完整证据链时进入章节质检并生成 Rubric。",
+      ],
+      readyForFullReview: textLength >= 80,
+      readyReason: "当前是本地演示结果；真实点评需要使用可用模型服务。",
+      quickScore,
+      confidence: 0,
+    };
+  }
+
   getPipeline() {
     return {
       stages: [
@@ -334,7 +553,7 @@ export class AnalysisService {
         "critic_pass",
         "generate_revision_plan",
       ],
-      providerModes: ["mock", "openai-compatible", "ai-horde"],
+      providerModes: ["mock", "openai-compatible"],
       providerPresets: this.modelProviders.getPresets(),
       storagePolicy:
         "local-first; user text stays in the deployment; API keys are not persisted; async jobs persist status, preprocessing, and chapter map partial results locally",
@@ -347,10 +566,6 @@ export class AnalysisService {
 
   getProviderPresets() {
     return this.modelProviders.getPresets();
-  }
-
-  async getHordeTextModels() {
-    return this.modelProviders.getHordeTextModels();
   }
 
   async inferReferenceProfile(input: InferReferenceProfileDto) {
@@ -707,6 +922,34 @@ export class AnalysisService {
           defaults.book.coreAppeal,
         ),
       },
+      transferableStyleCard: {
+        ...defaultRecord.transferableStyleCard,
+        ...source.transferableStyleCard,
+        coreStyleTags: this.arrayOrDefault(
+          source.transferableStyleCard?.coreStyleTags,
+          defaultRecord.transferableStyleCard.coreStyleTags,
+        ),
+        sensoryFocus: this.arrayOrDefault(
+          source.transferableStyleCard?.sensoryFocus,
+          defaultRecord.transferableStyleCard.sensoryFocus,
+        ),
+        pleasureMechanisms: this.arrayOrDefault(
+          source.transferableStyleCard?.pleasureMechanisms,
+          defaultRecord.transferableStyleCard.pleasureMechanisms,
+        ),
+        hookPatterns: this.arrayOrDefault(
+          source.transferableStyleCard?.hookPatterns,
+          defaultRecord.transferableStyleCard.hookPatterns,
+        ),
+        styleRules: this.arrayOrDefault(
+          source.transferableStyleCard?.styleRules,
+          defaultRecord.transferableStyleCard.styleRules,
+        ),
+        antiPatterns: this.arrayOrDefault(
+          source.transferableStyleCard?.antiPatterns,
+          defaultRecord.transferableStyleCard.antiPatterns,
+        ),
+      },
       worldbuilding: {
         ...defaults.worldbuilding,
         ...source.worldbuilding,
@@ -842,6 +1085,34 @@ export class AnalysisService {
         ...defaults.originalizationReport,
         ...source.originalizationReport,
       },
+      referenceBoundaryCheck: {
+        ...defaultRecord.referenceBoundaryCheck,
+        ...source.referenceBoundaryCheck,
+        learnablePatterns: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.learnablePatterns,
+          defaultRecord.referenceBoundaryCheck.learnablePatterns,
+        ),
+        doNotReuse: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.doNotReuse,
+          defaultRecord.referenceBoundaryCheck.doNotReuse,
+        ),
+        needsTransformation: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.needsTransformation,
+          defaultRecord.referenceBoundaryCheck.needsTransformation,
+        ),
+        nameAndTermRisks: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.nameAndTermRisks,
+          defaultRecord.referenceBoundaryCheck.nameAndTermRisks,
+        ),
+        plotSimilarityRisks: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.plotSimilarityRisks,
+          defaultRecord.referenceBoundaryCheck.plotSimilarityRisks,
+        ),
+        safeRewriteMoves: this.arrayOrDefault(
+          source.referenceBoundaryCheck?.safeRewriteMoves,
+          defaultRecord.referenceBoundaryCheck.safeRewriteMoves,
+        ),
+      },
       usageRiskNotice: {
         ...defaultRecord.usageRiskNotice,
         ...source.usageRiskNotice,
@@ -943,7 +1214,9 @@ ${input.referenceText}
     "emotion": "情绪要求",
     "hookDensity": "钩子密度要求",
     "language": "语言风格要求",
-    "setupTolerance": "铺垫容忍度"
+    "setupTolerance": "铺垫容忍度",
+    "pleasureDensity": "爽点密度要求",
+    "dataPriority": "该平台优先观察的数据指标"
   },
   "marketProfile": {
     "category": "细分分类",
@@ -1002,6 +1275,11 @@ Rubric 必须包含这些指标：${baseRubricMetrics.map((item) => item.name).j
 Rubric 必须按目标平台和目标读者校准，不要只判断文学质量。
 Rubric 必须判断分类、主题、标签、关键词和隐性期待是否命中。
 Rubric 必须参考平台推荐策略假设，但不能声称掌握平台内部算法；要把它当作外部流量环境和编辑经验假设。
+Rubric 必须吸收网文结构检查：黄金三章/黄金开局是否建立期待，爽点是否完成“期待建立 -> 延迟 -> 兑现”，章末钩子属于悬念、危机、转折、期待或揭示中的哪一种。
+Rubric 必须检查节奏密度：小高潮间隔、信息释放、情绪余韵和下一个期待种子，不要只说“节奏快慢”。
+Rubric 必须吸收爽点疲劳管理：连续同类爽点要扣分；要检查强度波动、类型轮换、代价、余波和下一轮期待。
+Rubric 必须吸收题材选择评分：平台匹配、作者储备、读者承诺、前三章钩子、差异化、风险成本；对单章评分时重点落到平台匹配、读者承诺、前三章钩子和差异化。
+Rubric 必须把“文本自然度”作为质量项，只诊断模板化、空泛升华、同质句式和专属细节不足，不承诺规避检测或过审。
 关键词不是词频统计，而是读者点击期待信号。显性关键词要自然出现，隐性期待要落实到结构。
 如果参考章节优点和目标平台风格不完全一致，请明确哪些原则可迁移、哪些不该迁移。
 每个指标必须能用于评分，不要写空泛表述。
@@ -1072,6 +1350,18 @@ ${JSON.stringify(chapterMaps, null, 2)}
     "oneSentencePremise": "一句话概括",
     "coreAppeal": ["核心吸引力"]
   },
+  "transferableStyleCard": {
+    "coreStyleTags": ["可迁移风格标签，不能写成仿写某作者"],
+    "narrativeVoice": "叙事视角、声音、信息遮蔽方式",
+    "sentenceRhythm": "句长、长短句切换、口语/书面比例",
+    "paragraphPattern": "段落长度、换行节奏、移动端可读性",
+    "dialoguePattern": "对白比例、说话标签、人物声音差异",
+    "sensoryFocus": ["视觉/触觉/听觉/味觉/嗅觉等主导感官"],
+    "pleasureMechanisms": ["力量型/地位型/情感型/认知型/探索型爽点"],
+    "hookPatterns": ["悬念型/危机型/转折型/期待型/揭示型钩子"],
+    "styleRules": ["可迁移写法规则，要求可自检"],
+    "antiPatterns": ["写同类原创故事时必须避免的做法"]
+  },
   "worldbuilding": {
     "worldRules": ["世界运行规则"],
     "powerSystem": ["能力/修炼/技术体系"],
@@ -1297,6 +1587,15 @@ ${JSON.stringify(chapterMaps, null, 2)}
     "fanFictionWarning": "同人/换皮/商业化风险提示",
     "rewriteStrategy": ["原创化迁移策略"]
   },
+  "referenceBoundaryCheck": {
+    "summary": "参考边界一句话结论：学结构，不复用可识别内容",
+    "learnablePatterns": ["可学习的节奏、爽点、钩子、情绪工程"],
+    "doNotReuse": ["不能复用的姓名、专名、关系、对白、桥段顺序"],
+    "needsTransformation": ["必须重组的角色功能、世界规则、事件链"],
+    "nameAndTermRisks": ["专有名词、能力名、组织名、地名风险"],
+    "plotSimilarityRisks": ["核心情节、人物关系、冲突模式的雷同风险"],
+    "safeRewriteMoves": ["安全迁移动作：换目标、换代价、换关系、换场景、换信息释放顺序"]
+  },
   "usageRiskNotice": {
     "summary": "工具只做文本拆解和格式转换，不判断用户最终用途是否合法。",
     "recommendedUse": ["读书笔记", "学习分析", "合法授权素材整理", "个人私用角色扮演", "原创化迁移参考"],
@@ -1311,8 +1610,10 @@ ${JSON.stringify(chapterMaps, null, 2)}
 3. 可以保留原作拆解笔记，但必须和原创化导出包分区。
 4. 对角色和世界观必须同时输出“原作拆解笔记”和“抽象原型 + 原创化导出卡”。
 5. chapterCountEstimate 必须使用章节数 ${preprocessing.chapters.length}。
-6. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
-7. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
+6. transferableStyleCard 只描述可迁移写法，不要鼓励“仿写某作者”；必须覆盖叙事声音、句式节奏、段落、对白、爽点、钩子和反面清单。
+7. referenceBoundaryCheck 必须替代模糊的“原创化风险”，用“可学/不可复用/必须改造/安全迁移”说清边界。
+8. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
+9. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
 `.trim();
   }
 
@@ -1336,6 +1637,18 @@ ${input.text}
     "oneSentencePremise": "一句话概括",
     "coreAppeal": ["核心吸引力"]
   },
+  "transferableStyleCard": {
+    "coreStyleTags": ["可迁移风格标签，不能写成仿写某作者"],
+    "narrativeVoice": "叙事视角、声音、信息遮蔽方式",
+    "sentenceRhythm": "句长、长短句切换、口语/书面比例",
+    "paragraphPattern": "段落长度、换行节奏、移动端可读性",
+    "dialoguePattern": "对白比例、说话标签、人物声音差异",
+    "sensoryFocus": ["视觉/触觉/听觉/味觉/嗅觉等主导感官"],
+    "pleasureMechanisms": ["力量型/地位型/情感型/认知型/探索型爽点"],
+    "hookPatterns": ["悬念型/危机型/转折型/期待型/揭示型钩子"],
+    "styleRules": ["可迁移写法规则，要求可自检"],
+    "antiPatterns": ["写同类原创故事时必须避免的做法"]
+  },
   "worldbuilding": {
     "worldRules": ["世界运行规则"],
     "powerSystem": ["能力/修炼/技术体系"],
@@ -1561,6 +1874,15 @@ ${input.text}
     "fanFictionWarning": "同人/换皮/商业化风险提示",
     "rewriteStrategy": ["原创化迁移策略"]
   },
+  "referenceBoundaryCheck": {
+    "summary": "参考边界一句话结论：学结构，不复用可识别内容",
+    "learnablePatterns": ["可学习的节奏、爽点、钩子、情绪工程"],
+    "doNotReuse": ["不能复用的姓名、专名、关系、对白、桥段顺序"],
+    "needsTransformation": ["必须重组的角色功能、世界规则、事件链"],
+    "nameAndTermRisks": ["专有名词、能力名、组织名、地名风险"],
+    "plotSimilarityRisks": ["核心情节、人物关系、冲突模式的雷同风险"],
+    "safeRewriteMoves": ["安全迁移动作：换目标、换代价、换关系、换场景、换信息释放顺序"]
+  },
   "usageRiskNotice": {
     "summary": "工具只做文本拆解和格式转换，不判断用户最终用途是否合法。",
     "recommendedUse": ["读书笔记", "学习分析", "合法授权素材整理", "个人私用角色扮演", "原创化迁移参考"],
@@ -1576,8 +1898,10 @@ ${input.text}
 4. 不要鼓励未授权商业化复制原作姓名、专有名词、人物关系网、关键事件链。
 5. 对角色和世界观必须同时输出“原作拆解笔记”和“抽象原型 + 原创化导出卡”。
 6. 如果输入文本很长，只基于当前可见文本做分析，并在结果中提示 chapterCountEstimate 是估算。
-7. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
-8. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
+7. transferableStyleCard 只描述可迁移写法，不要鼓励“仿写某作者”；必须覆盖叙事声音、句式节奏、段落、对白、爽点、钩子和反面清单。
+8. referenceBoundaryCheck 必须替代模糊的“原创化风险”，用“可学/不可复用/必须改造/安全迁移”说清边界。
+9. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
+10. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
 `.trim();
   }
 
@@ -1680,7 +2004,7 @@ ${input.chapterText}
     "emotionDiagnosis": "悲伤/激动/爽点情节是否产生真实情绪，而不是只写情绪词；未启用则写未启用",
     "settingRecapDiagnosis": "人物年龄、身份、关键事件和设定是否前后自洽；未启用则写未启用",
     "deleteSentenceDiagnosis": "删掉环境/心理描写后剧情是否几乎不受影响，判断注水风险；未启用则写未启用",
-    "aiTraceDiagnosis": "是否存在 AI 模板化短板：专属记忆弱、情绪浅、伏笔短线化、语言同质化；未启用则写未启用",
+    "aiTraceDiagnosis": "文本自然度诊断：是否有模板化升华、空泛排比、专属细节弱、句式过齐等问题；未启用则写未启用",
     "promptAddons": ["应该写进改文提示词的具体约束"]
   },
   "nextRevisionMove": "下一步最该改什么",
@@ -1706,7 +2030,9 @@ ${input.chapterText}
 9. 平台推荐策略只能作为假设和经验归因，不能写成平台内部算法结论；要结合正文证据判断是否能提高点击、有效阅读、收藏/追更或付费转化。
 10. revisionPrompt 要写给另一个“负责改文的 AI”，让它知道怎么改文；不要让它重新开新故事。
 11. 如果启用 AI 自测增强，必须由你基于用户章节自行执行测试，不要要求用户填结果；测试结论只能作为辅助证据，仍要回到章节文本和 Rubric。
-12. revisionPrompt 必须吸收 selfTestFit.promptAddons，把“遮挡人名、跳读、共情、设定复盘、删句、AI 味”转化为改文 AI 可执行的约束。
+12. revisionPrompt 必须吸收 selfTestFit.promptAddons，把“遮挡人名、跳读、共情、设定复盘、删句、文本自然度”转化为改文 AI 可执行的约束。
+13. 必须额外诊断爽点疲劳：如果连续用同一种打脸、隐藏实力或围观惊呼填充，要给出类型轮换、代价或关系推进的改法。
+14. 必须额外诊断钩子回收：章末钩子要说明属于悬念、危机、反转、期待、情感或信息揭示，并指出下一章前段应如何回收。
 `.trim();
   }
 
@@ -1820,6 +2146,26 @@ ${normalized.slice(-1600)}`;
           migrationQuestion:
             "我的关键词是否真的带来了读者期待的事件、情绪或反转？",
         },
+        {
+          id: "p4",
+          title: "爽点要有压制、兑现和余波",
+          sourceObservation:
+            "成熟章节不会只写主角赢，而会先让对手造成具体压力，再让反击带来局势变化。",
+          reusableRule:
+            "爽点按压制、蓄力、反击、兑现、余波拆开，余波要制造下一轮期待。",
+          migrationQuestion:
+            "我的爽点是否只是奖励结果，还是改变了关系、资源、风险或下一章目标？",
+        },
+        {
+          id: "p5",
+          title: "自然表达来自角色和场景",
+          sourceObservation:
+            "有效章节用具体动作、道具和人物反应承载情绪，不靠空泛总结拔高。",
+          reusableRule:
+            "删掉模板化升华和同质句式，把判断改成角色动作、场景细节或可验证后果。",
+          migrationQuestion:
+            "这一段如果去掉抽象评价，还剩下哪些只属于本角色和本场景的细节？",
+        },
       ],
       rubric: {
         id: `rubric-${input.genre}-mock-v1`,
@@ -1845,7 +2191,16 @@ ${normalized.slice(-1600)}`;
         },
         metrics: baseRubricMetrics.map((metric, index) => ({
           ...metric,
-          referencePrincipleId: index < 4 ? "p1" : index < 10 ? "p2" : "p3",
+          referencePrincipleId:
+            metric.id === "pleasure-structure"
+              ? "p4"
+              : metric.id === "prose-naturalness"
+                ? "p5"
+                : index < 4
+                  ? "p1"
+                  : index < 12
+                    ? "p2"
+                    : "p3",
         })),
       },
       editorNote: "这份 Rubric 适合先验证开局和单章追读能力。",
@@ -2021,7 +2376,7 @@ ${normalized.slice(-1600)}`;
           ? "真实模型会检查环境和心理描写是否承担信息、情绪或节奏功能，识别注水段落。"
           : "未启用。",
         aiTraceDiagnosis: aiSelfTest.enabled
-          ? "真实模型会识别专属细节不足、情绪浅层、伏笔短线化和语言模板化等 AI 味。"
+          ? "真实模型会识别模板化升华、空泛排比、专属细节不足、句式过齐和说明腔。"
           : "未启用。",
         promptAddons: aiSelfTest.promptAddons,
       },
@@ -2185,6 +2540,44 @@ ${normalized.slice(-1600)}`;
         oneSentencePremise:
           "一个被低估的主角在压力中发现隐藏能力，并被卷入更大的势力冲突。",
         coreAppeal: ["低谷开局", "能力觉醒", "身份反转", "升级危机"],
+      },
+      transferableStyleCard: {
+        coreStyleTags: [
+          "低谷逆袭",
+          "强目标开局",
+          "阶段反击",
+          "线索驱动",
+          "章末升级",
+        ],
+        narrativeVoice: "第三人称有限视角，贴近主角观察和判断，少做全知解释。",
+        sentenceRhythm:
+          "中短句为主，冲突段落压缩句长，线索段落用少量中句承接因果。",
+        paragraphPattern:
+          "移动端友好的短段落，每段承担一个动作、反应、信息或情绪点。",
+        dialoguePattern: "对白用于施压、试探和暴露信息差，避免长篇解释设定。",
+        sensoryFocus: ["视觉压迫", "动作细节", "道具线索", "公开场面反应"],
+        pleasureMechanisms: [
+          "地位型爽点：被轻视后反击",
+          "认知型爽点：旧案线索逐步揭开",
+          "力量型爽点：隐藏能力阶段展示",
+        ],
+        hookPatterns: [
+          "信物揭示型钩子",
+          "更高层敌人危机型钩子",
+          "能力代价悬念型钩子",
+        ],
+        styleRules: [
+          "开章尽快给出目标、阻碍和失败代价。",
+          "设定必须通过冲突、道具或选择进入。",
+          "每章结尾保留一个更高层级的问题、奖励或威胁。",
+          "爽点释放前先建立具体压迫和情绪债。",
+        ],
+        antiPatterns: [
+          "不要先解释大段世界观。",
+          "不要让能力无代价解决所有问题。",
+          "不要复用原作姓名、专名、组织和关键事件顺序。",
+          "不要把可迁移风格写成仿写某作者。",
+        ],
       },
       worldbuilding: {
         worldRules: [
@@ -2691,6 +3084,44 @@ ${normalized.slice(-1600)}`;
           "保留情绪模型，不保留具体桥段。",
         ],
       },
+      referenceBoundaryCheck: {
+        summary:
+          "可以学习节奏、爽点、钩子和情绪工程，但不能复用可识别人物、专名、关系网和事件链。",
+        learnablePatterns: [
+          "公开压迫先建立情绪债，再释放阶段反击。",
+          "旧案信物把单章冲突升级为长期追读线。",
+          "能力展示同时带来新敌人或新代价。",
+          "章末用危机、秘密、奖励或反转推动下一章。",
+        ],
+        doNotReuse: [
+          "原作角色名",
+          "原作组织名",
+          "原作能力体系专名",
+          "原作关键桥段顺序",
+          "原作对白和连续表达",
+        ],
+        needsTransformation: [
+          "把公开考核改成新的资源分配制度。",
+          "把旧案信物改成新的物证类型和因果链。",
+          "把压迫者关系改成新的利益冲突。",
+          "把能力来源、限制和代价全部重写。",
+        ],
+        nameAndTermRisks: [
+          "能力名、组织名、地名、道具名不能沿用。",
+          "高辨识度称号和专属设定要替换。",
+        ],
+        plotSimilarityRisks: [
+          "被取消资格后立刻发现同款信物的顺序过近。",
+          "导师、旧案、隐藏能力如果组合不变，会形成换皮风险。",
+        ],
+        safeRewriteMoves: [
+          "换主角目标和失败代价。",
+          "换冲突场景和资源制度。",
+          "换线索类型和回收顺序。",
+          "换人物关系和利益链。",
+          "换爽点释放方式但保留期待-延迟-兑现结构。",
+        ],
+      },
       usageRiskNotice: {
         summary: "工具只做文本拆解和格式转换，不判断用户最终用途是否合法。",
         recommendedUse: [
@@ -2889,7 +3320,8 @@ ${normalized.slice(-1600)}`;
       emotion: "共情测试：检查情绪是否由场景、动作和选择触发",
       "setting-recap": "复盘设定测试：核对人物身份、关键事件和设定自洽",
       "delete-sentence": "删句测试：检查描写删掉后是否影响剧情和情绪",
-      "ai-trace": "AI 味测试：识别专属细节弱、情绪浅、伏笔短线化和语言模板化",
+      "ai-trace":
+        "文本自然度测试：识别模板化升华、空泛排比、专属细节弱、句式过齐和说明腔",
     };
     const promptAddonMap: Record<string, string> = {
       "dialogue-mask":
@@ -2903,7 +3335,7 @@ ${normalized.slice(-1600)}`;
       "delete-sentence":
         "改写时删除或合并不承担信息、情绪、节奏、伏笔功能的环境和心理描写。",
       "ai-trace":
-        "改写时增加只属于本角色/本场景的细节、长线伏笔和非模板表达，降低一键生成感。",
+        "改写时删掉模板化升华、空泛排比和说明腔，增加只属于本角色/本场景的细节、动作后果和长线伏笔。",
     };
     const requestedTests = value?.tests?.length ? value.tests : allTests;
     const enabled = value?.enabled !== false && requestedTests.length > 0;
@@ -2960,8 +3392,11 @@ AI 自测约束：${aiSelfTest.summary}
 2. 把标签和关键词转化为事件、冲突、情绪债，不要机械堆词。
 3. 增强目标平台需要的节奏、情绪反馈和结尾钩子。
 4. 保留原章节的基本人物、场景和剧情事实，只调整表达、顺序、冲突强度和钩子。
+5. 爽点按“压制、蓄力、反击、兑现、余波”补齐，避免只写主角赢或围观惊呼。
+6. 章末钩子必须明确属于悬念、危机、反转、期待、情感或信息揭示，并给下一章前段留下回收点。
+7. 删除模板化升华、空泛排比和说明腔，用角色动作、道具细节和具体后果替代。
 ${aiSelfTest.promptAddons
-  .map((item, index) => `${index + 5}. ${item}`)
+  .map((item, index) => `${index + 8}. ${item}`)
   .join("\n")}
 
 禁止：

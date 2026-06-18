@@ -110,17 +110,65 @@ function ExportCenter({
 		return null;
 	}
 
-	const formats: Array<{ id: BookExportFormat; label: string }> = [
-		{ id: "markdown", label: "Markdown 报告" },
-		{ id: "json", label: "JSON 数据包" },
-		{ id: "tavern-card", label: "Tavern 角色卡" },
-		{ id: "world-book", label: "World Book" },
-		{ id: "sillytavern-world-info", label: "SillyTavern World Info" },
-		{ id: "continuation-pack", label: "续写包 JSON" },
-		{ id: "style-bible", label: "风格圣经" },
-		{ id: "outline", label: "卷纲/大纲" },
-		{ id: "prompt-pack", label: "Prompt 包" },
-		{ id: "do-not-copy", label: "避险清单" },
+	const formats: Array<{
+		id: BookExportFormat;
+		label: string;
+		description: string;
+		recommended?: boolean;
+	}> = [
+		{
+			id: "markdown",
+			label: "学习报告",
+			description: "最适合新手阅读、复盘和保存笔记。",
+			recommended: true,
+		},
+		{
+			id: "do-not-copy",
+			label: "避险清单",
+			description: "列出不建议照搬的角色、设定和桥段。",
+			recommended: true,
+		},
+		{
+			id: "outline",
+			label: "卷纲/大纲",
+			description: "把拆解结果整理成可继续创作的结构提纲。",
+			recommended: true,
+		},
+		{
+			id: "prompt-pack",
+			label: "改写提示词包",
+			description: "给 AI 续写或改稿时使用，适合已有创作方向。",
+		},
+		{
+			id: "continuation-pack",
+			label: "续写数据包",
+			description: "结构化上下文，适合程序或高级工作流。",
+		},
+		{
+			id: "style-bible",
+			label: "风格说明书",
+			description: "总结叙事节奏、表达习惯和场景组织方式。",
+		},
+		{
+			id: "json",
+			label: "完整 JSON",
+			description: "给开发者、自动化脚本或二次处理使用。",
+		},
+		{
+			id: "tavern-card",
+			label: "角色卡",
+			description: "导入 Tavern/SillyTavern 一类工具。",
+		},
+		{
+			id: "world-book",
+			label: "世界书",
+			description: "导入世界观、组织、地点和关键词触发条目。",
+		},
+		{
+			id: "sillytavern-world-info",
+			label: "SillyTavern 世界信息",
+			description: "给 SillyTavern 的 World Info 格式使用。",
+		},
 	];
 	const modes: Array<{
 		id: BookExportMode;
@@ -172,18 +220,29 @@ function ExportCenter({
 				当前模式：{selectedMode.label}。{selectedMode.description}
 			</p>
 			<ExportRiskNotice mode={mode} />
-			<div className="mt-4 flex flex-wrap gap-2">
+			<div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
 				{formats.map((format) => (
 					<Button
 						key={format.id}
 						variant="outline"
+						className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
 						onClick={() => onExport(format.id, mode)}
 						disabled={loading !== null}
 					>
-						{loading === "export" ? (
-							<Loader2 className="mr-2 size-4 animate-spin" />
-						) : null}
-						{format.label}
+						<span className="flex w-full items-start gap-2">
+							{loading === "export" ? (
+								<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+							) : null}
+							<span>
+								<span className="block font-medium">
+									{format.label}
+									{format.recommended ? "（推荐）" : ""}
+								</span>
+								<span className="mt-1 block text-xs leading-5 text-muted-foreground">
+									{format.description}
+								</span>
+							</span>
+						</span>
 					</Button>
 				))}
 			</div>
@@ -231,7 +290,7 @@ export function BookAnalysisPanel({ result }: { result: BookAnalysisResult | nul
 					<h2 className="text-lg font-semibold">整书拆解结果</h2>
 				</div>
 				<p className="mt-5 text-sm text-muted-foreground">
-					拆解完成后，这里会展示世界观、人物卡、关系图谱、大事纪、写作支持包、世界书导出和去原创化骨架。
+					拆解完成后，这里会展示世界观、人物卡、关系图谱、大事纪、写作支持包、可迁移风格卡、世界书导出和参考边界检查。
 				</p>
 			</section>
 		);
@@ -239,6 +298,8 @@ export function BookAnalysisPanel({ result }: { result: BookAnalysisResult | nul
 
 	const writingSupport = result.writingSupport;
 	const generationAssets = result.generationAssets;
+	const styleCard = result.transferableStyleCard;
+	const boundaryCheck = result.referenceBoundaryCheck;
 
 	return (
 		<section className="space-y-6">
@@ -327,6 +388,60 @@ export function BookAnalysisPanel({ result }: { result: BookAnalysisResult | nul
 					</div>
 				) : null}
 			</div>
+
+			{styleCard ? (
+				<div className="rounded-md border border-border bg-card p-5">
+					<h3 className="font-semibold">可迁移风格卡</h3>
+					<p className="mt-2 text-sm text-muted-foreground">
+						提炼可学习的写法规则，不用于仿写作者，也不复用原作可识别内容。
+					</p>
+					<div className="mt-4 grid gap-4 xl:grid-cols-3">
+						<div className="rounded-md border border-border bg-background p-4 text-sm">
+							<p className="font-medium">风格标签</p>
+							<div className="mt-3 flex flex-wrap gap-2">
+								{styleCard.coreStyleTags.map((tag) => (
+									<span
+										key={tag}
+										className="rounded-md border border-border px-2 py-1 text-xs"
+									>
+										{tag}
+									</span>
+								))}
+							</div>
+						</div>
+						<div className="rounded-md border border-border bg-background p-4 text-sm">
+							<p className="font-medium">叙事声音</p>
+							<p className="mt-2 text-muted-foreground">{styleCard.narrativeVoice}</p>
+						</div>
+						<div className="rounded-md border border-border bg-background p-4 text-sm">
+							<p className="font-medium">句式与段落</p>
+							<p className="mt-2 text-muted-foreground">{styleCard.sentenceRhythm}</p>
+							<p className="mt-2 text-muted-foreground">
+								{styleCard.paragraphPattern}
+							</p>
+						</div>
+					</div>
+					<div className="mt-4 grid gap-4 xl:grid-cols-2">
+						<div className="rounded-md border border-border bg-background p-4 text-sm">
+							<p className="font-medium">对白方式</p>
+							<p className="mt-2 text-muted-foreground">
+								{styleCard.dialoguePattern}
+							</p>
+							<div className="mt-3 grid gap-3">
+								<ListBlock title="主导感官" items={styleCard.sensoryFocus} />
+								<ListBlock title="爽点机制" items={styleCard.pleasureMechanisms} />
+								<ListBlock title="钩子方式" items={styleCard.hookPatterns} />
+							</div>
+						</div>
+						<div className="rounded-md border border-border bg-background p-4 text-sm">
+							<div className="grid gap-3">
+								<ListBlock title="可迁移规则" items={styleCard.styleRules} />
+								<ListBlock title="反面清单" items={styleCard.antiPatterns} />
+							</div>
+						</div>
+					</div>
+				</div>
+			) : null}
 
 			<div className="grid gap-6 xl:grid-cols-2">
 				<div className="rounded-md border border-border bg-card p-5">
@@ -818,7 +933,28 @@ export function BookAnalysisPanel({ result }: { result: BookAnalysisResult | nul
 			) : null}
 
 			<div className="rounded-md border border-border bg-card p-5">
-				<h3 className="font-semibold">原创化避险报告</h3>
+				<h3 className="font-semibold">参考边界检查</h3>
+				{boundaryCheck ? (
+					<>
+						<p className="mt-2 text-sm text-muted-foreground">
+							{boundaryCheck.summary}
+						</p>
+						<div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
+							<ListBlock title="可以学习" items={boundaryCheck.learnablePatterns} />
+							<ListBlock title="不要复用" items={boundaryCheck.doNotReuse} />
+							<ListBlock title="必须改造" items={boundaryCheck.needsTransformation} />
+							<ListBlock title="专名风险" items={boundaryCheck.nameAndTermRisks} />
+							<ListBlock
+								title="情节雷同风险"
+								items={boundaryCheck.plotSimilarityRisks}
+							/>
+							<ListBlock
+								title="安全迁移动作"
+								items={boundaryCheck.safeRewriteMoves}
+							/>
+						</div>
+					</>
+				) : null}
 				<div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
 					<ListBlock title="可学习" items={result.originalizationReport.safeToLearn} />
 					<ListBlock

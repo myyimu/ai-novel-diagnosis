@@ -37,8 +37,9 @@ import {
 	buildResearchPromptSeed,
 	buildScoreEvidenceChain,
 } from "@/lib/research-library";
+import { providerPresets } from "@/lib/provider-presets";
+import { type WorkspaceView, workspaceViewRoutes } from "@/lib/workspace-routes";
 import {
-	aiSelfTests,
 	type BookAnalysisJob,
 	type BookUploadPreview,
 	type PersistedResearchLibrary,
@@ -50,160 +51,20 @@ import {
 	type ResearchQaResult,
 	type RubricMetric,
 	type RubricResult,
+	type QuickReviewResult,
 	type ScoreResult,
+	defaultBookText,
+	defaultProvider,
+	defaultReferenceText,
+	defaultUserText,
 	useWorkspaceStore,
 } from "@/stores/workspace-store";
-
-const providerPresets: Record<
-	ProviderPresetId,
-	{
-		label: string;
-		kind: ProviderKind;
-		baseUrl: string;
-		model: string;
-		modelOptions?: string[];
-		jsonMode: boolean;
-		needsApiKey: boolean;
-		notice?: string;
-	}
-> = {
-	custom: {
-		label: "自定义模型服务",
-		kind: "openai-compatible",
-		baseUrl: "",
-		model: "",
-		modelOptions: [],
-		jsonMode: false,
-		needsApiKey: true,
-	},
-	"ai-horde": {
-		label: "公共免费模型",
-		kind: "ai-horde",
-		baseUrl: "https://aihorde.net/api/v2",
-		model: "aphrodite/TheDrummer/Cydonia-24B-v4.3",
-		modelOptions: [
-			"aphrodite/TheDrummer/Cydonia-24B-v4.3",
-			"aphrodite/TheDrummer/Skyfall-31B-v4.2",
-			"aphrodite/SicariusSicariiStuff/Impish_Bloodmoon_12B",
-			"koboldcpp/Cydonia-24B-v4.3",
-		],
-		jsonMode: false,
-		needsApiKey: false,
-		notice: "公共免费模型不用填写 API Key，但可能排队、变慢、失败或输出质量波动；不建议上传未授权原文、隐私内容或商业机密。",
-	},
-	"shared-gpu": {
-		label: "免费共享算力",
-		kind: "openai-compatible",
-		baseUrl: "",
-		model: "",
-		modelOptions: [],
-		jsonMode: false,
-		needsApiKey: false,
-		notice: "免费线路由服务器统一提供，可能排队、变慢、失败、可分析字数变少或输出质量波动；不建议上传未授权原文、隐私内容或商业机密。",
-	},
-	"openrouter-free": {
-		label: "OpenRouter 免费模型",
-		kind: "openai-compatible",
-		baseUrl: "https://openrouter.ai/api/v1",
-		model: "openrouter/free",
-		modelOptions: [
-			"openrouter/free",
-			"deepseek/deepseek-r1:free",
-			"qwen/qwen3-coder:free",
-			"meta-llama/llama-3.2-3b-instruct:free",
-		],
-		jsonMode: false,
-		needsApiKey: false,
-		notice: "免费模型由 OpenRouter 提供，可能限流、排队、临时不可用或输出质量波动；不建议上传未授权原文、隐私内容或商业机密。",
-	},
-	deepseek: {
-		label: "DeepSeek",
-		kind: "openai-compatible",
-		baseUrl: "https://api.deepseek.com/v1",
-		model: "deepseek-chat",
-		modelOptions: ["deepseek-chat", "deepseek-reasoner"],
-		jsonMode: false,
-		needsApiKey: true,
-	},
-	doubao: {
-		label: "豆包/火山方舟",
-		kind: "openai-compatible",
-		baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-		model: "doubao-seed-1-6",
-		modelOptions: ["doubao-seed-1-6"],
-		jsonMode: false,
-		needsApiKey: true,
-	},
-	qwen: {
-		label: "阿里云百炼/通义千问",
-		kind: "openai-compatible",
-		baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		model: "qwen-plus",
-		modelOptions: [
-			"qwen-plus",
-			"qwen-plus-latest",
-			"qwen3-max",
-			"qwen3-max-preview",
-			"qwen-max",
-			"qwen-max-latest",
-			"qwen-flash",
-			"qwen-turbo",
-			"qwen-turbo-latest",
-			"qwen3.5-plus",
-			"qwen3.5-flash",
-			"qwen3-coder-plus",
-			"qwen3-coder-flash",
-			"qwq-plus",
-		],
-		jsonMode: false,
-		needsApiKey: true,
-	},
-	ollama: {
-		label: "Ollama 本地模型",
-		kind: "openai-compatible",
-		baseUrl: "http://localhost:11434/v1",
-		model: "qwen2.5:7b",
-		modelOptions: ["qwen2.5:7b", "qwen3:8b", "llama3.1:8b"],
-		jsonMode: false,
-		needsApiKey: false,
-	},
-};
 
 interface ApiEnvelope<T> {
 	code: number;
 	message: string;
 	data: T;
 }
-
-interface HordeTextModel {
-	name: string;
-	workers: number;
-	eta: number;
-	queued: number;
-	performance: number;
-	jobs: number;
-}
-
-type WorkspaceView =
-	| "overview"
-	| "starter"
-	| "library"
-	| "provider"
-	| "chapter"
-	| "book"
-	| "history"
-	| "exports";
-
-const workspaceViewRoutes: Record<WorkspaceView, string> = {
-	overview: "/workspace",
-	starter: "/starter",
-	library: "/library",
-	provider: "/model",
-	chapter: "/critique",
-	book: "/book",
-	history: "/history",
-	exports: "/export",
-};
 
 type LoadingState =
 	| "provider"
@@ -235,7 +96,7 @@ interface ReferenceProfileResult {
 	notes?: string;
 }
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000/api/v1";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001/api/v1";
 
 function parseList(value: string): string[] {
 	return value
@@ -498,6 +359,58 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 	return payload.data;
 }
 
+function toQuickReviewErrorMessage(error: unknown): string {
+	const message = error instanceof Error ? error.message : String(error);
+	const normalized = message.toLowerCase();
+
+	if (
+		normalized.includes("403") ||
+		normalized.includes("kudos") ||
+		normalized.includes("heavy demand") ||
+		normalized.includes("429") ||
+		normalized.includes("rate limit") ||
+		normalized.includes("too many requests")
+	) {
+		return "当前模型服务正在限流或排队，请等 30 秒后再试。";
+	}
+
+	if (
+		normalized.includes("503") ||
+		normalized.includes("502") ||
+		normalized.includes("504") ||
+		normalized.includes("temporarily unavailable") ||
+		normalized.includes("provider request failed")
+	) {
+		return "模型服务暂时繁忙，请稍后重试。";
+	}
+
+	if (
+		normalized.includes("timed out") ||
+		normalized.includes("timeout") ||
+		normalized.includes("public workers may be busy")
+	) {
+		return "当前模型服务请求超时，请稍后重试；如果使用共享站，可能正在排队。";
+	}
+
+	if (
+		normalized.includes("failed to fetch") ||
+		normalized.includes("networkerror") ||
+		normalized.includes("network")
+	) {
+		return "网络连接失败，请确认 API 服务已启动，然后重试。";
+	}
+
+	if (
+		normalized.includes("json") ||
+		normalized.includes("unexpected token") ||
+		normalized.includes("extract")
+	) {
+		return "模型返回内容不完整，请重试一次。";
+	}
+
+	return message || "快速点评失败，请稍后重试。";
+}
+
 async function postForm<T>(path: string, body: FormData): Promise<T> {
 	const response = await fetch(`${apiBaseUrl}${path}`, {
 		method: "POST",
@@ -640,13 +553,9 @@ function optionLabel(options: Array<{ value: string; label: string }>, value: st
 	return options.find((option) => option.value === value)?.label ?? value;
 }
 
-export function NovelCritiqueConsole({
-	initialView = "overview",
-}: {
-	initialView?: WorkspaceView;
-}) {
+export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceView }) {
 	const router = useRouter();
-	const [activeView, setActiveView] = useState<WorkspaceView>(initialView);
+	const activeView = view;
 	const {
 		provider,
 		setProvider,
@@ -706,6 +615,8 @@ export function NovelCritiqueConsole({
 		setRubricResult,
 		scoreResult,
 		setScoreResult,
+		quickReviewResult,
+		setQuickReviewResult,
 		referenceProfileProgress,
 		setReferenceProfileProgress,
 		setScoreProgress,
@@ -737,31 +648,42 @@ export function NovelCritiqueConsole({
 		setResearchQaResult,
 	} = useWorkspaceStore();
 	const [status, setStatus] = useState<string>(
-		"默认使用公共免费模型；如果排队太久或失败，可以切换到其他模型服务。",
+		"默认使用共享站；配置自己的 API Key 后，会使用你选择的模型服务。",
 	);
 	const [loading, setLoading] = useState<LoadingState>(null);
-	const [hordeTextModels, setHordeTextModels] = useState<HordeTextModel[]>([]);
+	const [quickReviewElapsedSeconds, setQuickReviewElapsedSeconds] = useState(0);
 	const referenceProfileCacheRef = useRef<Map<string, ReferenceProfileResult>>(new Map());
 	const chapterDraftTouchedRef = useRef(false);
 	const platformStrategyTouchedRef = useRef(false);
 	const scoreProgressTimersRef = useRef<number[]>([]);
 
 	useEffect(() => {
-		setActiveView(initialView);
-	}, [initialView]);
+		if (loading !== "quick") {
+			setQuickReviewElapsedSeconds(0);
+			return;
+		}
+
+		const startedAt = Date.now();
+		setQuickReviewElapsedSeconds(0);
+		const timer = window.setInterval(() => {
+			setQuickReviewElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+		}, 1000);
+
+		return () => window.clearInterval(timer);
+	}, [loading]);
 
 	function openView(view: WorkspaceView) {
-		setActiveView(view);
 		router.push(workspaceViewRoutes[view]);
 	}
 
-	const navItems: Array<WorkspaceNavItem<WorkspaceView>> = [
+	const allViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 		{
 			id: "overview" as const,
 			label: "工作台",
 			icon: LayoutDashboard,
 			title: "小说拆解工作台",
-			description: "从成熟样本、章节质检到整书拆解，集中查看当前进度、下一步动作和最近结果。",
+			description:
+				"集中查看当前进度、下一步动作和最近结果；具体操作进入章节、整书或研究页完成。",
 		},
 		{
 			id: "starter" as const,
@@ -773,11 +695,11 @@ export function NovelCritiqueConsole({
 		},
 		{
 			id: "library" as const,
-			label: "小说研究库",
+			label: "研究决策",
 			icon: BookOpenCheck,
-			title: "小说研究库",
+			title: "研究决策",
 			description:
-				"把上传资料变成可追溯的创作判断：知识图谱、可解释评分、多书横向对比都从这里汇总。",
+				"把已拆解样本变成可追溯的创作判断：研究库、多书横向对比和选题 Prompt 都从这里汇总。",
 		},
 		{
 			id: "provider" as const,
@@ -785,22 +707,23 @@ export function NovelCritiqueConsole({
 			icon: Settings,
 			title: "AI 设置",
 			description:
-				"选择用于分析小说的模型服务。默认免费可用；需要更稳定时，可以切换到自己的模型账号或本地模型。",
+				"选择用于分析小说的模型服务。可用共享站，也可以切换到自己的模型账号或本地模型。",
 		},
 		{
 			id: "chapter" as const,
-			label: "单章点评",
+			label: "章节质检",
 			icon: FileText,
-			title: "单章点评流程",
+			title: "章节质检",
 			description:
-				"拆成熟章节生成评分标准（Rubric），再用同一套标准质检自己的章节并生成改文 Prompt。",
+				"围绕一个章节做快速判断、评分标准、完整评分和改文提示词，避免章节点评入口分散。",
 		},
 		{
 			id: "book" as const,
-			label: "整书拆解",
+			label: "整书资产",
 			icon: Network,
-			title: "整书拆解流程",
-			description: "上传 TXT，先检查章节切分，再逐章拆解世界观、人物和故事线。",
+			title: "整书资产",
+			description:
+				"上传 TXT，检查章节切分，逐章拆解世界观、人物和故事线；历史任务和导出围绕这里展开。",
 		},
 		{
 			id: "history" as const,
@@ -817,7 +740,12 @@ export function NovelCritiqueConsole({
 			description: "选择学习笔记或原创化素材包，再下载报告、角色卡、世界书和避险清单。",
 		},
 	];
-	const activeMeta = navItems.find((item) => item.id === activeView) ?? navItems[0];
+	const navItems = allViewItems.filter((item) =>
+		(["overview", "chapter", "book", "library", "provider"] as WorkspaceView[]).includes(
+			item.id,
+		),
+	);
+	const activeMeta = allViewItems.find((item) => item.id === activeView) ?? allViewItems[0];
 
 	const providerPayload = useMemo(
 		() => ({
@@ -832,17 +760,11 @@ export function NovelCritiqueConsole({
 		[provider],
 	);
 	const selectedProviderPreset = providerPresets[provider.preset];
-	const providerModelOptions =
-		provider.preset === "ai-horde" && hordeTextModels.length
-			? hordeTextModels.map((model) => model.name)
-			: (selectedProviderPreset.modelOptions ?? []);
+	const providerModelOptions = selectedProviderPreset.modelOptions ?? [];
 	const selectedModelOption = providerModelOptions.includes(provider.model)
 		? provider.model
 		: "__custom__";
-	const isBackendFreeProvider =
-		provider.preset === "shared-gpu" ||
-		provider.preset === "openrouter-free" ||
-		provider.preset === "ai-horde";
+	const isBackendFreeProvider = provider.preset === "shared-gpu";
 	const isShortPaidReading = readingMode === "short-paid";
 	const isShortFormReading = isShortPaidReading || platform === "wechat-short";
 	const isLongSerialization = readingMode === "long-serialization";
@@ -858,6 +780,8 @@ export function NovelCritiqueConsole({
 	const referenceProfileApplied = referenceProfileProgress.some(
 		(item) => item.id === "apply" && item.status === "completed",
 	);
+	const hasChapterDraft = Boolean(chapterText.trim());
+	const hasReferenceText = Boolean(referenceText.trim());
 	const hasPerformanceSnapshot = [
 		impressions,
 		clickThroughRate,
@@ -884,8 +808,19 @@ export function NovelCritiqueConsole({
 		},
 		{
 			label: "成熟章节导入",
-			done: Boolean(referenceText.trim()),
-			detail: referenceFileName || `${referenceText.trim().length} 字参考文本`,
+			done: hasReferenceText,
+			detail: hasReferenceText
+				? referenceFileName || `${referenceText.trim().length} 字参考文本`
+				: "可稍后导入，用来生成更细的评分标准。",
+		},
+		{
+			label: "快速点评",
+			done: Boolean(quickReviewResult),
+			detail: quickReviewResult
+				? `${quickReviewResult.quickScore}/10 · ${quickReviewResult.mainProblem}`
+				: hasChapterDraft
+					? "已有章节正文，可以先跑一次快速点评。"
+					: "先粘贴自己的章节正文，最快看到反馈。",
 		},
 		{
 			label: "市场定位识别",
@@ -895,11 +830,11 @@ export function NovelCritiqueConsole({
 				: "可手动填写；建议点击 AI 识别获得更可靠的定位。",
 		},
 		{
-			label: "评分标准（Rubric）",
+			label: "评分标准",
 			done: Boolean(rubricResult),
 			detail: rubricResult
 				? `${rubricResult.rubric.metrics.length} 个评分指标`
-				: "尚未生成评分标准（Rubric）。",
+				: "尚未生成评分标准。",
 		},
 		{
 			label: "章节评分",
@@ -918,48 +853,78 @@ export function NovelCritiqueConsole({
 		(chapterProjectSteps.filter((step) => step.done).length / chapterProjectSteps.length) * 100,
 	);
 	const nextChapterAction = !rubricResult
-		? "生成 Rubric"
+		? "生成评分标准"
 		: !scoreResult
 			? "开始章节评分"
 			: "查看评分报告";
-	const nextAction = !referenceProfileApplied
+	const nextAction = !hasChapterDraft
 		? {
-				title: "先校准市场定位",
+				title: "先粘贴自己的章节",
 				description:
-					"当前已有初步判断，但还没有完成市场定位校准。先确认分类、主题、标签和读者期待，后面的评分标准（Rubric）才不会偏。",
-				actionLabel: "去 AI 识别定位",
+					"不用先填完所有信息。粘贴一段正文后，可以先跑快速点评，马上看到卖点、问题和改稿方向。",
+				actionLabel: "去快速点评",
 				view: "chapter" as const,
-				secondaryLabel: "AI 设置",
+				secondaryLabel: "选择模型",
 				secondaryView: "provider" as const,
 			}
-		: !rubricResult
+		: !quickReviewResult
 			? {
-					title: "生成本章评分标准",
+					title: "先生成快速点评",
 					description:
-						"市场定位已经可用，下一步把成熟章节拆成可复用的评分标准（Rubric），再用同一套标准质检你的章节。",
-					actionLabel: "去生成 Rubric",
+						"快速点评只需要一段正文，会先给出定位、卖点、最大问题和三条改法；精评可以稍后再做。",
+					actionLabel: "生成快速点评",
 					view: "chapter" as const,
-					secondaryLabel: "调整策略画像",
+					secondaryLabel: "导入参考章节",
 					secondaryView: "chapter" as const,
 				}
-			: !scoreResult
+			: !hasReferenceText
 				? {
-						title: "开始质检你的章节",
+						title: "想精评时再导入参考章节",
 						description:
-							"评分标准（Rubric）已生成。现在可以按目标平台、市场定位、平台策略和数据快照给你的章节打分。",
-						actionLabel: "去开始评分",
+							"快速点评已经能给方向。需要更细的评分报告时，再导入一章成熟样本，让系统生成贴合目标题材的评分标准。",
+						actionLabel: "导入成熟章节",
 						view: "chapter" as const,
-						secondaryLabel: "查看 Rubric",
+						secondaryLabel: "查看快速点评",
 						secondaryView: "chapter" as const,
 					}
-				: {
-						title: "先改最大短板",
-						description: scoreResult.nextRevisionMove,
-						actionLabel: "查看评分报告",
-						view: "chapter" as const,
-						secondaryLabel: "拆解整书",
-						secondaryView: "book" as const,
-					};
+				: !referenceProfileApplied
+					? {
+							title: "先校准市场定位",
+							description:
+								"当前还没有完成市场定位校准。先确认分类、主题、标签和读者期待，后面的评分标准才不会偏。",
+							actionLabel: "去 AI 识别定位",
+							view: "chapter" as const,
+							secondaryLabel: "AI 设置",
+							secondaryView: "provider" as const,
+						}
+					: !rubricResult
+						? {
+								title: "生成本章评分标准",
+								description:
+									"市场定位已经可用，下一步把成熟章节拆成可复用的评分标准，再用同一套标准质检你的章节。",
+								actionLabel: "去生成评分标准",
+								view: "chapter" as const,
+								secondaryLabel: "调整策略画像",
+								secondaryView: "chapter" as const,
+							}
+						: !scoreResult
+							? {
+									title: "开始质检你的章节",
+									description:
+										"评分标准已生成。现在可以按目标平台、市场定位、平台策略和数据快照给你的章节打分。",
+									actionLabel: "去开始评分",
+									view: "chapter" as const,
+									secondaryLabel: "查看评分标准",
+									secondaryView: "chapter" as const,
+								}
+							: {
+									title: "先改最大短板",
+									description: scoreResult.nextRevisionMove,
+									actionLabel: "查看评分报告",
+									view: "chapter" as const,
+									secondaryLabel: "拆解整书",
+									secondaryView: "book" as const,
+								};
 	const bookStatusText = bookJob
 		? `${bookJob.status} · ${bookJob.progress.message}`
 		: bookUpload
@@ -1021,7 +986,7 @@ export function NovelCritiqueConsole({
 			status: scoreResult ? "已生成" : "待评分",
 			detail: scoreResult
 				? `${scoreResult.totalScore}/10 · ${evidenceScoreCount} 条证据`
-				: "需要先生成评分标准（Rubric）并完成章节评分。",
+				: "需要先生成评分标准并完成章节评分。",
 		},
 		{
 			name: "多书样本池",
@@ -1042,16 +1007,6 @@ export function NovelCritiqueConsole({
 			void loadResearchLibrary();
 		}
 	}, [activeView, persistedResearchLibrary]);
-
-	useEffect(() => {
-		if (
-			activeView === "provider" &&
-			provider.preset === "ai-horde" &&
-			hordeTextModels.length === 0
-		) {
-			void loadHordeTextModels();
-		}
-	}, [activeView, provider.preset, hordeTextModels.length]);
 
 	function clearScoreProgressTimers() {
 		scoreProgressTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1238,28 +1193,36 @@ export function NovelCritiqueConsole({
 		}));
 	}
 
-	async function loadHordeTextModels() {
-		try {
-			const models = await getJson<HordeTextModel[]>("/analysis/provider/horde-models");
-			setHordeTextModels(models);
-			if (provider.preset === "ai-horde" && models.length) {
-				setProvider((current) => {
-					if (
-						current.preset !== "ai-horde" ||
-						models.some((model) => model.name === current.model)
-					) {
-						return current;
-					}
+	function resetProviderSettings() {
+		setProvider(defaultProvider);
+		setStatus("已恢复默认 AI 设置，并保存到本机浏览器。");
+	}
 
-					return {
-						...current,
-						model: models[0].name,
-					};
-				});
-			}
-		} catch {
-			setHordeTextModels([]);
-		}
+	function useExampleChapter() {
+		setChapterTitle("第一章 考场重逢");
+		setChapterText(defaultUserText);
+		setQuickReviewResult(null);
+		setScoreResult(null);
+		setStatus("已填入示例章节。示例只用于演示，你可以直接替换成自己的正文。");
+	}
+
+	function useExampleReference() {
+		setReferenceTitle("第一章 少年被逐");
+		setReferenceText(defaultReferenceText);
+		setReferenceFileName("");
+		setRubricResult(null);
+		setScoreResult(null);
+		setReferenceProfileProgress([]);
+		setStatus("已填入示例参考章节。示例只用于演示，市场定位仍需 AI 识别或手动校正。");
+	}
+
+	function useExampleBook() {
+		setBookTitle("示例长篇小说");
+		setBookText(defaultBookText);
+		setBookUpload(null);
+		setBookAnalysisResult(null);
+		setBookJob(null);
+		setStatus("已填入示例整书文本。示例只用于演示，请在正式拆解前替换为自己的 TXT。");
 	}
 
 	function applyInferredPlatformStrategy(
@@ -1321,7 +1284,7 @@ export function NovelCritiqueConsole({
 				? `，置信度 ${Math.round(result.confidence * 100)}%`
 				: "";
 		const suffix = result.notes ? `。${result.notes}` : "";
-		setStatus(`AI 已识别市场定位${confidence}；你可以校正后生成评分标准（Rubric）${suffix}`);
+		setStatus(`AI 已识别市场定位${confidence}；你可以校正后生成评分标准${suffix}`);
 	}
 
 	async function inferReferenceProfileFromModel(text = referenceText, filename?: string) {
@@ -1381,7 +1344,7 @@ export function NovelCritiqueConsole({
 				detail: "已把缓存识别结果写入市场定位字段。",
 				facts: buildReferenceProfileFacts(cached),
 			});
-			setStatus("已使用缓存的 AI 识别结果；你可以校正后生成评分标准（Rubric）。");
+			setStatus("已使用缓存的 AI 识别结果；你可以校正后生成评分标准。");
 			return;
 		}
 
@@ -1422,7 +1385,7 @@ export function NovelCritiqueConsole({
 				detail: "AI 识别失败，未写入市场定位字段；请切换可用模型重试，或手动填写下面字段。",
 			});
 			setStatus(
-				`${(error as Error).message}；AI 识别失败，未自动改写市场定位字段。请切换可用模型重试，或手动填写后生成评分标准（Rubric）。`,
+				`${(error as Error).message}；AI 识别失败，未自动改写市场定位字段。请切换可用模型重试，或手动填写后生成评分标准。`,
 			);
 		} finally {
 			setLoading(null);
@@ -1453,7 +1416,7 @@ export function NovelCritiqueConsole({
 		setLoading("rubric");
 		setScoreResult(null);
 		resetScoreProgress();
-		setStatus("正在拆解参考章节并生成评分标准（Rubric）...");
+		setStatus("正在拆解参考章节并生成评分标准...");
 		try {
 			const result = await postJson<RubricResult>("/analysis/rubric", {
 				provider: providerPayload,
@@ -1476,7 +1439,7 @@ export function NovelCritiqueConsole({
 				referenceText,
 			});
 			setRubricResult(result);
-			setStatus(`评分标准（Rubric）已生成：${result.rubric.metrics.length} 个指标`);
+			setStatus(`评分标准已生成：${result.rubric.metrics.length} 个指标`);
 		} catch (error) {
 			setStatus((error as Error).message);
 		} finally {
@@ -1486,14 +1449,14 @@ export function NovelCritiqueConsole({
 
 	async function scoreChapter() {
 		if (!rubricResult) {
-			setStatus("请先生成评分标准（Rubric）。");
+			setStatus("请先生成评分标准。");
 			return;
 		}
 
 		setLoading("score");
 		setScoreResult(null);
 		initializeScoreProgress(rubricResult.rubric.metrics);
-		setStatus("正在按评分标准（Rubric）质检你的章节...");
+		setStatus("正在按评分标准质检你的章节...");
 		try {
 			const result = await postJson<ScoreResult>("/analysis/score", {
 				provider: providerPayload,
@@ -1557,73 +1520,34 @@ export function NovelCritiqueConsole({
 
 	async function runQuickExperience() {
 		if (chapterText.trim().length < 50) {
-			setStatus("请先粘贴至少 50 字章节正文，再运行快速体验。");
+			setStatus("请先粘贴至少 50 字章节正文，再运行快速点评。");
 			return;
 		}
 
 		setLoading("quick");
-		setRubricResult(null);
-		setScoreResult(null);
-		resetScoreProgress();
-		setStatus("快速体验：正在用默认成熟章节生成评分标准（Rubric）...");
+		setQuickReviewResult(null);
+		setStatus("正在读取章节...");
+		const queueStatusTimer = window.setTimeout(() => {
+			setStatus(
+				provider.preset === "shared-gpu"
+					? "共享站可能正在排队，请继续等待..."
+					: "正在等待你配置的模型返回结果...",
+			);
+		}, 10_000);
 		try {
-			const generatedRubric = await postJson<RubricResult>("/analysis/rubric", {
+			setStatus("正在生成快速点评...");
+			const result = await postJson<QuickReviewResult>("/analysis/quick-review", {
 				provider: providerPayload,
-				referenceTitle,
-				genre,
-				platform,
-				audience,
-				readingMode,
-				category,
-				theme,
-				tags: parseList(tags),
-				explicitKeywords: parseList(explicitKeywords),
-				implicitExpectations: parseList(implicitExpectations),
-				positioningPromise,
-				recommendationSignals: parseList(recommendationSignals),
-				competitionLevel,
-				competitionNotes,
-				pushStage,
-				trafficEntry: parseList(trafficEntry),
-				referenceText,
-			});
-			setRubricResult(generatedRubric);
-			initializeScoreProgress(generatedRubric.rubric.metrics);
-			setStatus("快速体验：评分标准（Rubric）已生成，正在质检章节...");
-
-			const scoredChapter = await postJson<ScoreResult>("/analysis/score", {
-				provider: providerPayload,
-				rubric: generatedRubric.rubric,
-				platform,
-				audience,
-				readingMode,
-				category,
-				theme,
-				tags: parseList(tags),
-				explicitKeywords: parseList(explicitKeywords),
-				implicitExpectations: parseList(implicitExpectations),
-				positioningPromise,
-				recommendationSignals: parseList(recommendationSignals),
-				competitionLevel,
-				competitionNotes,
-				pushStage,
-				trafficEntry: parseList(trafficEntry),
-				chapterTitle,
 				chapterText,
-				aiSelfTest: {
-					enabled: true,
-					tests: enabledAiSelfTests.length
-						? enabledAiSelfTests
-						: aiSelfTests.map((test) => test.id),
-				},
+				title: chapterTitle || undefined,
+				genre: genre || undefined,
 			});
-			setScoreResult(scoredChapter);
-			revealScoreProgress(scoredChapter);
-			setStatus(`快速体验完成：${scoredChapter.totalScore}/10`);
+			setQuickReviewResult(result);
+			setStatus(`快速点评完成：${result.quickScore}/10`);
 		} catch (error) {
-			failCurrentScoreProgress();
-			setStatus((error as Error).message);
+			setStatus(toQuickReviewErrorMessage(error));
 		} finally {
+			window.clearTimeout(queueStatusTimer);
 			setLoading(null);
 		}
 	}
@@ -1917,9 +1841,13 @@ export function NovelCritiqueConsole({
 					providerKind={provider.kind}
 					providerLabel={providerLabel}
 					providerModel={provider.model}
+					quickLoading={loading === "quick"}
+					quickElapsedSeconds={quickReviewElapsedSeconds}
+					quickReviewResult={quickReviewResult}
+					chapterText={chapterText}
 					chapterCompletion={chapterCompletion}
 					nextChapterAction={nextChapterAction}
-					referenceTitle={referenceTitle}
+					referenceTitle={referenceTitle || "未导入参考章节"}
 					scoreResult={scoreResult}
 					bookStatus={bookJob?.status ?? (bookUpload ? "已预览" : "未启动")}
 					bookStatusText={bookStatusText}
@@ -1932,12 +1860,17 @@ export function NovelCritiqueConsole({
 					competitionLevelLabel={optionLabel(competitionLevelOptions, competitionLevel)}
 					pushStageLabel={optionLabel(pushStageOptions, pushStage)}
 					competitionNotes={competitionNotes}
-					bookTitle={bookUpload?.title ?? bookTitle}
+					bookTitle={bookUpload?.title || bookTitle || "未填写书名"}
 					bookCompletion={bookCompletion}
-					chapterText={chapterText}
-					quickLoading={loading === "quick"}
-					onChapterTextChange={setChapterText}
+					onChapterTextChange={(value) => {
+						chapterDraftTouchedRef.current = true;
+						setChapterText(value);
+					}}
 					onRunQuickExperience={runQuickExperience}
+					onUseExampleChapter={useExampleChapter}
+					onOpenModel={() => openView("provider")}
+					onOpenCritique={() => openView("chapter")}
+					onOpenBook={() => openView("book")}
 					onOpenView={(view) => openView(view as WorkspaceView)}
 				/>
 			) : null}
@@ -1983,7 +1916,7 @@ export function NovelCritiqueConsole({
 							<KeyRound className="size-5 text-primary" />
 							<h2 className="text-lg font-semibold">
 								1. AI 设置
-								<FieldHelp text="这里决定由哪个模型服务来分析小说。免费服务可能排队或失败；需要更稳定时，可以切换到自己的模型账号或本地模型。" />
+								<FieldHelp text="这里决定由哪个模型服务来分析小说。共享站由服务端统一配置；选择付费或本地模型时会使用你填写的 Base URL、Model 和 API Key。" />
 							</h2>
 						</div>
 						<Button onClick={testProvider} disabled={loading !== null}>
@@ -1994,9 +1927,21 @@ export function NovelCritiqueConsole({
 						</Button>
 					</div>
 					<p className="mt-3 text-sm leading-6 text-muted-foreground">
-						先测试当前模型服务是否可用。免费服务适合快速体验，但可能排队或失败；自己的模型账号通常更稳定，填写的
-						API Key 只会用于本次请求，不会保存。
+						先测试当前模型服务是否可用。这里的设置会保存到本机浏览器，下次打开继续使用；API
+						Key 不会上传到后端保存。
 					</p>
+					<div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+						<span>本机默认：{providerPresets[provider.preset].label}</span>
+						<span>{provider.model || "未指定模型"}</span>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={resetProviderSettings}
+						>
+							恢复默认
+						</Button>
+					</div>
 					{selectedProviderPreset.notice ? (
 						<div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
 							<div className="flex items-start gap-2">
@@ -2014,24 +1959,18 @@ export function NovelCritiqueConsole({
 								value={provider.kind}
 								onChange={(event) => {
 									const nextKind = event.target.value as ProviderKind;
-									if (nextKind === "ai-horde") {
-										applyProviderPreset("ai-horde");
-										return;
-									}
-
 									setProvider((current) => ({
 										...current,
 										kind: nextKind,
 										preset:
-											current.preset === "ai-horde"
+											current.preset === "shared-gpu" && nextKind === "mock"
 												? "custom"
 												: current.preset,
 									}));
 								}}
 							>
 								<option value="mock">本地演示</option>
-								<option value="openai-compatible">在线模型服务</option>
-								<option value="ai-horde">公共免费模型</option>
+								<option value="openai-compatible">共享站/付费模型</option>
 							</select>
 						</div>
 						<div className="space-y-2">
@@ -2053,7 +1992,7 @@ export function NovelCritiqueConsole({
 						<div className="space-y-2">
 							<div className="flex items-center gap-1">
 								<Label>模型（Model）</Label>
-								<FieldHelp text="不同模型擅长的内容、速度和稳定性不同。免费模型如果排队太久，可以换一个 Model 再试。" />
+								<FieldHelp text="不同模型擅长的内容、速度和稳定性不同。共享站的模型由服务端配置；付费模型会使用这里选择或填写的 Model。" />
 							</div>
 							{providerModelOptions.length ? (
 								<select
@@ -2087,20 +2026,11 @@ export function NovelCritiqueConsole({
 								}
 								placeholder={
 									isBackendFreeProvider
-										? provider.preset === "ai-horde"
-											? "选择当前可用的免费模型"
-											: "由当前免费服务决定"
+										? "由共享站服务端配置决定"
 										: "例如 qwen-plus-latest"
 								}
 								disabled={provider.preset === "shared-gpu"}
 							/>
-							{provider.preset === "ai-horde" ? (
-								<p className="text-xs leading-5 text-muted-foreground">
-									{hordeTextModels.length
-										? `已加载 ${hordeTextModels.length} 个当前可用模型；列表会随服务状态变化。`
-										: "正在使用内置候选模型；进入页面时会尝试获取当前可用模型。"}
-								</p>
-							) : null}
 						</div>
 						<div className="space-y-2">
 							<Label>Base URL（高级）</Label>
@@ -2114,13 +2044,9 @@ export function NovelCritiqueConsole({
 									}))
 								}
 								placeholder={
-									isBackendFreeProvider
-										? provider.preset === "ai-horde"
-											? "公共免费模型服务"
-											: "由当前免费服务提供"
-										: undefined
+									isBackendFreeProvider ? "由共享站服务端配置提供" : undefined
 								}
-								disabled={isBackendFreeProvider}
+								disabled={provider.preset === "shared-gpu"}
 							/>
 						</div>
 						<div className="space-y-2">
@@ -2129,9 +2055,8 @@ export function NovelCritiqueConsole({
 								<div className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm leading-6 text-muted-foreground">
 									<p className="font-medium text-foreground">无需填写</p>
 									<p>
-										{provider.preset === "ai-horde"
-											? "当前公共免费服务可以直接使用，但排队时间和稳定性会受服务状态影响。"
-											: "当前免费服务由服务器统一连接。你只需要测试是否可用；如果不可用，可以切换到其他模型服务。"}
+										共享站由服务器统一连接。你只需要测试是否可用；如果不可用，可以切换到付费模型并填写自己的
+										API Key。
 									</p>
 								</div>
 							) : (
@@ -2146,7 +2071,7 @@ export function NovelCritiqueConsole({
 									}
 									placeholder={
 										providerPresets[provider.preset].needsApiKey
-											? "填写你的模型服务 API Key，不会保存"
+											? "填写你的模型服务 API Key，只保存在本机浏览器"
 											: "本地模型可留空"
 									}
 								/>
@@ -2159,6 +2084,10 @@ export function NovelCritiqueConsole({
 			{activeView === "chapter" ? (
 				<ChapterCritiqueView
 					loading={loading}
+					providerLabel={providerLabel}
+					quickLoading={loading === "quick"}
+					quickElapsedSeconds={quickReviewElapsedSeconds}
+					quickReviewResult={quickReviewResult}
 					importReferenceFile={importReferenceFile}
 					onInferReferenceProfile={inferReferenceProfileFromModel}
 					onReferenceTextChange={(value) => {
@@ -2168,6 +2097,11 @@ export function NovelCritiqueConsole({
 						resetReferenceProfileProgress();
 						resetScoreProgress();
 					}}
+					onRunQuickExperience={runQuickExperience}
+					onUseExampleChapter={useExampleChapter}
+					onUseExampleReference={useExampleReference}
+					onOpenModel={() => openView("provider")}
+					onOpenBook={() => openView("book")}
 					onBuildRubric={buildRubric}
 					onScoreChapter={scoreChapter}
 					onPlatformStrategyChange={(patch) => {
@@ -2222,6 +2156,14 @@ export function NovelCritiqueConsole({
 								</h2>
 							</div>
 							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									onClick={useExampleBook}
+									disabled={loading !== null}
+								>
+									填入示例整书
+								</Button>
 								<Button
 									variant="outline"
 									onClick={() =>
@@ -2283,6 +2225,28 @@ export function NovelCritiqueConsole({
 
 					<BookUploadPreviewPanel upload={bookUpload} />
 					<BookJobPanel job={bookJob} loading={loading} onResume={resumeBookAnalysis} />
+					<section className="rounded-md border border-border bg-card p-5">
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+							<div>
+								<h2 className="text-lg font-semibold">整书结果管理</h2>
+								<p className="mt-2 text-sm leading-6 text-muted-foreground">
+									历史任务和导出不再作为主导航，它们围绕整书拆解结果使用：先打开或完成一个任务，再下载报告、世界书和原创化素材包。
+								</p>
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<Button variant="outline" onClick={() => openView("history")}>
+									历史记录
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() => openView("exports")}
+									disabled={!bookJob || bookJob.status !== "succeeded"}
+								>
+									导出结果
+								</Button>
+							</div>
+						</div>
+					</section>
 					<BookAnalysisPanel result={bookAnalysisResult} />
 				</>
 			) : null}

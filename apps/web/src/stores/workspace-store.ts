@@ -1,15 +1,22 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import type {
+	ProviderKind,
+	ProviderPresetId,
+	QuickReviewResult,
+	RubricMetric,
+	RubricResult,
+	ScoreResult,
+} from "@ai-novel-first-step/ai-core";
 
-export type ProviderKind = "mock" | "openai-compatible" | "ai-horde";
-export type ProviderPresetId =
-	| "custom"
-	| "ai-horde"
-	| "openrouter-free"
-	| "shared-gpu"
-	| "deepseek"
-	| "doubao"
-	| "qwen"
-	| "ollama";
+export type {
+	ProviderKind,
+	ProviderPresetId,
+	QuickReviewResult,
+	RubricMetric,
+	RubricResult,
+	ScoreResult,
+};
 
 export interface ProviderForm {
 	preset: ProviderPresetId;
@@ -21,143 +28,15 @@ export interface ProviderForm {
 	jsonMode: boolean;
 }
 
-export interface RubricMetric {
-	id: string;
-	name: string;
-	description: string;
-	scale: {
-		low: string;
-		medium: string;
-		high: string;
-	};
-	referencePrincipleId?: string;
-}
-
-export interface RubricResult {
-	mode: string;
-	reference: {
-		title: string;
-		genre: string;
-		platform: string;
-		audience: string;
-		readingMode: string;
-		oneSentenceSummary: string;
-	};
-	styleProfile?: {
-		platform: string;
-		audience: string;
-		readingMode: string;
-		pace: string;
-		emotion: string;
-		hookDensity: string;
-		language: string;
-		setupTolerance: string;
-	};
-	marketProfile?: {
-		category: string;
-		theme: string;
-		tags: string[];
-		explicitKeywords: string[];
-		implicitExpectations: string[];
-		positioningPromise: string;
-		readerExpectationModel: string[];
-	};
-	principles: Array<{
-		id: string;
-		title: string;
-		sourceObservation: string;
-		reusableRule: string;
-		migrationQuestion: string;
-	}>;
-	rubric: {
-		id: string;
-		genre: string;
-		platform?: string;
-		audience?: string;
-		readingMode?: string;
-		styleProfile?: Record<string, string>;
-		category?: string;
-		theme?: string;
-		marketProfile?: Record<string, unknown>;
-		metrics: RubricMetric[];
-	};
-	editorNote: string;
-}
-
-export interface ScoreResult {
-	mode: string;
-	chapterTitle: string;
-	totalScore: number;
-	scores: Array<{
-		metricId: string;
-		name: string;
-		score: number;
-		reason: string;
-		evidence: string;
-		fix: string;
-		referencePrincipleId?: string;
-	}>;
-	strongestPoint: string;
-	weakestPoint: string;
-	styleFit?: {
-		score: number;
-		platformRisk: string;
-		audienceRisk: string;
-		readingModeRisk: string;
-	};
-	marketFit?: {
-		score: number;
-		categoryRisk: string;
-		themeRisk: string;
-		keywordRisk: string;
-		frontloadRisk: string;
-	};
-	platformStrategyFit?: {
-		score: number;
-		recommendationRisk: string;
-		competitionRisk: string;
-		pushBottleneck: string;
-		trafficEntryAction: string;
-	};
-	performanceFit?: {
-		hasData: boolean;
-		funnelSummary: string;
-		impressionDiagnosis: string;
-		clickDiagnosis: string;
-		read30sDiagnosis: string;
-		read60sDiagnosis: string;
-		bottomDiagnosis: string;
-		followDiagnosis: string;
-		validReadDiagnosis?: string;
-		avgReadProgressDiagnosis?: string;
-		paidUnlockDiagnosis?: string;
-		bookshelfDiagnosis?: string;
-		firstChapterCompletionDiagnosis?: string;
-		nextChapterClickDiagnosis?: string;
-		threeChapterRetentionDiagnosis?: string;
-		priority: string;
-	};
-	selfTestFit?: {
-		enabled: boolean;
-		summary: string;
-		dialogueMaskDiagnosis: string;
-		jumpReadDiagnosis: string;
-		emotionDiagnosis: string;
-		settingRecapDiagnosis: string;
-		deleteSentenceDiagnosis: string;
-		aiTraceDiagnosis: string;
-		promptAddons: string[];
-	};
-	nextRevisionMove: string;
-	rewriteBrief?: {
-		target: string;
-		strategy: string;
-	};
-	revisionPrompt?: {
-		title: string;
-		prompt: string;
-	};
-}
+export const defaultProvider: ProviderForm = {
+	preset: "shared-gpu",
+	kind: "openai-compatible",
+	baseUrl: "",
+	apiKey: "",
+	model: "",
+	temperature: 0.2,
+	jsonMode: false,
+};
 
 export type ScoreProgressStatus = "pending" | "checking" | "completed" | "failed";
 export type AiSelfTestId =
@@ -245,8 +124,8 @@ export const aiSelfTests: AiSelfTest[] = [
 	},
 	{
 		id: "ai-trace",
-		name: "AI 味识别",
-		description: "AI 识别专属细节弱、情绪浅、伏笔短线化和语言模板化风险。",
+		name: "文本自然度",
+		description: "AI 识别模板化升华、空泛排比、专属细节弱和说明腔风险。",
 	},
 ];
 
@@ -264,6 +143,18 @@ export interface BookAnalysisResult {
 		chapterCountEstimate: number;
 		oneSentencePremise: string;
 		coreAppeal: string[];
+	};
+	transferableStyleCard?: {
+		coreStyleTags: string[];
+		narrativeVoice: string;
+		sentenceRhythm: string;
+		paragraphPattern: string;
+		dialoguePattern: string;
+		sensoryFocus: string[];
+		pleasureMechanisms: string[];
+		hookPatterns: string[];
+		styleRules: string[];
+		antiPatterns: string[];
 	};
 	worldbuilding: {
 		worldRules: string[];
@@ -469,6 +360,15 @@ export interface BookAnalysisResult {
 		mustTransform: string[];
 		fanFictionWarning: string;
 		rewriteStrategy: string[];
+	};
+	referenceBoundaryCheck?: {
+		summary: string;
+		learnablePatterns: string[];
+		doNotReuse: string[];
+		needsTransformation: string[];
+		nameAndTermRisks: string[];
+		plotSimilarityRisks: string[];
+		safeRewriteMoves: string[];
 	};
 	usageRiskNotice?: {
 		summary: string;
@@ -693,6 +593,7 @@ interface WorkspaceStoreState {
 	chapterText: string;
 	rubricResult: RubricResult | null;
 	scoreResult: ScoreResult | null;
+	quickReviewResult: QuickReviewResult | null;
 	referenceProfileProgress: ReferenceProfileProgressItem[];
 	scoreProgress: ScoreProgressItem[];
 	bookTitle: string;
@@ -751,6 +652,7 @@ interface WorkspaceStoreActions {
 	setChapterText: StoreSetter<string>;
 	setRubricResult: StoreSetter<RubricResult | null>;
 	setScoreResult: StoreSetter<ScoreResult | null>;
+	setQuickReviewResult: StoreSetter<QuickReviewResult | null>;
 	setReferenceProfileProgress: StoreSetter<ReferenceProfileProgressItem[]>;
 	setScoreProgress: StoreSetter<ScoreProgressItem[]>;
 	setBookTitle: StoreSetter<string>;
@@ -773,57 +675,50 @@ interface WorkspaceStoreActions {
 export type WorkspaceStore = WorkspaceStoreState & WorkspaceStoreActions;
 
 const initialWorkspaceState: WorkspaceStoreState = {
-	provider: {
-		preset: "ai-horde",
-		kind: "ai-horde",
-		baseUrl: "https://aihorde.net/api/v2",
-		apiKey: "",
-		model: "aphrodite/TheDrummer/Cydonia-24B-v4.3",
-		temperature: 0.2,
-		jsonMode: false,
-	},
-	referenceTitle: "第一章 少年被逐",
+	provider: defaultProvider,
+	referenceTitle: "",
 	genre: "xuanhuan",
 	platform: "fanqie",
 	audience: "male-fast-paced",
 	readingMode: "mobile-fragmented",
-	category: "都市神医",
-	theme: "逆袭打脸",
-	tags: "神医，退婚，豪门，隐藏身份",
-	explicitKeywords: "退婚，银针，豪门千金",
-	implicitExpectations: "被低估，公开羞辱，医术反转，身份揭露",
-	positioningPromise: "退婚当天，我用九根银针救下豪门千金",
-	recommendationSignals: "点击率，有效阅读，触底/完读，加书架，追更",
+	category: "",
+	theme: "",
+	tags: "",
+	explicitKeywords: "",
+	implicitExpectations: "",
+	positioningPromise: "",
+	recommendationSignals: "",
 	competitionLevel: "high",
-	competitionNotes: "同质化爽点多，需要更早给出差异化钩子。",
+	competitionNotes: "",
 	pushStage: "cold-start",
-	trafficEntry: "推荐流，分类页，关键词标签",
-	impressions: "12000",
-	clickThroughRate: "7.5",
-	validReadRate: "52",
-	read30sRate: "58",
-	read60sRate: "31",
-	bottomRate: "42",
-	followRate: "12",
-	bookshelfRate: "18",
-	firstChapterCompletionRate: "46",
-	nextChapterClickRate: "33",
-	threeChapterRetentionRate: "24",
-	avgReadProgressRate: "64",
-	paidUnlockRate: "8",
-	aiSelfTestEnabled: true,
+	trafficEntry: "",
+	impressions: "",
+	clickThroughRate: "",
+	validReadRate: "",
+	read30sRate: "",
+	read60sRate: "",
+	bottomRate: "",
+	followRate: "",
+	bookshelfRate: "",
+	firstChapterCompletionRate: "",
+	nextChapterClickRate: "",
+	threeChapterRetentionRate: "",
+	avgReadProgressRate: "",
+	paidUnlockRate: "",
+	aiSelfTestEnabled: false,
 	enabledAiSelfTests: aiSelfTests.map((test) => test.id),
-	referenceText: defaultReferenceText,
+	referenceText: "",
 	referenceFileName: "",
-	chapterTitle: "第一章 考场重逢",
-	chapterText: defaultUserText,
+	chapterTitle: "",
+	chapterText: "",
 	rubricResult: null,
 	scoreResult: null,
+	quickReviewResult: null,
 	referenceProfileProgress: [],
 	scoreProgress: [],
-	bookTitle: "示例长篇小说",
+	bookTitle: "",
 	bookGenre: "xuanhuan",
-	bookText: defaultBookText,
+	bookText: "",
 	bookFile: null,
 	bookUpload: null,
 	bookHistory: [],
@@ -832,78 +727,116 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	bookJob: null,
 	persistedResearchLibrary: null,
 	selectedResearchJobIds: [],
-	comparisonFocus: "对比开局承诺、卖点组合、情绪策略、章末钩子和可重组方向",
+	comparisonFocus: "",
 	researchComparison: null,
-	researchQuestion: "这些样本的开局承诺有什么共同点，哪个点最容易被新手忽略？",
+	researchQuestion: "",
 	researchQaResult: null,
 };
 
-export const useWorkspaceStore = create<WorkspaceStore>((set) => {
-	function makeSetter<K extends keyof WorkspaceStoreState>(
-		key: K,
-	): StoreSetter<WorkspaceStoreState[K]> {
-		return (value) =>
-			set((current) => ({
-				[key]: resolveStoreValue(value, current[key]),
-			}));
-	}
+const localSettingsStorageKey = "ai-novel-first-step-local-settings";
 
-	return {
-		...initialWorkspaceState,
-		setProvider: makeSetter("provider"),
-		setReferenceTitle: makeSetter("referenceTitle"),
-		setGenre: makeSetter("genre"),
-		setPlatform: makeSetter("platform"),
-		setAudience: makeSetter("audience"),
-		setReadingMode: makeSetter("readingMode"),
-		setCategory: makeSetter("category"),
-		setTheme: makeSetter("theme"),
-		setTags: makeSetter("tags"),
-		setExplicitKeywords: makeSetter("explicitKeywords"),
-		setImplicitExpectations: makeSetter("implicitExpectations"),
-		setPositioningPromise: makeSetter("positioningPromise"),
-		setRecommendationSignals: makeSetter("recommendationSignals"),
-		setCompetitionLevel: makeSetter("competitionLevel"),
-		setCompetitionNotes: makeSetter("competitionNotes"),
-		setPushStage: makeSetter("pushStage"),
-		setTrafficEntry: makeSetter("trafficEntry"),
-		setImpressions: makeSetter("impressions"),
-		setClickThroughRate: makeSetter("clickThroughRate"),
-		setValidReadRate: makeSetter("validReadRate"),
-		setRead30sRate: makeSetter("read30sRate"),
-		setRead60sRate: makeSetter("read60sRate"),
-		setBottomRate: makeSetter("bottomRate"),
-		setFollowRate: makeSetter("followRate"),
-		setBookshelfRate: makeSetter("bookshelfRate"),
-		setFirstChapterCompletionRate: makeSetter("firstChapterCompletionRate"),
-		setNextChapterClickRate: makeSetter("nextChapterClickRate"),
-		setThreeChapterRetentionRate: makeSetter("threeChapterRetentionRate"),
-		setAvgReadProgressRate: makeSetter("avgReadProgressRate"),
-		setPaidUnlockRate: makeSetter("paidUnlockRate"),
-		setAiSelfTestEnabled: makeSetter("aiSelfTestEnabled"),
-		setEnabledAiSelfTests: makeSetter("enabledAiSelfTests"),
-		setReferenceText: makeSetter("referenceText"),
-		setReferenceFileName: makeSetter("referenceFileName"),
-		setChapterTitle: makeSetter("chapterTitle"),
-		setChapterText: makeSetter("chapterText"),
-		setRubricResult: makeSetter("rubricResult"),
-		setScoreResult: makeSetter("scoreResult"),
-		setReferenceProfileProgress: makeSetter("referenceProfileProgress"),
-		setScoreProgress: makeSetter("scoreProgress"),
-		setBookTitle: makeSetter("bookTitle"),
-		setBookGenre: makeSetter("bookGenre"),
-		setBookText: makeSetter("bookText"),
-		setBookFile: makeSetter("bookFile"),
-		setBookUpload: makeSetter("bookUpload"),
-		setBookHistory: makeSetter("bookHistory"),
-		setUploadHistory: makeSetter("uploadHistory"),
-		setBookAnalysisResult: makeSetter("bookAnalysisResult"),
-		setBookJob: makeSetter("bookJob"),
-		setPersistedResearchLibrary: makeSetter("persistedResearchLibrary"),
-		setSelectedResearchJobIds: makeSetter("selectedResearchJobIds"),
-		setComparisonFocus: makeSetter("comparisonFocus"),
-		setResearchComparison: makeSetter("researchComparison"),
-		setResearchQuestion: makeSetter("researchQuestion"),
-		setResearchQaResult: makeSetter("researchQaResult"),
-	};
-});
+export const useWorkspaceStore = create<WorkspaceStore>()(
+	persist(
+		(set) => {
+			function makeSetter<K extends keyof WorkspaceStoreState>(
+				key: K,
+			): StoreSetter<WorkspaceStoreState[K]> {
+				return (value) =>
+					set((current) => ({
+						[key]: resolveStoreValue(value, current[key]),
+					}));
+			}
+
+			return {
+				...initialWorkspaceState,
+				setProvider: makeSetter("provider"),
+				setReferenceTitle: makeSetter("referenceTitle"),
+				setGenre: makeSetter("genre"),
+				setPlatform: makeSetter("platform"),
+				setAudience: makeSetter("audience"),
+				setReadingMode: makeSetter("readingMode"),
+				setCategory: makeSetter("category"),
+				setTheme: makeSetter("theme"),
+				setTags: makeSetter("tags"),
+				setExplicitKeywords: makeSetter("explicitKeywords"),
+				setImplicitExpectations: makeSetter("implicitExpectations"),
+				setPositioningPromise: makeSetter("positioningPromise"),
+				setRecommendationSignals: makeSetter("recommendationSignals"),
+				setCompetitionLevel: makeSetter("competitionLevel"),
+				setCompetitionNotes: makeSetter("competitionNotes"),
+				setPushStage: makeSetter("pushStage"),
+				setTrafficEntry: makeSetter("trafficEntry"),
+				setImpressions: makeSetter("impressions"),
+				setClickThroughRate: makeSetter("clickThroughRate"),
+				setValidReadRate: makeSetter("validReadRate"),
+				setRead30sRate: makeSetter("read30sRate"),
+				setRead60sRate: makeSetter("read60sRate"),
+				setBottomRate: makeSetter("bottomRate"),
+				setFollowRate: makeSetter("followRate"),
+				setBookshelfRate: makeSetter("bookshelfRate"),
+				setFirstChapterCompletionRate: makeSetter("firstChapterCompletionRate"),
+				setNextChapterClickRate: makeSetter("nextChapterClickRate"),
+				setThreeChapterRetentionRate: makeSetter("threeChapterRetentionRate"),
+				setAvgReadProgressRate: makeSetter("avgReadProgressRate"),
+				setPaidUnlockRate: makeSetter("paidUnlockRate"),
+				setAiSelfTestEnabled: makeSetter("aiSelfTestEnabled"),
+				setEnabledAiSelfTests: makeSetter("enabledAiSelfTests"),
+				setReferenceText: makeSetter("referenceText"),
+				setReferenceFileName: makeSetter("referenceFileName"),
+				setChapterTitle: makeSetter("chapterTitle"),
+				setChapterText: makeSetter("chapterText"),
+				setRubricResult: makeSetter("rubricResult"),
+				setScoreResult: makeSetter("scoreResult"),
+				setQuickReviewResult: makeSetter("quickReviewResult"),
+				setReferenceProfileProgress: makeSetter("referenceProfileProgress"),
+				setScoreProgress: makeSetter("scoreProgress"),
+				setBookTitle: makeSetter("bookTitle"),
+				setBookGenre: makeSetter("bookGenre"),
+				setBookText: makeSetter("bookText"),
+				setBookFile: makeSetter("bookFile"),
+				setBookUpload: makeSetter("bookUpload"),
+				setBookHistory: makeSetter("bookHistory"),
+				setUploadHistory: makeSetter("uploadHistory"),
+				setBookAnalysisResult: makeSetter("bookAnalysisResult"),
+				setBookJob: makeSetter("bookJob"),
+				setPersistedResearchLibrary: makeSetter("persistedResearchLibrary"),
+				setSelectedResearchJobIds: makeSetter("selectedResearchJobIds"),
+				setComparisonFocus: makeSetter("comparisonFocus"),
+				setResearchComparison: makeSetter("researchComparison"),
+				setResearchQuestion: makeSetter("researchQuestion"),
+				setResearchQaResult: makeSetter("researchQaResult"),
+			};
+		},
+		{
+			name: localSettingsStorageKey,
+			version: 1,
+			storage: createJSONStorage(() => localStorage),
+			partialize: (state) => ({ provider: state.provider }),
+			merge: (persistedState, currentState) => {
+				const persistedProvider = (persistedState as Partial<WorkspaceStoreState>).provider;
+				const allowedPresets: ProviderPresetId[] = [
+					"custom",
+					"shared-gpu",
+					"deepseek",
+					"doubao",
+					"qwen",
+					"ollama",
+				];
+				const safeProvider =
+					persistedProvider && allowedPresets.includes(persistedProvider.preset)
+						? persistedProvider
+						: currentState.provider;
+
+				return {
+					...currentState,
+					provider: safeProvider
+						? {
+								...currentState.provider,
+								...safeProvider,
+							}
+						: currentState.provider,
+				};
+			},
+		},
+	),
+);

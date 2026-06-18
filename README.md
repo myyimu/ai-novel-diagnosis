@@ -13,6 +13,8 @@
 
 ![AI小说第一步工作台](./docs/assets/ai-novel-first-step-home.png)
 
+_界面仍在快速迭代中，截图仅供参考，请以当前版本实际页面为准。_
+
 ## 目录
 
 - [适合解决什么问题](#适合解决什么问题)
@@ -24,6 +26,7 @@
 - [本地数据](#本地数据)
 - [质量检查](#质量检查)
 - [当前限制](#当前限制)
+- [Friendly Links](#friendly-links)
 - [开源信息](#开源信息)
 
 ## 适合解决什么问题
@@ -148,31 +151,35 @@ API: http://127.0.0.1:3001/api/v1
 
 默认不配置 `DATABASE_URL` 时，API 会使用 `.local/pglite` 作为本地开发数据库。
 
-默认的 AI Horde 公共模型池不需要配置 Key；如果要提升 Horde 排队优先级，可以在 API 服务环境变量中配置：
-
-```text
-AI_HORDE_API_KEY=your-horde-key
-AI_HORDE_MODEL=aphrodite/TheDrummer/Cydonia-24B-v4.3
-```
-
-如果要启用“OpenRouter 免费模型”入口，需要在 API 服务环境变量中配置：
-
-```text
-OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_FREE_MODEL=openrouter/free
-OPENROUTER_HTTP_REFERER=http://localhost:3001
-OPENROUTER_APP_TITLE=AI小说第一步
-```
-
-如果要换成其他 OpenAI-compatible 免费/共享推理线路，可以配置通用共享算力入口：
+如果要启用“免费共享算力”入口，可以配置 OpenAI-compatible 共享线路：
 
 ```text
 SHARED_GPU_BASE_URL=https://your-shared-gpu.example.com/v1
 SHARED_GPU_MODEL=your-model-id
 SHARED_GPU_API_KEY=optional-backend-only-key
+SHARED_GPU_JSON_MODE=false
 ```
 
-免费线路适合降低首次使用门槛，但可能排队、限流、超时、质量波动或不适合敏感文本；建议上线时配合限流和日志审计。
+共享线路适合降低首次使用门槛，但可能排队、限流、超时、质量波动或不适合敏感文本；需要稳定性时建议在界面里切换到自备 Key 的付费模型。
+
+## Docker Compose
+
+复制根目录环境变量模板后启动：
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+默认地址：
+
+```text
+Web: http://localhost:3000
+API: http://localhost:3001/api/v1
+Health: http://localhost:3001/health
+```
+
+当前 compose 只启动实际使用的 `postgres`、`api`、`web`。Redis / MinIO 暂未接入代码，不再默认启动。
 
 上传文本和整书拆解中间结果默认保存在：
 
@@ -207,6 +214,12 @@ pnpm run ci
 - 真实 PostgreSQL 部署时，如果 schema 有变化，需要运行 `pnpm --filter api db:push` 或生成迁移。
 - 当前没有账号系统，更适合本地单人部署。
 - 工具只提供拆解、学习、质检和导出能力；用户需要自行确认上传文本和导出素材的使用权与风险边界。
+
+## Friendly Links
+
+- [linux.do](https://linux.do/)
+- [One CLI](https://github.com/1cli-team/one-cli)
+- [mediago-drama](https://github.com/mediago-dev/mediago-drama)
 
 ## 开源信息
 

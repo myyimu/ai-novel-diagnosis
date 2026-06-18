@@ -14,8 +14,12 @@ const baseProps = {
 	providerKind: "mock" as const,
 	providerLabel: "本地演示",
 	providerModel: "",
+	quickLoading: false,
+	quickElapsedSeconds: 0,
+	quickReviewResult: null,
+	chapterText: "",
 	chapterCompletion: 50,
-	nextChapterAction: "生成 Rubric",
+	nextChapterAction: "生成评分标准",
 	referenceTitle: "成熟样本",
 	scoreResult: null,
 	bookStatus: "未启动",
@@ -25,7 +29,7 @@ const baseProps = {
 	graphNodeCount: 0,
 	chapterProjectSteps: [
 		{ label: "平台和策略画像", done: true, detail: "番茄 · 男频 · 长篇追更" },
-		{ label: "评分标准（Rubric）", done: false, detail: "尚未生成评分标准（Rubric）。" },
+		{ label: "评分标准", done: false, detail: "尚未生成评分标准。" },
 	],
 	platformLabel: "番茄小说",
 	readingModeLabel: "长篇追更",
@@ -34,10 +38,12 @@ const baseProps = {
 	competitionNotes: "先做差异化卖点。",
 	bookTitle: "示例长篇小说",
 	bookCompletion: 0,
-	chapterText: "主角被公开否定，却发现旧案信物。",
-	quickLoading: false,
 	onChapterTextChange: vi.fn(),
 	onRunQuickExperience: vi.fn(),
+	onUseExampleChapter: vi.fn(),
+	onOpenModel: vi.fn(),
+	onOpenCritique: vi.fn(),
+	onOpenBook: vi.fn(),
 	onOpenView: vi.fn(),
 };
 
@@ -46,12 +52,13 @@ describe("OverviewView", () => {
 		const html = renderToStaticMarkup(<OverviewView {...baseProps} />);
 
 		expect(html).toContain("看懂爆款");
+		expect(html).toContain("快速点评");
 		expect(html).toContain("模型状态");
 		expect(html).toContain("本地演示");
 		expect(html).toContain("单章项目进度");
 		expect(html).toContain("平台策略画像");
 		expect(html).toContain("番茄小说");
-		expect(html).toContain("快速体验");
+		expect(html).toContain("最近评分摘要");
 	});
 
 	it("shows latest score evidence when a report exists", () => {

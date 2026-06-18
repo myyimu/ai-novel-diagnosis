@@ -13,6 +13,8 @@ AI Novel First Step is a local-first AI tool for novel analysis and draft critiq
 
 ![AI Novel First Step workspace](./docs/assets/ai-novel-first-step-home.png)
 
+_The interface is evolving quickly. This screenshot is for reference only; use the current app as the source of truth._
+
 ## Contents
 
 - [What Problem It Solves](#what-problem-it-solves)
@@ -24,6 +26,7 @@ AI Novel First Step is a local-first AI tool for novel analysis and draft critiq
 - [Local Data](#local-data)
 - [Quality Gates](#quality-gates)
 - [Current Limitations](#current-limitations)
+- [Friendly Links](#friendly-links)
 - [Open Source](#open-source)
 
 ## What Problem It Solves
@@ -109,8 +112,8 @@ pnpm run dev:core:raw
 Default local URLs:
 
 ```text
-Web: http://localhost:3001
-API: http://localhost:3000/api/v1
+Web: http://localhost:3000
+API: http://localhost:3001/api/v1
 ```
 
 ## Workspace
@@ -122,6 +125,25 @@ API: http://localhost:3000/api/v1
 ## Local Data
 
 If `DATABASE_URL` is not configured, the API uses `.local/pglite` as the local development database.
+
+## Docker Compose
+
+Copy the root environment template and start the stack:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Default URLs:
+
+```text
+Web: http://localhost:3000
+API: http://localhost:3001/api/v1
+Health: http://localhost:3001/health
+```
+
+The compose stack starts only the services currently used by the code: `postgres`, `api`, and `web`. Redis and MinIO are not started by default because no runtime client uses them yet.
 
 Uploaded text and intermediate full-book analysis artifacts are stored under:
 
@@ -155,6 +177,12 @@ pnpm run ci
 - For real PostgreSQL deployments, run `pnpm --filter api db:push` or generate migrations when schema changes.
 - There is no account system yet. The project is currently best suited for local single-user deployment.
 - The tool only provides analysis, learning, critique, and export features. Users are responsible for confirming they have the necessary rights or legal basis for uploaded texts and exported assets.
+
+## Friendly Links
+
+- [linux.do](https://linux.do/)
+- [One CLI](https://github.com/1cli-team/one-cli)
+- [mediago-drama](https://github.com/mediago-dev/mediago-drama)
 
 ## Open Source
 

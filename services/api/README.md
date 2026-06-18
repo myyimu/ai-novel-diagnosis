@@ -268,8 +268,8 @@ pnpm run start
 ## 环境变量
 
 ```bash
-PORT=3000
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/demo
+PORT=3001
+DATABASE_URL=postgresql://novel:novel@127.0.0.1:5432/ai_novel_first_step
 JWT_SECRET=your-jwt-secret-here
 JWT_EXPIRES_IN=30d
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
@@ -432,12 +432,9 @@ pnpm test:e2e       # 端到端测试
 ## Docker 部署
 
 ```bash
-# 构建镜像
-pnpm docker:build
+# 启动全部服务（postgres + api + web）
+docker compose up --build
 
-# 启动全部服务 (app + postgres)
-docker compose up -d
-
-# 仅启动应用
-docker compose up -d app
+# 仅启动 API 及依赖
+docker compose up --build api
 ```

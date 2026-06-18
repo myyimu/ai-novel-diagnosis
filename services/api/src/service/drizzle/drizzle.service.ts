@@ -4,7 +4,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from "@nestjs/common";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
@@ -31,8 +31,9 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DrizzleService.name);
   private readonly mode: "postgres" | "pglite";
   private readonly pool?: Pool;
-  private readonly pglite?: PGlite;
-  public readonly db: NodePgDatabase<typeof schema>;
+  private pglite?: PGlite;
+  private pgliteDataDir?: string;
+  public db: NodePgDatabase<typeof schema>;
 
   constructor() {
     const url = process.env.DATABASE_URL?.trim();
@@ -42,19 +43,17 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       this.db = drizzleNodePg(this.pool, { schema });
     } else {
       this.mode = "pglite";
-      const dataDir =
+      this.pgliteDataDir =
         process.env.PGLITE_DATA_DIR?.trim() ||
         join(process.cwd(), ".local", "pglite");
-      mkdirSync(dataDir, { recursive: true });
-      this.pglite = new PGlite(dataDir);
-      // PgliteDatabase shares the query-builder API with NodePgDatabase;
-      // we cast so repositories type-check against a single shape.
+      mkdirSync(this.pgliteDataDir, { recursive: true });
+      this.pglite = new PGlite(this.pgliteDataDir);
       this.db = drizzlePglite(this.pglite, {
         schema,
       }) as unknown as NodePgDatabase<typeof schema>;
       this.logger.warn(
         "DATABASE_URL 未设置，使用本地文件 PGlite 作为开发兜底。" +
-          `数据目录：${dataDir}；生产部署请设置 ` +
+          `数据目录：${this.pgliteDataDir}；生产部署请设置 ` +
           "`one env set DATABASE_URL=postgres://... -p <project>`",
       );
     }
@@ -62,8 +61,16 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     if (this.mode === "pglite") {
-      await this.bootstrapPgliteSchema();
-      this.logger.log("PGlite (in-memory) ready");
+      try {
+        await this.bootstrapPgliteSchema();
+      } catch (error) {
+        this.logger.warn(
+          `PGlite 数据库打开失败（${(error as Error).message}），` +
+            "可能是版本升级导致数据格式不兼容。正在备份旧数据并重建……",
+        );
+        await this.rebuildPglite();
+      }
+      this.logger.log("PGlite ready");
       return;
     }
     try {
@@ -157,5 +164,27 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       ALTER TABLE "book_analysis_jobs"
       ADD COLUMN IF NOT EXISTS "partial_result" jsonb
     `);
+  }
+
+  private async rebuildPglite(): Promise<void> {
+    const dir = this.pgliteDataDir!;
+    try {
+      await this.pglite!.close();
+    } catch {
+      /* already broken — ignore close errors */
+    }
+
+    const backupDir = `${dir}-broken-${Date.now()}`;
+    renameSync(dir, backupDir);
+    this.logger.warn(`旧数据已备份到 ${backupDir}`);
+
+    mkdirSync(dir, { recursive: true });
+    this.pglite = new PGlite(dir);
+    this.db = drizzlePglite(this.pglite, {
+      schema,
+    }) as unknown as NodePgDatabase<typeof schema>;
+
+    await this.bootstrapPgliteSchema();
+    this.logger.log("已用空白数据库重建 PGlite，旧数据保留在备份目录中");
   }
 }

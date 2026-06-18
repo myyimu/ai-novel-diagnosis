@@ -191,7 +191,7 @@ export class AiSelfTestOptionsDto {
 
   @ApiProperty({
     description:
-      "AI-run self-tests used to improve scoring and the revision prompt.",
+      "AI-run craft self-tests used to improve scoring and the revision prompt.",
     required: false,
     enum: [
       "dialogue-mask",

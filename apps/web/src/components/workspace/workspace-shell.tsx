@@ -150,7 +150,7 @@ export function WorkspaceShell<TView extends string>({
 
 					<div className="hidden text-xs leading-5 text-muted-foreground lg:mt-auto lg:block">
 						<p>本机使用</p>
-						<p>免费模型可用</p>
+						<p>共享站/自备 Key</p>
 					</div>
 				</div>
 			</aside>
@@ -159,7 +159,7 @@ export function WorkspaceShell<TView extends string>({
 				<header className="border-b border-border pb-5">
 					<div>
 						<p className="text-sm text-muted-foreground">
-							本机使用 · 免费模型可用 · 爆款启蒙与创作决策
+							本机使用 · 共享站/自备 Key · 爆款启蒙与创作决策
 						</p>
 						<h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
 							{activeMeta.title}
