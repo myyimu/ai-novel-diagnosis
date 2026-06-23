@@ -258,13 +258,13 @@ export function OverviewView({
 	chapterText,
 	chapterCompletion,
 	nextChapterAction,
-	referenceTitle,
+	referenceTitle: _referenceTitle,
 	scoreResult,
 	bookStatus,
 	bookStatusText,
-	researchReadiness,
-	researchSourceCount,
-	graphNodeCount,
+	researchReadiness: _researchReadiness,
+	researchSourceCount: _researchSourceCount,
+	graphNodeCount: _graphNodeCount,
 	chapterProjectSteps,
 	platformLabel,
 	readingModeLabel,
@@ -301,7 +301,7 @@ export function OverviewView({
 							去改、改完再贴回来复诊。样本、整书和研究库都退到进阶区。
 						</p>
 					</div>
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+					<div className="grid gap-3">
 						<div className="rounded-md border border-border bg-background p-3">
 							<div className="flex items-center gap-2 text-sm text-muted-foreground">
 								<KeyRound className="size-4 text-primary" />
@@ -312,16 +312,6 @@ export function OverviewView({
 								{providerKind === "mock"
 									? "适合演示流程"
 									: providerModel || "使用预设模型"}
-							</p>
-						</div>
-						<div className="rounded-md border border-border bg-background p-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<FileText className="size-4 text-primary" />
-								高级质检
-							</div>
-							<p className="mt-2 font-semibold">{chapterCompletion}%</p>
-							<p className="mt-1 text-xs leading-5 text-muted-foreground">
-								{nextChapterAction} · {referenceTitle}
 							</p>
 						</div>
 					</div>
@@ -424,24 +414,10 @@ export function OverviewView({
 										{bookProgressDetail.deep.total}
 									</div>
 								) : null}
-								<div>
-									<div className="mb-2 flex items-center justify-between text-sm">
-										<span className="text-muted-foreground">研究库就绪度</span>
-										<span className="font-medium">{researchReadiness}%</span>
-									</div>
-									<ProgressBar value={researchReadiness} />
-									<p className="mt-2 text-xs leading-5 text-muted-foreground">
-										{researchSourceCount} 个资料资产 · {graphNodeCount}{" "}
-										个图谱节点
-									</p>
-								</div>
 							</div>
 							<div className="mt-4 flex flex-wrap gap-2">
 								<Button variant="outline" onClick={onOpenBook}>
 									整书拆解
-								</Button>
-								<Button variant="outline" onClick={() => onOpenView("library")}>
-									样本研究
 								</Button>
 							</div>
 						</section>

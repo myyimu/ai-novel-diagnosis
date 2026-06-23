@@ -1,9 +1,5 @@
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
+import { redirect } from "next/navigation";
 
 export default function WorkspacePage() {
-	return (
-		<main className="min-h-screen bg-background text-foreground">
-			<NovelCritiqueConsole view="overview" />
-		</main>
-	);
+	redirect("/");
 }

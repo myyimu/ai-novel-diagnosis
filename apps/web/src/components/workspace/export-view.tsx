@@ -1809,502 +1809,576 @@ export function BookAnalysisPanel({
 				onSearchEvidence={searchable ? runGraphReviewSearch : undefined}
 			/>
 
-			<div className="rounded-md border border-border bg-card p-5">
-				<h3 className="font-semibold">故事线与大事纪</h3>
-				<div className="mt-4 grid gap-4 text-sm xl:grid-cols-2">
-					<div className="space-y-3">
-						{result.plotlines.map((line) => (
-							<div
-								key={line.name}
-								className="rounded-md border border-border bg-background p-4"
-							>
-								<p className="font-medium">{line.name}</p>
-								<p className="mt-2 text-muted-foreground">{line.reusablePattern}</p>
-								<p className="mt-2">兑现：{line.payoff}</p>
-							</div>
-						))}
+			<details className="rounded-md border border-border bg-background p-5">
+				<summary className="cursor-pointer list-none">
+					<div className="flex items-center justify-between gap-3">
+						<div>
+							<h3 className="font-semibold">高级详情</h3>
+							<p className="mt-1 text-sm text-muted-foreground">
+								展开查看故事线、写作支持包、世界书、原作笔记和风险提示。
+							</p>
+						</div>
+						<span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+							可选
+						</span>
 					</div>
-					<ListBlock
-						title="大事纪"
-						items={result.chronicle.map(
-							(item) => `${item.order}. ${item.event} - ${item.storyFunction}`,
-						)}
-					/>
-				</div>
-			</div>
-
-			{writingSupport ? (
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">写作支持包</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
-						给后续继续写、AI 续写和长篇校对使用，重点防止忘坑、跑偏、OOC 和节奏空转。
-					</p>
-					<div className="mt-5 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">章节功能表</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{writingSupport.chapterFunctionTable.map((item) => (
+				</summary>
+				<div className="mt-5 space-y-6">
+					<div className="rounded-md border border-border bg-card p-5">
+						<h3 className="font-semibold">故事线与大事纪</h3>
+						<div className="mt-4 grid gap-4 text-sm xl:grid-cols-2">
+							<div className="space-y-3">
+								{result.plotlines.map((line) => (
 									<div
-										key={`${item.chapterOrder}-${item.title}`}
-										className="rounded-md border border-border bg-card p-3"
+										key={line.name}
+										className="rounded-md border border-border bg-background p-4"
 									>
-										<p className="font-medium">
-											{item.chapterOrder}. {item.title}
+										<p className="font-medium">{line.name}</p>
+										<p className="mt-2 text-muted-foreground">
+											{line.reusablePattern}
 										</p>
-										<p className="mt-1 text-muted-foreground">
-											{item.function}
-										</p>
-										<p className="mt-2">目标：{item.goal}</p>
-										<p className="mt-1">冲突：{item.conflict}</p>
-										<p className="mt-1">钩子：{item.hook}</p>
+										<p className="mt-2">兑现：{line.payoff}</p>
 									</div>
 								))}
 							</div>
-						</div>
-
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">伏笔与回收表</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{writingSupport.foreshadowingLedger.map((item) => (
-									<div
-										key={`${item.setupChapter}-${item.setup}`}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<p className="font-medium">
-											第 {item.setupChapter} 章 · {item.status}
-										</p>
-										<p className="mt-2">伏笔：{item.setup}</p>
-										<p className="mt-1">回收：{item.payoff}</p>
-										<p className="mt-1 text-muted-foreground">
-											风险：{item.risk}
-										</p>
-									</div>
-								))}
-							</div>
+							<ListBlock
+								title="大事纪"
+								items={result.chronicle.map(
+									(item) =>
+										`${item.order}. ${item.event} - ${item.storyFunction}`,
+								)}
+							/>
 						</div>
 					</div>
 
-					<div className="mt-6 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">爽点/情绪点地图</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{writingSupport.emotionalBeatMap.map((item) => (
-									<div
-										key={`beat-${item.chapterOrder}`}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<p className="font-medium">
-											第 {item.chapterOrder} 章 · {item.intensity}
-										</p>
-										<p className="mt-2">{item.beats.join("、")}</p>
-										<p className="mt-1 text-muted-foreground">
-											承诺：{item.readerPromise}
-										</p>
+					{writingSupport ? (
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">写作支持包</h3>
+							<p className="mt-2 text-sm text-muted-foreground">
+								给后续继续写、AI 续写和长篇校对使用，重点防止忘坑、跑偏、OOC
+								和节奏空转。
+							</p>
+							<div className="mt-5 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">章节功能表</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{writingSupport.chapterFunctionTable.map((item) => (
+											<div
+												key={`${item.chapterOrder}-${item.title}`}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">
+													{item.chapterOrder}. {item.title}
+												</p>
+												<p className="mt-1 text-muted-foreground">
+													{item.function}
+												</p>
+												<p className="mt-2">目标：{item.goal}</p>
+												<p className="mt-1">冲突：{item.conflict}</p>
+												<p className="mt-1">钩子：{item.hook}</p>
+											</div>
+										))}
 									</div>
-								))}
-							</div>
-						</div>
+								</div>
 
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">节奏曲线</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{writingSupport.pacingCurve.map((item) => (
-									<div
-										key={`pace-${item.chapterOrder}`}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<p className="font-medium">第 {item.chapterOrder} 章</p>
-										<p className="mt-2">
-											信息 {item.informationDensity} · 冲突{" "}
-											{item.conflictIntensity} · 钩子 {item.hookStrength}
-										</p>
-										<p className="mt-1 text-muted-foreground">
-											风险：{item.risk}
-										</p>
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">伏笔与回收表</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{writingSupport.foreshadowingLedger.map((item) => (
+											<div
+												key={`${item.setupChapter}-${item.setup}`}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">
+													第 {item.setupChapter} 章 · {item.status}
+												</p>
+												<p className="mt-2">伏笔：{item.setup}</p>
+												<p className="mt-1">回收：{item.payoff}</p>
+												<p className="mt-1 text-muted-foreground">
+													风险：{item.risk}
+												</p>
+											</div>
+										))}
 									</div>
-								))}
+								</div>
 							</div>
-						</div>
-					</div>
 
-					<div className="mt-6 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">读者承诺与冲突矩阵</h4>
-							<div className="mt-3 grid gap-3 text-sm">
+							<div className="mt-6 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">爽点/情绪点地图</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{writingSupport.emotionalBeatMap.map((item) => (
+											<div
+												key={`beat-${item.chapterOrder}`}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">
+													第 {item.chapterOrder} 章 · {item.intensity}
+												</p>
+												<p className="mt-2">{item.beats.join("、")}</p>
+												<p className="mt-1 text-muted-foreground">
+													承诺：{item.readerPromise}
+												</p>
+											</div>
+										))}
+									</div>
+								</div>
+
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">节奏曲线</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{writingSupport.pacingCurve.map((item) => (
+											<div
+												key={`pace-${item.chapterOrder}`}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">
+													第 {item.chapterOrder} 章
+												</p>
+												<p className="mt-2">
+													信息 {item.informationDensity} · 冲突{" "}
+													{item.conflictIntensity} · 钩子{" "}
+													{item.hookStrength}
+												</p>
+												<p className="mt-1 text-muted-foreground">
+													风险：{item.risk}
+												</p>
+											</div>
+										))}
+									</div>
+								</div>
+							</div>
+
+							<div className="mt-6 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">读者承诺与冲突矩阵</h4>
+									<div className="mt-3 grid gap-3 text-sm">
+										<ListBlock
+											title="读者承诺"
+											items={writingSupport.readerPromiseChecklist.map(
+												(item) =>
+													`${item.promise}：${item.status}；${item.nextCheck}`,
+											)}
+										/>
+										<ListBlock
+											title="冲突矩阵"
+											items={writingSupport.conflictMatrix.map(
+												(item) =>
+													`${item.parties.join(" vs ")}：${item.conflict}；升级：${item.nextEscalation}`,
+											)}
+										/>
+									</div>
+								</div>
+
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">续写约束包</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										<p>
+											<span className="text-muted-foreground">
+												当前状态：
+											</span>
+											{writingSupport.continuationPack.currentState}
+										</p>
+										<p>
+											<span className="text-muted-foreground">
+												下一章目标：
+											</span>
+											{writingSupport.continuationPack.nextChapterGoal}
+										</p>
+										<ListBlock
+											title="未解决线索"
+											items={writingSupport.continuationPack.openThreads}
+										/>
+										<ListBlock
+											title="人物不跑偏"
+											items={writingSupport.continuationPack.oocGuards}
+										/>
+										<ListBlock
+											title="设定不冲突"
+											items={writingSupport.continuationPack.settingGuards}
+										/>
+										<ListBlock
+											title="风格约束"
+											items={writingSupport.continuationPack.styleConstraints}
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="mt-6 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">质量诊断</h4>
+									<div className="mt-3 grid gap-3 text-sm">
+										<ListBlock
+											title="强项"
+											items={writingSupport.qualityDiagnosis.strengths}
+										/>
+										<ListBlock
+											title="短板"
+											items={writingSupport.qualityDiagnosis.weaknesses}
+										/>
+										<ListBlock
+											title="优先修正"
+											items={writingSupport.qualityDiagnosis.priorityFixes}
+										/>
+									</div>
+								</div>
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">
+										给写作 AI 的续写 Prompt
+									</h4>
+									<pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-card p-3 text-xs leading-5">
+										{writingSupport.continuationPack.aiPrompt}
+									</pre>
+								</div>
+							</div>
+						</div>
+					) : null}
+
+					<div className="grid gap-6 xl:grid-cols-2">
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">世界历史书</h3>
+							<div className="mt-4 grid gap-3 text-sm">
 								<ListBlock
-									title="读者承诺"
-									items={writingSupport.readerPromiseChecklist.map(
-										(item) =>
-											`${item.promise}：${item.status}；${item.nextCheck}`,
-									)}
+									title="远古史"
+									items={result.historyBook.ancientHistory}
 								/>
 								<ListBlock
-									title="冲突矩阵"
-									items={writingSupport.conflictMatrix.map(
-										(item) =>
-											`${item.parties.join(" vs ")}：${item.conflict}；升级：${item.nextEscalation}`,
-									)}
+									title="近代事件"
+									items={result.historyBook.recentHistory}
+								/>
+								<ListBlock
+									title="公开传说"
+									items={result.historyBook.publicMyths}
+								/>
+								<ListBlock
+									title="隐藏真相"
+									items={result.historyBook.hiddenTruths}
 								/>
 							</div>
 						</div>
 
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">续写约束包</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								<p>
-									<span className="text-muted-foreground">当前状态：</span>
-									{writingSupport.continuationPack.currentState}
-								</p>
-								<p>
-									<span className="text-muted-foreground">下一章目标：</span>
-									{writingSupport.continuationPack.nextChapterGoal}
-								</p>
-								<ListBlock
-									title="未解决线索"
-									items={writingSupport.continuationPack.openThreads}
-								/>
-								<ListBlock
-									title="人物不跑偏"
-									items={writingSupport.continuationPack.oocGuards}
-								/>
-								<ListBlock
-									title="设定不冲突"
-									items={writingSupport.continuationPack.settingGuards}
-								/>
-								<ListBlock
-									title="风格约束"
-									items={writingSupport.continuationPack.styleConstraints}
-								/>
-							</div>
-						</div>
-					</div>
-
-					<div className="mt-6 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">质量诊断</h4>
-							<div className="mt-3 grid gap-3 text-sm">
-								<ListBlock
-									title="强项"
-									items={writingSupport.qualityDiagnosis.strengths}
-								/>
-								<ListBlock
-									title="短板"
-									items={writingSupport.qualityDiagnosis.weaknesses}
-								/>
-								<ListBlock
-									title="优先修正"
-									items={writingSupport.qualityDiagnosis.priorityFixes}
-								/>
-							</div>
-						</div>
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">给写作 AI 的续写 Prompt</h4>
-							<pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-card p-3 text-xs leading-5">
-								{writingSupport.continuationPack.aiPrompt}
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">酒馆/AI 写作软件导出包</h3>
+							<pre className="mt-4 max-h-96 overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5 whitespace-pre-wrap">
+								{JSON.stringify(result.exportPackage, null, 2)}
 							</pre>
 						</div>
 					</div>
-				</div>
-			) : null}
 
-			<div className="grid gap-6 xl:grid-cols-2">
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">世界历史书</h3>
-					<div className="mt-4 grid gap-3 text-sm">
-						<ListBlock title="远古史" items={result.historyBook.ancientHistory} />
-						<ListBlock title="近代事件" items={result.historyBook.recentHistory} />
-						<ListBlock title="公开传说" items={result.historyBook.publicMyths} />
-						<ListBlock title="隐藏真相" items={result.historyBook.hiddenTruths} />
-					</div>
-				</div>
+					{generationAssets ? (
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">世界书与生成资产</h3>
+							<p className="mt-2 text-sm text-muted-foreground">
+								用于导入酒馆、AI
+								写作软件或作为续写上下文。世界书条目默认做原创化处理，并标注触发关键词和复用风险。
+							</p>
+							<div className="mt-5 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">世界书条目</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{generationAssets.worldBook.entries.map((entry) => (
+											<div
+												key={`${entry.category}-${entry.keys.join("-")}`}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="rounded-md border border-border px-2 py-1 text-xs">
+														{entry.category}
+													</span>
+													<span className="text-xs text-muted-foreground">
+														priority {entry.priority} · risk{" "}
+														{entry.sourceRisk}
+													</span>
+												</div>
+												<p className="mt-2 font-medium">
+													{entry.keys.join("、")}
+												</p>
+												<p className="mt-2 text-muted-foreground">
+													{entry.content}
+												</p>
+												<p className="mt-2">
+													辅助触发：
+													{entry.secondaryKeys.join("、") || "无"}
+												</p>
+												<p className="mt-1 text-muted-foreground">
+													原创化：{entry.originalizationNote}
+												</p>
+											</div>
+										))}
+									</div>
+								</div>
 
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">酒馆/AI 写作软件导出包</h3>
-					<pre className="mt-4 max-h-96 overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5 whitespace-pre-wrap">
-						{JSON.stringify(result.exportPackage, null, 2)}
-					</pre>
-				</div>
-			</div>
-
-			{generationAssets ? (
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">世界书与生成资产</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
-						用于导入酒馆、AI
-						写作软件或作为续写上下文。世界书条目默认做原创化处理，并标注触发关键词和复用风险。
-					</p>
-					<div className="mt-5 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">世界书条目</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{generationAssets.worldBook.entries.map((entry) => (
-									<div
-										key={`${entry.category}-${entry.keys.join("-")}`}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<div className="flex flex-wrap items-center gap-2">
-											<span className="rounded-md border border-border px-2 py-1 text-xs">
-												{entry.category}
-											</span>
-											<span className="text-xs text-muted-foreground">
-												priority {entry.priority} · risk {entry.sourceRisk}
-											</span>
-										</div>
-										<p className="mt-2 font-medium">{entry.keys.join("、")}</p>
+								<div className="grid gap-4 text-sm">
+									<ListBlock
+										title="世界书触发规则"
+										items={generationAssets.worldBook.activationRules}
+									/>
+									<div className="rounded-md border border-border bg-background p-4">
+										<p className="font-medium">导入说明</p>
 										<p className="mt-2 text-muted-foreground">
-											{entry.content}
-										</p>
-										<p className="mt-2">
-											辅助触发：{entry.secondaryKeys.join("、") || "无"}
-										</p>
-										<p className="mt-1 text-muted-foreground">
-											原创化：{entry.originalizationNote}
+											{generationAssets.worldBook.importNotes}
 										</p>
 									</div>
-								))}
+									<ListBlock
+										title="一致性检查"
+										items={generationAssets.consistencyChecklist}
+									/>
+								</div>
+							</div>
+
+							<div className="mt-6 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4 text-sm">
+									<h4 className="font-semibold">风格圣经</h4>
+									<p className="mt-2">
+										<span className="text-muted-foreground">视角：</span>
+										{generationAssets.styleBible.narrativePOV}
+									</p>
+									<div className="mt-3 grid gap-3">
+										<ListBlock
+											title="语气关键词"
+											items={generationAssets.styleBible.toneKeywords}
+										/>
+										<ListBlock
+											title="文风规则"
+											items={generationAssets.styleBible.proseRules}
+										/>
+										<ListBlock
+											title="对话规则"
+											items={generationAssets.styleBible.dialogueRules}
+										/>
+										<ListBlock
+											title="禁忌"
+											items={generationAssets.styleBible.tabooList}
+										/>
+									</div>
+								</div>
+
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">卷/阶段规划</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{generationAssets.volumePlan.map((volume) => (
+											<div
+												key={volume.volume}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">{volume.volume}</p>
+												<p className="mt-2">目标：{volume.goal}</p>
+												<p className="mt-1">冲突：{volume.mainConflict}</p>
+												<p className="mt-1">高潮：{volume.climax}</p>
+												<p className="mt-1 text-muted-foreground">
+													卷末钩子：{volume.endingHook}
+												</p>
+											</div>
+										))}
+									</div>
+								</div>
+							</div>
+
+							<div className="mt-6 grid gap-6 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">场景模板</h4>
+									<div className="mt-3 space-y-3 text-sm">
+										{generationAssets.sceneTemplates.map((scene) => (
+											<div
+												key={scene.name}
+												className="rounded-md border border-border bg-card p-3"
+											>
+												<p className="font-medium">{scene.name}</p>
+												<p className="mt-2 text-muted-foreground">
+													{scene.useWhen}
+												</p>
+												<p className="mt-2">
+													节拍：{scene.beats.join(" -> ")}
+												</p>
+												<p className="mt-1">
+													避开：{scene.avoid.join("、")}
+												</p>
+											</div>
+										))}
+									</div>
+								</div>
+
+								<div className="rounded-md border border-border bg-background p-4">
+									<h4 className="text-sm font-semibold">角色语气与反派压力</h4>
+									<div className="mt-3 grid gap-3 text-sm">
+										<ListBlock
+											title="角色语气"
+											items={generationAssets.characterVoiceGuide.map(
+												(item) =>
+													`${item.character}：${item.speechStyle}；禁忌：${item.forbiddenTone.join("、")}`,
+											)}
+										/>
+										<ListBlock
+											title="反派压力"
+											items={generationAssets.antagonistPressurePlan.map(
+												(item) =>
+													`${item.antagonist}：${item.pressureMethod}；代价：${item.defeatCost}`,
+											)}
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="mt-6 rounded-md border border-border bg-background p-4 text-sm">
+								<h4 className="font-semibold">标题/简介/关键词包</h4>
+								<div className="mt-3 grid gap-3 md:grid-cols-2">
+									<ListBlock
+										title="标题关键词"
+										items={
+											generationAssets.titleSynopsisKeywordPack.titleKeywords
+										}
+									/>
+									<ListBlock
+										title="简介卖点"
+										items={
+											generationAssets.titleSynopsisKeywordPack
+												.synopsisSellingPoints
+										}
+									/>
+									<ListBlock
+										title="搜索标签"
+										items={generationAssets.titleSynopsisKeywordPack.searchTags}
+									/>
+									<ListBlock
+										title="开局关键词"
+										items={
+											generationAssets.titleSynopsisKeywordPack
+												.openingKeywords
+										}
+									/>
+								</div>
 							</div>
 						</div>
+					) : null}
 
-						<div className="grid gap-4 text-sm">
-							<ListBlock
-								title="世界书触发规则"
-								items={generationAssets.worldBook.activationRules}
-							/>
-							<div className="rounded-md border border-border bg-background p-4">
-								<p className="font-medium">导入说明</p>
-								<p className="mt-2 text-muted-foreground">
-									{generationAssets.worldBook.importNotes}
+					{result.sourceAssetArchive ? (
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">原作拆解笔记</h3>
+							<p className="mt-2 text-sm text-muted-foreground">
+								{result.sourceAssetArchive.usageNotice}
+							</p>
+							<div className="mt-4 grid gap-4 xl:grid-cols-2">
+								<div className="rounded-md border border-border bg-background p-4 text-sm">
+									<p className="font-medium">原作人物笔记</p>
+									<div className="mt-3 space-y-3">
+										{result.sourceAssetArchive.sourceCharacterNotes.map(
+											(item) => (
+												<div key={`${item.name}-${item.role}`}>
+													<p className="font-medium">
+														{item.name} · {item.role}
+													</p>
+													<p className="mt-1 text-muted-foreground">
+														{item.plotFunction}
+													</p>
+													<p className="mt-1">
+														可识别特征：
+														{item.recognizableTraits.join("、")}
+													</p>
+												</div>
+											),
+										)}
+									</div>
+								</div>
+								<div className="grid gap-3 text-sm">
+									<ListBlock
+										title="原作世界观笔记"
+										items={result.sourceAssetArchive.sourceWorldNotes}
+									/>
+									<ListBlock
+										title="原作时间线笔记"
+										items={result.sourceAssetArchive.sourceTimelineNotes}
+									/>
+									<ListBlock
+										title="原作关系网笔记"
+										items={result.sourceAssetArchive.sourceRelationshipNotes}
+									/>
+									<ListBlock
+										title="原作专有名词笔记"
+										items={result.sourceAssetArchive.sourceTermNotes}
+									/>
+								</div>
+							</div>
+						</div>
+					) : null}
+
+					<div className="rounded-md border border-border bg-card p-5">
+						<h3 className="font-semibold">参考边界检查</h3>
+						{boundaryCheck ? (
+							<>
+								<p className="mt-2 text-sm text-muted-foreground">
+									{boundaryCheck.summary}
 								</p>
-							</div>
-							<ListBlock
-								title="一致性检查"
-								items={generationAssets.consistencyChecklist}
-							/>
-						</div>
-					</div>
-
-					<div className="mt-6 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4 text-sm">
-							<h4 className="font-semibold">风格圣经</h4>
-							<p className="mt-2">
-								<span className="text-muted-foreground">视角：</span>
-								{generationAssets.styleBible.narrativePOV}
-							</p>
-							<div className="mt-3 grid gap-3">
-								<ListBlock
-									title="语气关键词"
-									items={generationAssets.styleBible.toneKeywords}
-								/>
-								<ListBlock
-									title="文风规则"
-									items={generationAssets.styleBible.proseRules}
-								/>
-								<ListBlock
-									title="对话规则"
-									items={generationAssets.styleBible.dialogueRules}
-								/>
-								<ListBlock
-									title="禁忌"
-									items={generationAssets.styleBible.tabooList}
-								/>
-							</div>
-						</div>
-
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">卷/阶段规划</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{generationAssets.volumePlan.map((volume) => (
-									<div
-										key={volume.volume}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<p className="font-medium">{volume.volume}</p>
-										<p className="mt-2">目标：{volume.goal}</p>
-										<p className="mt-1">冲突：{volume.mainConflict}</p>
-										<p className="mt-1">高潮：{volume.climax}</p>
-										<p className="mt-1 text-muted-foreground">
-											卷末钩子：{volume.endingHook}
-										</p>
-									</div>
-								))}
-							</div>
-						</div>
-					</div>
-
-					<div className="mt-6 grid gap-6 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">场景模板</h4>
-							<div className="mt-3 space-y-3 text-sm">
-								{generationAssets.sceneTemplates.map((scene) => (
-									<div
-										key={scene.name}
-										className="rounded-md border border-border bg-card p-3"
-									>
-										<p className="font-medium">{scene.name}</p>
-										<p className="mt-2 text-muted-foreground">
-											{scene.useWhen}
-										</p>
-										<p className="mt-2">节拍：{scene.beats.join(" -> ")}</p>
-										<p className="mt-1">避开：{scene.avoid.join("、")}</p>
-									</div>
-								))}
-							</div>
-						</div>
-
-						<div className="rounded-md border border-border bg-background p-4">
-							<h4 className="text-sm font-semibold">角色语气与反派压力</h4>
-							<div className="mt-3 grid gap-3 text-sm">
-								<ListBlock
-									title="角色语气"
-									items={generationAssets.characterVoiceGuide.map(
-										(item) =>
-											`${item.character}：${item.speechStyle}；禁忌：${item.forbiddenTone.join("、")}`,
-									)}
-								/>
-								<ListBlock
-									title="反派压力"
-									items={generationAssets.antagonistPressurePlan.map(
-										(item) =>
-											`${item.antagonist}：${item.pressureMethod}；代价：${item.defeatCost}`,
-									)}
-								/>
-							</div>
-						</div>
-					</div>
-
-					<div className="mt-6 rounded-md border border-border bg-background p-4 text-sm">
-						<h4 className="font-semibold">标题/简介/关键词包</h4>
-						<div className="mt-3 grid gap-3 md:grid-cols-2">
-							<ListBlock
-								title="标题关键词"
-								items={generationAssets.titleSynopsisKeywordPack.titleKeywords}
-							/>
-							<ListBlock
-								title="简介卖点"
-								items={
-									generationAssets.titleSynopsisKeywordPack.synopsisSellingPoints
-								}
-							/>
-							<ListBlock
-								title="搜索标签"
-								items={generationAssets.titleSynopsisKeywordPack.searchTags}
-							/>
-							<ListBlock
-								title="开局关键词"
-								items={generationAssets.titleSynopsisKeywordPack.openingKeywords}
-							/>
-						</div>
-					</div>
-				</div>
-			) : null}
-
-			{result.sourceAssetArchive ? (
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">原作拆解笔记</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
-						{result.sourceAssetArchive.usageNotice}
-					</p>
-					<div className="mt-4 grid gap-4 xl:grid-cols-2">
-						<div className="rounded-md border border-border bg-background p-4 text-sm">
-							<p className="font-medium">原作人物笔记</p>
-							<div className="mt-3 space-y-3">
-								{result.sourceAssetArchive.sourceCharacterNotes.map((item) => (
-									<div key={`${item.name}-${item.role}`}>
-										<p className="font-medium">
-											{item.name} · {item.role}
-										</p>
-										<p className="mt-1 text-muted-foreground">
-											{item.plotFunction}
-										</p>
-										<p className="mt-1">
-											可识别特征：{item.recognizableTraits.join("、")}
-										</p>
-									</div>
-								))}
-							</div>
-						</div>
-						<div className="grid gap-3 text-sm">
-							<ListBlock
-								title="原作世界观笔记"
-								items={result.sourceAssetArchive.sourceWorldNotes}
-							/>
-							<ListBlock
-								title="原作时间线笔记"
-								items={result.sourceAssetArchive.sourceTimelineNotes}
-							/>
-							<ListBlock
-								title="原作关系网笔记"
-								items={result.sourceAssetArchive.sourceRelationshipNotes}
-							/>
-							<ListBlock
-								title="原作专有名词笔记"
-								items={result.sourceAssetArchive.sourceTermNotes}
-							/>
-						</div>
-					</div>
-				</div>
-			) : null}
-
-			<div className="rounded-md border border-border bg-card p-5">
-				<h3 className="font-semibold">参考边界检查</h3>
-				{boundaryCheck ? (
-					<>
-						<p className="mt-2 text-sm text-muted-foreground">
-							{boundaryCheck.summary}
-						</p>
+								<div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
+									<ListBlock
+										title="可以学习"
+										items={boundaryCheck.learnablePatterns}
+									/>
+									<ListBlock title="不要复用" items={boundaryCheck.doNotReuse} />
+									<ListBlock
+										title="必须改造"
+										items={boundaryCheck.needsTransformation}
+									/>
+									<ListBlock
+										title="专名风险"
+										items={boundaryCheck.nameAndTermRisks}
+									/>
+									<ListBlock
+										title="情节雷同风险"
+										items={boundaryCheck.plotSimilarityRisks}
+									/>
+									<ListBlock
+										title="安全迁移动作"
+										items={boundaryCheck.safeRewriteMoves}
+									/>
+								</div>
+							</>
+						) : null}
 						<div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
-							<ListBlock title="可以学习" items={boundaryCheck.learnablePatterns} />
-							<ListBlock title="不要复用" items={boundaryCheck.doNotReuse} />
-							<ListBlock title="必须改造" items={boundaryCheck.needsTransformation} />
-							<ListBlock title="专名风险" items={boundaryCheck.nameAndTermRisks} />
 							<ListBlock
-								title="情节雷同风险"
-								items={boundaryCheck.plotSimilarityRisks}
+								title="可学习"
+								items={result.originalizationReport.safeToLearn}
 							/>
 							<ListBlock
-								title="安全迁移动作"
-								items={boundaryCheck.safeRewriteMoves}
+								title="必须转换"
+								items={result.originalizationReport.mustTransform}
+							/>
+							<ListBlock
+								title="迁移策略"
+								items={result.originalizationReport.rewriteStrategy}
 							/>
 						</div>
-					</>
-				) : null}
-				<div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
-					<ListBlock title="可学习" items={result.originalizationReport.safeToLearn} />
-					<ListBlock
-						title="必须转换"
-						items={result.originalizationReport.mustTransform}
-					/>
-					<ListBlock
-						title="迁移策略"
-						items={result.originalizationReport.rewriteStrategy}
-					/>
-				</div>
-				<p className="mt-4 text-sm text-muted-foreground">
-					{result.originalizationReport.fanFictionWarning}
-				</p>
-			</div>
-
-			{result.usageRiskNotice ? (
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">使用风险提示</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
-						{result.usageRiskNotice.summary}
-					</p>
-					<div className="mt-4 grid gap-4 md:grid-cols-3">
-						<ListBlock title="推荐用途" items={result.usageRiskNotice.recommendedUse} />
-						<ListBlock
-							title="较高风险用途"
-							items={result.usageRiskNotice.higherRiskUse}
-						/>
-						<div className="rounded-md border border-border bg-background p-4 text-sm">
-							<p className="font-medium">使用责任</p>
-							<p className="mt-2 text-muted-foreground">
-								{result.usageRiskNotice.userResponsibility}
-							</p>
-						</div>
+						<p className="mt-4 text-sm text-muted-foreground">
+							{result.originalizationReport.fanFictionWarning}
+						</p>
 					</div>
+
+					{result.usageRiskNotice ? (
+						<div className="rounded-md border border-border bg-card p-5">
+							<h3 className="font-semibold">使用风险提示</h3>
+							<p className="mt-2 text-sm text-muted-foreground">
+								{result.usageRiskNotice.summary}
+							</p>
+							<div className="mt-4 grid gap-4 md:grid-cols-3">
+								<ListBlock
+									title="推荐用途"
+									items={result.usageRiskNotice.recommendedUse}
+								/>
+								<ListBlock
+									title="较高风险用途"
+									items={result.usageRiskNotice.higherRiskUse}
+								/>
+								<div className="rounded-md border border-border bg-background p-4 text-sm">
+									<p className="font-medium">使用责任</p>
+									<p className="mt-2 text-muted-foreground">
+										{result.usageRiskNotice.userResponsibility}
+									</p>
+								</div>
+							</div>
+						</div>
+					) : null}
 				</div>
-			) : null}
+			</details>
 		</section>
 	);
 }

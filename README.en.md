@@ -5,7 +5,7 @@
 [![CI - workspace](https://github.com/myyimu/ai-novel-first-step/actions/workflows/ci.yml/badge.svg)](https://github.com/myyimu/ai-novel-first-step/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-AI Novel First Step is a local-first AI chapter triage and sample analysis tool for web novel writers. It is not a ghostwriting app. It helps new writers rescue the first chapter first: paste a chapter, find the biggest retention problem, get a revision prompt they can copy into their writing AI, and then move into reference-sample rubrics, advanced critique, full-book assets, and research workflows when needed.
+AI Novel First Step is a local-first AI chapter triage and sample analysis tool for web novel writers. It is not a ghostwriting app. It helps new writers rescue the first chapter first: paste a chapter, find the biggest retention problem, get a revision prompt they can copy into their writing AI, and then move into reference-sample rubrics, full-book graph review, exports, and research workflows when needed. The main navigation is intentionally small: chapter triage, advanced critique, and AI settings. Full-book analysis, graph review, history, exports, and sample research are advanced workflows.
 
 > Alpha status: suitable for local experiments, feature validation, and feedback collection. Do not expose it as a production public service yet.
 
@@ -13,7 +13,7 @@ AI Novel First Step is a local-first AI chapter triage and sample analysis tool 
 
 ![AI Novel First Step workspace](./docs/assets/ai-novel-first-step-home.png)
 
-_The interface is evolving quickly. This screenshot is for reference only; use the current app as the source of truth._
+_The interface is evolving quickly. This screenshot may lag behind the current information architecture; use the current app as the source of truth._
 
 ## Contents
 
@@ -54,6 +54,8 @@ Import a mature reference chapter -> infer market positioning -> generate a scor
 
 Full-book assets and the research library are advanced workflows. Use them when you already have a complete TXT file or multiple analyzed samples and want character cards, world books, style rules, topic decisions, and traceable evidence.
 
+The current page structure is intentionally compressed: `/` is the chapter triage room, `/critique` is advanced chapter critique, `/model` is AI settings, and `/book` is full-book analysis plus result management. `/workspace`, `/starter`, `/history`, `/export`, and `/library` remain compatibility routes and redirect back to the home or full-book workflow.
+
 ## Features
 
 - Chapter triage: paste only your own chapter and get positioning, selling points, the biggest problem, concrete fixes, and a revision prompt.
@@ -63,7 +65,10 @@ Full-book assets and the research library are advanced workflows. Use them when 
 - Performance signals: use impressions, CTR, 30s/60s read retention, completion rate, and follow rate as diagnostic context.
 - Full-book analysis: upload a TXT file, clean text, split chapters, and run async Map-Reduce analysis.
 - Partial result persistence: each chapter map is saved locally so token exhaustion or job failure does not waste completed work.
-- Export center: export Markdown, JSON, Tavern character cards, World Book, SillyTavern World Info, continuation packs, style bibles, outlines, prompt packs, and Do Not Copy lists.
+- Relationship graph workbench: turn full-book results into an interactive graph with overview, review, timeline, export, node dragging, and JSON/SVG graph export.
+- Graph review queue: confirm weak-evidence edges, edit relation labels, merge or ignore isolated nodes, and include local correction records in exported graph JSON.
+- Full-book result management: history and exports are no longer primary pages; they live inside the full-book analysis workflow.
+- Export tools: export Markdown, JSON, Tavern character cards, World Book, SillyTavern World Info, continuation packs, style bibles, outlines, prompt packs, and Do Not Copy lists.
 - Originalized export: choose between source analysis notes and abstracted, de-identified creative assets.
 
 ## Tech Stack
@@ -77,9 +82,12 @@ Full-book assets and the research library are advanced workflows. Use them when 
 
 ## Model Providers
 
-The app uses BYOK by default. API keys are sent per request and are not persisted.
+The app provides public/shared model entry points by default and also supports BYOK. User-provided API keys are sent per request and are not persisted.
 
 - mock: local demo and automated validation.
+- AI Horde public pool: anonymous low-priority shared queue.
+- OpenRouter free models: backend-configured OpenRouter key, with no frontend key required.
+- Shared compute: backend-configured OpenAI-compatible shared line.
 - DeepSeek.
 - Doubao / Volcengine Ark.
 - Alibaba Cloud Bailian / Tongyi Qianwen.
@@ -127,16 +135,35 @@ pnpm run dev:raw
 
 This starts `web`, `api`, and `ai-core` in parallel without the `one` command.
 
-Windows one-click local startup:
+Windows one-click local startup for first-time users:
+
+```text
+scripts/start-local.cmd
+```
+
+This entry point runs environment checks first, then starts the app:
+
+- checks Node.js and pnpm against the project version policy.
+- guides dependency installation; `scripts/start-local.cmd -a` uses auto-install mode.
+- runs `pnpm install` when workspace dependencies are missing.
+- reuses healthy project services, or searches nearby ports when defaults are occupied.
+- opens separate API and Web PowerShell windows and writes logs to `.local/run-logs`.
+- opens the Web page after startup unless disabled.
+
+If you are already in a terminal at the workspace root, use the equivalent npm script:
 
 ```powershell
 pnpm run start:local
 ```
 
-You can also double-click:
+Common startup commands:
 
-```text
+```powershell
 scripts/start-local.cmd
+scripts/start-local.cmd -a
+pnpm run start:local -- -NoBrowser
+pnpm run start:local -- -Kill
+pnpm run start:local -- -WebPort 3100 -ApiPort 3101
 ```
 
 The startup script now checks `Node.js` and `pnpm` automatically before launching `api` and `web`.
@@ -171,7 +198,7 @@ API: http://localhost:3001/api/v1
 
 ## Workspace
 
-- `apps/web`: Next.js console.
+- `apps/web`: Next.js console for chapter triage, advanced critique, AI settings, and full-book analysis.
 - `services/api`: NestJS API for text cleaning, chapter splitting, async jobs, full-book analysis, and exports.
 - `packages/ai-core`: Shared types, scoring metrics, and analysis contracts.
 
@@ -238,7 +265,8 @@ pnpm run doctor
 ## Current Limitations
 
 - This is an Alpha / MVP project. AI analysis and scoring are not guaranteed to be correct.
-- Partial results are persisted, but resume-from-checkpoint and partial export UI are not fully implemented yet.
+- Partial results are persisted, and failed/interrupted full-book jobs have a basic resume path. More granular partial export and persisted graph-review corrections are still being iterated.
+- Relationship graphs support local manual corrections and correction-aware JSON export, but correction records are not yet stored as a separate database entity.
 - For real PostgreSQL deployments, run `pnpm --filter api db:push` or generate migrations when schema changes.
 - There is no account system yet. The project is currently best suited for local single-user deployment.
 - The tool only provides analysis, learning, critique, and export features. Users are responsible for confirming they have the necessary rights or legal basis for uploaded texts and exported assets.

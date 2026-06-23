@@ -41,7 +41,11 @@ Before opening the API and Web windows, the startup flow now does the following:
 5. Ensure `pnpm` is available, preferring `corepack` and falling back to `npm install -g`.
 6. Check whether workspace dependencies are installed.
 7. If dependencies are missing, run `pnpm install` from the workspace root.
-8. Start the API and Web dev servers in separate PowerShell windows.
+8. Reuse existing healthy project services when possible.
+9. If default ports are occupied by other services, search nearby ports.
+10. Start the API and Web dev servers in separate PowerShell windows.
+11. Write runtime logs to `.local/run-logs`.
+12. Open the Web URL automatically unless `-NoBrowser` is used.
 
 在打开 API 和 Web 窗口之前，脚本现在会按下面顺序执行：
 
@@ -52,7 +56,59 @@ Before opening the API and Web windows, the startup flow now does the following:
 5. 确保 `pnpm` 可用，优先使用 `corepack`，失败再回退到 `npm install -g`。
 6. 检查工作区依赖是否已安装。
 7. 如果依赖缺失，在工作区根目录自动执行 `pnpm install`。
-8. 最后分别打开 API 和 Web 的 PowerShell 开发窗口。
+8. 优先复用已经健康运行的本项目服务。
+9. 如果默认端口被其他服务占用，自动尝试附近端口。
+10. 最后分别打开 API 和 Web 的 PowerShell 开发窗口。
+11. 把运行日志写入 `.local/run-logs`。
+12. 除非使用 `-NoBrowser`，否则启动后自动打开 Web 页面。
+
+## Arguments / 参数
+
+The beginner-friendly `.cmd` entry supports:
+
+```powershell
+scripts/start-local.cmd
+scripts/start-local.cmd -a
+scripts/start-local.cmd --auto-install
+```
+
+The PowerShell entry is better when you need startup options:
+
+```powershell
+pnpm run start:local -- -NoBrowser
+pnpm run start:local -- -Kill
+pnpm run start:local -- -WebPort 3100 -ApiPort 3101
+pnpm run start:local -- -PortSearchLimit 30
+```
+
+- `-NoBrowser`: start services without opening the browser.
+- `-Kill`: restart existing project-owned API/Web processes instead of reusing them.
+- `-WebPort`: preferred Web port, default `3000`.
+- `-ApiPort`: preferred API port, default `3001`.
+- `-PortSearchLimit`: how far to search after the preferred port, default `20`.
+
+适合新手的 `.cmd` 入口支持：
+
+```powershell
+scripts/start-local.cmd
+scripts/start-local.cmd -a
+scripts/start-local.cmd --auto-install
+```
+
+需要传递启动参数时，更适合使用 PowerShell 入口：
+
+```powershell
+pnpm run start:local -- -NoBrowser
+pnpm run start:local -- -Kill
+pnpm run start:local -- -WebPort 3100 -ApiPort 3101
+pnpm run start:local -- -PortSearchLimit 30
+```
+
+- `-NoBrowser`：只启动服务，不自动打开浏览器。
+- `-Kill`：重启本项目已有的 API/Web 进程，而不是复用。
+- `-WebPort`：Web 优先端口，默认 `3000`。
+- `-ApiPort`：API 优先端口，默认 `3001`。
+- `-PortSearchLimit`：首选端口之后继续尝试的范围，默认 `20`。
 
 ## Project Version Policy / 项目版本策略
 
@@ -131,6 +187,22 @@ This is expected behavior.
 If the startup flow is healthy, those windows should keep running the dev servers rather than exiting immediately with missing-command errors.
 
 如果启动链路正常，这两个窗口应该持续运行开发服务，而不是立刻因为缺命令报错退出。
+
+The launcher window prints the actual Web/API URLs and log directory. Defaults are:
+
+```text
+Web: http://127.0.0.1:3000
+API: http://127.0.0.1:3001/api/v1
+Logs: .local/run-logs
+```
+
+启动窗口会打印实际 Web/API 地址和日志目录。默认是：
+
+```text
+Web: http://127.0.0.1:3000
+API: http://127.0.0.1:3001/api/v1
+Logs: .local/run-logs
+```
 
 ## Troubleshooting / 排查建议
 

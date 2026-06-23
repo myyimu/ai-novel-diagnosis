@@ -638,6 +638,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 	);
 	const [loading, setLoading] = useState<LoadingState>(null);
 	const [quickReviewElapsedSeconds, setQuickReviewElapsedSeconds] = useState(0);
+	const [bookUtilityPanel, setBookUtilityPanel] = useState<"history" | "exports" | null>(null);
 	const [previousQuickReviewResult, setPreviousQuickReviewResult] =
 		useState<QuickReviewResult | null>(null);
 	const referenceProfileCacheRef = useRef<Map<string, ReferenceProfileResult>>(new Map());
@@ -673,6 +674,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 
 	function openView(view: WorkspaceView) {
 		router.push(workspaceViewRoutes[view]);
+	}
+
+	function openBookUtility(panel: "history" | "exports") {
+		setBookUtilityPanel((current) => (current === panel ? null : panel));
 	}
 
 	const navItems = getWorkspaceNavItems();
@@ -2219,12 +2224,15 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 								</p>
 							</div>
 							<div className="flex flex-wrap gap-2">
-								<Button variant="outline" onClick={() => openView("history")}>
+								<Button
+									variant={bookUtilityPanel === "history" ? "default" : "outline"}
+									onClick={() => openBookUtility("history")}
+								>
 									历史记录
 								</Button>
 								<Button
-									variant="outline"
-									onClick={() => openView("exports")}
+									variant={bookUtilityPanel === "exports" ? "default" : "outline"}
+									onClick={() => openBookUtility("exports")}
 									disabled={!bookJob || bookJob.status !== "succeeded"}
 								>
 									导出结果
@@ -2232,6 +2240,25 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 							</div>
 						</div>
 					</section>
+					{bookUtilityPanel === "history" ? (
+						<BookHistoryPanel
+							jobs={bookHistory}
+							uploads={uploadHistory}
+							loading={loading}
+							onLoadHistory={loadHistory}
+							onOpenJob={openHistoryJob}
+							onDeleteJob={deleteHistoryJob}
+						/>
+					) : null}
+					{bookUtilityPanel === "exports" ? (
+						<ExportView
+							job={bookJob}
+							result={bookAnalysisResult}
+							loading={loading}
+							onExport={exportBookResult}
+							onOpenHistory={() => openBookUtility("history")}
+						/>
+					) : null}
 					<BookAnalysisPanel result={bookAnalysisResult} job={bookJob} />
 				</>
 			) : null}

@@ -155,21 +155,15 @@ export function WorkspaceShell<TView extends string>({
 				</div>
 			</aside>
 
-			<section className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-				<header className="border-b border-border pb-5">
+			<section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+				<header className="border-b border-border pb-4">
 					<div>
-						<p className="text-sm text-muted-foreground">
-							本机使用 · 共享站/自备 Key · 爆款启蒙与创作决策
-						</p>
-						<h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+						<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
 							{activeMeta.title}
 						</h1>
-						<p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-							{activeMeta.description}
-						</p>
 					</div>
 				</header>
-				<StatusBanner status={status} loading={loading} />
+				<StatusBanner status={status} loading={loading} compact />
 				{children}
 			</section>
 		</div>
