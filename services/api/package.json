@@ -2,7 +2,7 @@
   "name": "api",
   "version": "0.1.0",
   "private": true,
-  "description": "Local API for 新手AI小说第一步.",
+  "description": "Local API for AI小说第一步 first-chapter triage, full-book analysis, exports, and graph review.",
   "license": "MIT",
   "author": "",
   "scripts": {

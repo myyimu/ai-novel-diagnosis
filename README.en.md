@@ -5,21 +5,58 @@
 [![CI - workspace](https://github.com/myyimu/ai-novel-first-step/actions/workflows/ci.yml/badge.svg)](https://github.com/myyimu/ai-novel-first-step/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-AI Novel First Step is a local-first AI chapter triage and sample analysis tool for web novel writers. It is not a ghostwriting app. It helps new writers rescue the first chapter first: paste a chapter, find the biggest retention problem, get a revision prompt they can copy into their writing AI, and then move into reference-sample rubrics, full-book graph review, exports, and research workflows when needed. The main navigation is intentionally small: chapter triage, advanced critique, and AI settings. Full-book analysis, graph review, history, exports, and sample research are advanced workflows.
+Want to know what is wrong with your web novel, why it gets no traffic, or why readers drop off in chapter one?
+
+AI Novel First Step is a local AI novel diagnosis and book-analysis tool. It helps web novel writers rescue the first chapter first: paste a chapter, find the biggest retention problem, explain whether the issue is the opening, hook, emotion, pacing, setup, or market promise, generate a revision prompt you can copy into your writing AI, then run the chapter again to check whether the problem was actually fixed.
+
+It is not a ghostwriting app. It is a local AI diagnosis desk for writers: start by answering "what is wrong with my story and why is nobody reading it?", then move into reference-sample critique, full-book analysis, relationship graphs, and exportable writing assets when needed.
 
 > Alpha status: suitable for local experiments, feature validation, and feedback collection. Do not expose it as a production public service yet.
+
+## Try It In 3 Minutes
+
+On Windows, double-click:
+
+```text
+scripts/start-local.cmd
+```
+
+The script checks Node.js / pnpm, installs missing dependencies, starts the API and Web app, and opens the page automatically. After the page opens, skip advanced configuration at first. Paste your first chapter and run chapter triage.
+
+If you are already in a terminal at the repository root, run:
+
+```powershell
+pnpm run start:local
+```
+
+Default URLs:
+
+```text
+Web: http://127.0.0.1:3000
+API: http://127.0.0.1:3001/api/v1
+```
+
+## What You Get
+
+- A clear diagnosis of the biggest first-chapter drop-off risk: opening, hook, emotion, pacing, setup, or market promise.
+- A concrete explanation of why the chapter may not get traffic, clicks, retention, or follow-up reading.
+- A copyable revision prompt: concrete instructions you can pass to a writing AI, not vague critique.
+- A retest loop: run the revised chapter again and compare whether the core issue changed.
+- Advanced assets: reference-sample rubrics, full-book character/world analysis, relationship graphs, timelines, and export packs.
 
 ## Screenshot
 
 ![AI Novel First Step workspace](./docs/assets/ai-novel-first-step-home.png)
 
-_The interface is evolving quickly. This screenshot may lag behind the current information architecture; use the current app as the source of truth._
+_The interface is evolving quickly; use the current app as the source of truth._
 
 ## Contents
 
-- [What Problem It Solves](#what-problem-it-solves)
+- [Try It In 3 Minutes](#try-it-in-3-minutes)
+- [What You Get](#what-you-get)
+- [Who It Is For](#who-it-is-for)
 - [Recommended Workflow](#recommended-workflow)
-- [Features](#features)
+- [Core Capabilities](#core-capabilities)
 - [Tech Stack](#tech-stack)
 - [Model Providers](#model-providers)
 - [Local Development](#local-development)
@@ -30,13 +67,21 @@ _The interface is evolving quickly. This screenshot may lag behind the current i
 - [Friendly Links](#friendly-links)
 - [Open Source](#open-source)
 
-## What Problem It Solves
+## Who It Is For
 
-- You finished a first chapter, but do not know where readers may drop off.
-- You do not know whether the biggest issue is the opening, hook, emotion, pacing, setup, or market promise.
-- You want AI feedback to become a copyable revision prompt, not vague advice.
-- You want to turn mature samples into a rubric, then critique your own draft with the same standard.
-- You want to upload a full TXT novel and extract worldbuilding, characters, plotlines, timelines, and reusable writing assets.
+Good fit:
+
+- New web novel writers who finished a first chapter but do not know why readers may drop off.
+- Writers who want to know what is wrong with their novel, why it gets no traffic, or why readers do not continue.
+- Writers who want AI critique to become executable revision tasks, not comments like "the pacing is slow".
+- Writers who want to learn how mature samples deliver genre promise, character relationships, and emotional payoffs.
+- Creators who want to turn a full TXT novel into character cards, world books, relationship graphs, timelines, and writing assets.
+
+Not a good fit:
+
+- Users who want AI to ghostwrite a whole book.
+- Users who want to copy source works through analysis outputs.
+- Teams that need accounts, permissions, collaboration, and production hosting.
 
 ## Recommended Workflow
 
@@ -52,24 +97,39 @@ When you need a deeper critique, move into the advanced workflow:
 Import a mature reference chapter -> infer market positioning -> generate a scoring rubric -> score your own chapter with the same standard
 ```
 
-Full-book assets and the research library are advanced workflows. Use them when you already have a complete TXT file or multiple analyzed samples and want character cards, world books, style rules, topic decisions, and traceable evidence.
+When you already have a complete TXT file or multiple samples, move into full-book analysis:
+
+```text
+Upload a full TXT -> preview chapter split -> run Map-Reduce analysis -> review the relationship graph -> export character/world/continuation assets
+```
 
 The current page structure is intentionally compressed: `/` is the chapter triage room, `/critique` is advanced chapter critique, `/model` is AI settings, and `/book` is full-book analysis plus result management. `/workspace`, `/starter`, `/history`, `/export`, and `/library` remain compatibility routes and redirect back to the home or full-book workflow.
 
-## Features
+## Core Capabilities
 
-- Chapter triage: paste only your own chapter and get positioning, selling points, the biggest problem, concrete fixes, and a revision prompt.
-- Retest loop: compare quick-review results before and after revision to check whether the change actually solved the problem.
-- Advanced critique: analyze a mature reference chapter, generate a scoring rubric, and score your own chapter with the same standard.
-- Platform profile: model target platform, target readers, reading mode, category, theme, tags, and keywords.
-- Performance signals: use impressions, CTR, 30s/60s read retention, completion rate, and follow rate as diagnostic context.
-- Full-book analysis: upload a TXT file, clean text, split chapters, and run async Map-Reduce analysis.
-- Partial result persistence: each chapter map is saved locally so token exhaustion or job failure does not waste completed work.
-- Relationship graph workbench: turn full-book results into an interactive graph with overview, review, timeline, export, node dragging, and JSON/SVG graph export.
-- Graph review queue: confirm weak-evidence edges, edit relation labels, merge or ignore isolated nodes, and include local correction records in exported graph JSON.
-- Full-book result management: history and exports are no longer primary pages; they live inside the full-book analysis workflow.
-- Export tools: export Markdown, JSON, Tavern character cards, World Book, SillyTavern World Info, continuation packs, style bibles, outlines, prompt packs, and Do Not Copy lists.
-- Originalized export: choose between source analysis notes and abstracted, de-identified creative assets.
+First-chapter triage:
+
+- Paste only your own first chapter and get positioning, selling points, the biggest problem, concrete fixes, and a revision prompt.
+- Run the revised chapter again and compare quickScore plus issue changes.
+- Start without reference samples, platform profiles, or complex configuration.
+
+Advanced chapter critique:
+
+- Analyze a mature reference chapter and infer category, theme, tags, implicit expectations, and title/blurb promises.
+- Generate a transferable rubric, then score your own chapter with the same standard.
+- Use impressions, CTR, 30s/60s read retention, completion rate, and follow rate as diagnostic context.
+
+Full-book visual analysis:
+
+- Upload a TXT file, clean text, preview chapter splitting, and run async Map-Reduce analysis.
+- Save each completed chapter map locally, so token exhaustion or job failure does not waste completed work.
+- Extract characters, factions, locations, worldbuilding, plotlines, timelines, and reusable writing assets.
+
+Relationship graph workbench:
+
+- Turn full-book results into an interactive graph with overview, review, timeline, node dragging, and graph export.
+- Confirm weak-evidence edges, edit relation labels, merge duplicate nodes, or ignore noisy nodes.
+- Export Markdown, JSON, Tavern character cards, World Book, SillyTavern World Info, continuation packs, style bibles, outlines, prompt packs, and Do Not Copy lists.
 
 ## Tech Stack
 
@@ -96,19 +156,11 @@ The app provides public/shared model entry points by default and also supports B
 
 ## Local Development
 
-If you just want to try the product quickly on Windows, use the one-click local startup:
+For a quick product trial, start with [Try It In 3 Minutes](#try-it-in-3-minutes). This section is for developers and users who need startup options.
 
-```powershell
-pnpm run start:local
-```
+`scripts/start-local.cmd` runs environment checks before startup: Node.js / pnpm validation, guided dependency installation, missing `pnpm install`, healthy service reuse, nearby port search, and API/Web logs under `.local/run-logs`.
 
-Then open:
-
-```text
-Web: http://127.0.0.1:3000
-```
-
-After the page opens, you can skip advanced configuration at first. Paste a chapter and run chapter triage. If the shared model path is unavailable or slow, switch to your own model provider in “AI Settings”.
+If the shared model path is unavailable or slow, switch to your own model provider in "AI Settings".
 
 For engineering work, One CLI is the recommended path.
 
@@ -208,7 +260,7 @@ If `DATABASE_URL` is not configured, the API uses `.local/pglite` as the local d
 
 ## Docker Compose
 
-Docker Compose is suitable for local deployment or demos when Docker Desktop is already installed. Non-engineering users should usually start with `pnpm run start:local`.
+Docker Compose is suitable for local deployment or demos when Docker Desktop is already installed. Non-engineering users should usually start with `scripts/start-local.cmd`.
 
 Copy the root environment template and start the stack:
 
@@ -284,20 +336,31 @@ pnpm run doctor
 - Contact: [xiaoke5211@gmail.com](mailto:xiaoke5211@gmail.com)
 - Contributing: see [CONTRIBUTING.md](./CONTRIBUTING.md)
 - Security policy: see [SECURITY.md](./SECURITY.md)
+- GitHub Social Preview candidate: [docs/assets/github-social-preview.png](./docs/assets/github-social-preview.png).
 
 ## Recommended GitHub Topics
 
 ```text
 ai-novel
+ai
+llm
+artificial-intelligence
+prompt-engineering
+natural-language-processing
+knowledge-graph
+text-analysis
+storytelling
 webnovel
+novel
 novel-analysis
-novel-critique
+book-analysis
+novel-diagnosis
+webnovel-diagnosis
+ai-writing
+writing-assistant
+relationship-graph
+writing
 writing-tools
-local-first
-byok
-nextjs
-nestjs
-one-cli
 ```
 
 ## One CLI

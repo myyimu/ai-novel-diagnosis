@@ -2,18 +2,18 @@
 
 `services/api` 是 AI 小说第一步的 NestJS 后端。
 
-它负责模型调用、章节急诊、成熟样本拆解、评分、整书异步任务、研究库和导出。前端通过 `/api/v1` 访问这些接口；本地开发默认监听 `http://127.0.0.1:3001/api/v1`。
+它负责模型调用、第一章改稿急诊、成熟样本质检、整书异步拆解、关系图谱资产、研究库和导出。前端通过 `/api/v1` 访问这些接口；本地开发默认监听 `http://127.0.0.1:3001/api/v1`。
 
 ## 主要模块
 
-- `analysis`: 小说分析主模块，包含章节急诊、参考画像、Rubric、评分、整书拆解和导出。
-- `research-library`: 从已完成整书任务生成研究库资产，支持多书对比和证据问答。
+- `analysis`: 小说分析主模块，包含第一章急诊、参考画像、Rubric、评分、整书拆解、图谱资产和导出。
+- `research-library`: 从已完成整书任务生成进阶研究资产，支持多书对比和证据问答。
 - `health`: 健康检查。
 - `auth` / `user` / `common`: 模板保留模块，当前不是产品主路径。
 
 ## 核心接口
 
-### 章节急诊
+### 第一章改稿急诊
 
 - `POST /api/v1/analysis/quick-review`
 
@@ -34,7 +34,7 @@
 
 支持 mock、共享 OpenAI-compatible 线路、自备 Key、DeepSeek、豆包/火山方舟、通义千问、Ollama 和自定义 OpenAI-compatible 接口。
 
-### 整书资产
+### 整书拆解与导出
 
 - `POST /api/v1/analysis/book/uploads`
 - `GET /api/v1/analysis/book/uploads/:uploadId`
@@ -46,7 +46,7 @@
 - `GET /api/v1/analysis/book/jobs`
 - `GET /api/v1/analysis/book/jobs/:jobId/export`
 
-整书任务采用异步 Map-Reduce。每章 map 结果会持久化，任务失败时已完成章节不会丢失。
+整书任务采用异步 Map-Reduce。每章 map 结果会持久化，任务失败时已完成章节不会丢失。Reduce 结果会支撑角色卡、世界书、关系图谱、时间线和导出包。
 
 ### 研究库
 
@@ -130,4 +130,5 @@ pnpm --filter api db:push
 - 首屏接口优先保障 `quick-review` 的稳定性和错误解释。
 - 高级质检接口必须保留证据、原因和可执行改法，避免只返回泛泛评分。
 - 整书任务必须保留中间结果，避免长文本任务失败后完全白跑。
+- 图谱和导出接口必须保留证据链与原创化边界，避免把拆解结果误导成可直接复制的原作素材。
 - 所有模型路径都必须支持 mock fallback，方便本地验证和自动化测试。

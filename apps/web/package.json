@@ -2,6 +2,7 @@
 	"name": "web",
 	"version": "0.1.0",
 	"private": true,
+	"description": "Next.js console for first-chapter triage, revision prompts, full-book analysis, and relationship graph review.",
 	"license": "MIT",
 	"scripts": {
 		"dev": "next dev",
