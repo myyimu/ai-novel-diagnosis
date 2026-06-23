@@ -128,7 +128,7 @@ export function StarterView({ digest, onOpenView }: StarterViewProps) {
 				</div>
 
 				<div className="rounded-md border border-border bg-card p-5">
-					<h2 className="text-lg font-semibold">新手模式输出原则</h2>
+					<h2 className="text-lg font-semibold">套路库输出原则</h2>
 					<div className="mt-5 space-y-3 text-sm">
 						{[
 							"先问“为什么火”，再问“怎么写”。",

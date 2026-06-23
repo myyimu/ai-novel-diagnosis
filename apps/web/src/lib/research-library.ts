@@ -335,19 +335,19 @@ export function buildBeginnerLearningDigest(result?: BookAnalysisLike | null) {
 			title: "爆款不是文笔平均分高，而是承诺清楚",
 			explanation:
 				"新手先看一本书承诺了什么情绪回报：爽、怕、甜、虐、悬疑、成长，而不是先学句子怎么写。",
-			source: "新手模式默认规律",
+			source: "套路库默认规律",
 			apply: "拆书时先写出一句话：这本书让读者持续期待什么。",
 		},
 		{
 			title: "偏离平均值才有记忆点",
 			explanation: "AI 默认会生成高频组合，新人要学的是爆款如何把常见元素重组出新鲜感。",
-			source: "新手模式默认规律",
+			source: "套路库默认规律",
 			apply: "每次拆书记录“常见元素”和“反常组合”各 1 条。",
 		},
 		{
 			title: "每章都要增加一个继续读的理由",
 			explanation: "好网文不是信息堆叠，而是持续给读者新问题、新压力、新奖励或新关系变化。",
-			source: "新手模式默认规律",
+			source: "套路库默认规律",
 			apply: "拆前三章时只问：这一章新增了什么必须继续看的理由。",
 		},
 	];

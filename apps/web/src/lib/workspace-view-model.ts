@@ -22,26 +22,24 @@ import type {
 export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	{
 		id: "overview",
-		label: "第一步",
+		label: "急诊室",
 		icon: LayoutDashboard,
-		title: "第一章质检台",
-		description: "先粘贴一章，找出最大追读问题，拿到可复制给写作 AI 的改稿 Prompt。",
+		title: "第一章改稿急诊室",
+		description: "粘贴第一章，找出最大流失点，拿到下一版改稿方案，再贴回来复诊。",
 	},
 	{
 		id: "starter",
-		label: "新手模式",
+		label: "爆款套路库",
 		icon: Sparkles,
-		title: "新手模式",
-		description:
-			"如果你想用 AI 写网文，但还没看懂网文怎么运作：先让每本书只留下 3 条关键规律。",
+		title: "爆款开头套路库",
+		description: "进阶使用：从样本里提炼开头套路和可复用约束，不作为第一次使用入口。",
 	},
 	{
 		id: "library",
-		label: "研究决策",
+		label: "样本研究",
 		icon: BookOpenCheck,
-		title: "研究决策",
-		description:
-			"把已拆解样本变成可追溯的创作判断：研究库、多书横向对比和选题 Prompt 都从这里汇总。",
+		title: "样本研究",
+		description: "进阶使用：把已拆解样本变成可追溯的题材、卖点和开头判断。",
 	},
 	{
 		id: "provider",
@@ -53,18 +51,17 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	},
 	{
 		id: "chapter",
-		label: "高级质检",
+		label: "深度质检",
 		icon: FileText,
-		title: "高级章节质检",
-		description: "急诊跑通后，再用成熟样本、评分标准、证据链和数据快照做深度判断。",
+		title: "深度章节质检",
+		description: "急诊跑通后，再用成熟样本、评分标准和证据链确认这一章该怎么改。",
 	},
 	{
 		id: "book",
-		label: "整书资产",
+		label: "整书拆解",
 		icon: Network,
-		title: "整书资产",
-		description:
-			"上传 TXT，检查章节切分，逐章拆解世界观、人物和故事线；历史任务和导出围绕这里展开。",
+		title: "整书拆解",
+		description: "进阶使用：上传 TXT，拆解人物、故事线和可导出的写作资产。",
 	},
 	{
 		id: "history",
@@ -82,13 +79,7 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	},
 ];
 
-const primaryWorkspaceViews = new Set<WorkspaceView>([
-	"overview",
-	"chapter",
-	"book",
-	"library",
-	"provider",
-]);
+const primaryWorkspaceViews = new Set<WorkspaceView>(["overview", "chapter", "provider"]);
 
 export function getWorkspaceNavItems() {
 	return workspaceViewItems.filter((item) => primaryWorkspaceViews.has(item.id));
@@ -252,11 +243,11 @@ export function buildOverviewNextAction({
 }): OverviewNextAction {
 	if (!hasChapterDraft) {
 		return {
-			title: "先粘贴自己的章节",
+			title: "先把第一章贴进急诊室",
 			description:
-				"不用先填完所有信息。粘贴一段正文后，可以先跑快速点评，马上看到卖点、问题和改稿方向。",
-			actionLabel: "去快速点评",
-			view: "chapter",
+				"不用先填样本、平台和复杂参数。先贴正文，系统只回答：这章为什么没人追读，下一版怎么改。",
+			actionLabel: "开始急诊",
+			view: "overview",
 			secondaryLabel: "选择模型",
 			secondaryView: "provider",
 		};
@@ -264,24 +255,24 @@ export function buildOverviewNextAction({
 
 	if (!quickReviewResult) {
 		return {
-			title: "先生成快速点评",
+			title: "先生成改稿急诊",
 			description:
-				"快速点评只需要一段正文，会先给出定位、卖点、最大问题和三条改法；精评可以稍后再做。",
-			actionLabel: "生成快速点评",
-			view: "chapter",
-			secondaryLabel: "导入参考章节",
-			secondaryView: "chapter",
+				"急诊只需要一段正文，会给出定位、卖点、最大流失点、三条改法和可复制的改稿 Prompt。",
+			actionLabel: "回到急诊室",
+			view: "overview",
+			secondaryLabel: "选择模型",
+			secondaryView: "provider",
 		};
 	}
 
 	if (!hasReferenceText) {
 		return {
-			title: "想精评时再导入参考章节",
+			title: "复制 Prompt，改完回来复诊",
 			description:
-				"快速点评已经能给方向。需要更细的评分报告时，再导入一章成熟样本，让系统生成贴合目标题材的评分标准。",
-			actionLabel: "导入成熟章节",
-			view: "chapter",
-			secondaryLabel: "查看快速点评",
+				"第一轮价值已经出现。先按 Prompt 改一版，再把新版贴回急诊室，看最大流失点有没有真的被解决。",
+			actionLabel: "查看急诊结果",
+			view: "overview",
+			secondaryLabel: "需要证据链",
 			secondaryView: "chapter",
 		};
 	}
@@ -327,8 +318,8 @@ export function buildOverviewNextAction({
 		description: scoreResult.nextRevisionMove,
 		actionLabel: "查看评分报告",
 		view: "chapter",
-		secondaryLabel: "拆解整书",
-		secondaryView: "book",
+		secondaryLabel: "回到急诊室",
+		secondaryView: "overview",
 	};
 }
 

@@ -34,8 +34,8 @@ describe("ChapterCritiqueView", () => {
 	it("renders the chapter critique workflow from workspace store state", () => {
 		const html = renderToStaticMarkup(<ChapterCritiqueView {...baseProps} />);
 
-		expect(html).toContain("30 秒章节急诊");
-		expect(html).toContain("高级质检：样本、评分标准和证据链");
+		expect(html).toContain("30 秒改稿急诊");
+		expect(html).toContain("深度质检：样本、评分标准和证据链");
 		expect(html).toContain("平台风格画像");
 		expect(html).toContain("导入成熟章节");
 		expect(html).toContain("AI 识别的市场定位");

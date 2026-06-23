@@ -17,8 +17,9 @@ import { Toaster } from "@/components/ui/sonner";
 
 export async function generateMetadata(): Promise<Metadata> {
 	return {
-		title: "AI小说第一步 | AI Novel First Step",
-		description: "本地部署的 AI 网文拆书、评分与改稿质检工具，适合新手学习怎么用 AI 写小说。",
+		title: "AI小说第一步 | 第一章改稿急诊室",
+		description:
+			"本地部署的 AI 网文第一章改稿急诊工具，帮作者找出最大流失点、生成改稿 Prompt，并复诊改稿效果。",
 	};
 }
 

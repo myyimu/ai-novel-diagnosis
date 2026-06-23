@@ -1,7 +1,6 @@
 "use client";
 
 import {
-	BookOpenCheck,
 	CheckCircle2,
 	FileText,
 	KeyRound,
@@ -215,15 +214,15 @@ function ScoreSummary({
 		<section className="rounded-md border border-border bg-card p-5">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div>
-					<h2 className="text-lg font-semibold">高级质检结果</h2>
+					<h2 className="text-lg font-semibold">深度质检结果</h2>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
 						{scoreResult
 							? scoreResult.nextRevisionMove
-							: "快速点评跑通后，再用成熟样本生成评分标准，拿到更细的证据链和改稿边界。"}
+							: "改稿急诊跑通后，再用成熟样本生成评分标准，拿到更细的证据链和改稿边界。"}
 					</p>
 				</div>
 				<Button variant={scoreResult ? "outline" : "default"} onClick={onOpenCritique}>
-					{scoreResult ? "查看评分报告" : "进入高级质检"}
+					{scoreResult ? "查看评分报告" : "进入深度质检"}
 				</Button>
 			</div>
 			{scoreResult ? (
@@ -293,13 +292,13 @@ export function OverviewView({
 			<section className="rounded-md border border-border bg-card p-5">
 				<div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
 					<div>
-						<p className="text-sm text-primary">AI 网文作者的第一章质检台</p>
+						<p className="text-sm text-primary">第一章改稿急诊室</p>
 						<h2 className="mt-2 text-2xl font-semibold tracking-tight">
-							先找出为什么没人追读，再决定怎么让 AI 改。
+							这章为什么没人追读？下一版具体怎么改？
 						</h2>
 						<p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-							当前首页只保留最短路径：粘贴章节、跑急诊、复制改稿
-							Prompt。研究库、整书拆解和导出继续保留，但不抢第一次使用的注意力。
+							首页只保留最短闭环：粘贴第一章、生成改稿急诊、复制 Prompt
+							去改、改完再贴回来复诊。样本、整书和研究库都退到进阶区。
 						</p>
 					</div>
 					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -333,25 +332,26 @@ export function OverviewView({
 				<PathCard
 					icon={Target}
 					label="第一步"
-					title="章节急诊"
-					description="只看一章，先定位最大追读问题和可执行改法。"
+					title="找流失点"
+					description="只看一章，先定位读者最可能弃读的地方。"
 					active={!hasQuickResult}
 					done={hasQuickResult}
 				/>
 				<PathCard
 					icon={FileText}
 					label="第二步"
-					title="高级质检"
-					description="用成熟样本生成 Rubric，给出证据、评分和改稿边界。"
-					active={hasQuickResult && !scoreResult}
-					done={Boolean(scoreResult)}
+					title="拿改稿方案"
+					description="把问题转成三条改法和可直接复制给写作 AI 的 Prompt。"
+					active={hasQuickResult}
+					done={hasQuickResult}
 				/>
 				<PathCard
-					icon={BookOpenCheck}
+					icon={CheckCircle2}
 					label="第三步"
-					title="沉淀打法"
-					description="把多本样本变成赛道规律、研究库和可复用提示词。"
-					active={Boolean(scoreResult)}
+					title="复诊验证"
+					description="贴回改后版本，看分数、最大问题和下一步是否真的变化。"
+					active={Boolean(previousQuickReviewResult && quickReviewResult)}
+					done={Boolean(previousQuickReviewResult && quickReviewResult)}
 				/>
 			</section>
 
@@ -387,9 +387,9 @@ export function OverviewView({
 				<summary className="flex cursor-pointer list-none items-start gap-3">
 					<Network className="mt-0.5 size-5 text-primary" />
 					<div className="min-w-0">
-						<h2 className="text-lg font-semibold">进阶工作台</h2>
+						<h2 className="text-lg font-semibold">进阶能力</h2>
 						<p className="mt-1 text-sm leading-6 text-muted-foreground">
-							高级质检、整书资产、研究库和数据快照都在这里。第一次使用可以先不打开。
+							深度质检、整书拆解、样本研究和数据快照都在这里。第一次使用可以先不打开。
 						</p>
 					</div>
 					<span className="ml-auto shrink-0 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
@@ -403,12 +403,12 @@ export function OverviewView({
 						<section className="rounded-md border border-border bg-background p-5">
 							<div className="flex items-center gap-2">
 								<Network className="size-5 text-primary" />
-								<h2 className="text-lg font-semibold">高级能力放在后面</h2>
+								<h2 className="text-lg font-semibold">不是第一次使用入口</h2>
 							</div>
 							<div className="mt-4 space-y-4">
 								<div>
 									<div className="mb-2 flex items-center justify-between text-sm">
-										<span className="text-muted-foreground">整书资产</span>
+										<span className="text-muted-foreground">整书拆解</span>
 										<span className="font-medium">{bookCompletion}%</span>
 									</div>
 									<ProgressBar value={bookCompletion} />
@@ -438,10 +438,10 @@ export function OverviewView({
 							</div>
 							<div className="mt-4 flex flex-wrap gap-2">
 								<Button variant="outline" onClick={onOpenBook}>
-									拆解整本书
+									整书拆解
 								</Button>
 								<Button variant="outline" onClick={() => onOpenView("library")}>
-									打开研究库
+									样本研究
 								</Button>
 							</div>
 						</section>
@@ -450,7 +450,7 @@ export function OverviewView({
 					<section className="rounded-md border border-border bg-background p-5">
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div>
-								<h2 className="text-lg font-semibold">高级质检进度</h2>
+								<h2 className="text-lg font-semibold">深度质检进度</h2>
 								<p className="mt-2 text-sm leading-6 text-muted-foreground">
 									{platformLabel} · {readingModeLabel} · {competitionLevelLabel} ·{" "}
 									{pushStageLabel}

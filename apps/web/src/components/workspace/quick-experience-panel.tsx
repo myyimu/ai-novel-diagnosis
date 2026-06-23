@@ -70,10 +70,10 @@ export function QuickExperiencePanel({
 				<div className="max-w-3xl">
 					<div className="flex items-center gap-2">
 						<Target className="size-5 text-primary" />
-						<h2 className="text-xl font-semibold">30 秒章节急诊</h2>
+						<h2 className="text-xl font-semibold">30 秒改稿急诊</h2>
 					</div>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
-						先别填复杂表单。粘贴一章正文，先找出最大追读问题、当前卖点和三条可执行改法。
+						先别填复杂表单。粘贴第一章，直接找最大流失点、保留卖点和下一版改法。
 					</p>
 				</div>
 				<div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
@@ -126,14 +126,14 @@ export function QuickExperiencePanel({
 				<div className="flex flex-col justify-between gap-3 rounded-md border border-border bg-background p-4">
 					<div className="space-y-2 text-sm text-muted-foreground">
 						<p className="font-medium text-foreground">这一步只回答一个问题：</p>
-						<p>为什么这一章可能没人追读？</p>
-						<p>跑完后直接拿到改稿 Prompt。</p>
+						<p>读者会在哪里弃读？</p>
+						<p>跑完后直接拿到下一版改稿 Prompt。</p>
 						{hasCachedResult ? <p>当前文本命中过往结果，默认优先复用缓存。</p> : null}
 					</div>
 					<div className="space-y-2">
 						<Button className="w-full" onClick={onRun} disabled={loading}>
 							{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-							找最大追读问题
+							生成改稿方案
 						</Button>
 						{hasCachedResult ? (
 							<Button
@@ -198,7 +198,7 @@ export function QuickExperiencePanel({
 				<div className="mt-5 space-y-4 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-5">
 					<div className="flex items-center gap-2">
 						<CheckCircle2 className="size-5 text-success-foreground" />
-						<h3 className="text-base font-semibold">章节急诊结果：{quickScore}</h3>
+						<h3 className="text-base font-semibold">改稿急诊结果：{quickScore}</h3>
 						<span className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
 							{quickReviewResult.genre || "类型待确认"} ·{" "}
 							{confidence === null ? "置信度待确认" : `置信度 ${confidence}%`}
@@ -299,7 +299,7 @@ export function QuickExperiencePanel({
 					) : null}
 					<details className="rounded-md border border-border bg-background p-4">
 						<summary className="cursor-pointer list-none text-sm font-medium">
-							进阶判断：平台和深度质检
+							需要证据链时再打开
 							<span className="ml-2 text-xs font-normal text-muted-foreground">
 								急诊跑通后再看
 							</span>
@@ -333,9 +333,9 @@ export function QuickExperiencePanel({
 								)}
 							</div>
 							<div className="mt-4 flex flex-wrap gap-2">
-								<Button onClick={onOpenCritique}>打开高级质检</Button>
+								<Button onClick={onOpenCritique}>打开深度质检</Button>
 								<Button variant="outline" onClick={onOpenBook}>
-									拆解整本书
+									样本/整书进阶
 								</Button>
 							</div>
 						</div>

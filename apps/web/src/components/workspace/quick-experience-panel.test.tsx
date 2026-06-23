@@ -24,9 +24,9 @@ describe("QuickExperiencePanel", () => {
 			/>,
 		);
 
-		expect(html).toContain("30 秒章节急诊");
+		expect(html).toContain("30 秒改稿急诊");
 		expect(html).toContain("当前 AI: 免费共享算力");
-		expect(html).toContain("找最大追读问题");
+		expect(html).toContain("生成改稿方案");
 	});
 
 	it("renders quick review result when provided", () => {
@@ -95,8 +95,8 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("从“失败代价不清楚”变为“冲突压力不足”。");
 		expect(html).toContain("推荐发布平台");
 		expect(html).toContain("番茄小说");
-		expect(html).toContain("打开高级质检");
-		expect(html).toContain("拆解整本书");
+		expect(html).toContain("打开深度质检");
+		expect(html).toContain("样本/整书进阶");
 	});
 
 	it("falls back when the model returns an incomplete result", () => {

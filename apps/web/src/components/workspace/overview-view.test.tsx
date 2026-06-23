@@ -55,14 +55,14 @@ describe("OverviewView", () => {
 	it("renders the workspace status dashboard from supplied state", () => {
 		const html = renderToStaticMarkup(<OverviewView {...baseProps} />);
 
-		expect(html).toContain("AI 网文作者的第一章质检台");
-		expect(html).toContain("章节急诊");
+		expect(html).toContain("第一章改稿急诊室");
+		expect(html).toContain("找流失点");
 		expect(html).toContain("当前模型");
 		expect(html).toContain("本地演示");
-		expect(html).toContain("高级质检进度");
-		expect(html).toContain("高级能力放在后面");
+		expect(html).toContain("深度质检进度");
+		expect(html).toContain("不是第一次使用入口");
 		expect(html).toContain("番茄小说");
-		expect(html).toContain("整书资产");
+		expect(html).toContain("整书拆解");
 	});
 
 	it("shows latest score evidence when a report exists", () => {

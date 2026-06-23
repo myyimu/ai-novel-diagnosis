@@ -547,7 +547,7 @@ export function ChapterCritiqueView({
 				<summary className="flex cursor-pointer list-none items-start gap-3">
 					<Sparkles className="mt-0.5 size-5 text-primary" />
 					<div className="min-w-0">
-						<h2 className="text-lg font-semibold">高级质检：样本、评分标准和证据链</h2>
+						<h2 className="text-lg font-semibold">深度质检：样本、评分标准和证据链</h2>
 						<p className="mt-1 text-sm leading-6 text-muted-foreground">
 							当急诊已经给出方向，再打开这里导入成熟样本、生成 Rubric、做完整评分。
 						</p>
