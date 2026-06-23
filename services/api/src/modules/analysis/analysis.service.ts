@@ -1550,6 +1550,22 @@ ${content}`,
     const defaults = this.mockBookAnalysis(input);
     const source = (value || {}) as Record<string, any>;
     const defaultRecord = defaults as Record<string, any>;
+    const hasSourcePayload = Object.keys(source).length > 0;
+    const normalizedCharacters = this.normalizeBookCharacters(
+      source.characters,
+      hasSourcePayload ? [] : defaults.characters,
+    );
+    const normalizedRelationships = this.normalizeBookRelationships({
+      rawRelationships: source.relationships,
+      characters: normalizedCharacters,
+      worldbuilding: hasSourcePayload
+        ? source.worldbuilding
+        : defaults.worldbuilding,
+      fallback: defaults.relationships,
+    });
+    const relationshipGraphQuality = this.buildRelationshipGraphQuality(
+      normalizedRelationships,
+    );
 
     return {
       ...defaults,
@@ -1614,19 +1630,9 @@ ${content}`,
           defaults.worldbuilding.itemsAndTerms,
         ),
       },
-      characters: this.arrayOrDefault(source.characters, defaults.characters),
-      relationships: {
-        ...defaults.relationships,
-        ...source.relationships,
-        nodes: this.arrayOrDefault(
-          source.relationships?.nodes,
-          defaults.relationships.nodes,
-        ),
-        edges: this.arrayOrDefault(
-          source.relationships?.edges,
-          defaults.relationships.edges,
-        ),
-      },
+      characters: normalizedCharacters,
+      relationships: normalizedRelationships,
+      relationshipGraphQuality,
       plotlines: this.arrayOrDefault(source.plotlines, defaults.plotlines),
       chronicle: this.arrayOrDefault(source.chronicle, defaults.chronicle),
       historyBook: {
@@ -1762,6 +1768,543 @@ ${content}`,
 
   private arrayOrDefault<T>(value: unknown, fallback: T[]): T[] {
     return Array.isArray(value) && value.length > 0 ? (value as T[]) : fallback;
+  }
+
+  private normalizeBookCharacters(value: unknown, fallback: unknown[]) {
+    const rawCharacters = this.arrayOrDefault(value, fallback);
+    return rawCharacters
+      .filter((item): item is Record<string, any> =>
+        Boolean(item && typeof item === "object"),
+      )
+      .map((character, index) => {
+        const sourceName =
+          this.asText(character.sourceName) ||
+          this.asText(character.common_name) ||
+          this.asText(character.name) ||
+          `角色 ${index + 1}`;
+        const names = this.mergeReducerList(
+          [
+            sourceName,
+            ...this.asTextList(character.names),
+            ...this.asTextList(character.aliases),
+          ],
+          12,
+        );
+        const graphId =
+          typeof character.id === "number" && Number.isFinite(character.id)
+            ? String(character.id)
+            : this.asText(character.id);
+        return {
+          id: graphId || sourceName,
+          sourceName,
+          role:
+            this.asText(character.role) ||
+            (character.main_character || character.mainCharacter
+              ? "主角"
+              : "配角"),
+          archetype:
+            this.asText(character.archetype) ||
+            this.asText(character.description) ||
+            "待归纳角色原型",
+          personalityCore: this.arrayOrDefault(
+            character.personalityCore,
+            this.asText(character.description)
+              ? [this.asText(character.description)]
+              : ["待补充性格底色"],
+          ),
+          desire: this.asText(character.desire) || "待归纳核心欲望",
+          fearOrWound: this.asText(character.fearOrWound) || "待归纳创伤或顾虑",
+          capability: this.asText(character.capability) || "待归纳能力功能",
+          relationshipFunction:
+            this.asText(character.relationshipFunction) ||
+            this.asText(character.description) ||
+            "待归纳关系功能",
+          names,
+          mainCharacter: Boolean(
+            character.main_character || character.mainCharacter,
+          ),
+          portraitPrompt:
+            this.asText(character.portraitPrompt) ||
+            this.asText(character.portrait_prompt) ||
+            this.asText(character.avatarPrompt),
+          originalCharacterCard: {
+            namePlaceholder:
+              character.originalCharacterCard?.namePlaceholder ||
+              "原创角色名占位",
+            summary:
+              character.originalCharacterCard?.summary ||
+              this.asText(character.description) ||
+              `${sourceName} 的原创化角色简介待补充。`,
+            personality:
+              character.originalCharacterCard?.personality ||
+              this.asText(character.description) ||
+              "待补充原创化性格描述。",
+            scenario:
+              character.originalCharacterCard?.scenario ||
+              "待补充适合开局或关键冲突的场景。",
+            firstMessage:
+              character.originalCharacterCard?.firstMessage ||
+              "待补充角色开场白。",
+            doNotCopy: this.arrayOrDefault(
+              character.originalCharacterCard?.doNotCopy,
+              names,
+            ),
+          },
+        };
+      });
+  }
+
+  private normalizeBookRelationships(input: {
+    rawRelationships: unknown;
+    characters: unknown[];
+    worldbuilding: unknown;
+    fallback: {
+      nodes: Array<{ id: string; label: string; type: string }>;
+      edges: Array<{
+        source: string;
+        target: string;
+        label: string;
+        tension: string;
+      }>;
+    };
+  }) {
+    const raw = (input.rawRelationships || {}) as Record<string, any>;
+    const nodes = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        type: string;
+        names: string[];
+        mainCharacter: boolean;
+        description: string;
+        portraitPrompt: string;
+      }
+    >();
+    const aliases = new Map<string, string>();
+
+    const toGraphText = (value: unknown) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? String(value)
+        : this.asText(value);
+
+    const registerAlias = (alias: unknown, id: string) => {
+      const text = toGraphText(alias);
+      if (!text) {
+        return;
+      }
+      aliases.set(text, id);
+      aliases.set(this.normalizeGraphKey(text), id);
+    };
+
+    const addNode = (node: Record<string, any>) => {
+      const label =
+        this.asText(node.label) ||
+        this.asText(node.common_name) ||
+        this.asText(node.sourceName) ||
+        this.asText(node.name) ||
+        toGraphText(node.id);
+      if (!label) {
+        return undefined;
+      }
+      const id =
+        toGraphText(node.id) ||
+        toGraphText(node.nodeId) ||
+        this.normalizeGraphKey(label);
+      const existing = nodes.get(id);
+      const names = this.mergeReducerList(
+        [
+          ...(existing?.names || []),
+          label,
+          ...this.asTextList(node.names),
+          ...this.asTextList(node.aliases),
+        ],
+        12,
+      );
+      const next = {
+        id,
+        label: existing?.label || label,
+        type:
+          this.asText(node.type) ||
+          existing?.type ||
+          (node.role || node.archetype ? "character" : "unknown"),
+        names,
+        mainCharacter:
+          Boolean(node.mainCharacter) ||
+          Boolean(node.main_character) ||
+          existing?.mainCharacter ||
+          /主角|protagonist|main/i.test(
+            `${this.asText(node.role)} ${this.asText(node.archetype)}`,
+          ),
+        description:
+          this.asText(node.description) ||
+          this.asText(node.relationshipFunction) ||
+          existing?.description ||
+          "",
+        portraitPrompt:
+          this.asText(node.portraitPrompt) ||
+          this.asText(node.portrait_prompt) ||
+          this.asText(node.avatarPrompt) ||
+          existing?.portraitPrompt ||
+          "",
+      };
+      nodes.set(id, next);
+      registerAlias(id, id);
+      registerAlias(label, id);
+      names.forEach((name) => registerAlias(name, id));
+      return next;
+    };
+
+    const hasRelationshipSource =
+      Array.isArray(raw.nodes) ||
+      Array.isArray(raw.edges) ||
+      Array.isArray(raw.relations) ||
+      input.characters.length > 0;
+    const rawNodes =
+      Array.isArray(raw.nodes) && raw.nodes.length
+        ? raw.nodes
+        : hasRelationshipSource
+          ? []
+          : input.fallback.nodes;
+
+    rawNodes.forEach((node) => {
+      if (node && typeof node === "object") {
+        addNode(node as Record<string, any>);
+      }
+    });
+    input.characters.forEach((character) => {
+      if (character && typeof character === "object") {
+        const item = character as Record<string, any>;
+        addNode({
+          ...item,
+          label: item.sourceName || item.common_name || item.name,
+          type: "character",
+          names: item.names || item.aliases,
+          description: item.relationshipFunction || item.description,
+          portraitPrompt: item.portraitPrompt || item.portrait_prompt,
+        });
+      }
+    });
+
+    const worldbuilding = (input.worldbuilding || {}) as Record<string, any>;
+    this.asObjectList(worldbuilding.locations).forEach((location) =>
+      addNode({
+        id: this.asText(location.name),
+        label: location.name,
+        type: "location",
+        description: location.function,
+      }),
+    );
+    this.asObjectList(worldbuilding.factions).forEach((faction) =>
+      addNode({
+        id: this.asText(faction.name),
+        label: faction.name,
+        type: "faction",
+        description: faction.conflictRole || faction.goal,
+      }),
+    );
+
+    const resolveNodeId = (value: unknown) => {
+      const text = toGraphText(value);
+      if (!text) {
+        return "";
+      }
+      return (
+        aliases.get(text) || aliases.get(this.normalizeGraphKey(text)) || ""
+      );
+    };
+    const rawEdges =
+      Array.isArray(raw.edges) && raw.edges.length
+        ? raw.edges
+        : Array.isArray(raw.relations) && raw.relations.length
+          ? raw.relations
+          : hasRelationshipSource
+            ? []
+            : input.fallback.edges;
+    const edgeMap = new Map<
+      string,
+      {
+        source: string;
+        target: string;
+        label: string;
+        tension: string;
+        relation: string[];
+        weight: number;
+        positivity: number;
+        evidence: string[];
+        firstSeenChapter?: number;
+        confidence: number;
+      }
+    >();
+    let duplicateMergeCount = 0;
+
+    rawEdges.forEach((edge) => {
+      if (!edge || typeof edge !== "object") {
+        return;
+      }
+      const item = edge as Record<string, any>;
+      const source =
+        resolveNodeId(item.source) ||
+        resolveNodeId(item.id1) ||
+        resolveNodeId(item.from);
+      const target =
+        resolveNodeId(item.target) ||
+        resolveNodeId(item.id2) ||
+        resolveNodeId(item.to);
+      if (!source || !target || source === target) {
+        return;
+      }
+      const [left, right] = [source, target].sort();
+      const key = `${left}--${right}`;
+      const relation = this.mergeReducerList(
+        [
+          ...this.asTextList(item.relation),
+          this.asText(item.label),
+          this.asText(item.type),
+        ],
+        8,
+      );
+      const existing = edgeMap.get(key);
+      if (existing) {
+        duplicateMergeCount += 1;
+      }
+      const weight = this.clampNumber(
+        Number(item.weight ?? item.strength ?? 1),
+        1,
+        10,
+        1,
+      );
+      const positivity = this.clampNumber(
+        Number(item.positivity ?? item.sentiment ?? 0),
+        -1,
+        1,
+        0,
+      );
+      const evidence = this.mergeReducerList(
+        [
+          ...(existing?.evidence || []),
+          ...this.asTextList(item.evidence),
+          ...this.asTextList(item.evidenceSnippets),
+        ],
+        6,
+      );
+      edgeMap.set(key, {
+        source: existing?.source || source,
+        target: existing?.target || target,
+        label:
+          relation[0] || existing?.label || this.asText(item.label) || "关系",
+        tension:
+          this.asText(item.tension) ||
+          existing?.tension ||
+          this.relationshipTensionFromPositivity(positivity),
+        relation: this.mergeReducerList(
+          [...(existing?.relation || []), ...relation],
+          8,
+        ),
+        weight: existing ? Math.max(existing.weight, weight) : weight,
+        positivity: existing
+          ? this.clampNumber((existing.positivity + positivity) / 2, -1, 1, 0)
+          : positivity,
+        evidence,
+        firstSeenChapter:
+          typeof item.firstSeenChapter === "number"
+            ? item.firstSeenChapter
+            : existing?.firstSeenChapter,
+        confidence: this.clampNumber(
+          Number(item.confidence ?? existing?.confidence ?? 0.7),
+          0,
+          1,
+          0.7,
+        ),
+      });
+    });
+
+    return {
+      nodes: [...nodes.values()].map((node) => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        names: node.names,
+        mainCharacter: node.mainCharacter,
+        description: node.description,
+        portraitPrompt: node.portraitPrompt,
+      })),
+      edges: [...edgeMap.values()],
+      duplicateMergeCount,
+    };
+  }
+
+  private buildRelationshipGraphQuality(relationships: {
+    nodes: Array<{ id: string; label: string; type?: string }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      label?: string;
+      relation?: string[];
+      evidence?: string[];
+      confidence?: number;
+    }>;
+    duplicateMergeCount?: number;
+  }) {
+    const nodeDegree = new Map<string, number>();
+    const nodeLabels = new Map(
+      relationships.nodes.map((node) => [node.id, node.label]),
+    );
+    relationships.nodes.forEach((node) => nodeDegree.set(node.id, 0));
+    relationships.edges.forEach((edge) => {
+      nodeDegree.set(edge.source, (nodeDegree.get(edge.source) || 0) + 1);
+      nodeDegree.set(edge.target, (nodeDegree.get(edge.target) || 0) + 1);
+    });
+
+    const isolatedNodes = relationships.nodes
+      .filter((node) => (nodeDegree.get(node.id) || 0) === 0)
+      .map((node) => ({
+        id: node.id,
+        label: node.label,
+        type: node.type || "unknown",
+        suggestedQuery: node.label,
+        reviewAction: "检索该节点名称，确认它是否应并入已有角色、势力或地点。",
+      }));
+    const weakEvidenceEdges = relationships.edges
+      .map((edge) => {
+        const evidenceCount = edge.evidence?.length || 0;
+        const confidence = this.clampNumber(
+          Number(edge.confidence ?? 0.7),
+          0,
+          1,
+          0.7,
+        );
+        const reasons = [
+          evidenceCount === 0 ? "缺少文本证据" : "",
+          confidence < 0.55 ? "置信度偏低" : "",
+        ].filter(Boolean);
+        if (!reasons.length) {
+          return undefined;
+        }
+        const sourceLabel = nodeLabels.get(edge.source) || edge.source;
+        const targetLabel = nodeLabels.get(edge.target) || edge.target;
+        const label = edge.relation?.length
+          ? edge.relation.join("、")
+          : edge.label || `${sourceLabel}->${targetLabel}`;
+        return {
+          source: edge.source,
+          target: edge.target,
+          sourceLabel,
+          targetLabel,
+          label,
+          confidence,
+          evidenceCount,
+          reason: reasons.join("；"),
+          suggestedQuery: [sourceLabel, targetLabel, label]
+            .filter(Boolean)
+            .join(" "),
+          reviewAction: "检索双方名称和关系词，补充证据后再用于图谱学习。",
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          source: string;
+          target: string;
+          sourceLabel: string;
+          targetLabel: string;
+          label: string;
+          confidence: number;
+          evidenceCount: number;
+          reason: string;
+          suggestedQuery: string;
+          reviewAction: string;
+        } => Boolean(item),
+      );
+
+    const nodeCount = relationships.nodes.length;
+    const edgeCount = relationships.edges.length;
+    const averageConfidence =
+      edgeCount > 0
+        ? Number(
+            (
+              relationships.edges.reduce(
+                (sum, edge) =>
+                  sum +
+                  this.clampNumber(Number(edge.confidence ?? 0.7), 0, 1, 0.7),
+                0,
+              ) / edgeCount
+            ).toFixed(2),
+          )
+        : 0;
+    const evidenceCoverage =
+      edgeCount > 0
+        ? Number(
+            (
+              relationships.edges.filter((edge) => edge.evidence?.length)
+                .length / edgeCount
+            ).toFixed(2),
+          )
+        : 0;
+    const isolatedRatio = nodeCount > 0 ? isolatedNodes.length / nodeCount : 1;
+    const weakEdgeRatio =
+      edgeCount > 0 ? weakEvidenceEdges.length / edgeCount : 1;
+    const riskLevel =
+      edgeCount === 0 || nodeCount < 2 || weakEdgeRatio >= 0.7
+        ? "weak"
+        : isolatedRatio > 0.45 ||
+            weakEdgeRatio > 0.35 ||
+            averageConfidence < 0.6
+          ? "needs-review"
+          : "good";
+    const recommendedFixes = [
+      edgeCount === 0
+        ? "没有抽到关系边，建议补充更多章节或启用深拆后重跑。"
+        : "",
+      isolatedNodes.length
+        ? "存在孤立节点，建议检查角色别名、势力名和地点名是否被正确合并。"
+        : "",
+      weakEvidenceEdges.length
+        ? "部分关系缺少证据或置信度偏低，建议回到章节证据索引补证据后再用于仿写。"
+        : "",
+      (relationships.duplicateMergeCount || 0) > 0
+        ? "系统已合并重复关系，建议优先查看合并后的关系标签是否语义一致。"
+        : "",
+    ].filter(Boolean);
+
+    return {
+      nodeCount,
+      edgeCount,
+      duplicateMergeCount: relationships.duplicateMergeCount || 0,
+      isolatedNodes,
+      weakEvidenceEdges,
+      averageConfidence,
+      evidenceCoverage,
+      riskLevel,
+      recommendedFixes,
+    };
+  }
+
+  private asObjectList(value: unknown): Array<Record<string, any>> {
+    return Array.isArray(value)
+      ? value.filter((item): item is Record<string, any> =>
+          Boolean(item && typeof item === "object"),
+        )
+      : [];
+  }
+
+  private normalizeGraphKey(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w\u4e00-\u9fa5-]/g, "");
+  }
+
+  private relationshipTensionFromPositivity(value: number) {
+    if (value < -0.1) {
+      return "冲突/对抗";
+    }
+    if (value > 0.1) {
+      return "支持/亲近";
+    }
+    return "中性/博弈";
   }
 
   private normalizeChapterMapResult(
@@ -2326,6 +2869,7 @@ ${JSON.stringify(chapterMaps, null, 2)}
       "fearOrWound": "恐惧或创伤",
       "capability": "能力功能，不复制专名",
       "relationshipFunction": "在关系网中的叙事功能",
+      "portraitPrompt": "可选，抽象化人物肖像提示，不复用原作专有视觉元素",
       "originalCharacterCard": {
         "namePlaceholder": "原创角色名占位",
         "summary": "可导入写作软件的原创化角色简介",
@@ -2337,8 +2881,31 @@ ${JSON.stringify(chapterMaps, null, 2)}
     }
   ],
   "relationships": {
-    "nodes": [{"id":"c1","label":"角色","type":"character|faction|location"}],
-    "edges": [{"source":"c1","target":"c2","label":"关系","tension":"冲突/依赖/暧昧/师徒等"}]
+    "nodes": [
+      {
+        "id": "c1",
+        "label": "角色常用名",
+        "type": "character|faction|location",
+        "names": ["别名、称号、代称"],
+        "mainCharacter": true,
+        "description": "在故事和关系网中的功能",
+        "portraitPrompt": "可选，适合头像或人物卡的原创化视觉提示"
+      }
+    ],
+    "edges": [
+      {
+        "source": "c1",
+        "target": "c2",
+        "label": "关系摘要",
+        "relation": ["师徒", "敌对", "交易", "暧昧", "亲属", "同盟"],
+        "tension": "冲突/依赖/暧昧/师徒/交易/压迫等",
+        "weight": 1,
+        "positivity": 0,
+        "evidence": ["来自章节 map 的短证据或关系信号"],
+        "firstSeenChapter": 1,
+        "confidence": 0.8
+      }
+    ]
   },
   "plotlines": [
     {
@@ -2561,6 +3128,10 @@ ${JSON.stringify(chapterMaps, null, 2)}
 7. referenceBoundaryCheck 必须替代模糊的“原创化风险”，用“可学/不可复用/必须改造/安全迁移”说清边界。
 8. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
 9. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
+10. relationships 必须按多轮图谱审校思路生成：先列候选角色/势力/地点，再做证据对齐，再消解重复/冲突，最后只保留可解释的最终图谱。
+11. relationships 必须吸收人物关系图谱规则：角色节点要保留 names/别名、mainCharacter 和可选 portraitPrompt；关系边必须给 relation 数组、weight 1-10、positivity -1 到 1、evidence 和 firstSeenChapter。
+12. relationships.edges 只能连接 relationships.nodes 中存在的 id；不要用 label 混用 id。重复关系必须合并成一条边，relation 可合并，weight 取更强关系，positivity 表达总体情绪倾向。
+13. 不要为了“完整”虚构角色关系；无法从章节 map 支撑的关系不要输出，confidence 低于 0.5 的关系宁可省略。
 `.trim();
   }
 
@@ -2613,6 +3184,7 @@ ${input.text}
       "fearOrWound": "恐惧或创伤",
       "capability": "能力功能，不复制专名",
       "relationshipFunction": "在关系网中的叙事功能",
+      "portraitPrompt": "可选，抽象化人物肖像提示，不复用原作专有视觉元素",
       "originalCharacterCard": {
         "namePlaceholder": "原创角色名占位",
         "summary": "可导入写作软件的原创化角色简介",
@@ -2624,8 +3196,31 @@ ${input.text}
     }
   ],
   "relationships": {
-    "nodes": [{"id":"c1","label":"角色","type":"character|faction|location"}],
-    "edges": [{"source":"c1","target":"c2","label":"关系","tension":"冲突/依赖/暧昧/师徒等"}]
+    "nodes": [
+      {
+        "id": "c1",
+        "label": "角色常用名",
+        "type": "character|faction|location",
+        "names": ["别名、称号、代称"],
+        "mainCharacter": true,
+        "description": "在故事和关系网中的功能",
+        "portraitPrompt": "可选，适合头像或人物卡的原创化视觉提示"
+      }
+    ],
+    "edges": [
+      {
+        "source": "c1",
+        "target": "c2",
+        "label": "关系摘要",
+        "relation": ["师徒", "敌对", "交易", "暧昧", "亲属", "同盟"],
+        "tension": "冲突/依赖/暧昧/师徒/交易/压迫等",
+        "weight": 1,
+        "positivity": 0,
+        "evidence": ["来自正文的短证据或关系信号"],
+        "firstSeenChapter": 1,
+        "confidence": 0.8
+      }
+    ]
   },
   "plotlines": [
     {
@@ -2849,6 +3444,10 @@ ${input.text}
 8. referenceBoundaryCheck 必须替代模糊的“原创化风险”，用“可学/不可复用/必须改造/安全迁移”说清边界。
 9. writingSupport 必须服务“后续继续写”，重点输出章节功能、伏笔回收、情绪点、节奏风险和可复制给写作 AI 的续写提示词。
 10. generationAssets 必须服务“导入 AI 写作软件/世界书/长期续写”，世界书条目要有 keys、category、priority、sourceRisk 和 originalizationNote。
+11. relationships 必须按多轮图谱审校思路生成：先列候选角色/势力/地点，再做证据对齐，再消解重复/冲突，最后只保留可解释的最终图谱。
+12. relationships 必须吸收人物关系图谱规则：角色节点要保留 names/别名、mainCharacter 和可选 portraitPrompt；关系边必须给 relation 数组、weight 1-10、positivity -1 到 1、evidence 和 firstSeenChapter。
+13. relationships.edges 只能连接 relationships.nodes 中存在的 id；不要用 label 混用 id。重复关系必须合并成一条边，relation 可合并，weight 取更强关系，positivity 表达总体情绪倾向。
+14. 不要为了“完整”虚构角色关系；无法从正文支撑的关系不要输出，confidence 低于 0.5 的关系宁可省略。
 `.trim();
   }
 
@@ -3969,17 +4568,55 @@ ${normalized.slice(-1600)}`;
       ],
       relationships: {
         nodes: [
-          { id: "c1", label: "原创主角名", type: "character" },
-          { id: "f1", label: "原创评审机构", type: "faction" },
-          { id: "l1", label: "公开考核场", type: "location" },
+          {
+            id: "c1",
+            label: "原创主角名",
+            type: "character",
+            names: ["主角原型", "原创主角名"],
+            mainCharacter: true,
+            description: "承载代入、压迫和反击期待。",
+          },
+          {
+            id: "f1",
+            label: "原创评审机构",
+            type: "faction",
+            names: ["评审机构", "资源分配方"],
+            mainCharacter: false,
+            description: "制造公开评价和资源压迫。",
+          },
+          {
+            id: "l1",
+            label: "公开考核场",
+            type: "location",
+            names: ["考核场", "公开评价舞台"],
+            mainCharacter: false,
+            description: "放大羞辱、评价和反击的公共场景。",
+          },
         ],
         edges: [
-          { source: "c1", target: "f1", label: "被压制/反击", tension: "冲突" },
+          {
+            source: "c1",
+            target: "f1",
+            label: "被压制/反击",
+            relation: ["压迫", "反击"],
+            tension: "冲突",
+            weight: 8,
+            positivity: -0.7,
+            evidence: ["公开否定主角资格", "主角准备反击"],
+            firstSeenChapter: 1,
+            confidence: 0.9,
+          },
           {
             source: "c1",
             target: "l1",
             label: "身份被公开评价",
             tension: "压力",
+            relation: ["公开评价", "身份压力"],
+            weight: 5,
+            positivity: -0.2,
+            evidence: ["主角在公开场合被评价"],
+            firstSeenChapter: 1,
+            confidence: 0.8,
           },
         ],
       },

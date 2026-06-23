@@ -1,10 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { FileText, Loader2, Network, ShieldAlert } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import type { PointerEvent } from "react";
+import {
+	Check,
+	Download,
+	FileText,
+	Filter,
+	GitMerge,
+	Loader2,
+	Network,
+	Pencil,
+	RotateCcw,
+	ShieldAlert,
+	Trash2,
+	Undo2,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiUrl, type ApiEnvelope } from "@/lib/api-client";
+import {
+	applyRelationshipGraphCorrections,
+	buildRelationshipGraph,
+	buildRelationshipGraphExport,
+	buildRelationshipGraphVersions,
+	graphCommunityColors,
+	graphLayoutOptions,
+	graphTypeColors,
+	graphTypeLabels,
+	resolveEdgeTone,
+	sanitizeFilename,
+	type GraphPositionOverrides,
+	type RelationshipGraphCorrection,
+	type RelationshipGraphLayout,
+} from "@/lib/relationship-graph";
 import type { BookAnalysisJob, BookAnalysisResult } from "@/stores/workspace-store";
 
 export type BookExportFormat =
@@ -315,6 +346,1071 @@ interface BookEvidenceSearchResult {
 	hits: BookEvidenceSearchHit[];
 }
 
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+	const blob = new Blob([content], { type: mimeType });
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = url;
+	anchor.download = filename;
+	document.body.appendChild(anchor);
+	anchor.click();
+	anchor.remove();
+	URL.revokeObjectURL(url);
+}
+
+function resolveGraphQualityTone(
+	riskLevel?: NonNullable<BookAnalysisResult["relationshipGraphQuality"]>["riskLevel"],
+) {
+	if (riskLevel === "good") {
+		return {
+			label: "可信",
+			className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+		};
+	}
+	if (riskLevel === "needs-review") {
+		return {
+			label: "需复核",
+			className: "border-amber-200 bg-amber-50 text-amber-700",
+		};
+	}
+	return {
+		label: "偏弱",
+		className: "border-destructive/30 bg-destructive/10 text-destructive",
+	};
+}
+
+type GraphWorkbenchView = "overview" | "review" | "timeline" | "export";
+
+const graphWorkbenchViews: Array<{ id: GraphWorkbenchView; label: string; description: string }> = [
+	{ id: "overview", label: "总览", description: "看主角、社区和核心关系" },
+	{ id: "review", label: "复核", description: "先处理弱证据和孤立节点" },
+	{ id: "timeline", label: "时间线", description: "按章节理解关系演化" },
+	{ id: "export", label: "导出", description: "沉淀 JSON/SVG 图谱资产" },
+];
+
+function RelationshipGraphPanel({
+	result,
+	onSearchEvidence,
+}: {
+	result: BookAnalysisResult;
+	onSearchEvidence?: (query: string) => void;
+}) {
+	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+	const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+	const [typeFilter, setTypeFilter] = useState("all");
+	const [layout, setLayout] = useState<RelationshipGraphLayout>("force");
+	const [workbenchView, setWorkbenchView] = useState<GraphWorkbenchView>("overview");
+	const [corrections, setCorrections] = useState<RelationshipGraphCorrection[]>([]);
+	const [edgeLabelDrafts, setEdgeLabelDrafts] = useState<Record<string, string>>({});
+	const [zoom, setZoom] = useState(1);
+	const [positionOverrides, setPositionOverrides] = useState<GraphPositionOverrides>({});
+	const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+	const svgRef = useRef<SVGSVGElement | null>(null);
+	const graphGroupRef = useRef<SVGGElement | null>(null);
+	const effectiveResult = useMemo(
+		() => applyRelationshipGraphCorrections(result, corrections),
+		[result, corrections],
+	);
+	const graph = useMemo(() => {
+		const next = buildRelationshipGraph(effectiveResult, layout);
+		next.nodes.forEach((node) => {
+			const override = positionOverrides[node.id];
+			if (override) {
+				node.x = override.x;
+				node.y = override.y;
+			}
+		});
+		return next;
+	}, [effectiveResult, layout, positionOverrides]);
+	const quality = effectiveResult.relationshipGraphQuality;
+	const qualityTone = resolveGraphQualityTone(quality?.riskLevel);
+	const visibleNodeIds = new Set(
+		graph.nodes
+			.filter((node) => typeFilter === "all" || node.type === typeFilter)
+			.map((node) => node.id),
+	);
+	const visibleNodes = graph.nodes.filter((node) => visibleNodeIds.has(node.id));
+	const visibleEdges = graph.edges.filter(
+		(edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
+	);
+	const selectedNode = visibleNodes.find((node) => node.id === selectedNodeId) ?? visibleNodes[0];
+	const selectedEdge = visibleEdges.find((edge) => edge.id === selectedEdgeId);
+	const relatedEdges = selectedNode
+		? visibleEdges.filter(
+				(edge) => edge.source === selectedNode.id || edge.target === selectedNode.id,
+			)
+		: [];
+	const timelineEdges = [...graph.edges].sort((left, right) => {
+		const chapterDelta = (left.firstSeenChapter || 999999) - (right.firstSeenChapter || 999999);
+		return chapterDelta || right.weight - left.weight;
+	});
+	const graphVersions = buildRelationshipGraphVersions(graph);
+	const recommendedView: GraphWorkbenchView =
+		quality?.weakEvidenceEdges.length || quality?.isolatedNodes.length
+			? "review"
+			: graphVersions.length
+				? "timeline"
+				: "export";
+	const currentWorkbench = graphWorkbenchViews.find((view) => view.id === workbenchView);
+	const switchWorkbenchView = (view: GraphWorkbenchView) => {
+		setWorkbenchView(view);
+		if (view === "timeline") {
+			setLayout("timeline");
+			setPositionOverrides({});
+		}
+		if (view === "overview" && layout === "timeline") {
+			setLayout("force");
+			setPositionOverrides({});
+		}
+	};
+	const addGraphCorrection = (correction: RelationshipGraphCorrection) => {
+		setCorrections((current) => [
+			...current,
+			{
+				...correction,
+				createdAt: new Date().toISOString(),
+			},
+		]);
+		setSelectedEdgeId(null);
+		setPositionOverrides({});
+	};
+	const edgeReviewKey = (source: string, target: string, label: string) =>
+		`${source}--${target}--${label}`;
+	const correctionLabel = (correction: RelationshipGraphCorrection) => {
+		if (correction.type === "merge-node") {
+			return `合并节点 ${correction.fromId} -> ${correction.toId}`;
+		}
+		if (correction.type === "delete-node") {
+			return `忽略节点 ${correction.nodeId}`;
+		}
+		if (correction.type === "delete-edge") {
+			return `忽略关系 ${correction.source} -> ${correction.target}`;
+		}
+		if (correction.type === "confirm-edge") {
+			return `确认关系 ${correction.source} -> ${correction.target}`;
+		}
+		return `改关系 ${correction.source} -> ${correction.target}`;
+	};
+	const typeOptions = [
+		{ id: "all", label: "全部" },
+		{ id: "character", label: "人物" },
+		{ id: "faction", label: "势力" },
+		{ id: "location", label: "地点" },
+	];
+
+	function exportGraphJson() {
+		downloadTextFile(
+			`${sanitizeFilename(effectiveResult.book.title)}-relationship-graph.json`,
+			JSON.stringify(
+				buildRelationshipGraphExport(effectiveResult, graph, corrections),
+				null,
+				2,
+			),
+			"application/json;charset=utf-8",
+		);
+	}
+
+	function exportGraphSvg() {
+		if (!svgRef.current) {
+			return;
+		}
+		const serialized = new XMLSerializer().serializeToString(svgRef.current);
+		downloadTextFile(
+			`${sanitizeFilename(result.book.title)}-relationship-graph.svg`,
+			serialized,
+			"image/svg+xml;charset=utf-8",
+		);
+	}
+
+	function updateDraggedNode(event: PointerEvent<SVGSVGElement>) {
+		if (!draggingNodeId || !graphGroupRef.current) {
+			return;
+		}
+		const point = svgRef.current?.createSVGPoint();
+		const matrix = graphGroupRef.current.getScreenCTM();
+		if (!point || !matrix) {
+			return;
+		}
+		point.x = event.clientX;
+		point.y = event.clientY;
+		const nextPoint = point.matrixTransform(matrix.inverse());
+		setPositionOverrides((current) => ({
+			...current,
+			[draggingNodeId]: {
+				x: Math.max(45, Math.min(915, nextPoint.x)),
+				y: Math.max(45, Math.min(515, nextPoint.y)),
+			},
+		}));
+	}
+
+	return (
+		<div className="rounded-md border border-border bg-card p-5">
+			<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<div className="flex items-center gap-2">
+						<Network className="size-5 text-primary" />
+						<h3 className="font-semibold">一键整书关系图谱工作台</h3>
+					</div>
+					<p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+						把整书拆解结果转成可点击的学习图谱：先看谁推动冲突，再看关系张力、势力位置和新手可迁移的结构功能。
+					</p>
+				</div>
+				<div className="flex flex-wrap gap-2">
+					{graphLayoutOptions.map((option) => (
+						<Button
+							key={option.id}
+							type="button"
+							variant={layout === option.id ? "default" : "outline"}
+							size="sm"
+							onClick={() => {
+								setLayout(option.id);
+								setPositionOverrides({});
+								setSelectedEdgeId(null);
+							}}
+						>
+							{option.label}
+						</Button>
+					))}
+					{typeOptions.map((option) => (
+						<Button
+							key={option.id}
+							type="button"
+							variant={typeFilter === option.id ? "default" : "outline"}
+							size="sm"
+							onClick={() => {
+								setTypeFilter(option.id);
+								setSelectedEdgeId(null);
+								setSelectedNodeId(null);
+							}}
+						>
+							{option.id === "all" ? <Filter className="mr-2 size-4" /> : null}
+							{option.label}
+						</Button>
+					))}
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						title="导出图谱 JSON"
+						aria-label="导出图谱 JSON"
+						onClick={exportGraphJson}
+					>
+						<FileText className="size-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						title="导出图谱 SVG"
+						aria-label="导出图谱 SVG"
+						onClick={exportGraphSvg}
+					>
+						<Download className="size-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						title="放大图谱"
+						aria-label="放大图谱"
+						onClick={() => setZoom((current) => Math.min(1.45, current + 0.15))}
+					>
+						<ZoomIn className="size-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						title="缩小图谱"
+						aria-label="缩小图谱"
+						onClick={() => setZoom((current) => Math.max(0.7, current - 0.15))}
+					>
+						<ZoomOut className="size-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						title="重置视图"
+						aria-label="重置视图"
+						onClick={() => {
+							setZoom(1);
+							setPositionOverrides({});
+							setTypeFilter("all");
+							setSelectedNodeId(null);
+							setSelectedEdgeId(null);
+						}}
+					>
+						<RotateCcw className="size-4" />
+					</Button>
+				</div>
+			</div>
+			<div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+				<div className="overflow-hidden rounded-md border border-border bg-background">
+					<svg
+						ref={svgRef}
+						viewBox="0 0 960 560"
+						role="img"
+						aria-label="整书人物与势力关系图谱"
+						className="block aspect-[12/7] w-full"
+						onPointerMove={updateDraggedNode}
+						onPointerUp={() => setDraggingNodeId(null)}
+						onPointerLeave={() => setDraggingNodeId(null)}
+					>
+						<rect width="960" height="560" fill="hsl(var(--background))" />
+						<g
+							ref={graphGroupRef}
+							transform={`translate(480 280) scale(${zoom}) translate(-480 -280)`}
+						>
+							{layout === "timeline" ? (
+								<g>
+									<line
+										x1="100"
+										y1="95"
+										x2="860"
+										y2="95"
+										stroke="hsl(var(--border))"
+										strokeDasharray="4 8"
+									/>
+									{["人物", "势力", "地点"].map((label, index) => (
+										<text
+											key={label}
+											x="40"
+											y={140 + index * 135}
+											fill="hsl(var(--muted-foreground))"
+											fontSize="12"
+										>
+											{label}
+										</text>
+									))}
+								</g>
+							) : layout === "cluster" ? (
+								graph.communities.map((community) => {
+									const members = visibleNodes.filter(
+										(node) => node.community === community.id,
+									);
+									if (!members.length) {
+										return null;
+									}
+									const centerX =
+										members.reduce((sum, node) => sum + node.x, 0) /
+										members.length;
+									const centerY =
+										members.reduce((sum, node) => sum + node.y, 0) /
+										members.length;
+									const radius = Math.min(150, 70 + members.length * 10);
+									return (
+										<g key={community.id}>
+											<circle
+												cx={centerX}
+												cy={centerY}
+												r={radius}
+												fill={community.color}
+												fillOpacity="0.06"
+												stroke={community.color}
+												strokeOpacity="0.25"
+												strokeDasharray="7 8"
+											/>
+											<text
+												x={centerX}
+												y={centerY - radius + 18}
+												textAnchor="middle"
+												fill="hsl(var(--muted-foreground))"
+												fontSize="12"
+											>
+												{community.label} · {community.size}
+											</text>
+										</g>
+									);
+								})
+							) : (
+								<>
+									<circle
+										cx="480"
+										cy="280"
+										r="250"
+										fill="none"
+										stroke="hsl(var(--border))"
+										strokeDasharray="5 8"
+									/>
+									<circle
+										cx="480"
+										cy="280"
+										r="190"
+										fill="none"
+										stroke="hsl(var(--border))"
+										strokeDasharray="3 10"
+									/>
+								</>
+							)}
+							{visibleEdges.map((edge) => {
+								const tone = resolveEdgeTone(edge);
+								const selected = selectedEdge?.id === edge.id;
+								return (
+									<g key={edge.id}>
+										<line
+											x1={edge.sourceNode.x}
+											y1={edge.sourceNode.y}
+											x2={edge.targetNode.x}
+											y2={edge.targetNode.y}
+											stroke={tone.color}
+											strokeWidth={
+												selected
+													? 5
+													: Math.max(1.8, Math.min(5, edge.weight / 2))
+											}
+											strokeOpacity={selected ? 0.9 : 0.42}
+											onClick={() => {
+												setSelectedEdgeId(edge.id);
+												setSelectedNodeId(edge.source);
+											}}
+											className="cursor-pointer"
+										/>
+									</g>
+								);
+							})}
+							{visibleNodes.map((node, index) => {
+								const selected = selectedNode?.id === node.id;
+								const radius = Math.min(26, 12 + node.degree * 3);
+								const color = graphTypeColors[node.type] || graphTypeColors.unknown;
+								return (
+									<g
+										key={node.id}
+										transform={`translate(${node.x} ${node.y})`}
+										className="cursor-grab active:cursor-grabbing"
+										onPointerDown={(event) => {
+											event.preventDefault();
+											event.stopPropagation();
+											setDraggingNodeId(node.id);
+											setSelectedNodeId(node.id);
+											setSelectedEdgeId(null);
+										}}
+										onClick={() => {
+											setSelectedNodeId(node.id);
+											setSelectedEdgeId(null);
+										}}
+									>
+										<circle
+											r={radius + (selected ? 6 : 0)}
+											fill={
+												selected
+													? "hsl(var(--primary) / 0.16)"
+													: "transparent"
+											}
+											stroke={
+												selected ? "hsl(var(--primary))" : "transparent"
+											}
+											strokeWidth="2"
+										/>
+										<circle
+											r={radius}
+											fill={
+												layout === "cluster"
+													? graphCommunityColors[
+															node.community %
+																graphCommunityColors.length
+														]
+													: color
+											}
+											stroke="hsl(var(--background))"
+											strokeWidth="3"
+										/>
+										<text
+											textAnchor="middle"
+											dominantBaseline="central"
+											fill="white"
+											fontSize="12"
+											fontWeight="700"
+										>
+											{node.label.slice(0, 1) || index + 1}
+										</text>
+									</g>
+								);
+							})}
+						</g>
+					</svg>
+				</div>
+				<div className="rounded-md border border-border bg-background p-4">
+					<div className="grid grid-cols-2 gap-3 text-sm">
+						<div>
+							<p className="text-muted-foreground">节点</p>
+							<p className="mt-1 text-2xl font-semibold">{visibleNodes.length}</p>
+						</div>
+						<div>
+							<p className="text-muted-foreground">关系</p>
+							<p className="mt-1 text-2xl font-semibold">{visibleEdges.length}</p>
+						</div>
+					</div>
+					<div className="mt-4 flex flex-wrap gap-2 text-xs">
+						{Object.entries(graphTypeLabels).map(([type, label]) => (
+							<span key={type} className="inline-flex items-center gap-1">
+								<span
+									className="size-2 rounded-full"
+									style={{ backgroundColor: graphTypeColors[type] }}
+								/>
+								{label}
+							</span>
+						))}
+					</div>
+					<div className="mt-4 grid grid-cols-4 gap-2">
+						{graphWorkbenchViews.map((view) => (
+							<Button
+								key={view.id}
+								type="button"
+								variant={workbenchView === view.id ? "default" : "outline"}
+								size="sm"
+								className="px-2 text-xs"
+								onClick={() => switchWorkbenchView(view.id)}
+							>
+								{view.label}
+							</Button>
+						))}
+					</div>
+					<div className="mt-3 rounded-md border border-border bg-card p-3 text-sm">
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<p className="font-semibold">{currentWorkbench?.label}工作区</p>
+								<p className="mt-1 text-xs leading-5 text-muted-foreground">
+									{currentWorkbench?.description}
+								</p>
+							</div>
+							{recommendedView !== workbenchView ? (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="shrink-0 text-xs"
+									onClick={() => switchWorkbenchView(recommendedView)}
+								>
+									推荐下一步
+								</Button>
+							) : null}
+						</div>
+					</div>
+					<div className="mt-4 rounded-md border border-border bg-card p-3 text-sm">
+						<div className="flex items-center justify-between gap-3">
+							<p className="font-semibold">
+								{workbenchView === "timeline" ? "关系时间线" : "社区与时间线摘要"}
+							</p>
+							<span className="text-xs text-muted-foreground">
+								{graph.communities.length} 个社区
+							</span>
+						</div>
+						<div className="mt-3 flex flex-wrap gap-2 text-xs">
+							{graph.communities.slice(0, 6).map((community) => (
+								<span
+									key={community.id}
+									className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1"
+								>
+									<span
+										className="size-2 rounded-full"
+										style={{ backgroundColor: community.color }}
+									/>
+									{community.label} · {community.size}
+								</span>
+							))}
+						</div>
+						<div
+							className={`mt-3 space-y-2 overflow-auto text-xs ${
+								workbenchView === "timeline" ? "max-h-80" : "max-h-40"
+							}`}
+						>
+							{graphVersions
+								.slice(0, workbenchView === "timeline" ? 10 : 5)
+								.map((version) => (
+									<div
+										key={version.id}
+										className="rounded-md border border-border bg-background px-2 py-1.5"
+									>
+										<p className="font-medium">
+											{version.label} · 新增 {version.newEdges} 条关系
+										</p>
+										<p className="mt-1 text-muted-foreground">
+											累计 {version.totalNodes} 节点 / {version.totalEdges}{" "}
+											关系
+											{version.strongestEdge
+												? ` · 强关系：${version.strongestEdge.sourceNode.label} -> ${version.strongestEdge.targetNode.label}`
+												: ""}
+										</p>
+									</div>
+								))}
+							{timelineEdges
+								.slice(0, workbenchView === "timeline" ? 12 : 6)
+								.map((edge) => (
+									<button
+										key={`timeline-${edge.id}`}
+										type="button"
+										onClick={() => {
+											setSelectedEdgeId(edge.id);
+											setSelectedNodeId(edge.source);
+										}}
+										className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-left hover:border-primary"
+									>
+										<span className="font-medium">
+											{edge.firstSeenChapter
+												? `第 ${edge.firstSeenChapter} 章`
+												: "章节未知"}
+										</span>
+										<span className="ml-2 text-muted-foreground">
+											{edge.sourceNode.label} {"->"} {edge.targetNode.label} ·{" "}
+											{edge.relation.join("、") || edge.label}
+										</span>
+									</button>
+								))}
+							{timelineEdges.length === 0 ? (
+								<p className="text-muted-foreground">还没有可排序的关系时间线。</p>
+							) : null}
+						</div>
+					</div>
+					{quality ? (
+						<div className="mt-4 rounded-md border border-border bg-card p-3 text-sm">
+							<div className="flex items-start justify-between gap-3">
+								<div>
+									<p className="font-semibold">
+										{workbenchView === "review"
+											? "图谱质量复核"
+											: "图谱质量校准"}
+									</p>
+									<p className="mt-1 text-xs text-muted-foreground">
+										证据覆盖 {Math.round(quality.evidenceCoverage * 100)}% ·
+										平均置信 {Math.round(quality.averageConfidence * 100)}%
+									</p>
+								</div>
+								<span
+									className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs ${qualityTone.className}`}
+								>
+									<ShieldAlert className="size-3" />
+									{qualityTone.label}
+								</span>
+							</div>
+							<div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+								<div className="rounded-md border border-border bg-background p-2">
+									<p className="text-muted-foreground">孤立节点</p>
+									<p className="mt-1 text-base font-semibold">
+										{quality.isolatedNodes.length}
+									</p>
+								</div>
+								<div className="rounded-md border border-border bg-background p-2">
+									<p className="text-muted-foreground">弱证据边</p>
+									<p className="mt-1 text-base font-semibold">
+										{quality.weakEvidenceEdges.length}
+									</p>
+								</div>
+								<div className="rounded-md border border-border bg-background p-2">
+									<p className="text-muted-foreground">已合并</p>
+									<p className="mt-1 text-base font-semibold">
+										{quality.duplicateMergeCount}
+									</p>
+								</div>
+							</div>
+							{quality.recommendedFixes.length ? (
+								<div className="mt-3 space-y-1 text-xs leading-5 text-muted-foreground">
+									{quality.recommendedFixes
+										.slice(0, workbenchView === "review" ? 4 : 2)
+										.map((item) => (
+											<p key={item}>{item}</p>
+										))}
+								</div>
+							) : null}
+							{corrections.length ? (
+								<div className="mt-3 rounded-md border border-border bg-background p-2 text-xs">
+									<div className="flex items-center justify-between gap-2">
+										<p className="font-medium">
+											已应用 {corrections.length} 条人工修正
+										</p>
+										<div className="flex gap-2">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="h-7 px-2 text-xs"
+												onClick={() =>
+													setCorrections((current) =>
+														current.slice(0, -1),
+													)
+												}
+											>
+												<Undo2 className="mr-1 size-3" />
+												撤销
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="h-7 px-2 text-xs"
+												onClick={() => setCorrections([])}
+											>
+												清空
+											</Button>
+										</div>
+									</div>
+									<p className="mt-1 truncate text-muted-foreground">
+										{correctionLabel(corrections[corrections.length - 1])}
+									</p>
+								</div>
+							) : null}
+							{quality.weakEvidenceEdges.length || quality.isolatedNodes.length ? (
+								<div className="mt-3 space-y-2">
+									{quality.weakEvidenceEdges
+										.slice(0, workbenchView === "review" ? 8 : 3)
+										.map((edge) => {
+											const reviewKey = edgeReviewKey(
+												edge.source,
+												edge.target,
+												edge.label,
+											);
+											const draft = edgeLabelDrafts[reviewKey] || "";
+											return (
+												<div
+													key={reviewKey}
+													className="rounded-md border border-border bg-background p-2 text-xs"
+												>
+													<div className="flex items-start justify-between gap-2">
+														<div>
+															<p className="font-medium">
+																{edge.sourceLabel || edge.source}{" "}
+																{"->"}{" "}
+																{edge.targetLabel || edge.target}
+															</p>
+															<p className="mt-1 text-muted-foreground">
+																{edge.label} · {edge.reason}
+															</p>
+														</div>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															className="h-7 shrink-0 px-2 text-xs"
+															onClick={() =>
+																addGraphCorrection({
+																	type: "confirm-edge",
+																	source: edge.source,
+																	target: edge.target,
+																	evidence: [
+																		`人工确认：${edge.sourceLabel || edge.source} 与 ${edge.targetLabel || edge.target} 存在 ${edge.label}`,
+																	],
+																})
+															}
+														>
+															<Check className="mr-1 size-3" />
+															确认
+														</Button>
+													</div>
+													<div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+														<Input
+															value={draft}
+															placeholder="改成更准确的关系标签"
+															className="h-8 text-xs"
+															onChange={(event) =>
+																setEdgeLabelDrafts((current) => ({
+																	...current,
+																	[reviewKey]: event.target.value,
+																}))
+															}
+														/>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															className="h-8 px-2 text-xs"
+															disabled={!draft.trim()}
+															onClick={() => {
+																addGraphCorrection({
+																	type: "edit-edge",
+																	source: edge.source,
+																	target: edge.target,
+																	label: draft.trim(),
+																	relation: draft
+																		.split(/[、,，/]/)
+																		.map((item) => item.trim())
+																		.filter(Boolean),
+																});
+																setEdgeLabelDrafts((current) => ({
+																	...current,
+																	[reviewKey]: "",
+																}));
+															}}
+														>
+															<Pencil className="mr-1 size-3" />
+															改标签
+														</Button>
+													</div>
+													<div className="mt-2 flex flex-wrap gap-2">
+														{onSearchEvidence && edge.suggestedQuery ? (
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																className="h-7 px-2 text-xs"
+																onClick={() =>
+																	onSearchEvidence(
+																		edge.suggestedQuery!,
+																	)
+																}
+															>
+																检索证据
+															</Button>
+														) : null}
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															className="h-7 px-2 text-xs text-destructive"
+															onClick={() =>
+																addGraphCorrection({
+																	type: "delete-edge",
+																	source: edge.source,
+																	target: edge.target,
+																	reason: "人工复核忽略弱证据关系",
+																})
+															}
+														>
+															<Trash2 className="mr-1 size-3" />
+															忽略关系
+														</Button>
+													</div>
+												</div>
+											);
+										})}
+									{quality.isolatedNodes
+										.slice(0, workbenchView === "review" ? 6 : 2)
+										.map((node) => {
+											const candidates = graph.nodes
+												.filter((item) => item.id !== node.id)
+												.sort((left, right) => right.degree - left.degree)
+												.slice(0, 3);
+											return (
+												<div
+													key={`isolated-${node.id}`}
+													className="rounded-md border border-border bg-background p-2 text-xs"
+												>
+													<div className="flex items-start justify-between gap-2">
+														<div>
+															<p className="font-medium">
+																{node.label}
+															</p>
+															<p className="mt-1 text-muted-foreground">
+																{node.reviewAction ||
+																	"需要复核是否应合并。"}
+															</p>
+														</div>
+														{onSearchEvidence && node.suggestedQuery ? (
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																className="h-7 shrink-0 px-2 text-xs"
+																onClick={() =>
+																	onSearchEvidence(
+																		node.suggestedQuery!,
+																	)
+																}
+															>
+																检索节点
+															</Button>
+														) : null}
+													</div>
+													<div className="mt-2 flex flex-wrap gap-2">
+														{candidates.map((candidate) => (
+															<Button
+																key={`${node.id}-merge-${candidate.id}`}
+																type="button"
+																variant="outline"
+																size="sm"
+																className="h-7 px-2 text-xs"
+																onClick={() =>
+																	addGraphCorrection({
+																		type: "merge-node",
+																		fromId: node.id,
+																		toId: candidate.id,
+																		reason: "人工复核合并孤立节点",
+																	})
+																}
+															>
+																<GitMerge className="mr-1 size-3" />
+																并入 {candidate.label}
+															</Button>
+														))}
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															className="h-7 px-2 text-xs text-destructive"
+															onClick={() =>
+																addGraphCorrection({
+																	type: "delete-node",
+																	nodeId: node.id,
+																	reason: "人工复核忽略孤立节点",
+																})
+															}
+														>
+															<Trash2 className="mr-1 size-3" />
+															忽略节点
+														</Button>
+													</div>
+												</div>
+											);
+										})}
+								</div>
+							) : null}
+						</div>
+					) : null}
+					{workbenchView === "export" ? (
+						<div className="mt-4 rounded-md border border-border bg-card p-3 text-sm">
+							<p className="font-semibold">导出图谱资产</p>
+							<p className="mt-1 text-xs leading-5 text-muted-foreground">
+								JSON 保留节点、关系、社区、时间线和质量信息；SVG
+								保留当前布局视图，适合笔记和汇报。
+							</p>
+							<div className="mt-3 grid grid-cols-2 gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={exportGraphJson}
+								>
+									<FileText className="mr-2 size-4" />
+									JSON
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={exportGraphSvg}
+								>
+									<Download className="mr-2 size-4" />
+									SVG
+								</Button>
+							</div>
+						</div>
+					) : null}
+					{selectedEdge ? (
+						<div className="mt-5 rounded-md border border-border bg-card p-3 text-sm">
+							<p className="font-semibold">当前关系</p>
+							<p className="mt-2">
+								{selectedEdge.sourceNode.label} {"->"}{" "}
+								{selectedEdge.targetNode.label}
+							</p>
+							<p className="mt-1 text-muted-foreground">
+								{selectedEdge.relation.join("、") || selectedEdge.label}
+							</p>
+							<p className="mt-1 text-muted-foreground">
+								张力：{selectedEdge.tension}
+							</p>
+							<p className="mt-1 text-muted-foreground">
+								权重 {selectedEdge.weight}/10 · 情绪{" "}
+								{selectedEdge.positivity > 0 ? "+" : ""}
+								{selectedEdge.positivity}
+								{selectedEdge.firstSeenChapter
+									? ` · 首次出现第 ${selectedEdge.firstSeenChapter} 章`
+									: ""}
+							</p>
+							{selectedEdge.evidence.length ? (
+								<div className="mt-2 space-y-1 text-xs text-muted-foreground">
+									{selectedEdge.evidence.slice(0, 3).map((item) => (
+										<p key={item}>证据：{item}</p>
+									))}
+								</div>
+							) : null}
+						</div>
+					) : null}
+					{selectedNode ? (
+						<div className="mt-5 rounded-md border border-border bg-card p-3 text-sm">
+							<p className="font-semibold">{selectedNode.label}</p>
+							<p className="mt-1 text-muted-foreground">
+								{graphTypeLabels[selectedNode.type] || "未知"} ·{" "}
+								{selectedNode.degree} 条关系
+							</p>
+							{selectedNode.mainCharacter ? (
+								<p className="mt-2 text-xs text-primary">主线角色</p>
+							) : null}
+							{selectedNode.description ? (
+								<p className="mt-2 text-xs leading-5 text-muted-foreground">
+									{selectedNode.description}
+								</p>
+							) : null}
+							{selectedNode.portraitPrompt ? (
+								<p className="mt-2 text-xs leading-5 text-muted-foreground">
+									肖像提示：{selectedNode.portraitPrompt}
+								</p>
+							) : null}
+							{selectedNode.names.length > 1 ? (
+								<p className="mt-2 text-xs leading-5 text-muted-foreground">
+									别名：{selectedNode.names.join("、")}
+								</p>
+							) : null}
+							<div className="mt-3 max-h-60 space-y-2 overflow-auto">
+								{relatedEdges.map((edge) => {
+									const other =
+										edge.source === selectedNode.id
+											? edge.targetNode
+											: edge.sourceNode;
+									const tone = resolveEdgeTone(edge);
+									return (
+										<button
+											key={edge.id}
+											type="button"
+											onClick={() => setSelectedEdgeId(edge.id)}
+											className="block w-full rounded-md border border-border bg-background px-3 py-2 text-left hover:border-primary"
+										>
+											<span className="flex items-center justify-between gap-2">
+												<span>{other.label}</span>
+												<span
+													className="rounded-md border border-border px-2 py-0.5 text-xs"
+													style={{ color: tone.color }}
+												>
+													{tone.label}
+												</span>
+											</span>
+											<span className="mt-1 block text-xs text-muted-foreground">
+												{edge.label} · {edge.tension}
+											</span>
+										</button>
+									);
+								})}
+								{relatedEdges.length === 0 ? (
+									<p className="text-muted-foreground">当前筛选下没有关系边。</p>
+								) : null}
+							</div>
+						</div>
+					) : null}
+				</div>
+			</div>
+			<div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+				{visibleNodes.slice(0, 12).map((node, index) => (
+					<button
+						key={node.id}
+						type="button"
+						onClick={() => {
+							setSelectedNodeId(node.id);
+							setSelectedEdgeId(null);
+						}}
+						className="flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left text-sm hover:border-primary"
+					>
+						<span
+							className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+							style={{ backgroundColor: graphTypeColors[node.type] }}
+						>
+							{index + 1}
+						</span>
+						<span className="min-w-0">
+							<span className="block truncate font-medium">{node.label}</span>
+							<span className="block text-xs text-muted-foreground">
+								{graphTypeLabels[node.type] || "未知"} · {node.degree} 条关系
+							</span>
+						</span>
+					</button>
+				))}
+			</div>
+			{visibleEdges.length === 0 ? (
+				<p className="mt-4 rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
+					当前整书结果还没有关系边。可以先完成整书拆解，或在后续版本补充关系抽取增强。
+				</p>
+			) : null}
+		</div>
+	);
+}
+
 export function BookAnalysisPanel({
 	result,
 	job,
@@ -326,6 +1422,7 @@ export function BookAnalysisPanel({
 	const [searchLoading, setSearchLoading] = useState(false);
 	const [searchError, setSearchError] = useState("");
 	const [searchResult, setSearchResult] = useState<BookEvidenceSearchResult | null>(null);
+	const evidenceSearchRef = useRef<HTMLDivElement | null>(null);
 
 	if (!result) {
 		return (
@@ -349,17 +1446,19 @@ export function BookAnalysisPanel({
 		job?.id && job.status === "succeeded" && result.mapReduce?.chunkEvidenceIndex?.length,
 	);
 
-	async function runEvidenceSearch() {
-		if (!job?.id || !searchQuery.trim()) {
+	async function runEvidenceSearch(queryOverride?: string) {
+		const nextQuery = (queryOverride ?? searchQuery).trim();
+		if (!job?.id || !nextQuery) {
 			return;
 		}
 
+		setSearchQuery(nextQuery);
 		setSearchLoading(true);
 		setSearchError("");
 		try {
 			const response = await fetch(
 				apiUrl(
-					`/analysis/book/jobs/${job.id}/search?q=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+					`/analysis/book/jobs/${job.id}/search?q=${encodeURIComponent(nextQuery)}&limit=8`,
 				),
 			);
 			const payload = (await response.json()) as ApiEnvelope<BookEvidenceSearchResult>;
@@ -373,6 +1472,14 @@ export function BookAnalysisPanel({
 		} finally {
 			setSearchLoading(false);
 		}
+	}
+
+	function runGraphReviewSearch(query: string) {
+		evidenceSearchRef.current?.scrollIntoView({
+			behavior: "smooth",
+			block: "start",
+		});
+		void runEvidenceSearch(query);
 	}
 
 	return (
@@ -473,7 +1580,10 @@ export function BookAnalysisPanel({
 							))}
 						</div>
 						{result.mapReduce.chunkEvidenceIndex?.length ? (
-							<div className="mt-4 rounded-md border border-border bg-card p-3">
+							<div
+								ref={evidenceSearchRef}
+								className="mt-4 rounded-md border border-border bg-card p-3"
+							>
 								<p className="font-medium">证据索引</p>
 								<p className="mt-1 text-xs text-muted-foreground">
 									已建立可回查的文本片段索引，后续复核可以直接定位到原文偏移位置。
@@ -694,10 +1804,15 @@ export function BookAnalysisPanel({
 				</div>
 			</div>
 
-			<div className="grid gap-6 xl:grid-cols-2">
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">故事线与大事纪</h3>
-					<div className="mt-4 space-y-3 text-sm">
+			<RelationshipGraphPanel
+				result={result}
+				onSearchEvidence={searchable ? runGraphReviewSearch : undefined}
+			/>
+
+			<div className="rounded-md border border-border bg-card p-5">
+				<h3 className="font-semibold">故事线与大事纪</h3>
+				<div className="mt-4 grid gap-4 text-sm xl:grid-cols-2">
+					<div className="space-y-3">
 						{result.plotlines.map((line) => (
 							<div
 								key={line.name}
@@ -708,27 +1823,13 @@ export function BookAnalysisPanel({
 								<p className="mt-2">兑现：{line.payoff}</p>
 							</div>
 						))}
-						<ListBlock
-							title="大事纪"
-							items={result.chronicle.map(
-								(item) => `${item.order}. ${item.event} - ${item.storyFunction}`,
-							)}
-						/>
 					</div>
-				</div>
-
-				<div className="rounded-md border border-border bg-card p-5">
-					<h3 className="font-semibold">人物关系图谱</h3>
-					<div className="mt-4 space-y-2 text-sm">
-						{result.relationships.edges.map((edge) => (
-							<div
-								key={`${edge.source}-${edge.target}-${edge.label}`}
-								className="rounded-md border border-border bg-background px-3 py-2"
-							>
-								{`${edge.source} -> ${edge.target}：${edge.label}（${edge.tension}）`}
-							</div>
-						))}
-					</div>
+					<ListBlock
+						title="大事纪"
+						items={result.chronicle.map(
+							(item) => `${item.order}. ${item.event} - ${item.storyFunction}`,
+						)}
+					/>
 				</div>
 			</div>
 

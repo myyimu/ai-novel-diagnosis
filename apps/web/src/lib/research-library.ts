@@ -58,7 +58,18 @@ export type BookAnalysisLike = {
 		}>;
 	};
 	relationships: {
-		edges: Array<{ source: string; target: string; label: string; tension: string }>;
+		edges: Array<{
+			source: string;
+			target: string;
+			label: string;
+			tension: string;
+			relation?: string[];
+			weight?: number;
+			positivity?: number;
+			evidence?: string[];
+			firstSeenChapter?: number;
+			confidence?: number;
+		}>;
 	};
 	chronicle: Array<{
 		order: number;
@@ -207,8 +218,15 @@ export function buildResearchGraph(result?: BookAnalysisLike | null) {
 		id: `relationship-${index}`,
 		source: edge.source,
 		target: edge.target,
-		label: edge.label,
-		detail: edge.tension,
+		label: edge.relation?.join("、") || edge.label,
+		detail: [
+			edge.tension,
+			edge.weight ? `强度 ${edge.weight}/10` : "",
+			typeof edge.positivity === "number" ? `情绪 ${edge.positivity}` : "",
+			edge.evidence?.[0] ? `证据：${edge.evidence[0]}` : "",
+		]
+			.filter(Boolean)
+			.join("；"),
 	}));
 
 	return {

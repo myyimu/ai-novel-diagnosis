@@ -177,6 +177,9 @@ export interface BookAnalysisResult {
 		fearOrWound: string;
 		capability: string;
 		relationshipFunction: string;
+		names?: string[];
+		mainCharacter?: boolean;
+		portraitPrompt?: string;
 		originalCharacterCard: {
 			namePlaceholder: string;
 			summary: string;
@@ -187,8 +190,56 @@ export interface BookAnalysisResult {
 		};
 	}>;
 	relationships: {
-		nodes: Array<{ id: string; label: string; type: string }>;
-		edges: Array<{ source: string; target: string; label: string; tension: string }>;
+		nodes: Array<{
+			id: string;
+			label: string;
+			type: string;
+			names?: string[];
+			mainCharacter?: boolean;
+			description?: string;
+			portraitPrompt?: string;
+		}>;
+		edges: Array<{
+			source: string;
+			target: string;
+			label: string;
+			tension: string;
+			relation?: string[];
+			weight?: number;
+			positivity?: number;
+			evidence?: string[];
+			firstSeenChapter?: number;
+			confidence?: number;
+		}>;
+		duplicateMergeCount?: number;
+	};
+	relationshipGraphQuality?: {
+		nodeCount: number;
+		edgeCount: number;
+		duplicateMergeCount: number;
+		averageConfidence: number;
+		evidenceCoverage: number;
+		riskLevel: "good" | "needs-review" | "weak";
+		isolatedNodes: Array<{
+			id: string;
+			label: string;
+			type: string;
+			suggestedQuery?: string;
+			reviewAction?: string;
+		}>;
+		weakEvidenceEdges: Array<{
+			source: string;
+			target: string;
+			sourceLabel?: string;
+			targetLabel?: string;
+			label: string;
+			confidence: number;
+			evidenceCount: number;
+			reason: string;
+			suggestedQuery?: string;
+			reviewAction?: string;
+		}>;
+		recommendedFixes: string[];
 	};
 	plotlines: Array<{
 		name: string;

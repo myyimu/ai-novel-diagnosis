@@ -33,7 +33,20 @@ const book = {
 		],
 	},
 	relationships: {
-		edges: [{ source: "主角", target: "评审会", label: "压迫", tension: "资格被剥夺" }],
+		edges: [
+			{
+				source: "主角",
+				target: "评审会",
+				label: "压迫",
+				tension: "资格被剥夺",
+				relation: ["压迫", "反击"],
+				weight: 8,
+				positivity: -0.7,
+				evidence: ["公开否定主角资格"],
+				firstSeenChapter: 1,
+				confidence: 0.9,
+			},
+		],
 	},
 	chronicle: [
 		{ order: 1, event: "主角被否定", impact: "制造反击期待", storyFunction: "开局钩子" },
@@ -83,6 +96,9 @@ describe("research-library helpers", () => {
 
 		expect(graph.nodes.length).toBeGreaterThanOrEqual(5);
 		expect(graph.edges).toHaveLength(1);
+		expect(graph.edges[0].label).toBe("压迫、反击");
+		expect(graph.edges[0].detail).toContain("强度 8/10");
+		expect(graph.edges[0].detail).toContain("证据：公开否定主角资格");
 		expect(graph.summary).toContain("图谱节点");
 	});
 

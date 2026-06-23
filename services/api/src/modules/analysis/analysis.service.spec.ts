@@ -302,6 +302,206 @@ describe("AnalysisService", () => {
     );
   });
 
+  it("should normalize chargraph-style character relations into stable graph data", () => {
+    const service = createService();
+    const normalize = (
+      service as unknown as {
+        normalizeBookAnalysisResult: (
+          input: { title: string; genre: string; text: string },
+          value: unknown,
+        ) => {
+          relationships: {
+            nodes: Array<{
+              id: string;
+              label: string;
+              names?: string[];
+              mainCharacter?: boolean;
+              portraitPrompt?: string;
+            }>;
+            edges: Array<{
+              source: string;
+              target: string;
+              relation: string[];
+              weight: number;
+              positivity: number;
+              evidence: string[];
+            }>;
+          };
+          relationshipGraphQuality: {
+            edgeCount: number;
+            nodeCount: number;
+            duplicateMergeCount: number;
+            averageConfidence: number;
+            evidenceCoverage: number;
+            riskLevel: "good" | "needs-review" | "weak";
+            isolatedNodes: Array<{ id: string; label: string; type: string }>;
+            weakEvidenceEdges: Array<{
+              source: string;
+              target: string;
+              sourceLabel?: string;
+              targetLabel?: string;
+              label: string;
+              reason: string;
+              suggestedQuery?: string;
+            }>;
+          };
+        };
+      }
+    ).normalizeBookAnalysisResult.bind(service);
+
+    const result = normalize(
+      {
+        title: "Graph test",
+        genre: "xuanhuan",
+        text: "chapter text",
+      },
+      {
+        characters: [
+          {
+            id: 1,
+            common_name: "阿青",
+            names: ["阿青", "青少爷"],
+            main_character: true,
+            description: "被压迫后反击的主角。",
+            portrait_prompt: "young fighter with a restrained silhouette",
+          },
+          {
+            id: 2,
+            common_name: "评审长",
+            names: ["评审长"],
+            main_character: false,
+          },
+        ],
+        relationships: {
+          relations: [
+            {
+              id1: 1,
+              id2: 2,
+              relation: ["压迫", "反击"],
+              weight: 8,
+              positivity: -0.75,
+              evidence: ["评审长当众否定阿青"],
+            },
+            {
+              id1: 2,
+              id2: 1,
+              relation: ["敌对"],
+              weight: 6,
+              positivity: -0.5,
+            },
+          ],
+        },
+      },
+    );
+
+    expect(result.relationships.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "1",
+          label: "阿青",
+          names: expect.arrayContaining(["青少爷"]),
+          mainCharacter: true,
+          portraitPrompt: "young fighter with a restrained silhouette",
+        }),
+      ]),
+    );
+    expect(result.relationships.edges).toHaveLength(1);
+    expect(result.relationships.edges[0]).toEqual(
+      expect.objectContaining({
+        source: "1",
+        target: "2",
+        relation: expect.arrayContaining(["压迫", "反击", "敌对"]),
+        weight: 8,
+        evidence: expect.arrayContaining(["评审长当众否定阿青"]),
+      }),
+    );
+    expect(result.relationships.edges[0].positivity).toBeLessThan(0);
+    expect(result.relationshipGraphQuality).toEqual(
+      expect.objectContaining({
+        nodeCount: 2,
+        edgeCount: 1,
+        duplicateMergeCount: 1,
+        evidenceCoverage: 1,
+        riskLevel: "good",
+      }),
+    );
+    expect(result.relationshipGraphQuality.isolatedNodes).toHaveLength(0);
+    expect(result.relationshipGraphQuality.weakEvidenceEdges).toHaveLength(0);
+  });
+
+  it("should create review queries for weak relationship evidence", () => {
+    const service = createService();
+    const normalize = (
+      service as unknown as {
+        normalizeBookAnalysisResult: (
+          input: { title: string; genre: string; text: string },
+          value: unknown,
+        ) => {
+          relationshipGraphQuality: {
+            riskLevel: "good" | "needs-review" | "weak";
+            isolatedNodes: Array<{
+              label: string;
+              suggestedQuery?: string;
+              reviewAction?: string;
+            }>;
+            weakEvidenceEdges: Array<{
+              sourceLabel?: string;
+              targetLabel?: string;
+              label: string;
+              reason: string;
+              suggestedQuery?: string;
+              reviewAction?: string;
+            }>;
+          };
+        };
+      }
+    ).normalizeBookAnalysisResult.bind(service);
+
+    const result = normalize(
+      {
+        title: "Weak graph test",
+        genre: "xuanhuan",
+        text: "chapter text",
+      },
+      {
+        characters: [
+          { id: "c1", common_name: "阿青" },
+          { id: "c2", common_name: "神秘导师" },
+          { id: "c3", common_name: "孤立商会" },
+        ],
+        relationships: {
+          relations: [
+            {
+              id1: "c1",
+              id2: "c2",
+              relation: ["疑似指引"],
+              confidence: 0.4,
+            },
+          ],
+        },
+      },
+    );
+
+    expect(result.relationshipGraphQuality.riskLevel).toBe("weak");
+    expect(result.relationshipGraphQuality.weakEvidenceEdges[0]).toEqual(
+      expect.objectContaining({
+        sourceLabel: "阿青",
+        targetLabel: "神秘导师",
+        reason: expect.stringContaining("缺少文本证据"),
+        suggestedQuery: expect.stringContaining("阿青 神秘导师 疑似指引"),
+      }),
+    );
+    expect(
+      result.relationshipGraphQuality.weakEvidenceEdges[0].reviewAction,
+    ).toContain("补充证据");
+    expect(result.relationshipGraphQuality.isolatedNodes[0]).toEqual(
+      expect.objectContaining({
+        label: "孤立商会",
+        suggestedQuery: "孤立商会",
+      }),
+    );
+  });
+
   it("should search chunk evidence index from a succeeded book job", async () => {
     const bookJobs = {
       get: jest.fn(),
