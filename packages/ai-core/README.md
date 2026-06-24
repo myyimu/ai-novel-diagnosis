@@ -6,11 +6,72 @@
 
 ## 当前职责
 
-- `ProviderKind`、`ProviderPresetId` 等模型接入类型。
+- `types.ts`：`ProviderKind`、`ProviderPresetId`、`QuickReviewResult`、`RubricResult`、`ScoreResult` 等共享契约。
+- `metrics.ts`：默认章节质检指标。
+- `validation.ts`：外部输入的轻量结构校验。
+- `preview.ts`：可插拔的预览报告策略。
+- `prompts.ts`：共享提示词契约构造器，供 API 侧接入真实 provider。
 - `QuickReviewResult`：章节急诊结果。
 - `RubricResult`：成熟样本拆出的评分标准。
 - `ScoreResult`：章节质检评分报告。
 - 推荐平台、评分指标、改稿提示词等共享结构。
+
+`createPreviewReport` 是本地预览能力，不等同于真实 LLM 语义诊断。真实的证据抽取、prompt 编排和模型调用由 `services/api` 负责。
+
+## 使用示例
+
+```ts
+import {
+  buildChapterTriagePrompt,
+  createPreviewReport,
+  validateProviderConfig,
+  type PreviewStrategy,
+} from "@ai-novel-diagnosis/ai-core";
+
+const provider = validateProviderConfig({
+  id: "qwen",
+  kind: "openai-compatible",
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  model: "qwen-plus",
+  capabilities: {
+    jsonMode: true,
+    streaming: false,
+    maxContextTokens: 32768,
+  },
+});
+
+const llmBackedPreview: PreviewStrategy = {
+  id: "llm-backed-preview",
+  createReport(input, context) {
+    // 在 services/api 中把 input/context 转成 prompt，再调用 provider。
+    // ai-core 只定义契约，不在包内持有 API key 或发起网络请求。
+    return createPreviewReport(input, { metrics: context.metrics });
+  },
+};
+
+const report = createPreviewReport(
+  {
+    title: "第一章",
+    text: "主角进入考场，却发现考官正是三年前废掉他经脉的人。",
+    rubricId: "default",
+  },
+  { strategy: llmBackedPreview },
+);
+
+const prompt = buildChapterTriagePrompt({
+  title: "第一章",
+  text: "主角进入考场，却发现考官正是三年前废掉他经脉的人。",
+  rubricId: "default",
+});
+
+console.log(provider.model, report.totalScore, prompt.id);
+```
+
+## 模块边界
+
+- `ai-core` 负责稳定类型、默认指标、输入验证、prompt 契约和可插拔策略接口。
+- `services/api` 负责 prompt、LLM provider、JSON 修复、证据抽取和真实诊断流程。
+- `apps/web` 负责展示、交互、缓存和用户工作流。
 
 ## 使用方
 
