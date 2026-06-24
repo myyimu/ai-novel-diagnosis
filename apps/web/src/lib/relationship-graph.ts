@@ -1,5 +1,10 @@
 import type { BookAnalysisResult } from "@/stores/workspace-store";
 
+const GRAPH_CENTER_X = 720;
+const GRAPH_CENTER_Y = 450;
+const GRAPH_WIDTH = 1440;
+const GRAPH_HEIGHT = 900;
+
 export type RelationshipGraphNode = {
 	id: string;
 	label: string;
@@ -586,8 +591,8 @@ function positionGraphNodes(
 	edges: RelationshipGraphEdge[],
 	layout: RelationshipGraphLayout,
 ) {
-	const centerX = 480;
-	const centerY = 280;
+	const centerX = GRAPH_CENTER_X;
+	const centerY = GRAPH_CENTER_Y;
 	const maxNodes = Math.max(nodes.length, 1);
 
 	if (layout === "timeline") {
@@ -607,8 +612,8 @@ function positionGraphNodes(
 					)
 					.sort((left, right) => left - right)[0] || minChapter;
 			const typeBand = node.type === "character" ? 0 : node.type === "faction" ? 1 : 2;
-			node.x = 120 + ((firstChapter - minChapter) / chapterSpan) * 720;
-			node.y = 135 + typeBand * 135 + (index % 3) * 22;
+			node.x = 170 + ((firstChapter - minChapter) / chapterSpan) * 1100;
+			node.y = 190 + typeBand * 200 + (index % 3) * 28;
 		});
 		return;
 	}
@@ -621,8 +626,8 @@ function positionGraphNodes(
 		communityIds.forEach((community, index) => {
 			const angle = (index / Math.max(communityIds.length, 1)) * Math.PI * 2 - Math.PI / 2;
 			centers.set(community, {
-				x: centerX + Math.cos(angle) * (communityIds.length > 1 ? 210 : 0),
-				y: centerY + Math.sin(angle) * (communityIds.length > 1 ? 150 : 0),
+				x: centerX + Math.cos(angle) * (communityIds.length > 1 ? 320 : 0),
+				y: centerY + Math.sin(angle) * (communityIds.length > 1 ? 230 : 0),
 			});
 		});
 		const grouped = new Map<number, RelationshipGraphNode[]>();
@@ -637,7 +642,7 @@ function positionGraphNodes(
 					node.y = center.y;
 					return;
 				}
-				const radius = Math.min(118, 52 + items.length * 8);
+				const radius = Math.min(190, 74 + items.length * 12);
 				const angle = (index / items.length) * Math.PI * 2 - Math.PI / 2;
 				node.x = center.x + Math.cos(angle) * radius;
 				node.y = center.y + Math.sin(angle) * radius;
@@ -648,7 +653,7 @@ function positionGraphNodes(
 
 	nodes.forEach((node, index) => {
 		const angle = (index / maxNodes) * Math.PI * 2 - Math.PI / 2;
-		const radius = node.degree > 1 ? 160 : 230;
+		const radius = node.degree > 1 ? 290 : 390;
 		node.x = centerX + Math.cos(angle) * radius;
 		node.y = centerY + Math.sin(angle) * radius;
 	});
@@ -685,8 +690,14 @@ function positionGraphNodes(
 		});
 		nodes.forEach((node) => {
 			const delta = deltas.get(node.id)!;
-			node.x = Math.max(65, Math.min(895, node.x + delta.x + (centerX - node.x) * 0.01));
-			node.y = Math.max(65, Math.min(495, node.y + delta.y + (centerY - node.y) * 0.01));
+			node.x = Math.max(
+				110,
+				Math.min(GRAPH_WIDTH - 110, node.x + delta.x + (centerX - node.x) * 0.01),
+			);
+			node.y = Math.max(
+				110,
+				Math.min(GRAPH_HEIGHT - 110, node.y + delta.y + (centerY - node.y) * 0.01),
+			);
 		});
 	}
 }

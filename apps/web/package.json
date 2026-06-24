@@ -14,8 +14,8 @@
 		"typecheck": "tsc --noEmit --project tsconfig.json",
 		"format": "oxfmt --check package.json next.config.ts postcss.config.mjs components.json tsconfig.json vitest.config.ts src",
 		"format:fix": "oxfmt --write package.json next.config.ts postcss.config.mjs components.json tsconfig.json vitest.config.ts src",
-		"check": "pnpm run lint && pnpm run typecheck && pnpm run format",
-		"check:fix": "pnpm run lint:fix && pnpm run format:fix"
+		"check": "node ../../scripts/run-pnpm.cjs run lint && node ../../scripts/run-pnpm.cjs run typecheck && node ../../scripts/run-pnpm.cjs run format",
+		"check:fix": "node ../../scripts/run-pnpm.cjs run lint:fix && node ../../scripts/run-pnpm.cjs run format:fix"
 	},
 	"dependencies": {
 		"@ai-novel-diagnosis/ai-core": "workspace:*",

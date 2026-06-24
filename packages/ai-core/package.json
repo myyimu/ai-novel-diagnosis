@@ -32,10 +32,10 @@
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "format": "oxfmt --check package.json tsconfig.json tsdown.config.ts vitest.config.ts src",
     "format:fix": "oxfmt --write package.json tsconfig.json tsdown.config.ts vitest.config.ts src",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run format",
-    "check:fix": "pnpm run lint:fix && pnpm run format:fix",
-    "prepublishOnly": "pnpm run check && pnpm run test && pnpm run build",
-    "publish:public": "pnpm publish --access public"
+    "check": "node ../../scripts/run-pnpm.cjs run lint && node ../../scripts/run-pnpm.cjs run typecheck && node ../../scripts/run-pnpm.cjs run format",
+    "check:fix": "node ../../scripts/run-pnpm.cjs run lint:fix && node ../../scripts/run-pnpm.cjs run format:fix",
+    "prepublishOnly": "node ../../scripts/run-pnpm.cjs run check && node ../../scripts/run-pnpm.cjs run test && node ../../scripts/run-pnpm.cjs run build",
+    "publish:public": "node ../../scripts/run-pnpm.cjs publish --access public"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",

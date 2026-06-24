@@ -53,4 +53,29 @@ describe("extractJson", () => {
       ],
     });
   });
+
+  it("repairs mixed adjacent array values", () => {
+    expect(
+      extractJson(
+        '{"items":[{"name":"a"} {"name":"b"} "tail" true null 3 ["x" "y"]]}',
+      ),
+    ).toEqual({
+      items: [{ name: "a" }, { name: "b" }, "tail", true, null, 3, ["x", "y"]],
+    });
+  });
+
+  it("repairs missing commas between object fields", () => {
+    expect(extractJson('{"title":"demo" "summary":"ok" "score":7}')).toEqual({
+      title: "demo",
+      summary: "ok",
+      score: 7,
+    });
+  });
+
+  it("normalizes full-width json punctuation outside strings", () => {
+    expect(extractJson('{"a"：1，"b"：[1，2，3]}')).toEqual({
+      a: 1,
+      b: [1, 2, 3],
+    });
+  });
 });

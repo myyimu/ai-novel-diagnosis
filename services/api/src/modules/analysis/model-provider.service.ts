@@ -103,7 +103,9 @@ const defaultSharedGpuFallback = {
   label: "AI Horde 匿名共享池",
 };
 
-const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
+// Shared/public providers often queue for a while during book-scale analysis.
+// Keep the default generous, while still allowing env override per deployment.
+const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MAX_ERROR_BODY_LENGTH = 1_000;
 
 function providerTimeoutMs() {
@@ -492,7 +494,9 @@ export class ModelProviderService {
       });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new BadRequestException("Provider request timed out.");
+        throw new BadRequestException(
+          "Provider request timed out. Retry later, switch to a faster provider, or raise PROVIDER_REQUEST_TIMEOUT_MS.",
+        );
       }
       throw error;
     } finally {

@@ -60,6 +60,28 @@ interface ExportViewProps {
 	onOpenHistory: () => void;
 }
 
+const GRAPH_WIDTH = 1440;
+const GRAPH_HEIGHT = 900;
+const GRAPH_CENTER_X = GRAPH_WIDTH / 2;
+const GRAPH_CENTER_Y = GRAPH_HEIGHT / 2;
+
+function truncateGraphLabel(label: string, maxLength = 8) {
+	return label.length > maxLength ? `${label.slice(0, maxLength)}…` : label;
+}
+
+function resolveEdgeDisplayLabel(label: string, relation: string[]) {
+	return truncateGraphLabel(label || relation[0] || "关系", 10);
+}
+
+function resolveNodeLabelOffset(x: number, y: number, radius: number) {
+	const horizontal = x > GRAPH_CENTER_X ? -1 : 1;
+	const vertical = y > GRAPH_CENTER_Y ? -1 : 1;
+	return {
+		x: horizontal * Math.max(18, radius * 0.55),
+		y: vertical * (radius + 22),
+	};
+}
+
 function FieldHelp({ text }: { text: string }) {
 	const [open, setOpen] = useState(false);
 
@@ -116,13 +138,11 @@ function ExportEmptyHint({ show, onOpenHistory }: { show: boolean; onOpenHistory
 }
 
 export function ExportView({ job, result, loading, onExport, onOpenHistory }: ExportViewProps) {
+	const hasUsableResult = Boolean(job && result);
 	return (
 		<>
 			<ExportCenter job={job} loading={loading} onExport={onExport} />
-			<ExportEmptyHint
-				show={!job || job.status !== "succeeded"}
-				onOpenHistory={onOpenHistory}
-			/>
+			<ExportEmptyHint show={!hasUsableResult} onOpenHistory={onOpenHistory} />
 			<BookAnalysisPanel result={result} job={job} />
 		</>
 	);
@@ -139,7 +159,7 @@ function ExportCenter({
 }) {
 	const [mode, setMode] = useState<BookExportMode>("notes");
 
-	if (!job || job.status !== "succeeded") {
+	if (!job) {
 		return null;
 	}
 
@@ -433,7 +453,7 @@ function RelationshipGraphPanel({
 	const visibleEdges = graph.edges.filter(
 		(edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
 	);
-	const selectedNode = visibleNodes.find((node) => node.id === selectedNodeId) ?? visibleNodes[0];
+	const selectedNode = visibleNodes.find((node) => node.id === selectedNodeId);
 	const selectedEdge = visibleEdges.find((edge) => edge.id === selectedEdgeId);
 	const relatedEdges = selectedNode
 		? visibleEdges.filter(
@@ -537,8 +557,8 @@ function RelationshipGraphPanel({
 		setPositionOverrides((current) => ({
 			...current,
 			[draggingNodeId]: {
-				x: Math.max(45, Math.min(915, nextPoint.x)),
-				y: Math.max(45, Math.min(515, nextPoint.y)),
+				x: Math.max(110, Math.min(GRAPH_WIDTH - 110, nextPoint.x)),
+				y: Math.max(110, Math.min(GRAPH_HEIGHT - 110, nextPoint.y)),
 			},
 		}));
 	}
@@ -613,7 +633,7 @@ function RelationshipGraphPanel({
 						size="icon"
 						title="放大图谱"
 						aria-label="放大图谱"
-						onClick={() => setZoom((current) => Math.min(1.45, current + 0.15))}
+						onClick={() => setZoom((current) => Math.min(2.2, current + 0.15))}
 					>
 						<ZoomIn className="size-4" />
 					</Button>
@@ -623,7 +643,7 @@ function RelationshipGraphPanel({
 						size="icon"
 						title="缩小图谱"
 						aria-label="缩小图谱"
-						onClick={() => setZoom((current) => Math.max(0.7, current - 0.15))}
+						onClick={() => setZoom((current) => Math.max(0.65, current - 0.15))}
 					>
 						<ZoomOut className="size-4" />
 					</Button>
@@ -645,40 +665,63 @@ function RelationshipGraphPanel({
 					</Button>
 				</div>
 			</div>
-			<div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-				<div className="overflow-hidden rounded-md border border-border bg-background">
+			<div className="mt-5 space-y-4">
+				<div className="overflow-hidden rounded-md border border-border bg-card p-4">
+					<div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+						<p>拖拽节点可微调位置，滚轮或按钮可缩放，点击关系可查看证据。</p>
+						<p>
+							当前画布：{visibleNodes.length} 个节点 / {visibleEdges.length} 条关系
+						</p>
+					</div>
 					<svg
 						ref={svgRef}
-						viewBox="0 0 960 560"
+						viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
 						role="img"
 						aria-label="整书人物与势力关系图谱"
-						className="block aspect-[12/7] w-full"
+						className="block h-[62vh] min-h-[560px] w-full md:h-[72vh] xl:h-[80vh]"
 						onPointerMove={updateDraggedNode}
 						onPointerUp={() => setDraggingNodeId(null)}
 						onPointerLeave={() => setDraggingNodeId(null)}
 					>
-						<rect width="960" height="560" fill="hsl(var(--background))" />
+						<defs>
+							<pattern
+								id="graph-grid"
+								width="36"
+								height="36"
+								patternUnits="userSpaceOnUse"
+							>
+								<path
+									d="M 36 0 L 0 0 0 36"
+									fill="none"
+									stroke="hsl(var(--border) / 0.45)"
+									strokeWidth="1"
+								/>
+							</pattern>
+						</defs>
+						<rect width={GRAPH_WIDTH} height={GRAPH_HEIGHT} fill="hsl(var(--card))" />
+						<rect width={GRAPH_WIDTH} height={GRAPH_HEIGHT} fill="url(#graph-grid)" />
 						<g
 							ref={graphGroupRef}
-							transform={`translate(480 280) scale(${zoom}) translate(-480 -280)`}
+							transform={`translate(${GRAPH_CENTER_X} ${GRAPH_CENTER_Y}) scale(${zoom}) translate(-${GRAPH_CENTER_X} -${GRAPH_CENTER_Y})`}
 						>
 							{layout === "timeline" ? (
 								<g>
 									<line
-										x1="100"
-										y1="95"
-										x2="860"
-										y2="95"
+										x1="120"
+										y1="120"
+										x2={GRAPH_WIDTH - 120}
+										y2="120"
 										stroke="hsl(var(--border))"
 										strokeDasharray="4 8"
 									/>
 									{["人物", "势力", "地点"].map((label, index) => (
 										<text
 											key={label}
-											x="40"
-											y={140 + index * 135}
+											x="54"
+											y={178 + index * 160}
 											fill="hsl(var(--muted-foreground))"
-											fontSize="12"
+											fontSize="13"
+											fontWeight="600"
 										>
 											{label}
 										</text>
@@ -726,17 +769,17 @@ function RelationshipGraphPanel({
 							) : (
 								<>
 									<circle
-										cx="480"
-										cy="280"
-										r="250"
+										cx={GRAPH_CENTER_X}
+										cy={GRAPH_CENTER_Y}
+										r="310"
 										fill="none"
 										stroke="hsl(var(--border))"
 										strokeDasharray="5 8"
 									/>
 									<circle
-										cx="480"
-										cy="280"
-										r="190"
+										cx={GRAPH_CENTER_X}
+										cy={GRAPH_CENTER_Y}
+										r="235"
 										fill="none"
 										stroke="hsl(var(--border))"
 										strokeDasharray="3 10"
@@ -746,6 +789,24 @@ function RelationshipGraphPanel({
 							{visibleEdges.map((edge) => {
 								const tone = resolveEdgeTone(edge);
 								const selected = selectedEdge?.id === edge.id;
+								const midX = (edge.sourceNode.x + edge.targetNode.x) / 2;
+								const midY = (edge.sourceNode.y + edge.targetNode.y) / 2;
+								const dx = edge.targetNode.x - edge.sourceNode.x;
+								const dy = edge.targetNode.y - edge.sourceNode.y;
+								const distance = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+								const normalX = -dy / distance;
+								const normalY = dx / distance;
+								const edgeLabel = resolveEdgeDisplayLabel(
+									edge.label,
+									edge.relation,
+								);
+								const showEdgeLabel =
+									selected ||
+									(edge.weight >= 6 &&
+										edge.sourceNode.degree >= 3 &&
+										edge.targetNode.degree >= 3);
+								const edgeLabelX = midX + normalX * 18;
+								const edgeLabelY = midY + normalY * 18;
 								return (
 									<g key={edge.id}>
 										<line
@@ -756,23 +817,69 @@ function RelationshipGraphPanel({
 											stroke={tone.color}
 											strokeWidth={
 												selected
-													? 5
-													: Math.max(1.8, Math.min(5, edge.weight / 2))
+													? 6
+													: Math.max(2.4, Math.min(6, edge.weight / 1.8))
 											}
-											strokeOpacity={selected ? 0.9 : 0.42}
+											strokeOpacity={selected ? 0.92 : 0.58}
 											onClick={() => {
 												setSelectedEdgeId(edge.id);
 												setSelectedNodeId(edge.source);
 											}}
 											className="cursor-pointer"
 										/>
+										{showEdgeLabel ? (
+											<g
+												transform={`translate(${edgeLabelX} ${edgeLabelY})`}
+												className="cursor-pointer"
+												onClick={() => {
+													setSelectedEdgeId(edge.id);
+													setSelectedNodeId(edge.source);
+												}}
+											>
+												<rect
+													x={-(edgeLabel.length * 7.5 + 12) / 2}
+													y={-12}
+													width={edgeLabel.length * 7.5 + 12}
+													height="24"
+													rx="999"
+													fill={
+														selected
+															? "hsl(var(--foreground) / 0.92)"
+															: "rgba(15, 23, 42, 0.88)"
+													}
+													stroke={
+														selected
+															? tone.color
+															: "hsl(var(--foreground) / 0.28)"
+													}
+													strokeOpacity={0.95}
+												/>
+												<text
+													textAnchor="middle"
+													dominantBaseline="central"
+													fill="white"
+													fontSize="12"
+													fontWeight="700"
+												>
+													{edgeLabel}
+												</text>
+											</g>
+										) : null}
 									</g>
 								);
 							})}
 							{visibleNodes.map((node, index) => {
 								const selected = selectedNode?.id === node.id;
-								const radius = Math.min(26, 12 + node.degree * 3);
+								const radius = Math.min(34, 14 + node.degree * 3.8);
 								const color = graphTypeColors[node.type] || graphTypeColors.unknown;
+								const nodeLabel = truncateGraphLabel(node.label, 8);
+								const labelWidth = Math.max(48, nodeLabel.length * 13 + 18);
+								const labelOffset = resolveNodeLabelOffset(node.x, node.y, radius);
+								const showNodeLabel =
+									selected ||
+									node.mainCharacter ||
+									node.degree >= 3 ||
+									visibleNodes.length <= 10;
 								return (
 									<g
 										key={node.id}
@@ -812,18 +919,52 @@ function RelationshipGraphPanel({
 														]
 													: color
 											}
-											stroke="hsl(var(--background))"
+											stroke="hsl(var(--card))"
 											strokeWidth="3"
 										/>
 										<text
 											textAnchor="middle"
 											dominantBaseline="central"
 											fill="white"
-											fontSize="12"
+											fontSize="13"
 											fontWeight="700"
 										>
-											{node.label.slice(0, 1) || index + 1}
+											{truncateGraphLabel(node.label, 2) || index + 1}
 										</text>
+										{showNodeLabel ? (
+											<g
+												transform={`translate(${labelOffset.x} ${labelOffset.y})`}
+												pointerEvents="none"
+											>
+												<rect
+													x={-labelWidth / 2}
+													y="-11"
+													width={labelWidth}
+													height="22"
+													rx="999"
+													fill={
+														selected
+															? "hsl(var(--foreground) / 0.92)"
+															: "rgba(15, 23, 42, 0.88)"
+													}
+													stroke={
+														selected
+															? "hsl(var(--primary))"
+															: "hsl(var(--foreground) / 0.24)"
+													}
+													strokeOpacity={0.95}
+												/>
+												<text
+													textAnchor="middle"
+													dominantBaseline="central"
+													fill="white"
+													fontSize="12"
+													fontWeight={selected ? "700" : "600"}
+												>
+													{nodeLabel}
+												</text>
+											</g>
+										) : null}
 									</g>
 								);
 							})}
@@ -1442,9 +1583,7 @@ export function BookAnalysisPanel({
 	const generationAssets = result.generationAssets;
 	const styleCard = result.transferableStyleCard;
 	const boundaryCheck = result.referenceBoundaryCheck;
-	const searchable = Boolean(
-		job?.id && job.status === "succeeded" && result.mapReduce?.chunkEvidenceIndex?.length,
-	);
+	const searchable = Boolean(job?.id && result.mapReduce?.chunkEvidenceIndex?.length);
 
 	async function runEvidenceSearch(queryOverride?: string) {
 		const nextQuery = (queryOverride ?? searchQuery).trim();
@@ -1765,10 +1904,10 @@ export function BookAnalysisPanel({
 				</div>
 			) : null}
 
-			<div className="grid gap-6 xl:grid-cols-2">
-				<div className="rounded-md border border-border bg-card p-5">
+			<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+				<div className="flex flex-col rounded-md border border-border bg-card p-5 xl:h-[620px]">
 					<h3 className="font-semibold">世界观设计</h3>
-					<div className="mt-4 space-y-4 text-sm">
+					<div className="mt-4 space-y-4 text-sm xl:flex-1 xl:overflow-y-auto xl:pr-2">
 						<ListBlock title="世界规则" items={result.worldbuilding.worldRules} />
 						<ListBlock title="能力体系" items={result.worldbuilding.powerSystem} />
 						<ListBlock
@@ -1780,9 +1919,9 @@ export function BookAnalysisPanel({
 					</div>
 				</div>
 
-				<div className="rounded-md border border-border bg-card p-5">
+				<div className="flex flex-col rounded-md border border-border bg-card p-5 xl:h-[620px]">
 					<h3 className="font-semibold">人物卡</h3>
-					<div className="mt-4 space-y-3">
+					<div className="mt-4 space-y-3 xl:flex-1 xl:overflow-y-auto xl:pr-2">
 						{result.characters.map((character) => (
 							<div
 								key={`${character.sourceName}-${character.role}`}

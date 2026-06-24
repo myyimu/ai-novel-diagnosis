@@ -19,6 +19,7 @@ import {
 } from "@ai-novel-diagnosis/ai-core";
 import {
   BookAnalysisJobProgress,
+  BookAnalysisJobSnapshot,
   BookAnalysisJobService,
 } from "./book-analysis-job.service";
 import { AnalyzeBookDto } from "./dto/analyze-book.dto";
@@ -1586,7 +1587,7 @@ export class AnalysisService {
   }
 
   getBookAnalysisJob(jobId: string, options?: { includeResult?: boolean }) {
-    return this.bookJobs.get(jobId, options);
+    return this.readBookAnalysisJobWithDerivedResult(jobId, options);
   }
 
   deleteBookAnalysisJob(jobId: string) {
@@ -1603,10 +1604,12 @@ export class AnalysisService {
       throw new BadRequestException("Search query is required.");
     }
 
-    const job = await this.bookJobs.get(jobId, { includeResult: true });
-    if (job.status !== "succeeded" || !job.result) {
+    const job = await this.readBookAnalysisJobWithDerivedResult(jobId, {
+      includeResult: true,
+    });
+    if (!job.result) {
       throw new BadRequestException(
-        "Only succeeded book-analysis jobs can be searched.",
+        "This book-analysis job does not have searchable chunk evidence yet.",
       );
     }
 
@@ -1728,14 +1731,36 @@ export class AnalysisService {
     format: BookExportFormat,
     mode: BookExportMode = "notes",
   ) {
-    const job = await this.bookJobs.get(jobId);
-    if (job.status !== "succeeded" || !job.result) {
+    const job = await this.readBookAnalysisJobWithDerivedResult(jobId, {
+      includeResult: true,
+    });
+    if (!job.result) {
       throw new BadRequestException(
-        "Only succeeded jobs with results can be exported.",
+        "This book-analysis job does not have exportable assets yet.",
       );
     }
 
     return this.bookExports.export(job.result, format, mode);
+  }
+
+  private async readBookAnalysisJobWithDerivedResult(
+    jobId: string,
+    options?: { includeResult?: boolean },
+  ) {
+    const job = await this.bookJobs.get(jobId, options);
+    if (options?.includeResult === false || job.result || !job.partialResult) {
+      return job;
+    }
+
+    const derivedResult = await this.buildPartialBookAnalysisResult(job);
+    if (!derivedResult) {
+      return job;
+    }
+
+    return {
+      ...job,
+      result: derivedResult,
+    };
   }
 
   async createBookAnalysisJobFromUpload(input: {
@@ -2108,6 +2133,85 @@ ${content}`,
     };
   }
 
+  private async buildPartialBookAnalysisResult(
+    job: BookAnalysisJobSnapshot,
+  ): Promise<Record<string, unknown> | null> {
+    if (!job.partialResult || !job.preprocessing) {
+      return null;
+    }
+
+    const chapterMaps = (
+      await this.bookJobs.readChapterMaps<ChapterMapResult>(job.id)
+    ).sort((left, right) => left.order - right.order);
+    if (!chapterMaps.length) {
+      return null;
+    }
+
+    const input: AnalyzeBookDto = {
+      title: job.inputSummary.title,
+      genre: job.inputSummary.genre,
+      text: "",
+      provider: {
+        kind: "mock",
+        preset: "custom",
+      },
+    };
+    const preprocessing: BookPreprocessResult = {
+      cleaning: job.preprocessing.cleaning,
+      chapters: job.preprocessing.chapters.map((chapter) => ({
+        ...chapter,
+        text: "",
+      })),
+    };
+    const base = this.mockBookReduce(
+      input,
+      preprocessing,
+      chapterMaps,
+    ) as Record<string, unknown>;
+    const partial = this.buildPartialChapterMapAssets(
+      input,
+      preprocessing,
+      chapterMaps,
+      job.partialResult,
+    );
+    const normalized = this.normalizeBookAnalysisResult(input, {
+      ...base,
+      ...partial,
+    }) as Record<string, unknown>;
+
+    return {
+      ...normalized,
+      preprocessing: {
+        cleaning: preprocessing.cleaning,
+        chapters: preprocessing.chapters.map(
+          ({ text: _text, ...chapter }) => chapter,
+        ),
+      },
+      mapReduce: {
+        strategy:
+          job.partialResult.analysisStrategy ||
+          "partial chapter-map aggregation preview",
+        mapCount: chapterMaps.length,
+        chapterMaps,
+        chunkCount: chapterMaps.length,
+        outlineCount: job.partialResult.outlineCount ?? chapterMaps.length,
+        deepCount: chapterMaps.filter((item) => item.analysisDepth === "deep")
+          .length,
+        deepTargetOrders: job.partialResult.deepTargetOrders || [],
+        chunkEvidenceIndex: this.buildChunkEvidenceIndex(chapterMaps),
+        reducerNote: `Partial preview generated from ${chapterMaps.length}/${job.partialResult.totalChapters} analyzed chunks. Unmapped chapters are not included yet.`,
+      },
+      partialAnalysis: {
+        isPartial: true,
+        stage: job.partialResult.stage,
+        mapCount: chapterMaps.length,
+        totalChapters: job.partialResult.totalChapters,
+        notice: job.partialResult.notice,
+        savedAt: job.partialResult.savedAt,
+      },
+    };
+  }
+
   private normalizeBookAnalysisResult(input: AnalyzeBookDto, value: unknown) {
     const defaults = this.mockBookAnalysis(input);
     const source = (value || {}) as Record<string, any>;
@@ -2330,6 +2434,411 @@ ${content}`,
 
   private arrayOrDefault<T>(value: unknown, fallback: T[]): T[] {
     return Array.isArray(value) && value.length > 0 ? (value as T[]) : fallback;
+  }
+
+  private buildPartialChapterMapAssets(
+    input: AnalyzeBookDto,
+    preprocessing: BookPreprocessResult,
+    chapterMaps: ChapterMapResult[],
+    partialResult: NonNullable<BookAnalysisJobSnapshot["partialResult"]>,
+  ) {
+    const characterFrequency = new Map<string, number>();
+    const characterFirstSeen = new Map<string, number>();
+    const relationshipAccumulator = new Map<
+      string,
+      {
+        source: string;
+        target: string;
+        label: string;
+        tension: string;
+        relation: Set<string>;
+        evidence: Set<string>;
+        positivity: number;
+        weight: number;
+        confidence: number;
+        firstSeenChapter: number;
+      }
+    >();
+    const worldSignals = new Set<string>();
+    const timelineEvents = new Set<string>();
+    const plotFunctions = new Set<string>();
+
+    for (const chapter of chapterMaps) {
+      const names = this.extractEntityCandidates(chapter.characterSignals);
+      names.forEach((name) => {
+        characterFrequency.set(name, (characterFrequency.get(name) || 0) + 1);
+        if (!characterFirstSeen.has(name)) {
+          characterFirstSeen.set(name, chapter.order);
+        }
+      });
+
+      chapter.worldbuildingSignals.forEach((signal) => {
+        const text = this.asText(signal);
+        if (text) {
+          worldSignals.add(text);
+        }
+      });
+      chapter.timelineEvents.forEach((event) => {
+        const text = this.asText(event);
+        if (text) {
+          timelineEvents.add(text);
+        }
+      });
+      if (chapter.plotFunction) {
+        plotFunctions.add(chapter.plotFunction);
+      }
+
+      const chapterPairs = names.flatMap((source, sourceIndex) =>
+        names.slice(sourceIndex + 1).map((target) => [source, target] as const),
+      );
+      for (const [source, target] of chapterPairs) {
+        const edgeKey = [source, target].sort().join("::");
+        const existing = relationshipAccumulator.get(edgeKey);
+        const label = this.asText(chapter.relationshipSignals[0]) || "同章互动";
+        const evidence = [
+          ...chapter.evidenceSnippets,
+          ...chapter.sourceAnchors.map((anchor) => anchor.quote),
+        ]
+          .map((item) => this.asText(item))
+          .filter(Boolean)
+          .slice(0, 6) as string[];
+        const positivity = this.partialRelationshipPositivity(label);
+        if (existing) {
+          evidence.forEach((item) => existing.evidence.add(item));
+          if (label) {
+            existing.relation.add(label);
+          }
+          existing.weight += 1;
+          existing.confidence = Math.min(0.98, existing.confidence + 0.1);
+          existing.positivity = (existing.positivity + positivity) / 2;
+          continue;
+        }
+        relationshipAccumulator.set(edgeKey, {
+          source,
+          target,
+          label,
+          tension:
+            positivity < -0.1 ? "high" : positivity > 0.1 ? "low" : "medium",
+          relation: new Set(label ? [label] : []),
+          evidence: new Set(evidence),
+          positivity,
+          weight: 1,
+          confidence: 0.45 + Math.min(0.35, evidence.length * 0.08),
+          firstSeenChapter: chapter.order,
+        });
+      }
+    }
+
+    const sortedCharacters = [...characterFrequency.entries()]
+      .sort(
+        (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+      )
+      .slice(0, 24);
+    const characters = sortedCharacters.map(([name, frequency]) => ({
+      sourceName: name,
+      role:
+        /主角|protagonist|hero/i.test(name) ||
+        (characterFirstSeen.get(name) || 99) === 1
+          ? "主角"
+          : frequency >= 3
+            ? "核心角色"
+            : "角色",
+      archetype: `从已分析章节中提取的角色信号（出现 ${frequency} 次）`,
+      personalityCore: this.mergeReducerList(
+        chapterMaps
+          .filter((chapter) =>
+            this.extractEntityCandidates(chapter.characterSignals).includes(
+              name,
+            ),
+          )
+          .flatMap((chapter) => chapter.emotionalBeats || []),
+        4,
+      ),
+      desire: "待后续章节补全角色长期目标",
+      fearOrWound: "待更多章节证据补全",
+      capability: "待更多章节证据补全",
+      relationshipFunction: "基于当前已拆章节生成的临时角色卡",
+      names: [name],
+      mainCharacter:
+        /主角|protagonist|hero/i.test(name) ||
+        (characterFirstSeen.get(name) || 99) === 1,
+      originalCharacterCard: {
+        namePlaceholder: `${name}（待原创化命名）`,
+        summary: `基于已拆章节生成的临时角色卡。当前能确认 ${frequency} 次出场信号，建议在全书拆完后再补全人物弧线。`,
+        personality:
+          "待更多章节证据补全 personality / speech / contradiction。",
+        scenario: `适合放入当前已分析章节相关场景，首见约在第 ${characterFirstSeen.get(name) || "?"} 章。`,
+        firstMessage:
+          "这是基于半拆结果生成的临时角色卡，建议补完全书后再定稿。",
+        doNotCopy: [name],
+      },
+    }));
+
+    const relationships = {
+      nodes: characters.map((character) => ({
+        id: character.sourceName,
+        label: character.sourceName,
+        type: "character",
+        names: character.names,
+        mainCharacter: character.mainCharacter,
+        description: character.archetype,
+      })),
+      edges: [...relationshipAccumulator.values()].map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+        tension: edge.tension,
+        relation: [...edge.relation].slice(0, 4),
+        weight: edge.weight,
+        positivity: edge.positivity,
+        evidence: [...edge.evidence].slice(0, 6),
+        firstSeenChapter: edge.firstSeenChapter,
+        confidence: Number(edge.confidence.toFixed(2)),
+      })),
+    };
+
+    const chapterFunctionTable = chapterMaps.map((chapter) => ({
+      chapterOrder: chapter.order,
+      title: chapter.title,
+      function: chapter.plotFunction,
+      goal: chapter.chapterGoal || "待后续章节补全",
+      conflict: chapter.conflict || "待后续章节补全",
+      hook: chapter.hook,
+    }));
+
+    return {
+      book: {
+        title: input.title,
+        genre: input.genre,
+        chapterCountEstimate: preprocessing.chapters.length,
+        oneSentencePremise: this.mergeReducerList(
+          chapterMaps.slice(0, 2).map((chapter) => chapter.summary),
+          2,
+        ).join(" / "),
+        coreAppeal: this.mergeReducerList(
+          [
+            ...plotFunctions,
+            ...chapterMaps.slice(0, 3).map((chapter) => chapter.hook),
+            `已拆 ${chapterMaps.length}/${partialResult.totalChapters} 章`,
+          ],
+          6,
+        ),
+      },
+      characters,
+      relationships,
+      worldbuilding: {
+        worldRules: [...worldSignals].slice(0, 8),
+        powerSystem: [...worldSignals]
+          .filter((signal) => /能力|力量|规则|体系|血脉|法则/i.test(signal))
+          .slice(0, 6),
+        locations: [],
+        factions: [],
+        itemsAndTerms: [...worldSignals].slice(0, 8).map((signal) => ({
+          name: signal,
+          function: "从已拆章节中的世界观信号提取",
+          risk: "partial",
+        })),
+      },
+      chronicle: [...timelineEvents].slice(0, 24).map((event, index) => ({
+        order: index + 1,
+        event,
+        impact: "从已完成章节 map 中归纳的临时时间线事件",
+        storyFunction: index === 0 ? "开局信息" : "推进事件",
+      })),
+      writingSupport: {
+        chapterFunctionTable,
+        foreshadowingLedger: chapterMaps.flatMap((chapter) =>
+          (chapter.foreshadowingSetups || []).slice(0, 2).map((setup) => ({
+            setup,
+            setupChapter: chapter.order,
+            payoff: chapter.payoffSignals?.[0] || "待后续章节回收",
+            status: "open",
+            risk: "当前为半拆结果，回收关系仍需更多章节验证。",
+          })),
+        ),
+        emotionalBeatMap: chapterMaps.map((chapter) => ({
+          chapterOrder: chapter.order,
+          beats: chapter.emotionalBeats?.length
+            ? chapter.emotionalBeats
+            : ["冲突推进", "待补全情绪曲线"],
+          intensity: chapter.analysisDepth === "deep" ? "high" : "medium",
+          readerPromise: chapter.hook,
+        })),
+        pacingCurve: chapterMaps.map((chapter) => ({
+          chapterOrder: chapter.order,
+          informationDensity: chapter.worldbuildingSignals.length
+            ? "medium"
+            : "low",
+          conflictIntensity: chapter.conflict ? "high" : "medium",
+          hookStrength: chapter.hook ? "high" : "medium",
+          risk: "基于半拆结果推断，仍需全书 reduce 后复核。",
+        })),
+        readerPromiseChecklist: chapterMaps.slice(0, 8).map((chapter) => ({
+          promise: chapter.hook,
+          status: "pending",
+          nextCheck: `补齐第 ${chapter.order} 章后的后续回收与升级。`,
+        })),
+        conflictMatrix: relationships.edges.slice(0, 12).map((edge) => ({
+          parties: [edge.source, edge.target],
+          conflict: edge.label,
+          level: edge.tension,
+          nextEscalation: "待更多章节确认冲突升级路径。",
+        })),
+        continuationPack: {
+          currentState: `当前已拆 ${chapterMaps.length}/${partialResult.totalChapters} 章，临时资产仅覆盖已完成章节。`,
+          nextChapterGoal: "优先补齐未拆章节，再复核角色弧线与关系图谱。",
+          openThreads: this.mergeReducerList(
+            chapterMaps.flatMap((chapter) => chapter.foreshadowingSetups || []),
+            8,
+          ),
+          oocGuards: ["当前角色卡为半拆草稿，定稿前不要直接当成完整人物设定。"],
+          settingGuards: ["当前图谱只反映已分析章节，不代表全书最终关系结构。"],
+          styleConstraints: ["补完全书后再做最终原创化整理与导出。"],
+          aiPrompt:
+            "这是基于半拆结果自动生成的临时续写上下文，使用前请先人工复核。",
+        },
+        qualityDiagnosis: {
+          strengths: ["已能从部分章节提取角色、冲突与世界观信号。"],
+          weaknesses: ["未覆盖全书，角色弧线和关系图仍可能缺边或误边。"],
+          priorityFixes: [
+            "继续补拆剩余章节",
+            "复核低证据关系边",
+            "补全主角目标、代价、回收链条",
+          ],
+        },
+      },
+      generationAssets: {
+        worldBook: {
+          entries: [...worldSignals].slice(0, 8).map((signal, index) => ({
+            keys: [signal],
+            secondaryKeys: [],
+            category: "partial-signal",
+            content: `从已拆章节提取的临时世界设定信号：${signal}`,
+            insertionOrder: 100 + index * 10,
+            priority: 50,
+            constant: false,
+            selective: true,
+            sourceRisk: "partial",
+            originalizationNote: "半拆草稿，需要在全书完成后再原创化和校准。",
+          })),
+          activationRules: [
+            "仅在半拆结果复盘时作为线索参考，不要直接视为全书定稿世界书。",
+          ],
+          importNotes: "当前 world book 为 partial preview。",
+        },
+        styleBible: {
+          narrativePOV: "待全书完成后归纳",
+          toneKeywords: this.mergeReducerList(
+            chapterMaps.flatMap((chapter) => chapter.emotionalBeats || []),
+            6,
+          ),
+          proseRules: ["当前风格规则来自已拆章节草稿，后续需整体复核。"],
+          dialogueRules: [],
+          tabooList: ["未完成全书拆解前，不要把当前临时资产当成最终定稿。"],
+        },
+        volumePlan: [],
+        sceneTemplates: [],
+        characterVoiceGuide: characters.slice(0, 8).map((character) => ({
+          character: character.sourceName,
+          speechStyle: "待更多章节证据补全",
+          forbiddenTone: ["半拆草稿，不要直接定稿语气"],
+        })),
+        antagonistPressurePlan: [],
+        titleSynopsisKeywordPack: {
+          titleKeywords: this.mergeReducerList(
+            chapterMaps.flatMap((chapter) => chapter.characterSignals),
+            6,
+          ),
+          synopsisSellingPoints: this.mergeReducerList(
+            chapterMaps.slice(0, 4).map((chapter) => chapter.summary),
+            4,
+          ),
+          searchTags: this.mergeReducerList([...worldSignals], 8),
+          openingKeywords: this.mergeReducerList(
+            chapterMaps.slice(0, 3).map((chapter) => chapter.hook),
+            4,
+          ),
+        },
+        consistencyChecklist: [
+          "当前图谱/角色卡只覆盖已拆章节。",
+          "先补完剩余章节，再做最终世界书和角色卡定稿。",
+        ],
+      },
+      exportPackage: {
+        tavernCharacterCards: characters.map((character) => ({
+          name: character.originalCharacterCard.namePlaceholder,
+          description: character.originalCharacterCard.summary,
+          personality: character.originalCharacterCard.personality,
+          scenario: character.originalCharacterCard.scenario,
+          first_mes: character.originalCharacterCard.firstMessage,
+          creator_notes:
+            "Partial preview generated from incomplete chapter maps.",
+        })),
+        worldBookEntries: [...worldSignals].slice(0, 8).map((signal) => ({
+          keys: [signal],
+          content: `Partial preview signal: ${signal}`,
+          insertion_order: 100,
+        })),
+        writingConstraints: [
+          "Partial preview only.",
+          "Complete the remaining chapters before final export.",
+        ],
+        doNotCopyList: characters
+          .slice(0, 8)
+          .map((character) => character.sourceName),
+      },
+      originalizationReport: {
+        riskLevel: "partial-preview",
+        safeToLearn: ["角色/关系/世界观线索提取方式"],
+        mustTransform: ["所有临时角色名、关系和设定都需要在全书完成后再复核"],
+        rewriteStrategy: ["先补全全书拆解，再进行原创化整理。"],
+        fanFictionWarning:
+          "Current assets are partial previews derived from incomplete chapter coverage.",
+      },
+      usageRiskNotice: {
+        summary:
+          "This preview is derived from incomplete chapter maps and should be treated as a draft.",
+        recommendedUse: [
+          "图谱草稿复核",
+          "角色卡方向预览",
+          "继续补拆前的中间检查",
+        ],
+        higherRiskUse: ["直接当最终角色卡发布", "直接作为完整世界书导出"],
+        userResponsibility: "补完全书并人工复核后再视为正式资产。",
+      },
+    };
+  }
+
+  private extractEntityCandidates(signals: string[]) {
+    return this.mergeReducerList(
+      signals.flatMap((signal) =>
+        this.asText(signal)
+          .split(/[、,，/|｜;；]/)
+          .flatMap((token) => token.split(/\s*(?:与|和|对|vs\.?|VS|->|→)\s*/))
+          .map((token) =>
+            token
+              .trim()
+              .replace(/^[【[(（"'“]+|[】\])）"'”.,，。:：;；!?！？]+$/g, ""),
+          )
+          .filter(
+            (token) =>
+              token.length >= 2 &&
+              token.length <= 24 &&
+              !/角色|人物|关系|主线|冲突|世界|设定|事件|线索|章节/.test(token),
+          ),
+      ),
+      24,
+    );
+  }
+
+  private partialRelationshipPositivity(label: string) {
+    if (/支持|合作|守护|依赖|亲近|盟友|信任/.test(label)) {
+      return 0.65;
+    }
+    if (/敌|压迫|对抗|冲突|背叛|威胁|利用/.test(label)) {
+      return -0.65;
+    }
+    return 0;
   }
 
   private normalizeBookCharacters(value: unknown, fallback: unknown[]) {

@@ -6,13 +6,13 @@
   "license": "MIT",
   "author": "",
   "scripts": {
-    "predev": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "predev": "node ../../scripts/run-pnpm.cjs --filter @ai-novel-diagnosis/ai-core build",
     "dev": "nest start --watch",
-    "prebuild": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "prebuild": "node ../../scripts/run-pnpm.cjs --filter @ai-novel-diagnosis/ai-core build",
     "build": "nest build",
-    "pretypecheck": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "pretypecheck": "node ../../scripts/run-pnpm.cjs --filter @ai-novel-diagnosis/ai-core build",
     "start": "nest start",
-    "prestart:dev": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "prestart:dev": "node ../../scripts/run-pnpm.cjs --filter @ai-novel-diagnosis/ai-core build",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
@@ -31,8 +31,8 @@
     "db:seed": "ts-node drizzle/seed.ts",
     "lint:fix": "oxlint --fix .",
     "format:fix": "oxfmt --write package.json nest-cli.json tsconfig.json tsconfig.build.json drizzle.config.ts src test drizzle",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run format",
-    "check:fix": "pnpm run lint:fix && pnpm run format:fix"
+    "check": "node ../../scripts/run-pnpm.cjs run lint && node ../../scripts/run-pnpm.cjs run typecheck && node ../../scripts/run-pnpm.cjs run format",
+    "check:fix": "node ../../scripts/run-pnpm.cjs run lint:fix && node ../../scripts/run-pnpm.cjs run format:fix"
   },
   "dependencies": {
     "@ai-novel-diagnosis/ai-core": "workspace:*",

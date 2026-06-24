@@ -141,6 +141,14 @@ function resolveStoreValue<T>(value: T | ((current: T) => T), current: T): T {
 
 export interface BookAnalysisResult {
 	mode: string;
+	partialAnalysis?: {
+		isPartial: boolean;
+		stage: string;
+		mapCount: number;
+		totalChapters: number;
+		notice: string;
+		savedAt: string;
+	};
 	book: {
 		title: string;
 		genre: string;

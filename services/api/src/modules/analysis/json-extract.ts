@@ -47,17 +47,181 @@ function replaceIllegalJsonControlChars(content: string) {
   }).join("");
 }
 
+function normalizeJsonPunctuationOutsideStrings(content: string) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (const char of content) {
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaped = inString;
+      continue;
+    }
+
+    if (char === '"') {
+      result += char;
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString && char === "，") {
+      result += ",";
+      continue;
+    }
+
+    if (!inString && char === "：") {
+      result += ":";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+function isDigit(char: string) {
+  return char >= "0" && char <= "9";
+}
+
+function isValueStartChar(char: string | undefined) {
+  if (!char) {
+    return false;
+  }
+
+  return (
+    char === "{" ||
+    char === "[" ||
+    char === '"' ||
+    char === "-" ||
+    isDigit(char) ||
+    char === "t" ||
+    char === "f" ||
+    char === "n"
+  );
+}
+
+function isValueEndChar(char: string | undefined) {
+  if (!char) {
+    return false;
+  }
+
+  return (
+    char === "}" ||
+    char === "]" ||
+    char === '"' ||
+    isDigit(char) ||
+    char === "e" ||
+    char === "E" ||
+    char === "l"
+  );
+}
+
+function insertMissingCommasByStructure(content: string) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  const stack: Array<"{" | "["> = [];
+
+  const lastNonWhitespaceChar = () => {
+    for (let index = result.length - 1; index >= 0; index -= 1) {
+      const char = result[index];
+      if (!/\s/.test(char)) {
+        return char;
+      }
+    }
+    return undefined;
+  };
+
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index];
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      if (inString) {
+        escaped = true;
+      }
+      continue;
+    }
+
+    if (!inString) {
+      const top = stack[stack.length - 1];
+      const previous = lastNonWhitespaceChar();
+      const needsCommaBeforeArrayValue =
+        top === "[" &&
+        isValueStartChar(char) &&
+        isValueEndChar(previous) &&
+        previous !== "," &&
+        previous !== "[" &&
+        previous !== ":";
+
+      if (needsCommaBeforeArrayValue) {
+        result += ",";
+      }
+
+      const needsCommaBeforeObjectKey =
+        top === "{" &&
+        char === '"' &&
+        isValueEndChar(previous) &&
+        previous !== "," &&
+        previous !== ":" &&
+        previous !== "{";
+
+      if (needsCommaBeforeObjectKey) {
+        result += ",";
+      }
+    }
+
+    result += char;
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      stack.push(char);
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      stack.pop();
+    }
+  }
+
+  return result;
+}
+
 function lightRepairJsonString(content: string) {
-  const repaired = content
+  const repaired = normalizeJsonPunctuationOutsideStrings(content)
     .replace(/^\uFEFF/, "")
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/[鈥溾€漖]/g, '"')
+    .replace(/[鈥樷€橾]/g, "'")
     .replace(/}\s*(?={)/g, "},")
     .replace(/]\s*(?=[{"])/g, "],")
     .replace(/"(\s*)(?=")/g, '",$1')
     .replace(/,\s*([}\]])/g, "$1");
 
-  return replaceIllegalJsonControlChars(repaired);
+  return replaceIllegalJsonControlChars(
+    insertMissingCommasByStructure(repaired),
+  );
 }
 
 function extractBalancedJsonObject(content: string) {

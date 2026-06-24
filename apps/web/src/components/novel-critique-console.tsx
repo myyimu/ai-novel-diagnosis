@@ -1068,7 +1068,11 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 			return;
 		}
 
-		if (bookJob.status === "succeeded" && !bookAnalysisResult) {
+		if (
+			(bookJob.status === "succeeded" ||
+				(bookJob.status === "failed" && Boolean(bookJob.partialResult))) &&
+			!bookAnalysisResult
+		) {
 			void openHistoryJob(bookJob.id, { silent: true, preserveLoading: true });
 		}
 	}, [bookAnalysisResult, bookJob?.id, bookJob?.status]);
@@ -1800,7 +1804,21 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				}
 
 				if (latestJob.status === "failed") {
-					throw new Error(latestJob.error || "整书拆解任务失败");
+					const failedJob = await readBookAnalysisJob(jobId, true);
+					setBookJob(failedJob);
+					if (failedJob.result) {
+						setBookAnalysisResult(failedJob.result);
+						updateBookAnalysisCacheByJobId(jobId, failedJob);
+						if (!options?.silent) {
+							setStatus(
+								failedJob.error
+									? `${failedJob.error} ???????/??????`
+									: "???????????????????????",
+							);
+						}
+						return failedJob;
+					}
+					throw new Error(latestJob.error || "????????");
 				}
 			}
 
@@ -2006,8 +2024,8 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 	}
 
 	async function exportBookResult(format: BookExportFormat, mode: BookExportMode) {
-		if (!bookJob?.id || bookJob.status !== "succeeded") {
-			setStatus("请先打开一个已完成的整书拆解任务。");
+		if (!bookJob?.id || !bookAnalysisResult) {
+			setStatus("?????????????????");
 			return;
 		}
 
@@ -2580,7 +2598,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 								<Button
 									variant={bookUtilityPanel === "exports" ? "default" : "outline"}
 									onClick={() => openBookUtility("exports")}
-									disabled={!bookJob || bookJob.status !== "succeeded"}
+									disabled={
+										!bookJob ||
+										(!bookAnalysisResult && bookJob.status !== "succeeded")
+									}
 								>
 									导出结果
 								</Button>
