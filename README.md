@@ -162,7 +162,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 关系图谱复核 -> 导出角色卡/世界书/续写包
 ```
 
-当前页面入口已经收敛：`/` 是第一章急诊室，`/critique` 是深度质检，`/model` 是 AI 设置，`/book` 是整书拆解与结果管理。`/workspace`、`/starter`、`/history`、`/export`、`/library` 保留为兼容路由，会回到首页或整书拆解页。
+当前页面入口已经收敛：`/` 是第一章诊断台，`/critique` 是深度质检，`/book` 是拆书图谱，`/library` 是样本研究，`/history` 是历史任务，`/export` 是导出资产，`/model` 是 AI 设置。`/workspace`、`/starter` 保留为兼容路由，会回到首页。
 
 ## 主要能力
 
@@ -302,7 +302,7 @@ API: http://127.0.0.1:3001/api/v1
 
 ## 工作区结构
 
-- `apps/web`: Next.js 控制台，主路径为急诊室、深度质检、AI 设置和整书拆解。
+- `apps/web`: Next.js 控制台，主路径为诊断台、深度质检、拆书图谱、样本研究、历史任务、导出资产和 AI 设置。
 - `services/api`: NestJS API，负责文本清洗、章节切分、异步任务、整书拆解和导出。
 - `packages/ai-core`: 共享类型、评分指标和分析契约。
 

@@ -22,32 +22,10 @@ import type {
 export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	{
 		id: "overview",
-		label: "急诊室",
+		label: "诊断台",
 		icon: LayoutDashboard,
 		title: "AI网文诊断台",
 		description: "别急着重写，先找出小说为什么没人追，再拿下一版改稿方案。",
-	},
-	{
-		id: "starter",
-		label: "爆款套路库",
-		icon: Sparkles,
-		title: "爆款开头套路库",
-		description: "进阶使用：从样本里提炼开头套路和可复用约束，不作为第一次使用入口。",
-	},
-	{
-		id: "library",
-		label: "样本研究",
-		icon: BookOpenCheck,
-		title: "样本研究",
-		description: "进阶使用：把已拆解样本变成可追溯的题材、卖点和开头判断。",
-	},
-	{
-		id: "provider",
-		label: "AI 设置",
-		icon: Settings,
-		title: "AI 设置",
-		description:
-			"选择用于分析小说的模型服务。可用共享站，也可以切换到自己的模型账号或本地模型。",
 	},
 	{
 		id: "chapter",
@@ -58,10 +36,17 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	},
 	{
 		id: "book",
-		label: "整书拆解",
+		label: "拆书图谱",
 		icon: Network,
-		title: "整书拆解",
-		description: "进阶使用：上传 TXT，拆解人物、故事线和可导出的写作资产。",
+		title: "AI拆书图谱",
+		description: "进阶使用：上传 TXT，拆角色、关系、时间线和可导出的写作资产。",
+	},
+	{
+		id: "library",
+		label: "样本研究",
+		icon: BookOpenCheck,
+		title: "样本研究",
+		description: "进阶使用：把已拆解样本变成可追溯的题材、卖点和开头判断。",
 	},
 	{
 		id: "history",
@@ -72,14 +57,37 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 	},
 	{
 		id: "exports",
-		label: "导出中心",
+		label: "导出资产",
 		icon: Download,
-		title: "导出中心",
+		title: "导出资产",
 		description: "选择学习笔记或原创化素材包，再下载报告、角色卡、世界书和避险清单。",
+	},
+	{
+		id: "provider",
+		label: "AI 设置",
+		icon: Settings,
+		title: "AI 设置",
+		description:
+			"选择用于分析小说的模型服务。可用共享站，也可以切换到自己的模型账号或本地模型。",
+	},
+	{
+		id: "starter",
+		label: "爆款套路库",
+		icon: Sparkles,
+		title: "爆款开头套路库",
+		description: "进阶使用：从样本里提炼开头套路和可复用约束，不作为第一次使用入口。",
 	},
 ];
 
-const primaryWorkspaceViews = new Set<WorkspaceView>(["overview", "chapter", "provider"]);
+const primaryWorkspaceViews = new Set<WorkspaceView>([
+	"overview",
+	"chapter",
+	"book",
+	"library",
+	"history",
+	"exports",
+	"provider",
+]);
 
 export function getWorkspaceNavItems() {
 	return workspaceViewItems.filter((item) => primaryWorkspaceViews.has(item.id));

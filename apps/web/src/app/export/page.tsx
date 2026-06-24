@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation";
+import { NovelCritiqueConsole } from "@/components/novel-critique-console";
 
 export default function ExportPage() {
-	redirect("/book");
+	return (
+		<main className="min-h-screen bg-background text-foreground">
+			<NovelCritiqueConsole view="exports" />
+		</main>
+	);
 }

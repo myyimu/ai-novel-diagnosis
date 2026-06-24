@@ -2105,7 +2105,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 							"预览章节切分",
 							"启动整书拆解任务",
 							"查看人物、世界观和时间线",
-							"去导出中心下载素材",
+							"去导出资产下载素材",
 						]}
 						note="整书文本通常太长，不能一次分析完。这里会先切成章节，再逐章分析，最后汇总成整书资料。"
 					/>

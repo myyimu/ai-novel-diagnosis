@@ -106,7 +106,7 @@ function ExportEmptyHint({ show, onOpenHistory }: { show: boolean; onOpenHistory
 		<section className="rounded-md border border-border bg-card p-5">
 			<h2 className="text-lg font-semibold">先打开一个已完成任务</h2>
 			<p className="mt-2 text-sm leading-6 text-muted-foreground">
-				导出中心依赖整书拆解结果。你可以先到历史任务打开一个已完成任务，或在整书拆解页完成新任务。完成后可导出报告、结构化数据、角色卡、世界书和避险清单。
+				导出资产依赖整书拆解结果。你可以先到历史任务打开一个已完成任务，或在整书拆解页完成新任务。完成后可导出报告、结构化数据、角色卡、世界书和避险清单。
 			</p>
 			<Button className="mt-4" variant="outline" onClick={onOpenHistory}>
 				去历史任务
@@ -226,7 +226,7 @@ function ExportCenter({
 			<div className="flex items-center gap-2">
 				<FileText className="size-5 text-primary" />
 				<h2 className="text-lg font-semibold">
-					导出中心
+					导出资产
 					<FieldHelp text="先选择导出模式，再选择格式。原作拆解笔记适合学习复盘；原创化导出会尽量抽象、去标识化，适合继续生成新书素材。" />
 				</h2>
 			</div>

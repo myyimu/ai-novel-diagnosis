@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation";
+import { NovelCritiqueConsole } from "@/components/novel-critique-console";
 
 export default function HistoryPage() {
-	redirect("/book");
+	return (
+		<main className="min-h-screen bg-background text-foreground">
+			<NovelCritiqueConsole view="history" />
+		</main>
+	);
 }
