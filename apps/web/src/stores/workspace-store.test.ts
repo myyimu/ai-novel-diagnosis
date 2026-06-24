@@ -4,6 +4,15 @@ import { mergeWorkspaceState, partializeWorkspaceState } from "./workspace-store
 
 function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceStoreState {
 	return {
+		projects: [
+			{
+				id: "default-project",
+				name: "默认项目",
+				createdAt: "2026-06-24T00:00:00.000Z",
+				updatedAt: "2026-06-24T00:00:00.000Z",
+			},
+		],
+		activeProjectId: "default-project",
 		provider: {
 			preset: "shared-gpu",
 			kind: "openai-compatible",
@@ -49,6 +58,8 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		chapterTitle: "",
 		chapterText: "",
 		quickReviewGenre: "",
+		quickReviewInputKind: "human-draft",
+		quickReviewPreviousPrompt: "",
 		rubricResult: null,
 		scoreResult: null,
 		quickReviewResult: null,
@@ -73,6 +84,8 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		rubricCache: [],
 		scoreCache: [],
 		bookAnalysisCache: [],
+		revisionSessions: [],
+		methodologyCards: [],
 		...overrides,
 	};
 }

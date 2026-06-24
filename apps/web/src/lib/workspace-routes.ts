@@ -1,5 +1,8 @@
 export type WorkspaceView =
 	| "overview"
+	| "dashboard"
+	| "methodology"
+	| "revisions"
 	| "starter"
 	| "library"
 	| "provider"
@@ -10,6 +13,9 @@ export type WorkspaceView =
 
 export const workspaceViewRoutes: Record<WorkspaceView, string> = {
 	overview: "/workspace",
+	dashboard: "/dashboard",
+	methodology: "/methodology",
+	revisions: "/revisions",
 	starter: "/starter",
 	library: "/library",
 	provider: "/model",

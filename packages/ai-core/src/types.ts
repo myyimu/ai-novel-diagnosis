@@ -200,9 +200,74 @@ export interface RecommendedPlatform {
   reason: string;
 }
 
+export type QuickReviewInputKind =
+  | "human-draft"
+  | "ai-draft"
+  | "idea"
+  | "outline"
+  | "prompt";
+
+export type GateDecision = "continue" | "revise" | "rebuild" | "discard";
+
+export type DiagnosisIssueSeverity = "critical" | "high" | "medium" | "low";
+
+export type DiagnosisIssueCategory =
+  | "opening"
+  | "hook"
+  | "character_goal"
+  | "conflict_pressure"
+  | "payoff"
+  | "pacing"
+  | "setting_load"
+  | "prose_ai_flavor"
+  | "prompt_constraint"
+  | "market_promise"
+  | "other";
+
+export interface DiagnosisEvidenceAnchor {
+  quote: string;
+  locationHint: string;
+  confidence: number;
+}
+
+export interface DiagnosisIssue {
+  id: string;
+  severity: DiagnosisIssueSeverity;
+  category: DiagnosisIssueCategory;
+  title: string;
+  description: string;
+  evidence: DiagnosisEvidenceAnchor[];
+  readerImpact: string;
+  fixAction: string;
+  promptConstraint: string;
+  blocksNextStep: boolean;
+}
+
+export interface MethodologyCard {
+  id: string;
+  sourceIssueId: string;
+  type:
+    | "opening_rule"
+    | "prompt_rule"
+    | "pacing_rule"
+    | "hook_rule"
+    | "payoff_rule"
+    | "anti_pattern";
+  title: string;
+  triggerProblem: string;
+  reusableRule: string;
+  selfCheckQuestion: string;
+  promptTemplate?: string;
+  exampleBefore?: string;
+  exampleAfter?: string;
+  createdAt?: string;
+  usageCount?: number;
+}
+
 export interface QuickReviewResult {
   title: string;
   genre: string;
+  inputKind?: QuickReviewInputKind;
   positioning: string;
   sellingPoints: string[];
   mainProblem: string;
@@ -212,6 +277,35 @@ export interface QuickReviewResult {
   readyReason: string;
   quickScore: number;
   confidence: number;
+  gateDecision?: GateDecision;
+  gateReason?: string;
+  oneLineDiagnosis?: string;
+  issues?: DiagnosisIssue[];
+  strengths?: Array<{
+    title: string;
+    evidence?: string;
+    keepAction: string;
+  }>;
+  revisionPlan?: {
+    priorityIssueIds: string[];
+    keep: string[];
+    change: string[];
+    avoid: string[];
+    checkpoints: string[];
+  };
+  promptDiagnosis?: {
+    originalPrompt?: string;
+    missingConstraints: string[];
+    vagueInstructions: string[];
+    improvedPromptPrinciples: string[];
+  };
+  nextPrompt?: {
+    title: string;
+    prompt: string;
+    linkedIssueIds: string[];
+    whyThisWorks: string[];
+  };
+  methodologyCards?: MethodologyCard[];
 }
 
 export interface MetricScore {

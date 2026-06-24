@@ -32,6 +32,111 @@ const recommendedPlatformSchema = objectSchema({
   reason: stringSchema,
 });
 
+const evidenceAnchorSchema = objectSchema({
+  quote: stringSchema,
+  locationHint: stringSchema,
+  confidence: numberSchema,
+});
+
+const diagnosisIssueSchema = objectSchema({
+  id: stringSchema,
+  severity: {
+    type: "string",
+    enum: ["critical", "high", "medium", "low"],
+  },
+  category: {
+    type: "string",
+    enum: [
+      "opening",
+      "hook",
+      "character_goal",
+      "conflict_pressure",
+      "payoff",
+      "pacing",
+      "setting_load",
+      "prose_ai_flavor",
+      "prompt_constraint",
+      "market_promise",
+      "other",
+    ],
+  },
+  title: stringSchema,
+  description: stringSchema,
+  evidence: arraySchema(evidenceAnchorSchema),
+  readerImpact: stringSchema,
+  fixAction: stringSchema,
+  promptConstraint: stringSchema,
+  blocksNextStep: booleanSchema,
+});
+
+const strengthSchema = objectSchema(
+  {
+    title: stringSchema,
+    evidence: stringSchema,
+    keepAction: stringSchema,
+  },
+  ["title", "keepAction"],
+);
+
+const revisionPlanSchema = objectSchema({
+  priorityIssueIds: stringArraySchema,
+  keep: stringArraySchema,
+  change: stringArraySchema,
+  avoid: stringArraySchema,
+  checkpoints: stringArraySchema,
+});
+
+const promptDiagnosisSchema = objectSchema(
+  {
+    originalPrompt: stringSchema,
+    missingConstraints: stringArraySchema,
+    vagueInstructions: stringArraySchema,
+    improvedPromptPrinciples: stringArraySchema,
+  },
+  ["missingConstraints", "vagueInstructions", "improvedPromptPrinciples"],
+);
+
+const nextPromptSchema = objectSchema({
+  title: stringSchema,
+  prompt: stringSchema,
+  linkedIssueIds: stringArraySchema,
+  whyThisWorks: stringArraySchema,
+});
+
+const methodologyCardSchema = objectSchema(
+  {
+    id: stringSchema,
+    sourceIssueId: stringSchema,
+    type: {
+      type: "string",
+      enum: [
+        "opening_rule",
+        "prompt_rule",
+        "pacing_rule",
+        "hook_rule",
+        "payoff_rule",
+        "anti_pattern",
+      ],
+    },
+    title: stringSchema,
+    triggerProblem: stringSchema,
+    reusableRule: stringSchema,
+    selfCheckQuestion: stringSchema,
+    promptTemplate: stringSchema,
+    exampleBefore: stringSchema,
+    exampleAfter: stringSchema,
+  },
+  [
+    "id",
+    "sourceIssueId",
+    "type",
+    "title",
+    "triggerProblem",
+    "reusableRule",
+    "selfCheckQuestion",
+  ],
+);
+
 export const quickReviewJsonSchema = objectSchema({
   title: stringSchema,
   genre: {
@@ -45,6 +150,10 @@ export const quickReviewJsonSchema = objectSchema({
       "other",
     ],
   },
+  inputKind: {
+    type: "string",
+    enum: ["human-draft", "ai-draft", "idea", "outline", "prompt"],
+  },
   positioning: stringSchema,
   sellingPoints: stringArraySchema,
   mainProblem: stringSchema,
@@ -54,6 +163,18 @@ export const quickReviewJsonSchema = objectSchema({
   readyReason: stringSchema,
   quickScore: numberSchema,
   confidence: numberSchema,
+  gateDecision: {
+    type: "string",
+    enum: ["continue", "revise", "rebuild", "discard"],
+  },
+  gateReason: stringSchema,
+  oneLineDiagnosis: stringSchema,
+  issues: arraySchema(diagnosisIssueSchema),
+  strengths: arraySchema(strengthSchema),
+  revisionPlan: revisionPlanSchema,
+  promptDiagnosis: promptDiagnosisSchema,
+  nextPrompt: nextPromptSchema,
+  methodologyCards: arraySchema(methodologyCardSchema),
 });
 
 export const referenceProfileJsonSchema = objectSchema({

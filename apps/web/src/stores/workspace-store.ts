@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
+	MethodologyCard,
 	ProviderKind,
 	ProviderPresetId,
+	QuickReviewInputKind,
 	QuickReviewResult,
 	RubricMetric,
 	RubricResult,
@@ -10,8 +12,10 @@ import type {
 } from "@ai-novel-diagnosis/ai-core";
 
 export type {
+	MethodologyCard,
 	ProviderKind,
 	ProviderPresetId,
+	QuickReviewInputKind,
 	QuickReviewResult,
 	RubricMetric,
 	RubricResult,
@@ -673,7 +677,46 @@ export interface CachedBookAnalysis {
 	result: BookAnalysisResult | null;
 }
 
+export interface WorkspaceProject {
+	id: string;
+	name: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface RevisionSession {
+	id: string;
+	projectId?: string;
+	createdAt: string;
+	chapterTitle: string;
+	genre: string;
+	inputKind: QuickReviewInputKind;
+	textHash: string;
+	textLength: number;
+	quickScore: number;
+	gateDecision: QuickReviewResult["gateDecision"];
+	mainProblem: string;
+	issueTitles: string[];
+	issueCategories?: string[];
+	nextPrompt?: string;
+	revisionNote?: string;
+	revisionNoteUpdatedAt?: string;
+	methodologyCardIds: string[];
+}
+
+export interface ProjectMethodologyCard extends MethodologyCard {
+	projectCardId: string;
+	projectId?: string;
+	firstSeenAt: string;
+	lastSeenAt: string;
+	sourceChapterTitle: string;
+	sourceIssueTitle?: string;
+	occurrenceCount: number;
+}
+
 export interface WorkspaceStoreState {
+	projects: WorkspaceProject[];
+	activeProjectId: string;
 	provider: ProviderForm;
 	referenceTitle: string;
 	genre: string;
@@ -711,6 +754,8 @@ export interface WorkspaceStoreState {
 	chapterTitle: string;
 	chapterText: string;
 	quickReviewGenre: string;
+	quickReviewInputKind: QuickReviewInputKind;
+	quickReviewPreviousPrompt: string;
 	rubricResult: RubricResult | null;
 	scoreResult: ScoreResult | null;
 	quickReviewResult: QuickReviewResult | null;
@@ -735,9 +780,13 @@ export interface WorkspaceStoreState {
 	rubricCache: CachedRubricResult[];
 	scoreCache: CachedScoreResult[];
 	bookAnalysisCache: CachedBookAnalysis[];
+	revisionSessions: RevisionSession[];
+	methodologyCards: ProjectMethodologyCard[];
 }
 
 interface WorkspaceStoreActions {
+	setProjects: StoreSetter<WorkspaceProject[]>;
+	setActiveProjectId: StoreSetter<string>;
 	setProvider: StoreSetter<ProviderForm>;
 	setReferenceTitle: StoreSetter<string>;
 	setGenre: StoreSetter<string>;
@@ -775,6 +824,8 @@ interface WorkspaceStoreActions {
 	setChapterTitle: StoreSetter<string>;
 	setChapterText: StoreSetter<string>;
 	setQuickReviewGenre: StoreSetter<string>;
+	setQuickReviewInputKind: StoreSetter<QuickReviewInputKind>;
+	setQuickReviewPreviousPrompt: StoreSetter<string>;
 	setRubricResult: StoreSetter<RubricResult | null>;
 	setScoreResult: StoreSetter<ScoreResult | null>;
 	setQuickReviewResult: StoreSetter<QuickReviewResult | null>;
@@ -799,11 +850,22 @@ interface WorkspaceStoreActions {
 	setRubricCache: StoreSetter<CachedRubricResult[]>;
 	setScoreCache: StoreSetter<CachedScoreResult[]>;
 	setBookAnalysisCache: StoreSetter<CachedBookAnalysis[]>;
+	setRevisionSessions: StoreSetter<RevisionSession[]>;
+	setMethodologyCards: StoreSetter<ProjectMethodologyCard[]>;
 }
 
 export type WorkspaceStore = WorkspaceStoreState & WorkspaceStoreActions;
 
+export const defaultWorkspaceProject: WorkspaceProject = {
+	id: "default-project",
+	name: "默认项目",
+	createdAt: "2026-06-24T00:00:00.000Z",
+	updatedAt: "2026-06-24T00:00:00.000Z",
+};
+
 const initialWorkspaceState: WorkspaceStoreState = {
+	projects: [defaultWorkspaceProject],
+	activeProjectId: defaultWorkspaceProject.id,
 	provider: defaultProvider,
 	referenceTitle: "",
 	genre: "xuanhuan",
@@ -841,6 +903,8 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	chapterTitle: "",
 	chapterText: "",
 	quickReviewGenre: "",
+	quickReviewInputKind: "human-draft",
+	quickReviewPreviousPrompt: "",
 	rubricResult: null,
 	scoreResult: null,
 	quickReviewResult: null,
@@ -865,11 +929,15 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	rubricCache: [],
 	scoreCache: [],
 	bookAnalysisCache: [],
+	revisionSessions: [],
+	methodologyCards: [],
 };
 
 const localSettingsStorageKey = "ai-novel-diagnosis-local-settings";
 
 const persistableWorkspaceKeys = [
+	"projects",
+	"activeProjectId",
 	"provider",
 	"referenceTitle",
 	"genre",
@@ -907,6 +975,8 @@ const persistableWorkspaceKeys = [
 	"chapterTitle",
 	"chapterText",
 	"quickReviewGenre",
+	"quickReviewInputKind",
+	"quickReviewPreviousPrompt",
 	"rubricResult",
 	"scoreResult",
 	"quickReviewResult",
@@ -922,6 +992,8 @@ const persistableWorkspaceKeys = [
 	"rubricCache",
 	"scoreCache",
 	"bookAnalysisCache",
+	"revisionSessions",
+	"methodologyCards",
 ] as const satisfies Array<keyof WorkspaceStoreState>;
 
 type PersistedWorkspaceState = Pick<WorkspaceStoreState, (typeof persistableWorkspaceKeys)[number]>;
@@ -987,10 +1059,20 @@ export function mergeWorkspaceState(
 		persistedProvider && allowedPresets.includes(persistedProvider.preset)
 			? persistedProvider
 			: currentState.provider;
+	const projects = Array.isArray(persisted.projects) && persisted.projects.length
+		? persisted.projects
+		: currentState.projects;
+	const activeProjectId =
+		typeof persisted.activeProjectId === "string" &&
+		projects.some((project) => project.id === persisted.activeProjectId)
+			? persisted.activeProjectId
+			: projects[0]?.id || defaultWorkspaceProject.id;
 
 	return {
 		...currentState,
 		...persisted,
+		projects,
+		activeProjectId,
 		provider: safeProvider
 			? {
 					...currentState.provider,
@@ -1015,6 +1097,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
 			return {
 				...initialWorkspaceState,
+				setProjects: makeSetter("projects"),
+				setActiveProjectId: makeSetter("activeProjectId"),
 				setProvider: makeSetter("provider"),
 				setReferenceTitle: makeSetter("referenceTitle"),
 				setGenre: makeSetter("genre"),
@@ -1052,6 +1136,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setChapterTitle: makeSetter("chapterTitle"),
 				setChapterText: makeSetter("chapterText"),
 				setQuickReviewGenre: makeSetter("quickReviewGenre"),
+				setQuickReviewInputKind: makeSetter("quickReviewInputKind"),
+				setQuickReviewPreviousPrompt: makeSetter("quickReviewPreviousPrompt"),
 				setRubricResult: makeSetter("rubricResult"),
 				setScoreResult: makeSetter("scoreResult"),
 				setQuickReviewResult: makeSetter("quickReviewResult"),
@@ -1076,6 +1162,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setRubricCache: makeSetter("rubricCache"),
 				setScoreCache: makeSetter("scoreCache"),
 				setBookAnalysisCache: makeSetter("bookAnalysisCache"),
+				setRevisionSessions: makeSetter("revisionSessions"),
+				setMethodologyCards: makeSetter("methodologyCards"),
 			};
 		},
 		{

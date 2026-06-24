@@ -5,11 +5,11 @@
 [![CI - workspace](https://github.com/myyimu/ai-novel-diagnosis/actions/workflows/ci.yml/badge.svg)](https://github.com/myyimu/ai-novel-diagnosis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-别急着让 AI 重写，先找出小说为什么没人追。
+别急着让 AI 重写，先诊断这稿为什么没人追。
 
-AI网文诊断台是本地 AI 小说诊断与 AI 拆书工具。它不是一键写小说工具，而是帮作者回答：我的小说哪里不好，为什么没有流量，读者为什么第一章就走？
+AI网文诊断台是本地 AI 小说诊断、改稿复诊与 Prompt 迭代工具。它不是一键写小说工具，而是帮作者回答：这篇稿子哪里不好，为什么没有流量，读者为什么第一章就走？
 
-粘贴第一章，它会定位最大流失点，用正文证据解释问题，给出修改优先级，并生成能直接复制给写作 AI 的改稿 Prompt。改完后再贴回来复诊，看问题是不是真的被解决。
+粘贴第一章或 AI 生成初稿，它会定位最大流失点，用正文证据解释问题，给出修改优先级，并生成能直接复制给写作 AI 的改稿 Prompt。改完后再贴回来复诊，看问题是不是真的被解决。
 
 进阶时，它还能做 AI 拆书：拆角色、关系、世界观、时间线和写作结构，帮你学习成熟作品怎么留住读者，而不是照搬内容。
 
@@ -44,6 +44,7 @@ API: http://127.0.0.1:3001/api/v1
 - 一份小说诊断解释：把“为什么没流量、为什么没人追读”拆成可修改的文本问题。
 - 一份可复制的改稿 Prompt：不是泛泛点评，而是能交给写作 AI 继续改的任务说明。
 - 一次复诊对比：改稿前后重新跑，判断这次修改有没有真正解决问题。
+- 一批可沉淀的方法论卡片：把反复出现的问题变成自查规则和 Prompt 规则。
 - 一套进阶资产：成熟样本 Rubric、整书角色/世界观拆解、关系图谱、时间线和导出包。
 
 ## 为什么不用一键写小说工具内置评审
@@ -56,7 +57,7 @@ API: http://127.0.0.1:3001/api/v1
 | 审稿常给泛泛建议 | 诊断绑定正文证据 |
 | 容易直接替你重写 | 先解释病因，再给改稿 Prompt |
 | 改前改后难对比 | 支持复诊闭环 |
-| 偏单次输出 | 沉淀 Rubric、关系图谱、世界书和导出资产 |
+| 偏单次输出 | 沉淀复诊记录、方法论卡片、Rubric 和进阶资产 |
 
 一句话区别：
 
@@ -71,6 +72,14 @@ API: http://127.0.0.1:3001/api/v1
 ```text
 问题 -> 正文证据 -> 读者反应 -> 修改优先级 -> 改稿 Prompt -> 复诊检查点
 ```
+
+后续诊断结果会继续向结构化 issue 和 Gate 判断升级：
+
+```text
+issue -> severity -> category -> evidence -> reader impact -> fix action -> gate decision
+```
+
+Gate 只表示当前稿件的改稿优先级建议，例如继续、修改、重构或废稿；它不是平台流量预测。
 
 它重点检查：
 
@@ -131,10 +140,12 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 适合：
 
 - 刚写完第一章，但不确定读者为什么会弃文的网文新手。
+- 用 AI 生成了初稿，但不知道为什么读起来平、假、没钩子的作者。
 - 想知道自己的小说哪里不好、为什么没流量、为什么没有追读的作者。
 - 想把 AI 点评变成可执行改稿任务，而不是只得到“节奏慢、描写弱”的作者。
+- 想把反复出现的问题沉淀成个人写作方法论和 Prompt 规则的作者。
 - 想学习成熟样本怎么兑现题材承诺、人物关系和爽点节奏的作者。
-- 想把整本 TXT 拆成角色卡、世界书、关系图谱、时间线和写作资产的创作者。
+- 想把整本 TXT 拆成角色卡、世界书、关系图谱、时间线和写作资产的作者。
 
 不适合：
 
@@ -150,6 +161,12 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 粘贴第一章 -> 运行改稿急诊 -> 查看最大流失点 -> 复制改稿 Prompt -> 改完再复诊
 ```
 
+如果稿子来自 AI，可以额外补上上一条 Prompt：
+
+```text
+粘贴 AI 初稿 + 上一条 Prompt -> 诊断正文问题和 Prompt 缺口 -> 生成下一轮改稿 Prompt -> 改完复诊
+```
+
 当你需要更细的判断时，再进入高级质检：
 
 ```text
@@ -162,7 +179,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 关系图谱复核 -> 导出角色卡/世界书/续写包
 ```
 
-当前页面入口已经收敛：`/` 是第一章诊断台，`/critique` 是深度质检，`/book` 是拆书图谱，`/library` 是样本研究，`/history` 是历史任务，`/export` 是导出资产，`/model` 是 AI 设置。`/workspace`、`/starter` 保留为兼容路由，会回到首页。
+当前页面入口已经收敛：`/` 是第一章诊断台，`/dashboard` 是诊断看板，`/methodology` 是方法论库，`/revisions` 是复诊历史，`/critique` 是深度质检，`/book` 是拆书图谱，`/library` 是样本研究，`/history` 是历史任务，`/export` 是导出资产，`/model` 是 AI 设置。`/workspace`、`/starter` 保留为兼容路由，会回到首页。
 
 ## 主要能力
 
@@ -171,6 +188,18 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 - 只粘贴自己的第一章，就能得到定位、卖点、最大流失点、三条改法和改稿 Prompt。
 - 改完后可以再次复诊，对比 quickScore 和问题变化。
 - 不强迫先填平台画像、成熟样本或复杂参数。
+
+AI 生成稿诊断与 Prompt 迭代：
+
+- 支持把 AI 初稿和上一条 Prompt 一起纳入诊断，判断问题来自正文执行、结构承诺还是 Prompt 约束不足。
+- 诊断结果会逐步升级为结构化 issue，绑定证据、读者影响、改稿动作和 Prompt 约束。
+- Dashboard 会展示常见问题、复诊改善趋势、Gate 分布和 Prompt 有效率推断。
+
+作者方法论沉淀：
+
+- 把反复出现的问题沉淀成开头规则、节奏规则、爽点规则、Prompt 规则和反面清单。
+- 方法论库不是历史任务列表，而是作者下次改稿前能复用的自查系统。
+- 复诊历史和方法论库可导出当前项目 Markdown 包，沉淀人工备注、问题轨迹和可复用 Prompt 模板。
 
 深度章节质检：
 
@@ -381,6 +410,8 @@ pnpm run doctor
 ## 当前限制
 
 - 这是 Alpha / MVP，不保证 AI 拆解和评分完全准确。
+- Gate、Prompt 有效率和复诊改善只能作为改稿优先级参考，不代表平台流量预测。
+- 复诊历史、作者方法论库、诊断 Dashboard 和项目导出包已具备前端闭环，但仍以浏览器本地状态为主，后端持久化见 [诊断工作流化改造计划](./docs/diagnosis-workflow-implementation-plan.md)。
 - 中间结果已经留存，失败或中断后的继续拆解已有基础入口；更细的半成品导出和跨会话复核持久化仍在迭代。
 - 关系图谱支持本地人工修正和导出记录，但修正记录暂未做独立数据库持久化。
 - 真实 PostgreSQL 部署时，如果 schema 有变化，需要运行 `pnpm --filter api db:push` 或生成迁移。
@@ -398,6 +429,8 @@ pnpm run doctor
 - 开源协议：MIT，见 [LICENSE](./LICENSE)。
 - 代码仓库：[github.com/myyimu/ai-novel-diagnosis](https://github.com/myyimu/ai-novel-diagnosis)
 - 联系方式：[xiaoke5211@gmail.com](mailto:xiaoke5211@gmail.com)
+- 产品定位与 AI 生成稿质检方向文档：见 [docs/product-positioning-ai-draft-diagnosis.md](./docs/product-positioning-ai-draft-diagnosis.md)。
+- 诊断工作流化改造计划：见 [docs/diagnosis-workflow-implementation-plan.md](./docs/diagnosis-workflow-implementation-plan.md)。
 - 产品评审与迭代规划：见 [docs/product-review-roadmap.md](./docs/product-review-roadmap.md)。
 - 贡献说明：见 [CONTRIBUTING.md](./CONTRIBUTING.md)
 - 安全策略：见 [SECURITY.md](./SECURITY.md)

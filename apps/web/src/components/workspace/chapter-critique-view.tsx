@@ -19,8 +19,11 @@ import { QuickExperiencePanel } from "@/components/workspace/quick-experience-pa
 import {
 	aiSelfTests,
 	type AiSelfTestId,
+	type ProjectMethodologyCard,
+	type QuickReviewInputKind,
 	type ReferenceProfileProgressItem,
 	type QuickReviewResult,
+	type RevisionSession,
 	type RubricResult,
 	type ScoreProgressItem,
 	type ScoreProgressStatus,
@@ -65,10 +68,16 @@ export interface ChapterCritiqueViewProps {
 	quickReviewResult: QuickReviewResult | null;
 	previousQuickReviewResult?: QuickReviewResult | null;
 	quickReviewGenre: string;
+	quickReviewInputKind: QuickReviewInputKind;
+	quickReviewPreviousPrompt: string;
+	revisionSessions: RevisionSession[];
+	methodologyCards: ProjectMethodologyCard[];
 	importReferenceFile: (event: ChangeEvent<HTMLInputElement>) => void;
 	onInferReferenceProfile: (text: string, fileName?: string) => void;
 	onReferenceTextChange: (value: string) => void;
 	onQuickReviewGenreChange: (value: string) => void;
+	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
+	onQuickReviewPreviousPromptChange: (value: string) => void;
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
@@ -263,10 +272,16 @@ export function ChapterCritiqueView({
 	quickReviewResult,
 	previousQuickReviewResult,
 	quickReviewGenre,
+	quickReviewInputKind,
+	quickReviewPreviousPrompt,
+	revisionSessions,
+	methodologyCards,
 	importReferenceFile,
 	onInferReferenceProfile,
 	onReferenceTextChange,
 	onQuickReviewGenreChange,
+	onQuickReviewInputKindChange,
+	onQuickReviewPreviousPromptChange,
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
@@ -525,8 +540,14 @@ export function ChapterCritiqueView({
 				quickReviewResult={quickReviewResult}
 				previousQuickReviewResult={previousQuickReviewResult}
 				quickReviewGenre={quickReviewGenre}
+				quickReviewInputKind={quickReviewInputKind}
+				quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+				revisionSessions={revisionSessions}
+				methodologyCards={methodologyCards}
 				onChapterTextChange={(value) => onChapterDraftChange({ chapterText: value })}
 				onQuickReviewGenreChange={onQuickReviewGenreChange}
+				onQuickReviewInputKindChange={onQuickReviewInputKindChange}
+				onQuickReviewPreviousPromptChange={onQuickReviewPreviousPromptChange}
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}

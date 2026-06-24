@@ -6,6 +6,7 @@ import type {
 	CachedRubricResult,
 	CachedScoreResult,
 	ProviderForm,
+	QuickReviewInputKind,
 	QuickReviewResult,
 	RubricResult,
 	ScoreResult,
@@ -36,17 +37,23 @@ export function buildProviderCacheFingerprint(provider: ProviderForm) {
 export function buildQuickReviewCacheKey({
 	provider,
 	quickReviewGenre,
+	quickReviewInputKind,
+	quickReviewPreviousPrompt,
 	chapterTitle,
 	chapterText,
 }: {
 	provider: ProviderForm;
 	quickReviewGenre: string;
+	quickReviewInputKind?: QuickReviewInputKind;
+	quickReviewPreviousPrompt?: string;
 	chapterTitle: string;
 	chapterText: string;
 }) {
 	return [
 		buildProviderCacheFingerprint(provider),
 		quickReviewGenre || "auto",
+		quickReviewInputKind || "human-draft",
+		hashString((quickReviewPreviousPrompt || "").trim()),
 		chapterTitle.trim(),
 		hashString(chapterText.trim()),
 	].join("|");

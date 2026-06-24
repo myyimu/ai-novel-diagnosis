@@ -4,6 +4,7 @@ import type {
 	BookUploadPreview,
 	PersistedResearchLibrary,
 	ProviderForm,
+	QuickReviewInputKind,
 	QuickReviewResult,
 	ResearchComparisonResult,
 	ResearchQaResult,
@@ -294,11 +295,15 @@ export function requestQuickReview({
 	chapterText,
 	chapterTitle,
 	quickReviewGenre,
+	quickReviewInputKind,
+	quickReviewPreviousPrompt,
 }: {
 	provider: ProviderForm;
 	chapterText: string;
 	chapterTitle: string;
 	quickReviewGenre: string;
+	quickReviewInputKind?: QuickReviewInputKind;
+	quickReviewPreviousPrompt?: string;
 }) {
 	const compactedChapterText = compactChapterText(chapterText);
 
@@ -307,6 +312,8 @@ export function requestQuickReview({
 		chapterText: compactedChapterText,
 		title: chapterTitle || undefined,
 		genre: quickReviewGenre || undefined,
+		inputKind: quickReviewInputKind || undefined,
+		previousPrompt: quickReviewPreviousPrompt?.trim() || undefined,
 	});
 }
 

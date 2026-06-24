@@ -1,9 +1,12 @@
 import {
+	BarChart3,
 	BookOpenCheck,
 	Download,
 	FileText,
 	History,
 	LayoutDashboard,
+	Layers3,
+	ListRestart,
 	Network,
 	Settings,
 	Sparkles,
@@ -26,6 +29,27 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 		icon: LayoutDashboard,
 		title: "AI网文诊断台",
 		description: "别急着重写，先找出小说为什么没人追，再拿下一版改稿方案。",
+	},
+	{
+		id: "dashboard",
+		label: "诊断看板",
+		icon: BarChart3,
+		title: "诊断 Dashboard",
+		description: "查看质量趋势、Prompt 有效率、常见问题和方法论沉淀。",
+	},
+	{
+		id: "methodology",
+		label: "方法论库",
+		icon: Layers3,
+		title: "项目方法论库",
+		description: "把反复出现的问题沉淀成自查规则、改稿约束和可复用 Prompt 模板。",
+	},
+	{
+		id: "revisions",
+		label: "复诊记录",
+		icon: ListRestart,
+		title: "项目复诊记录",
+		description: "回看当前项目每一次复诊、相邻版本变化和当时生成的下一轮 Prompt。",
 	},
 	{
 		id: "chapter",
@@ -81,6 +105,9 @@ export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
 
 const primaryWorkspaceViews = new Set<WorkspaceView>([
 	"overview",
+	"dashboard",
+	"methodology",
+	"revisions",
 	"chapter",
 	"book",
 	"library",

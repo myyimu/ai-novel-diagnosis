@@ -12,8 +12,14 @@ describe("QuickExperiencePanel", () => {
 				elapsedSeconds={0}
 				quickReviewResult={null}
 				quickReviewGenre=""
+				quickReviewInputKind="human-draft"
+				quickReviewPreviousPrompt=""
+				revisionSessions={[]}
+				methodologyCards={[]}
 				onChapterTextChange={vi.fn()}
 				onQuickReviewGenreChange={vi.fn()}
+				onQuickReviewInputKindChange={vi.fn()}
+				onQuickReviewPreviousPromptChange={vi.fn()}
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}
@@ -70,8 +76,44 @@ describe("QuickExperiencePanel", () => {
 					confidence: 0.75,
 				}}
 				quickReviewGenre=""
+				quickReviewInputKind="ai-draft"
+				quickReviewPreviousPrompt="写一个退婚流爽文第一章。"
+				revisionSessions={[
+					{
+						id: "revision-1",
+						createdAt: "2026-06-24T00:00:00.000Z",
+						chapterTitle: "第一章 退婚",
+						genre: "xuanhuan",
+						inputKind: "ai-draft",
+						textHash: "hash",
+						textLength: 120,
+						quickScore: 6.5,
+						gateDecision: "revise",
+						mainProblem: "冲突压力不足",
+						issueTitles: ["冲突压力不足"],
+						methodologyCardIds: ["method-1"],
+					},
+				]}
+				methodologyCards={[
+					{
+						id: "method-1",
+						projectCardId: "method-1",
+						sourceIssueId: "issue-1",
+						type: "hook_rule",
+						title: "钩子必须绑定代价",
+						triggerProblem: "冲突压力不足",
+						reusableRule: "章末钩子要让读者看到不追就错过的代价。",
+						selfCheckQuestion: "读者知道下一章非看不可的原因吗？",
+						firstSeenAt: "2026-06-24T00:00:00.000Z",
+						lastSeenAt: "2026-06-24T00:00:00.000Z",
+						sourceChapterTitle: "第一章 退婚",
+						occurrenceCount: 1,
+					},
+				]}
 				onChapterTextChange={vi.fn()}
 				onQuickReviewGenreChange={vi.fn()}
+				onQuickReviewInputKindChange={vi.fn()}
+				onQuickReviewPreviousPromptChange={vi.fn()}
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={true}
@@ -90,6 +132,8 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("可复制给写作 AI 的改稿 Prompt");
 		expect(html).toContain("请帮我改写这一章");
 		expect(html).toContain("改稿后复诊对比");
+		expect(html).toContain("项目迭代资产");
+		expect(html).toContain("钩子必须绑定代价");
 		expect(html).toContain("5.2");
 		expect(html).toContain("6.5");
 		expect(html).toContain("从“失败代价不清楚”变为“冲突压力不足”。");
@@ -114,8 +158,14 @@ describe("QuickExperiencePanel", () => {
 					} as never
 				}
 				quickReviewGenre=""
+				quickReviewInputKind="human-draft"
+				quickReviewPreviousPrompt=""
+				revisionSessions={[]}
+				methodologyCards={[]}
 				onChapterTextChange={vi.fn()}
 				onQuickReviewGenreChange={vi.fn()}
+				onQuickReviewInputKindChange={vi.fn()}
+				onQuickReviewPreviousPromptChange={vi.fn()}
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}
@@ -142,8 +192,14 @@ describe("QuickExperiencePanel", () => {
 				elapsedSeconds={21}
 				quickReviewResult={null}
 				quickReviewGenre=""
+				quickReviewInputKind="human-draft"
+				quickReviewPreviousPrompt=""
+				revisionSessions={[]}
+				methodologyCards={[]}
 				onChapterTextChange={vi.fn()}
 				onQuickReviewGenreChange={vi.fn()}
+				onQuickReviewInputKindChange={vi.fn()}
+				onQuickReviewPreviousPromptChange={vi.fn()}
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}

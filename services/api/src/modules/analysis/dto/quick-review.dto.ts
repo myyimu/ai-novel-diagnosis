@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsOptional,
+  IsIn,
   IsString,
   MaxLength,
   MinLength,
@@ -10,6 +11,17 @@ import {
 import { ProviderConfigDto } from "./provider-config.dto";
 
 export class QuickReviewDto {
+  @ApiPropertyOptional({
+    description:
+      "Input source kind. Defaults to human-draft for backwards compatibility.",
+    enum: ["human-draft", "ai-draft", "idea", "outline", "prompt"],
+    example: "ai-draft",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(["human-draft", "ai-draft", "idea", "outline", "prompt"])
+  inputKind?: "human-draft" | "ai-draft" | "idea" | "outline" | "prompt";
+
   @ApiPropertyOptional({
     description: "Chapter title. If omitted, the LLM infers one.",
     example: "第一章 退婚之后",
@@ -36,6 +48,16 @@ export class QuickReviewDto {
   @MinLength(50)
   @MaxLength(30000)
   chapterText!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "The previous writing prompt, useful when chapterText is AI-generated.",
+    example: "请写一个玄幻退婚流开头，主角要被羞辱后反击。",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(8000)
+  previousPrompt?: string;
 
   @ApiPropertyOptional({
     description:

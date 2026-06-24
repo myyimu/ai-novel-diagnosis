@@ -3,7 +3,13 @@
 import { CheckCircle2, Clipboard, Loader2, Target } from "lucide-react";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
-import type { QuickReviewResult } from "@/stores/workspace-store";
+import { summarizeRevisionTrend } from "@/lib/workspace-iteration";
+import type {
+	ProjectMethodologyCard,
+	QuickReviewInputKind,
+	QuickReviewResult,
+	RevisionSession,
+} from "@/stores/workspace-store";
 
 export function QuickExperiencePanel({
 	chapterText,
@@ -13,8 +19,14 @@ export function QuickExperiencePanel({
 	quickReviewResult,
 	previousQuickReviewResult,
 	quickReviewGenre,
+	quickReviewInputKind,
+	quickReviewPreviousPrompt,
+	revisionSessions,
+	methodologyCards: projectMethodologyCards,
 	onChapterTextChange,
 	onQuickReviewGenreChange,
+	onQuickReviewInputKindChange,
+	onQuickReviewPreviousPromptChange,
 	onRun,
 	onRerun,
 	hasCachedResult,
@@ -30,8 +42,14 @@ export function QuickExperiencePanel({
 	quickReviewResult: QuickReviewResult | null;
 	previousQuickReviewResult?: QuickReviewResult | null;
 	quickReviewGenre: string;
+	quickReviewInputKind: QuickReviewInputKind;
+	quickReviewPreviousPrompt: string;
+	revisionSessions: RevisionSession[];
+	methodologyCards: ProjectMethodologyCard[];
 	onChapterTextChange: (value: string) => void;
 	onQuickReviewGenreChange: (value: string) => void;
+	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
+	onQuickReviewPreviousPromptChange: (value: string) => void;
 	onRun: () => void;
 	onRerun: () => void;
 	hasCachedResult: boolean;
@@ -51,6 +69,13 @@ export function QuickExperiencePanel({
 				(platform) => platform && platform.label && platform.reason,
 			)
 		: [];
+	const issues = Array.isArray(quickReviewResult?.issues)
+		? quickReviewResult.issues.filter((issue) => issue && issue.title)
+		: [];
+	const methodologyCards = Array.isArray(quickReviewResult?.methodologyCards)
+		? quickReviewResult.methodologyCards.filter((card) => card && card.title)
+		: [];
+	const gate = buildGateView(quickReviewResult);
 	const quickScore =
 		typeof quickReviewResult?.quickScore === "number"
 			? `${quickReviewResult.quickScore}/10`
@@ -63,6 +88,8 @@ export function QuickExperiencePanel({
 	const rewritePrompt = buildRewritePrompt(quickReviewResult);
 	const sharpDiagnosis = buildSharpDiagnosis(quickReviewResult);
 	const reviewComparison = buildReviewComparison(previousQuickReviewResult, quickReviewResult);
+	const revisionTrend = summarizeRevisionTrend(revisionSessions);
+	const latestProjectCards = projectMethodologyCards.slice(0, 4);
 
 	return (
 		<section className="rounded-md border border-primary/30 bg-card p-5">
@@ -92,12 +119,12 @@ export function QuickExperiencePanel({
 					/>
 					<details className="mt-4 rounded-md border border-border bg-background p-3">
 						<summary className="cursor-pointer list-none text-sm font-medium">
-							可选：指定题材
+							可选：指定题材、稿件来源和上一条 Prompt
 							<span className="ml-2 text-xs font-normal text-muted-foreground">
 								不懂就保持自动判断
 							</span>
 						</summary>
-						<div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,260px)_1fr] sm:items-end">
+						<div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,220px)_1fr] lg:items-start">
 							<div className="space-y-2">
 								<Label htmlFor="quick-review-genre">题材</Label>
 								<select
@@ -117,9 +144,40 @@ export function QuickExperiencePanel({
 									<option value="other">其他</option>
 								</select>
 							</div>
-							<p className="text-xs leading-5 text-muted-foreground">
-								指定题材只会帮助模型少走弯路，不会改变你这一章的核心诊断。
-							</p>
+							<div className="space-y-2">
+								<Label htmlFor="quick-review-input-kind">稿件来源</Label>
+								<select
+									id="quick-review-input-kind"
+									className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+									value={quickReviewInputKind}
+									onChange={(event) =>
+										onQuickReviewInputKindChange(
+											event.target.value as QuickReviewInputKind,
+										)
+									}
+								>
+									<option value="human-draft">作者正文</option>
+									<option value="ai-draft">AI 生成稿</option>
+									<option value="idea">脑洞/设定</option>
+									<option value="outline">大纲</option>
+									<option value="prompt">Prompt 草稿</option>
+								</select>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="quick-review-previous-prompt">上一条 Prompt</Label>
+								<textarea
+									id="quick-review-previous-prompt"
+									value={quickReviewPreviousPrompt}
+									onChange={(event) =>
+										onQuickReviewPreviousPromptChange(event.target.value)
+									}
+									className="min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									placeholder="如果正文来自 AI，把上一条写作 Prompt 粘贴到这里。系统会判断问题出在正文还是 Prompt。"
+								/>
+								<p className="text-xs leading-5 text-muted-foreground">
+									题材和来源只帮助模型少走弯路；上一条 Prompt 会参与诊断和下一轮改稿指令。
+								</p>
+							</div>
 						</div>
 					</details>
 				</div>
@@ -209,6 +267,21 @@ export function QuickExperiencePanel({
 						{quickReviewResult.positioning ||
 							"模型没有返回明确定位，请重试或进入完整点评。"}
 					</p>
+					<div className="rounded-md border border-border bg-background p-4">
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+							<p className="text-sm font-medium">总判断</p>
+							<span className={`rounded-md border px-2 py-1 text-xs ${gate.className}`}>
+								{gate.label}
+							</span>
+						</div>
+						<p className="mt-2 text-sm leading-6">
+							{quickReviewResult.oneLineDiagnosis || sharpDiagnosis}
+						</p>
+						<p className="mt-1 text-xs leading-5 text-muted-foreground">
+							{quickReviewResult.gateReason ||
+								"这是当前稿件的改稿优先级建议，不代表平台流量预测。"}
+						</p>
+					</div>
 					<div>
 						<p className="text-sm font-medium">现在还能打的卖点</p>
 						<ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
@@ -230,6 +303,47 @@ export function QuickExperiencePanel({
 						<p className="text-sm font-medium">产品诊断</p>
 						<p className="mt-2 text-base font-semibold leading-6">{sharpDiagnosis}</p>
 					</div>
+					{issues.length ? (
+						<div className="rounded-md border border-border bg-background p-4">
+							<p className="text-sm font-medium">关键问题证据链</p>
+							<div className="mt-3 space-y-3">
+								{issues.slice(0, 3).map((issue) => (
+									<div key={issue.id || issue.title} className="rounded-md border border-border bg-card p-3">
+										<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+											<p className="text-sm font-semibold">{issue.title}</p>
+											<span className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+												{formatIssueSeverity(issue.severity)}
+												{" · "}
+												{formatIssueCategory(issue.category)}
+											</span>
+										</div>
+										<p className="mt-2 text-sm leading-6 text-muted-foreground">
+											{issue.description}
+										</p>
+										{issue.evidence?.length ? (
+											<div className="mt-2 rounded-md border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
+												<p className="font-medium text-foreground">正文证据</p>
+												{issue.evidence.slice(0, 2).map((item, index) => (
+													<p key={`${item.quote}-${index}`} className="mt-1">
+														{item.locationHint ? `${item.locationHint}：` : ""}
+														{item.quote}
+													</p>
+												))}
+											</div>
+										) : null}
+										<p className="mt-2 text-sm leading-6">
+											<span className="font-medium">读者影响：</span>
+											{issue.readerImpact}
+										</p>
+										<p className="mt-1 text-sm leading-6">
+											<span className="font-medium">下一步动作：</span>
+											{issue.fixAction}
+										</p>
+									</div>
+								))}
+							</div>
+						</div>
+					) : null}
 					<div>
 						<p className="text-sm font-medium">立刻改这三处</p>
 						<ol className="mt-1 list-inside list-decimal space-y-1 text-sm leading-6 text-muted-foreground">
@@ -261,6 +375,24 @@ export function QuickExperiencePanel({
 							value={rewritePrompt}
 						/>
 					</div>
+					{methodologyCards.length ? (
+						<div className="rounded-md border border-border bg-background p-4">
+							<p className="text-sm font-medium">可沉淀的方法论卡片</p>
+							<div className="mt-3 grid gap-3 md:grid-cols-2">
+								{methodologyCards.slice(0, 4).map((card) => (
+									<div key={card.id || card.title} className="rounded-md border border-border bg-card p-3">
+										<p className="text-sm font-semibold">{card.title}</p>
+										<p className="mt-2 text-sm leading-5 text-muted-foreground">
+											{card.reusableRule}
+										</p>
+										<p className="mt-2 text-xs leading-5 text-muted-foreground">
+											自查：{card.selfCheckQuestion}
+										</p>
+									</div>
+								))}
+							</div>
+						</div>
+					) : null}
 					{reviewComparison ? (
 						<div className="rounded-md border border-border bg-background p-4">
 							<p className="text-sm font-medium">改稿后复诊对比</p>
@@ -295,6 +427,60 @@ export function QuickExperiencePanel({
 									</p>
 								</div>
 							</div>
+						</div>
+					) : null}
+					{revisionTrend || latestProjectCards.length ? (
+						<div className="rounded-md border border-border bg-background p-4">
+							<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+								<p className="text-sm font-medium">项目迭代资产</p>
+								<span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+									{revisionSessions.length} 次复诊 · {projectMethodologyCards.length} 张方法论卡
+								</span>
+							</div>
+							{revisionTrend ? (
+								<div className="mt-3 grid gap-3 md:grid-cols-3">
+									<div className="rounded-md border border-border bg-card p-3">
+										<p className="text-xs text-muted-foreground">最近诊断</p>
+										<p className="mt-2 text-sm font-semibold">
+											{revisionTrend.latest.quickScore}/10 ·{" "}
+											{formatGateLabel(revisionTrend.latest.gateDecision)}
+										</p>
+									</div>
+									<div className="rounded-md border border-border bg-card p-3">
+										<p className="text-xs text-muted-foreground">分数变化</p>
+										<p className="mt-2 text-sm font-semibold">
+											{revisionTrend.scoreDelta === null
+												? "暂无上一版"
+												: revisionTrend.scoreDelta >= 0
+													? `+${revisionTrend.scoreDelta}`
+													: revisionTrend.scoreDelta}
+										</p>
+									</div>
+									<div className="rounded-md border border-border bg-card p-3">
+										<p className="text-xs text-muted-foreground">高频 Gate</p>
+										<p className="mt-2 text-sm font-semibold">
+											{formatGateLabel(revisionTrend.mostCommonGate)}
+										</p>
+									</div>
+								</div>
+							) : null}
+							{latestProjectCards.length ? (
+								<div className="mt-3 grid gap-3 md:grid-cols-2">
+									{latestProjectCards.map((card) => (
+										<div key={card.projectCardId} className="rounded-md border border-border bg-card p-3">
+											<div className="flex items-start justify-between gap-3">
+												<p className="text-sm font-semibold">{card.title}</p>
+												<span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+													{card.occurrenceCount} 次
+												</span>
+											</div>
+											<p className="mt-2 text-xs leading-5 text-muted-foreground">
+												{card.reusableRule}
+											</p>
+										</div>
+									))}
+								</div>
+							) : null}
 						</div>
 					) : null}
 					<details className="rounded-md border border-border bg-background p-4">
@@ -367,6 +553,70 @@ function buildSharpDiagnosis(result: QuickReviewResult | null) {
 	return `这章最大流失点：${problem}${firstFix ? `。先改：${firstFix}` : "。"}`;
 }
 
+function buildGateView(result: QuickReviewResult | null) {
+	const gate = result?.gateDecision || "revise";
+	const map = {
+		continue: {
+			label: "可继续打磨",
+			className: "border-emerald-500/40 bg-emerald-500/10 text-success-foreground",
+		},
+		revise: {
+			label: "先修改关键问题",
+			className: "border-primary/40 bg-primary/10 text-primary",
+		},
+		rebuild: {
+			label: "建议重构这一版",
+			className: "border-amber-500/40 bg-amber-500/10 text-warning-foreground",
+		},
+		discard: {
+			label: "当前版本不建议继续投入",
+			className: "border-destructive/40 bg-destructive/10 text-destructive",
+		},
+	} as const;
+
+	return map[gate] ?? map.revise;
+}
+
+function formatIssueSeverity(severity: string) {
+	const map: Record<string, string> = {
+		critical: "阻断",
+		high: "高优先级",
+		medium: "中优先级",
+		low: "低优先级",
+	};
+
+	return map[severity] || "待确认";
+}
+
+function formatIssueCategory(category: string) {
+	const map: Record<string, string> = {
+		opening: "开头",
+		hook: "钩子",
+		character_goal: "主角目标",
+		conflict_pressure: "冲突压力",
+		payoff: "爽点兑现",
+		pacing: "节奏",
+		setting_load: "设定负担",
+		prose_ai_flavor: "AI 腔",
+		prompt_constraint: "Prompt 约束",
+		market_promise: "市场承诺",
+		other: "其他",
+	};
+
+	return map[category] || "其他";
+}
+
+function formatGateLabel(gate: string | undefined) {
+	const map: Record<string, string> = {
+		continue: "继续",
+		revise: "修改",
+		rebuild: "重构",
+		discard: "废稿",
+	};
+
+	return map[gate || ""] || "修改";
+}
+
 function buildReviewComparison(
 	previous: QuickReviewResult | null | undefined,
 	current: QuickReviewResult | null,
@@ -411,6 +661,10 @@ function buildReviewComparison(
 function buildRewritePrompt(result: QuickReviewResult | null) {
 	if (!result) {
 		return "";
+	}
+
+	if (result.nextPrompt?.prompt) {
+		return result.nextPrompt.prompt;
 	}
 
 	const fixes = Array.isArray(result.actionableFixes)

@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
-import type { QuickReviewResult } from "@/stores/workspace-store";
+import type {
+	ProjectMethodologyCard,
+	QuickReviewInputKind,
+	QuickReviewResult,
+	RevisionSession,
+} from "@/stores/workspace-store";
 
 interface OverviewStep {
 	label: string;
@@ -46,6 +51,10 @@ interface OverviewViewProps {
 	quickReviewResult: QuickReviewResult | null;
 	previousQuickReviewResult?: QuickReviewResult | null;
 	quickReviewGenre: string;
+	quickReviewInputKind: QuickReviewInputKind;
+	quickReviewPreviousPrompt: string;
+	revisionSessions: RevisionSession[];
+	methodologyCards: ProjectMethodologyCard[];
 	chapterText: string;
 	chapterCompletion: number;
 	nextChapterAction: string;
@@ -79,6 +88,8 @@ interface OverviewViewProps {
 	};
 	onChapterTextChange: (value: string) => void;
 	onQuickReviewGenreChange: (value: string) => void;
+	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
+	onQuickReviewPreviousPromptChange: (value: string) => void;
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
@@ -255,6 +266,10 @@ export function OverviewView({
 	quickReviewResult,
 	previousQuickReviewResult,
 	quickReviewGenre,
+	quickReviewInputKind,
+	quickReviewPreviousPrompt,
+	revisionSessions,
+	methodologyCards,
 	chapterText,
 	chapterCompletion,
 	nextChapterAction,
@@ -276,6 +291,8 @@ export function OverviewView({
 	bookProgressDetail,
 	onChapterTextChange,
 	onQuickReviewGenreChange,
+	onQuickReviewInputKindChange,
+	onQuickReviewPreviousPromptChange,
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
@@ -353,8 +370,14 @@ export function OverviewView({
 				quickReviewResult={quickReviewResult}
 				previousQuickReviewResult={previousQuickReviewResult}
 				quickReviewGenre={quickReviewGenre}
+				quickReviewInputKind={quickReviewInputKind}
+				quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+				revisionSessions={revisionSessions}
+				methodologyCards={methodologyCards}
 				onChapterTextChange={onChapterTextChange}
 				onQuickReviewGenreChange={onQuickReviewGenreChange}
+				onQuickReviewInputKindChange={onQuickReviewInputKindChange}
+				onQuickReviewPreviousPromptChange={onQuickReviewPreviousPromptChange}
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}

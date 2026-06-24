@@ -47,3 +47,34 @@ export function buildChapterTriagePrompt(
     ],
   };
 }
+
+export function buildChapterScorePrompt(
+  input: UserChapterInput,
+  metrics: RubricMetric[] = DEFAULT_RUBRIC_METRICS,
+): PromptBundle {
+  const validInput = validateUserChapterInput(input);
+
+  return {
+    id: "chapter-score.v1",
+    responseContract:
+      "Return JSON with totalScore, scores, strongestPoint, weakestPoint, nextRevisionMove, rewriteBrief, revisionPrompt.",
+    messages: [
+      {
+        role: "system",
+        content: "你是严谨的中文网文点评官。必须基于正文证据评分，只给可执行改法，不代写整章。",
+      },
+      {
+        role: "user",
+        content: [
+          `章节标题：${validInput.title}`,
+          `Rubric ID：${validInput.rubricId}`,
+          "评分指标：",
+          ...metrics.map(metricLine),
+          "请逐项输出“分数 -> 正文证据 -> 扣分原因 -> 具体改法”，并给出下一步改稿动作。",
+          "正文：",
+          validInput.text,
+        ].join("\n"),
+      },
+    ],
+  };
+}

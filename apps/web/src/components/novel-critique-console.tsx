@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChapterCritiqueView } from "@/components/workspace/chapter-critique-view";
+import { DiagnosisDashboardView } from "@/components/workspace/diagnosis-dashboard-view";
 import {
 	BookAnalysisPanel,
 	ExportView,
@@ -23,7 +24,9 @@ import {
 	type BookExportMode,
 } from "@/components/workspace/export-view";
 import { LibraryView } from "@/components/workspace/library-view";
+import { MethodologyLibraryView } from "@/components/workspace/methodology-library-view";
 import { OverviewView } from "@/components/workspace/overview-view";
+import { RevisionHistoryView } from "@/components/workspace/revision-history-view";
 import { StarterView } from "@/components/workspace/starter-view";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import {
@@ -70,6 +73,12 @@ import {
 	getWorkspaceViewMeta,
 } from "@/lib/workspace-view-model";
 import {
+	buildProjectExportMarkdown,
+	createRevisionSession,
+	mergeProjectMethodologyCards,
+	upsertRevisionSession,
+} from "@/lib/workspace-iteration";
+import {
 	buildBookAnalysisCacheKey as createBookAnalysisCacheKey,
 	buildQuickReviewCacheKey as createQuickReviewCacheKey,
 	buildReferenceProfileCacheKey as createReferenceProfileCacheKey,
@@ -93,6 +102,7 @@ import {
 	type QuickReviewResult,
 	type ScoreResult,
 	defaultBookText,
+	defaultWorkspaceProject,
 	defaultProvider,
 	defaultReferenceText,
 	defaultUserText,
@@ -427,6 +437,10 @@ function downloadText(filename: string, content: string, contentType: string) {
 	URL.revokeObjectURL(url);
 }
 
+function toSafeFilename(value: string) {
+	return value.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-") || "project";
+}
+
 function FieldHelp({ text }: { text: string }) {
 	const [open, setOpen] = useState(false);
 
@@ -589,6 +603,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setChapterText,
 		quickReviewGenre,
 		setQuickReviewGenre,
+		quickReviewInputKind,
+		setQuickReviewInputKind,
+		quickReviewPreviousPrompt,
+		setQuickReviewPreviousPrompt,
 		rubricResult,
 		setRubricResult,
 		scoreResult,
@@ -626,12 +644,20 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setResearchQaResult,
 		quickReviewCache,
 		setQuickReviewCache,
+		revisionSessions,
+		setRevisionSessions,
+		methodologyCards,
+		setMethodologyCards,
 		rubricCache,
 		setRubricCache,
 		scoreCache,
 		setScoreCache,
 		bookAnalysisCache,
 		setBookAnalysisCache,
+		projects,
+		setProjects,
+		activeProjectId,
+		setActiveProjectId,
 	} = useWorkspaceStore();
 	const [status, setStatus] = useState<string>(
 		"默认使用共享站；配置自己的 API Key 后，会使用你选择的模型服务。",
@@ -639,6 +665,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 	const [loading, setLoading] = useState<LoadingState>(null);
 	const [quickReviewElapsedSeconds, setQuickReviewElapsedSeconds] = useState(0);
 	const [bookUtilityPanel, setBookUtilityPanel] = useState<"history" | "exports" | null>(null);
+	const [newProjectName, setNewProjectName] = useState("");
 	const [previousQuickReviewResult, setPreviousQuickReviewResult] =
 		useState<QuickReviewResult | null>(null);
 	const referenceProfileCacheRef = useRef<Map<string, ReferenceProfileResult>>(new Map());
@@ -656,6 +683,14 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		initializeReferenceProfileProgress,
 		updateReferenceProfileProgress,
 	} = useReferenceProfileProgressController(setReferenceProfileProgress);
+	const activeProject =
+		projects.find((project) => project.id === activeProjectId) ?? projects[0];
+	const projectRevisionSessions = revisionSessions.filter(
+		(session) => (session.projectId || "default-project") === activeProjectId,
+	);
+	const projectMethodologyCards = methodologyCards.filter(
+		(card) => (card.projectId || "default-project") === activeProjectId,
+	);
 
 	useEffect(() => {
 		if (loading !== "quick") {
@@ -678,6 +713,80 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 
 	function openBookUtility(panel: "history" | "exports") {
 		setBookUtilityPanel((current) => (current === panel ? null : panel));
+	}
+
+	function switchProject(projectId: string) {
+		if (projectId === activeProjectId) {
+			return;
+		}
+
+		const project = projects.find((item) => item.id === projectId);
+		setActiveProjectId(projectId);
+		setPreviousQuickReviewResult(null);
+		setQuickReviewResult(null);
+		setStatus(`已切换到项目：${project?.name || "未命名项目"}`);
+	}
+
+	function createProject() {
+		const name = newProjectName.trim();
+		if (!name) {
+			setStatus("请先填写项目名称。");
+			return;
+		}
+
+		const now = new Date().toISOString();
+		const project = {
+			id: `project-${Date.now().toString(36)}`,
+			name,
+			createdAt: now,
+			updatedAt: now,
+		};
+		setProjects((current) => [project, ...current]);
+		setActiveProjectId(project.id);
+		setNewProjectName("");
+		setPreviousQuickReviewResult(null);
+		setQuickReviewResult(null);
+		setStatus(`已创建并切换到项目：${project.name}`);
+	}
+
+	function saveRevisionNote(sessionId: string, note: string) {
+		const now = new Date().toISOString();
+		setRevisionSessions((current) =>
+			current.map((session) =>
+				session.id === sessionId
+					? {
+							...session,
+							revisionNote: note.trim(),
+							revisionNoteUpdatedAt: now,
+						}
+					: session,
+			),
+		);
+		setProjects((current) =>
+			current.map((project) =>
+				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
+			),
+		);
+		setStatus("复诊备注已保存。");
+	}
+
+	function exportProjectMarkdown() {
+		if (!projectRevisionSessions.length && !projectMethodologyCards.length) {
+			setStatus("当前项目还没有可导出的复诊记录或方法论卡。");
+			return;
+		}
+
+		const project = activeProject ?? defaultWorkspaceProject;
+		const content = buildProjectExportMarkdown({
+			project,
+			revisionSessions: projectRevisionSessions,
+			methodologyCards: projectMethodologyCards,
+		});
+		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+			.toISOString()
+			.slice(0, 10)}.md`;
+		downloadText(filename, content, "text/markdown;charset=utf-8");
+		setStatus(`项目导出完成：${filename}`);
 	}
 
 	const navItems = getWorkspaceNavItems();
@@ -846,6 +955,8 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		return createQuickReviewCacheKey({
 			provider,
 			quickReviewGenre,
+			quickReviewInputKind,
+			quickReviewPreviousPrompt,
 			chapterTitle,
 			chapterText,
 		});
@@ -932,6 +1043,34 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 			result,
 		});
 		setQuickReviewCache((current) => upsertCacheEntry(current, entry));
+	}
+
+	function rememberQuickReviewIteration(result: QuickReviewResult) {
+		const now = new Date().toISOString();
+		const mergedCards = mergeProjectMethodologyCards({
+			projectId: activeProjectId,
+			currentCards: methodologyCards,
+			resultCards: result.methodologyCards,
+			result,
+			chapterTitle,
+			now,
+		});
+		const session = createRevisionSession({
+			projectId: activeProjectId,
+			chapterTitle,
+			chapterText,
+			result,
+			methodologyCardIds: mergedCards.cardIds,
+			now,
+		});
+
+		setMethodologyCards(mergedCards.cards);
+		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		setProjects((current) =>
+			current.map((project) =>
+				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
+			),
+		);
 	}
 
 	function rememberRubric(key: string, result: RubricResult) {
@@ -1382,9 +1521,12 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				chapterText,
 				chapterTitle,
 				quickReviewGenre,
+				quickReviewInputKind,
+				quickReviewPreviousPrompt,
 			});
 			setQuickReviewResult(result);
 			rememberQuickReview(cacheKey, result);
+			rememberQuickReviewIteration(result);
 			setStatus(`快速点评完成：${result.quickScore}/10`);
 		} catch (error) {
 			setStatus(toQuickReviewErrorMessage(error));
@@ -1776,6 +1918,18 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 			loading={loading !== null}
 			onOpenView={openView}
 		>
+			<ProjectScopePanel
+				projects={projects}
+				activeProjectId={activeProjectId}
+				activeProjectName={activeProject?.name || "默认项目"}
+				newProjectName={newProjectName}
+				revisionCount={projectRevisionSessions.length}
+				methodologyCount={projectMethodologyCards.length}
+				onProjectChange={switchProject}
+				onNewProjectNameChange={setNewProjectName}
+				onCreateProject={createProject}
+			/>
+
 			{activeView === "overview" ? (
 				<OverviewView
 					nextAction={nextAction}
@@ -1787,6 +1941,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					quickReviewResult={quickReviewResult}
 					previousQuickReviewResult={previousQuickReviewResult}
 					quickReviewGenre={quickReviewGenre}
+					quickReviewInputKind={quickReviewInputKind}
+					quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+					revisionSessions={projectRevisionSessions}
+					methodologyCards={projectMethodologyCards}
 					chapterText={chapterText}
 					chapterCompletion={chapterCompletion}
 					nextChapterAction={nextChapterAction}
@@ -1811,6 +1969,8 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 						setChapterText(value);
 					}}
 					onQuickReviewGenreChange={setQuickReviewGenre}
+					onQuickReviewInputKindChange={setQuickReviewInputKind}
+					onQuickReviewPreviousPromptChange={setQuickReviewPreviousPrompt}
 					onRunQuickExperience={runQuickExperience}
 					onRerunQuickExperience={() => runQuickExperience(true)}
 					hasQuickReviewCache={Boolean(quickReviewCacheHit)}
@@ -1826,6 +1986,31 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				<StarterView
 					digest={beginnerLearningDigest}
 					onOpenView={(view) => openView(view as WorkspaceView)}
+				/>
+			) : null}
+
+			{activeView === "dashboard" ? (
+				<DiagnosisDashboardView
+					revisionSessions={projectRevisionSessions}
+					methodologyCards={projectMethodologyCards}
+					onOpenDiagnosis={() => openView("overview")}
+				/>
+			) : null}
+
+			{activeView === "methodology" ? (
+				<MethodologyLibraryView
+					methodologyCards={projectMethodologyCards}
+					onOpenDiagnosis={() => openView("overview")}
+					onExportProject={exportProjectMarkdown}
+				/>
+			) : null}
+
+			{activeView === "revisions" ? (
+				<RevisionHistoryView
+					revisionSessions={projectRevisionSessions}
+					onOpenDiagnosis={() => openView("overview")}
+					onSaveRevisionNote={saveRevisionNote}
+					onExportProject={exportProjectMarkdown}
 				/>
 			) : null}
 
@@ -2044,6 +2229,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					quickReviewResult={quickReviewResult}
 					previousQuickReviewResult={previousQuickReviewResult}
 					quickReviewGenre={quickReviewGenre}
+					quickReviewInputKind={quickReviewInputKind}
+					quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+					revisionSessions={projectRevisionSessions}
+					methodologyCards={projectMethodologyCards}
 					importReferenceFile={importReferenceFile}
 					onInferReferenceProfile={inferReferenceProfileFromModel}
 					onReferenceTextChange={(value) => {
@@ -2054,6 +2243,8 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 						resetScoreProgress();
 					}}
 					onQuickReviewGenreChange={setQuickReviewGenre}
+					onQuickReviewInputKindChange={setQuickReviewInputKind}
+					onQuickReviewPreviousPromptChange={setQuickReviewPreviousPrompt}
 					onRunQuickExperience={runQuickExperience}
 					onRerunQuickExperience={() => runQuickExperience(true)}
 					hasQuickReviewCache={Boolean(quickReviewCacheHit)}
@@ -2288,6 +2479,71 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				/>
 			) : null}
 		</WorkspaceShell>
+	);
+}
+
+function ProjectScopePanel({
+	projects,
+	activeProjectId,
+	activeProjectName,
+	newProjectName,
+	revisionCount,
+	methodologyCount,
+	onProjectChange,
+	onNewProjectNameChange,
+	onCreateProject,
+}: {
+	projects: Array<{ id: string; name: string }>;
+	activeProjectId: string;
+	activeProjectName: string;
+	newProjectName: string;
+	revisionCount: number;
+	methodologyCount: number;
+	onProjectChange: (projectId: string) => void;
+	onNewProjectNameChange: (value: string) => void;
+	onCreateProject: () => void;
+}) {
+	return (
+		<section className="rounded-md border border-border bg-card p-4">
+			<div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] lg:items-end">
+				<div>
+					<p className="text-sm font-medium">当前项目：{activeProjectName}</p>
+					<p className="mt-1 text-xs leading-5 text-muted-foreground">
+						复诊记录和方法论卡会按项目隔离，避免多本书互相污染。
+					</p>
+					<div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+						<span className="rounded-md border border-border px-2 py-1">
+							{revisionCount} 次复诊
+						</span>
+						<span className="rounded-md border border-border px-2 py-1">
+							{methodologyCount} 张方法论卡
+						</span>
+					</div>
+				</div>
+				<div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+					<select
+						value={activeProjectId}
+						onChange={(event) => onProjectChange(event.target.value)}
+						className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+						aria-label="选择项目"
+					>
+						{projects.map((project) => (
+							<option key={project.id} value={project.id}>
+								{project.name}
+							</option>
+						))}
+					</select>
+					<Input
+						value={newProjectName}
+						onChange={(event) => onNewProjectNameChange(event.target.value)}
+						placeholder="新项目名称"
+					/>
+					<Button type="button" onClick={onCreateProject}>
+						新建
+					</Button>
+				</div>
+			</div>
+		</section>
 	);
 }
 

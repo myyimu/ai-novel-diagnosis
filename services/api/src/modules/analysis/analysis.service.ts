@@ -1,8 +1,21 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import type {
+  DiagnosisIssue,
+  DiagnosisIssueCategory,
+  DiagnosisIssueSeverity,
+  GateDecision,
+  MethodologyCard,
   QuickReviewResult,
+  QuickReviewInputKind,
   RecommendedPlatform,
   RecommendedPlatformId,
+  RubricMetric,
+} from "@ai-novel-diagnosis/ai-core";
+import {
+  buildChapterScorePrompt,
+  buildChapterTriagePrompt,
+  createPreviewReport,
+  DEFAULT_RUBRIC_METRICS,
 } from "@ai-novel-diagnosis/ai-core";
 import {
   BookAnalysisJobProgress,
@@ -36,29 +49,6 @@ import {
 } from "./analysis-json-schemas";
 import { extractJson } from "./json-extract";
 import { ModelProviderService } from "./model-provider.service";
-
-const metrics = [
-  {
-    metricId: "chapter-goal",
-    name: "主角目标清晰度",
-    fix: "把本章目标写成读者能立刻理解的一句话，并补上失败代价。",
-  },
-  {
-    metricId: "conflict-pressure",
-    name: "冲突压力",
-    fix: "把阻碍改成具体损失，例如资格、资源、身份、关系或生命风险。",
-  },
-  {
-    metricId: "emotion-debt",
-    name: "情绪债",
-    fix: "增加可被兑现的羞辱、误解、秘密或承诺，让读者等待释放。",
-  },
-  {
-    metricId: "hook",
-    name: "追读钩子",
-    fix: "结尾加入更高一级的危机、奖励、身份暴露风险或反转信息。",
-  },
-];
 
 const baseRubricMetrics = [
   {
@@ -415,25 +405,23 @@ export class AnalysisService {
   ) {}
 
   previewScore(input: PreviewAnalysisDto) {
-    const score = input.text.length > 800 ? 6.8 : 5.2;
+    const report = createPreviewReport(input);
+    const metricNames = new Map(
+      DEFAULT_RUBRIC_METRICS.map((metric) => [metric.id, metric.name]),
+    );
 
     return {
       productName: "AI网文诊断台",
-      mode: "mock-preview",
+      mode: "statistical-preview",
       title: input.title,
       rubricId: input.rubricId,
-      totalScore: score,
-      strongestPoint: "API 链路已可接收章节并返回结构化评分报告。",
-      weakestPoint:
-        "尚未接入用户自己的 LLM Key，证据段落与真实评分由 Worker 补齐。",
-      nextRevisionMove: "先跑通目标、冲突、情绪债、追读钩子四项硬指标。",
-      scores: metrics.map((metric) => ({
-        metricId: metric.metricId,
-        name: metric.name,
-        score,
-        reason: `${metric.name} 已进入预览评分，正式任务会要求模型给出文本证据。`,
-        evidence: "preview endpoint does not quote user text",
-        fix: metric.fix,
+      totalScore: report.totalScore,
+      strongestPoint: report.strongestPoint,
+      weakestPoint: report.weakestPoint,
+      nextRevisionMove: report.nextRevisionMove,
+      scores: report.scores.map((score) => ({
+        ...score,
+        name: metricNames.get(score.metricId) || score.metricId,
       })),
     };
   }
@@ -449,28 +437,49 @@ export class AnalysisService {
         ? input.chapterText.trim()
         : `${input.chapterText.trim().slice(0, 5200)}\n\n……中间内容省略……\n\n${input.chapterText.trim().slice(-1600)}`;
 
-    const content = await this.modelProviders.chat(
-      provider,
-      [
+    const prompt = this.buildQuickReviewPrompt(input, textSample);
+    const content = await this.modelProviders.chat(provider, prompt.messages, {
+      maxOutputTokens: 2200,
+      jsonSchema: {
+        name: "quick_review_result",
+        schema: quickReviewJsonSchema,
+      },
+    });
+
+    return this.normalizeQuickReviewResult(
+      await this.parseJsonWithRepair(provider, content, "章节急诊"),
+      input,
+    );
+  }
+
+  private buildQuickReviewPrompt(input: QuickReviewDto, textSample: string) {
+    const prompt = buildChapterTriagePrompt({
+      title: input.title || "未命名章节",
+      text: textSample,
+      rubricId: "quick-review",
+    });
+
+    return {
+      ...prompt,
+      messages: [
         {
-          role: "system",
-          content:
-            "你是资深中文网文编辑。读完章节后给出快速点评。只返回合法 JSON，不使用 Markdown，不解释过程。",
+          ...prompt.messages[0],
+          content: `${prompt.messages[0].content}
+你只返回合法 JSON，不使用 Markdown，不解释过程。`,
         },
         {
-          role: "user",
-          content: `请阅读以下章节，给出快速点评。
+          ...prompt.messages[1],
+          content: `${prompt.messages[1].content}
 
-章节标题：${input.title || "未提供"}
-类型：${input.genre || "请自行判断"}
-
-章节正文：
-${textSample}
+类型提示：${input.genre || "请自行判断"}
+输入来源：${this.normalizeQuickReviewInputKind(input.inputKind)}
+上一条 Prompt：${input.previousPrompt?.trim() || "未提供"}
 
 严格返回这个 JSON 结构：
 {
   "title": "章节标题（如正文有标题则用正文的）",
   "genre": "xuanhuan | urban | romance | suspense | infinite-flow | other",
+  "inputKind": "human-draft | ai-draft | idea | outline | prompt",
   "positioning": "一句话定位这章在市场上的位置",
   "sellingPoints": ["本章 2-3 个主要卖点"],
   "mainProblem": "本章最大的一个问题，不超过 50 字",
@@ -486,7 +495,56 @@ ${textSample}
   "readyForFullReview": true或false,
   "readyReason": "是否适合做完整评分的一句话理由",
   "quickScore": 6.5,
-  "confidence": 0.8
+  "confidence": 0.8,
+  "gateDecision": "continue | revise | rebuild | discard",
+  "gateReason": "为什么当前建议继续、修改、重构或废稿",
+  "oneLineDiagnosis": "一句话说明这稿最该先解决什么",
+  "issues": [
+    {
+      "id": "issue-1",
+      "severity": "critical | high | medium | low",
+      "category": "opening | hook | character_goal | conflict_pressure | payoff | pacing | setting_load | prose_ai_flavor | prompt_constraint | market_promise | other",
+      "title": "问题标题",
+      "description": "问题说明",
+      "evidence": [{"quote": "原文短证据", "locationHint": "开头/中段/结尾/第N段", "confidence": 0.8}],
+      "readerImpact": "读者会如何流失或降低期待",
+      "fixAction": "下一步具体改法",
+      "promptConstraint": "下一轮改稿 Prompt 必须加入的约束",
+      "blocksNextStep": true
+    }
+  ],
+  "strengths": [{"title": "可保留优点", "evidence": "可选证据", "keepAction": "下一版如何保留"}],
+  "revisionPlan": {
+    "priorityIssueIds": ["issue-1"],
+    "keep": ["必须保留的内容"],
+    "change": ["必须修改的内容"],
+    "avoid": ["下一版不要做什么"],
+    "checkpoints": ["复诊时检查什么"]
+  },
+  "promptDiagnosis": {
+    "originalPrompt": "如果用户提供则原样摘要，否则空字符串",
+    "missingConstraints": ["上一条 Prompt 缺了什么约束"],
+    "vagueInstructions": ["哪些指令太泛"],
+    "improvedPromptPrinciples": ["下一条 Prompt 应该遵守的原则"]
+  },
+  "nextPrompt": {
+    "title": "下一轮改稿 Prompt",
+    "prompt": "可直接复制给写作 AI 的改稿 Prompt",
+    "linkedIssueIds": ["issue-1"],
+    "whyThisWorks": ["这条 Prompt 如何对应解决问题"]
+  },
+  "methodologyCards": [
+    {
+      "id": "method-1",
+      "sourceIssueId": "issue-1",
+      "type": "opening_rule | prompt_rule | pacing_rule | hook_rule | payoff_rule | anti_pattern",
+      "title": "可复用方法论标题",
+      "triggerProblem": "什么问题触发这条规则",
+      "reusableRule": "下次可复用的规则",
+      "selfCheckQuestion": "作者自查问题",
+      "promptTemplate": "可复用 Prompt 模板"
+    }
+  ]
 }
 
 要求：
@@ -496,22 +554,13 @@ ${textSample}
 4. recommendedPlatforms 返回 1-3 个中文网文平台，优先从 qidian、fanqie、jinjiang、qimao、wechat-short 中选择。
 5. fit 只能写“优先发布”“可作为第二选择”或“更适合短篇测试”之一。
 6. confidence 是 0 到 1 的数字，文本太短时降低。
-7. 每个字段都要简短，确保完整 JSON 可以在 512 token 内返回。`,
+7. issues 返回 1-3 条，必须有原文证据；没有证据时降低 confidence。
+8. gateDecision 只表示当前稿件改稿优先级，不预测平台流量。
+9. 如果提供上一条 Prompt，promptDiagnosis 必须指出 Prompt 缺口；未提供则返回空数组。
+10. nextPrompt 必须能直接复制给写作 AI，用于改这一版稿，不要另起炉灶。`,
         },
       ],
-      {
-        maxOutputTokens: 1400,
-        jsonSchema: {
-          name: "quick_review_result",
-          schema: quickReviewJsonSchema,
-        },
-      },
-    );
-
-    return this.normalizeQuickReviewResult(
-      await this.parseJsonWithRepair(provider, content, "章节急诊"),
-      input,
-    );
+    };
   }
 
   private normalizeQuickReviewResult(
@@ -525,18 +574,47 @@ ${textSample}
     const requestedGenre = this.normalizeQuickReviewGenre(input.genre);
     const genre =
       this.normalizeQuickReviewGenre(source.genre) || requestedGenre || "other";
+    const inputKind = this.normalizeQuickReviewInputKind(
+      source.inputKind || input.inputKind,
+    );
+    const mainProblem =
+      this.asText(source.mainProblem) ||
+      "模型没有返回明确问题，请重试或进入完整点评。";
+    const actionableFixes = this.asTextList(source.actionableFixes).slice(0, 4);
+    const issues = this.normalizeDiagnosisIssues(source.issues, {
+      mainProblem,
+      actionableFixes,
+      confidence: this.clampNumber(source.confidence, 0, 1, 0.5),
+      text: input.chapterText,
+    });
+    const gateDecision = this.normalizeGateDecision(
+      source.gateDecision,
+      issues,
+    );
+    const nextPrompt = this.normalizeNextPrompt(source.nextPrompt, {
+      positioning: this.asText(source.positioning),
+      sellingPoints: this.asTextList(source.sellingPoints),
+      mainProblem,
+      actionableFixes,
+      issues,
+      previousPrompt: input.previousPrompt,
+    });
+    const methodologyCards = this.normalizeMethodologyCards(
+      source.methodologyCards,
+      issues,
+      nextPrompt.prompt,
+    );
 
     return {
       title: this.asText(source.title) || input.title || "未命名章节",
       genre,
+      inputKind,
       positioning:
         this.asText(source.positioning) ||
         "模型没有返回明确定位，请重试或进入完整点评。",
       sellingPoints: this.asTextList(source.sellingPoints).slice(0, 4),
-      mainProblem:
-        this.asText(source.mainProblem) ||
-        "模型没有返回明确问题，请重试或进入完整点评。",
-      actionableFixes: this.asTextList(source.actionableFixes).slice(0, 4),
+      mainProblem,
+      actionableFixes,
       recommendedPlatforms: this.normalizeRecommendedPlatforms(
         source.recommendedPlatforms,
         genre,
@@ -551,7 +629,38 @@ ${textSample}
         "如果结果不完整，建议重试一次或进入完整评分。",
       quickScore: this.clampNumber(source.quickScore, 0, 10, 0),
       confidence: this.clampNumber(source.confidence, 0, 1, 0.5),
+      gateDecision,
+      gateReason:
+        this.asText(source.gateReason) ||
+        this.buildGateReason(gateDecision, issues),
+      oneLineDiagnosis:
+        this.asText(source.oneLineDiagnosis) ||
+        `这稿最该先解决：${mainProblem}`,
+      issues,
+      strengths: this.normalizeStrengths(source.strengths),
+      revisionPlan: this.normalizeRevisionPlan(source.revisionPlan, issues),
+      promptDiagnosis: this.normalizePromptDiagnosis(
+        source.promptDiagnosis,
+        input.previousPrompt,
+      ),
+      nextPrompt,
+      methodologyCards,
     };
+  }
+
+  private normalizeQuickReviewInputKind(
+    value: unknown,
+  ): QuickReviewInputKind {
+    const inputKind = this.asText(value).toLowerCase();
+    if (
+      ["human-draft", "ai-draft", "idea", "outline", "prompt"].includes(
+        inputKind,
+      )
+    ) {
+      return inputKind as QuickReviewInputKind;
+    }
+
+    return "human-draft";
   }
 
   private normalizeQuickReviewGenre(value: unknown) {
@@ -570,6 +679,398 @@ ${textSample}
     }
     if (genre === "xuanhua" || genre === "fantasy") return "xuanhuan";
     return "";
+  }
+
+  private normalizeDiagnosisIssues(
+    value: unknown,
+    fallback: {
+      mainProblem: string;
+      actionableFixes: string[];
+      confidence: number;
+      text: string;
+    },
+  ): DiagnosisIssue[] {
+    const issues = Array.isArray(value)
+      ? value
+          .map((item, index) => this.normalizeDiagnosisIssue(item, index))
+          .filter((item): item is DiagnosisIssue => item !== null)
+          .slice(0, 3)
+      : [];
+
+    if (issues.length > 0) {
+      return issues;
+    }
+
+    const quote = this.pickEvidenceQuote(fallback.text);
+    return [
+      {
+        id: "issue-1",
+        severity: "high",
+        category: "other",
+        title: fallback.mainProblem,
+        description: fallback.mainProblem,
+        evidence: quote
+          ? [
+              {
+                quote,
+                locationHint: "正文片段",
+                confidence: fallback.confidence,
+              },
+            ]
+          : [],
+        readerImpact:
+          "读者还没有获得足够明确的继续阅读理由，可能会在开头或中段流失。",
+        fixAction:
+          fallback.actionableFixes[0] ||
+          "先补清主角目标、失败代价、阻碍和章末钩子。",
+        promptConstraint:
+          fallback.actionableFixes[0] ||
+          "改写时优先解决最大追读问题，不要只做文笔润色。",
+        blocksNextStep: true,
+      },
+    ];
+  }
+
+  private normalizeDiagnosisIssue(
+    value: unknown,
+    index: number,
+  ): DiagnosisIssue | null {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const source = value as Record<string, unknown>;
+    const title = this.asText(source.title) || this.asText(source.description);
+    if (!title) {
+      return null;
+    }
+
+    return {
+      id: this.asText(source.id) || `issue-${index + 1}`,
+      severity: this.normalizeIssueSeverity(source.severity),
+      category: this.normalizeIssueCategory(source.category),
+      title,
+      description: this.asText(source.description) || title,
+      evidence: this.normalizeEvidenceAnchors(source.evidence),
+      readerImpact:
+        this.asText(source.readerImpact) ||
+        "读者可能无法形成明确期待，继续阅读动力会下降。",
+      fixAction:
+        this.asText(source.fixAction) ||
+        "先围绕这个问题做局部改写，不要整章重写。",
+      promptConstraint:
+        this.asText(source.promptConstraint) ||
+        "下一轮 Prompt 必须明确要求解决这个问题。",
+      blocksNextStep:
+        typeof source.blocksNextStep === "boolean"
+          ? source.blocksNextStep
+          : this.normalizeIssueSeverity(source.severity) === "critical",
+    };
+  }
+
+  private normalizeIssueSeverity(value: unknown): DiagnosisIssueSeverity {
+    const severity = this.asText(value).toLowerCase();
+    if (["critical", "high", "medium", "low"].includes(severity)) {
+      return severity as DiagnosisIssueSeverity;
+    }
+    return "medium";
+  }
+
+  private normalizeIssueCategory(value: unknown): DiagnosisIssueCategory {
+    const category = this.asText(value).toLowerCase();
+    const allowed: DiagnosisIssueCategory[] = [
+      "opening",
+      "hook",
+      "character_goal",
+      "conflict_pressure",
+      "payoff",
+      "pacing",
+      "setting_load",
+      "prose_ai_flavor",
+      "prompt_constraint",
+      "market_promise",
+      "other",
+    ];
+    return allowed.includes(category as DiagnosisIssueCategory)
+      ? (category as DiagnosisIssueCategory)
+      : "other";
+  }
+
+  private normalizeEvidenceAnchors(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const source = item as Record<string, unknown>;
+        const quote = this.asText(source.quote);
+        if (!quote) return null;
+        return {
+          quote: quote.slice(0, 180),
+          locationHint: this.asText(source.locationHint) || "正文片段",
+          confidence: this.clampNumber(source.confidence, 0, 1, 0.5),
+        };
+      })
+      .filter(
+        (item): item is { quote: string; locationHint: string; confidence: number } =>
+          item !== null,
+      )
+      .slice(0, 3);
+  }
+
+  private pickEvidenceQuote(text: string) {
+    return text.trim().replace(/\s+/g, " ").slice(0, 120);
+  }
+
+  private normalizeGateDecision(
+    value: unknown,
+    issues: DiagnosisIssue[],
+  ): GateDecision {
+    const gate = this.asText(value).toLowerCase();
+    if (["continue", "revise", "rebuild", "discard"].includes(gate)) {
+      return gate as GateDecision;
+    }
+
+    if (issues.some((issue) => issue.severity === "critical")) {
+      return "rebuild";
+    }
+    if (issues.some((issue) => issue.severity === "high")) {
+      return "revise";
+    }
+    return "continue";
+  }
+
+  private buildGateReason(gate: GateDecision, issues: DiagnosisIssue[]) {
+    const topIssue = issues[0]?.title || "最大追读问题";
+    const reasonMap: Record<GateDecision, string> = {
+      continue: "当前稿件有可用基础，可以继续打磨或进入深度质检。",
+      revise: `当前稿件有潜力，但需要先解决“${topIssue}”。`,
+      rebuild: `当前稿件的关键承诺或结构需要重构，优先处理“${topIssue}”。`,
+      discard:
+        "当前版本投入产出偏低，建议换角度重写或保留经验后另开一版。",
+    };
+    return reasonMap[gate];
+  }
+
+  private normalizeStrengths(
+    value: unknown,
+  ): NonNullable<QuickReviewResult["strengths"]> {
+    if (!Array.isArray(value)) return [];
+    return value
+      .flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const source = item as Record<string, unknown>;
+        const title = this.asText(source.title);
+        if (!title) return [];
+        const evidence = this.asText(source.evidence);
+        return [{
+          title,
+          ...(evidence ? { evidence } : {}),
+          keepAction:
+            this.asText(source.keepAction) || "下一版保留这个已有优势。",
+        }];
+      })
+      .slice(0, 3);
+  }
+
+  private normalizeRevisionPlan(
+    value: unknown,
+    issues: DiagnosisIssue[],
+  ): QuickReviewResult["revisionPlan"] {
+    const source =
+      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    const priorityIssueIds = this.asTextList(source.priorityIssueIds).slice(
+      0,
+      3,
+    );
+    const change = this.asTextList(source.change).slice(0, 4);
+    const checkpoints = this.asTextList(source.checkpoints).slice(0, 4);
+    return {
+      priorityIssueIds:
+        priorityIssueIds.length > 0
+          ? priorityIssueIds
+          : issues.slice(0, 1).map((issue) => issue.id),
+      keep: this.asTextList(source.keep).slice(0, 4),
+      change:
+        change.length > 0
+          ? change
+          : issues.slice(0, 3).map((issue) => issue.fixAction),
+      avoid: this.asTextList(source.avoid).slice(0, 4),
+      checkpoints:
+        checkpoints.length > 0
+          ? checkpoints
+          : issues
+              .slice(0, 3)
+              .map((issue) => `复诊时检查：${issue.title} 是否已被解决。`),
+    };
+  }
+
+  private normalizePromptDiagnosis(
+    value: unknown,
+    previousPrompt?: string,
+  ): QuickReviewResult["promptDiagnosis"] {
+    const source =
+      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    return {
+      originalPrompt:
+        this.asText(source.originalPrompt) || previousPrompt?.trim() || undefined,
+      missingConstraints: this.asTextList(source.missingConstraints).slice(0, 4),
+      vagueInstructions: this.asTextList(source.vagueInstructions).slice(0, 4),
+      improvedPromptPrinciples: this.asTextList(
+        source.improvedPromptPrinciples,
+      ).slice(0, 4),
+    };
+  }
+
+  private normalizeNextPrompt(
+    value: unknown,
+    fallback: {
+      positioning: string;
+      sellingPoints: string[];
+      mainProblem: string;
+      actionableFixes: string[];
+      issues: DiagnosisIssue[];
+      previousPrompt?: string;
+    },
+  ): NonNullable<QuickReviewResult["nextPrompt"]> {
+    const source =
+      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    const prompt = this.asText(source.prompt);
+    const linkedIssueIds = this.asTextList(source.linkedIssueIds);
+    return {
+      title: this.asText(source.title) || "下一轮改稿 Prompt",
+      prompt:
+        prompt ||
+        this.buildFallbackNextPrompt(
+          fallback.positioning,
+          fallback.sellingPoints,
+          fallback.mainProblem,
+          fallback.actionableFixes,
+          fallback.issues,
+          fallback.previousPrompt,
+        ),
+      linkedIssueIds:
+        linkedIssueIds.length > 0
+          ? linkedIssueIds.slice(0, 3)
+          : fallback.issues.slice(0, 3).map((issue) => issue.id),
+      whyThisWorks:
+        this.asTextList(source.whyThisWorks).slice(0, 3).length > 0
+          ? this.asTextList(source.whyThisWorks).slice(0, 3)
+          : fallback.issues
+              .slice(0, 2)
+              .map((issue) => `对应解决“${issue.title}”：${issue.fixAction}`),
+    };
+  }
+
+  private buildFallbackNextPrompt(
+    positioning: string,
+    sellingPoints: string[],
+    mainProblem: string,
+    actionableFixes: string[],
+    issues: DiagnosisIssue[],
+    previousPrompt?: string,
+  ) {
+    return [
+      "请帮我改写这一章，但不要另起炉灶。",
+      previousPrompt?.trim()
+        ? `上一条 Prompt 的基础：${previousPrompt.trim().slice(0, 400)}`
+        : "",
+      `当前定位：${positioning || "请根据正文判断定位"}`,
+      `保留卖点：${sellingPoints.length ? sellingPoints.join("；") : "保留已有冲突、人物关系和主线信息"}`,
+      `优先解决：${mainProblem}`,
+      `具体改法：${actionableFixes.length ? actionableFixes.join("；") : issues.map((issue) => issue.fixAction).join("；")}`,
+      `必须加入的约束：${issues.map((issue) => issue.promptConstraint).join("；")}`,
+      "改写边界：保留人物、场景、已发生事件和核心设定；不要只润色句子；不要新增无关设定。",
+      "输出格式：1. 改写策略 2. 需要改的段落 3. 改写正文 4. 为什么这样改。",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  private normalizeMethodologyCards(
+    value: unknown,
+    issues: DiagnosisIssue[],
+    prompt: string,
+  ): MethodologyCard[] {
+    const cards = Array.isArray(value)
+      ? value
+          .map((item, index) =>
+            this.normalizeMethodologyCard(item, index, issues, prompt),
+          )
+          .filter((item): item is MethodologyCard => item !== null)
+          .slice(0, 3)
+      : [];
+
+    if (cards.length > 0) {
+      return cards;
+    }
+
+    const issue = issues[0];
+    if (!issue) return [];
+    return [
+      {
+        id: "method-1",
+        sourceIssueId: issue.id,
+        type: issue.category === "hook" ? "hook_rule" : "prompt_rule",
+        title: `下次避免：${issue.title}`,
+        triggerProblem: issue.title,
+        reusableRule: issue.fixAction,
+        selfCheckQuestion: `提交前自查：${issue.readerImpact}`,
+        promptTemplate: prompt,
+        usageCount: 0,
+      },
+    ];
+  }
+
+  private normalizeMethodologyCard(
+    value: unknown,
+    index: number,
+    issues: DiagnosisIssue[],
+    prompt: string,
+  ): MethodologyCard | null {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+    const source = value as Record<string, unknown>;
+    const title = this.asText(source.title);
+    if (!title) return null;
+    const sourceIssueId =
+      this.asText(source.sourceIssueId) || issues[0]?.id || `issue-${index + 1}`;
+    return {
+      id: this.asText(source.id) || `method-${index + 1}`,
+      sourceIssueId,
+      type: this.normalizeMethodologyType(source.type),
+      title,
+      triggerProblem:
+        this.asText(source.triggerProblem) ||
+        issues.find((issue) => issue.id === sourceIssueId)?.title ||
+        title,
+      reusableRule:
+        this.asText(source.reusableRule) ||
+        issues.find((issue) => issue.id === sourceIssueId)?.fixAction ||
+        "下次遇到同类问题时，先明确读者期待和改稿约束。",
+      selfCheckQuestion:
+        this.asText(source.selfCheckQuestion) ||
+        "这版是否已经让读者知道为什么要继续看？",
+      promptTemplate: this.asText(source.promptTemplate) || prompt,
+      exampleBefore: this.asText(source.exampleBefore) || undefined,
+      exampleAfter: this.asText(source.exampleAfter) || undefined,
+      usageCount: 0,
+    };
+  }
+
+  private normalizeMethodologyType(value: unknown): MethodologyCard["type"] {
+    const type = this.asText(value).toLowerCase();
+    const allowed: MethodologyCard["type"][] = [
+      "opening_rule",
+      "prompt_rule",
+      "pacing_rule",
+      "hook_rule",
+      "payoff_rule",
+      "anti_pattern",
+    ];
+    return allowed.includes(type as MethodologyCard["type"])
+      ? (type as MethodologyCard["type"])
+      : "prompt_rule";
   }
 
   private asText(value: unknown): string {
@@ -814,13 +1315,47 @@ ${textSample}
     const textLength = input.chapterText.trim().length;
     const quickScore = textLength >= 300 ? 6.2 : 5.4;
     const genre = this.normalizeQuickReviewGenre(input.genre) || "other";
+    const issue: DiagnosisIssue = {
+      id: "issue-1",
+      severity: "high",
+      category: "other",
+      title: "演示模式不会判断真实剧情质量。",
+      description:
+        "当前使用 mock provider，只能验证诊断报告结构，不能代表真实编辑判断。",
+      evidence: [
+        {
+          quote: this.pickEvidenceQuote(input.chapterText),
+          locationHint: "输入开头",
+          confidence: 0,
+        },
+      ].filter((item) => item.quote),
+      readerImpact:
+        "如果只看演示结果，作者无法知道真实读者会在哪个位置流失。",
+      fixAction: "切换共享站或付费模型后重试快速点评。",
+      promptConstraint:
+        "使用真实模型时，要求它基于正文证据输出问题、读者影响和改稿动作。",
+      blocksNextStep: true,
+    };
+    const nextPrompt = this.normalizeNextPrompt(null, {
+      positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
+      sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
+      mainProblem: issue.title,
+      actionableFixes: [
+        "切换共享站或付费模型后重试快速点评。",
+        "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
+        "需要完整证据链时进入章节质检并生成 Rubric。",
+      ],
+      issues: [issue],
+      previousPrompt: input.previousPrompt,
+    });
 
     return {
       title: input.title || "未命名章节",
       genre,
+      inputKind: this.normalizeQuickReviewInputKind(input.inputKind),
       positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
       sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
-      mainProblem: "演示模式不会判断真实剧情质量。",
+      mainProblem: issue.title,
       actionableFixes: [
         "切换共享站或付费模型后重试快速点评。",
         "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
@@ -834,6 +1369,20 @@ ${textSample}
       readyReason: "当前是本地演示结果；真实点评需要使用可用模型服务。",
       quickScore,
       confidence: 0,
+      gateDecision: "revise",
+      gateReason: "当前是演示结构，真实稿件判断需要切换可用模型。",
+      oneLineDiagnosis: `这稿最该先解决：${issue.title}`,
+      issues: [issue],
+      strengths: [
+        {
+          title: "已经有可诊断文本入口",
+          keepAction: "下一步切换真实模型后保留相同输入复测。",
+        },
+      ],
+      revisionPlan: this.normalizeRevisionPlan(null, [issue]),
+      promptDiagnosis: this.normalizePromptDiagnosis(null, input.previousPrompt),
+      nextPrompt,
+      methodologyCards: this.normalizeMethodologyCards(null, [issue], nextPrompt.prompt),
     };
   }
 
@@ -953,17 +1502,7 @@ ${textSample}
 
     const content = await this.modelProviders.chat(
       input.provider,
-      [
-        {
-          role: "system",
-          content:
-            "你是严谨的中文网文点评官。你只返回合法 JSON，所有评分必须给出具体证据和可执行改法。",
-        },
-        {
-          role: "user",
-          content: this.scoreChapterPrompt(input),
-        },
-      ],
+      this.buildScoreChapterMessages(input),
       {
         maxOutputTokens: 3072,
         jsonSchema: {
@@ -3451,6 +3990,67 @@ ${input.text}
 `.trim();
   }
 
+  private buildScoreChapterMessages(input: ScoreChapterDto) {
+    const rubric = input.rubric as Record<string, unknown>;
+    const prompt = buildChapterScorePrompt(
+      {
+        title: input.chapterTitle,
+        text: input.chapterText,
+        rubricId: this.asText(rubric.id) || "score-chapter",
+      },
+      this.extractPromptMetrics(input.rubric),
+    );
+
+    return [
+      {
+        ...prompt.messages[0],
+        content: `${prompt.messages[0].content}
+你只返回合法 JSON，不使用 Markdown，所有评分必须给出具体证据和可执行改法。`,
+      },
+      {
+        ...prompt.messages[1],
+        content: `${prompt.messages[1].content}
+
+${this.scoreChapterPrompt(input)}`,
+      },
+    ];
+  }
+
+  private extractPromptMetrics(
+    rubric: Record<string, unknown>,
+  ): RubricMetric[] {
+    const metrics = Array.isArray(rubric.metrics) ? rubric.metrics : [];
+    const normalized = metrics
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+        const source = item as Record<string, unknown>;
+        const id = this.asText(source.id);
+        const name = this.asText(source.name);
+        if (!id || !name) {
+          return null;
+        }
+
+        return {
+          id,
+          name,
+          description: this.asText(source.description) || name,
+          scale:
+            source.scale && typeof source.scale === "object"
+              ? (source.scale as RubricMetric["scale"])
+              : {
+                  low: "低分：缺少可读证据或读者驱动力。",
+                  medium: "中分：方向存在，但压力、情绪或兑现不足。",
+                  high: "高分：正文证据清楚，能推动读者继续读。",
+                },
+        };
+      })
+      .filter((item): item is RubricMetric => item !== null);
+
+    return normalized.length > 0 ? normalized : DEFAULT_RUBRIC_METRICS;
+  }
+
   private scoreChapterPrompt(input: ScoreChapterDto): string {
     const styleProfile = this.buildStyleProfile(input);
     const marketProfile = this.buildMarketProfile(input);
@@ -3461,7 +4061,7 @@ ${input.text}
     );
     const aiSelfTest = this.buildAiSelfTestProfile(input.aiSelfTest);
     return `
-请使用给定 Rubric 质检用户章节。你要像网文编辑一样严格打分，并指出具体证据、问题和改法。
+补充上下文与严格输出要求：
 
 目标平台：${styleProfile.platformLabel}
 目标读者：${styleProfile.audienceLabel}
@@ -3480,11 +4080,6 @@ AI 自测增强：${aiSelfTest.summary}
 
 Rubric：
 ${JSON.stringify(input.rubric, null, 2)}
-
-用户章节标题：${input.chapterTitle}
-
-用户章节：
-${input.chapterText}
 
 请严格返回这个 JSON 结构：
 {

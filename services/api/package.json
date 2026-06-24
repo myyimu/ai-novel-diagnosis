@@ -6,12 +6,16 @@
   "license": "MIT",
   "author": "",
   "scripts": {
-    "dev": "nest start --watch --entryFile services/api/src/main",
+    "predev": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "dev": "nest start --watch",
+    "prebuild": "pnpm --filter @ai-novel-diagnosis/ai-core build",
     "build": "nest build",
-    "start": "nest start --entryFile services/api/src/main",
-    "start:dev": "nest start --watch --entryFile services/api/src/main",
-    "start:debug": "nest start --debug --watch --entryFile services/api/src/main",
-    "start:prod": "node dist/services/api/src/main",
+    "pretypecheck": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "start": "nest start",
+    "prestart:dev": "pnpm --filter @ai-novel-diagnosis/ai-core build",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
@@ -95,7 +99,8 @@
       "ts"
     ],
     "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/$1"
+      "^@/(.*)$": "<rootDir>/$1",
+      "^@ai-novel-diagnosis/ai-core$": "<rootDir>/../../../packages/ai-core/src/index.ts"
     },
     "rootDir": "src",
     "testEnvironment": "node",

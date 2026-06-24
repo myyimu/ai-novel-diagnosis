@@ -38,16 +38,26 @@ function tryParseJsonWithTargetedCommaRepair(content: string) {
   return undefined;
 }
 
+function replaceIllegalJsonControlChars(content: string) {
+  return Array.from(content, (char) => {
+    const code = char.charCodeAt(0);
+    const isIllegalControlChar =
+      code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d;
+    return isIllegalControlChar ? " " : char;
+  }).join("");
+}
+
 function lightRepairJsonString(content: string) {
-  return content
+  const repaired = content
     .replace(/^\uFEFF/, "")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
     .replace(/}\s*(?={)/g, "},")
     .replace(/]\s*(?=[{"])/g, "],")
     .replace(/"(\s*)(?=")/g, '",$1')
-    .replace(/,\s*([}\]])/g, "$1")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ");
+    .replace(/,\s*([}\]])/g, "$1");
+
+  return replaceIllegalJsonControlChars(repaired);
 }
 
 function extractBalancedJsonObject(content: string) {
