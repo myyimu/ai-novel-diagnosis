@@ -37,6 +37,7 @@ const sessions: RevisionSession[] = [
 		mainProblem: "开头承诺不清楚",
 		issueTitles: ["开头承诺不清楚"],
 		issueCategories: ["opening"],
+		nextPrompt: "请把开头承诺改成具体羞辱和反击目标。",
 		methodologyCardIds: [],
 	},
 ];
@@ -70,6 +71,15 @@ describe("RevisionHistoryView", () => {
 		expect(html).toContain("第二版");
 		expect(html).toContain("6.8/10");
 		expect(html).toContain("与上一版对比");
+		expect(html).toContain("分数变化");
+		expect(html).toContain("+1.2");
+		expect(html).toContain("Gate 改善");
+		expect(html).toContain("上一轮 Prompt 看起来有效");
+		expect(html).toContain("问题变化");
+		expect(html).toContain("已解决");
+		expect(html).toContain("新出现");
+		expect(html).toContain("下一版只做这件事");
+		expect(html).toContain("方法论卡");
 		expect(html).toContain("开头承诺不清楚");
 		expect(html).toContain("章末钩子没有代价");
 		expect(html).toContain("当时生成的下一轮 Prompt");

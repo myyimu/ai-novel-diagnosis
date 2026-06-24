@@ -2,6 +2,33 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { QuickExperiencePanel } from "./quick-experience-panel";
 
+const diagnosisExamples = [
+	{
+		id: "xuanhuan-ai-draft-opening-promise",
+		label: "玄幻 AI 初稿：开局承诺不清",
+		description: "把开局承诺改成具体的羞辱、代价和反击目标",
+		genre: "xuanhuan",
+		inputKind: "ai-draft" as const,
+		chapterTitle: "第一章 被逐出山门",
+		chapterText: "青岚宗外门钟声响了七下。",
+		previousPrompt: "请写一个玄幻废柴被逐出宗门的开头。",
+		topIssueCategory: "market_promise",
+		nextAction: "把开局承诺改成具体的羞辱、代价和反击目标",
+	},
+	{
+		id: "urban-prompt-too-vague",
+		label: "都市 AI 初稿：Prompt 约束太泛",
+		description: "把 Prompt 改成强冲突约束",
+		genre: "urban",
+		inputKind: "ai-draft" as const,
+		chapterTitle: "第一章 下山",
+		chapterText: "林越背着旧布包走出车站。",
+		previousPrompt: "请写一个都市下山高手开局。",
+		topIssueCategory: "prompt_constraint",
+		nextAction: "把 Prompt 改成强冲突约束",
+	},
+];
+
 describe("QuickExperiencePanel", () => {
 	it("renders the quick review entry without result", () => {
 		const html = renderToStaticMarkup(
@@ -23,6 +50,7 @@ describe("QuickExperiencePanel", () => {
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={vi.fn()}
 				onOpenModel={vi.fn()}
 				onOpenCritique={vi.fn()}
@@ -33,6 +61,10 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("30 秒小说诊断");
 		expect(html).toContain("当前 AI: 免费共享算力");
 		expect(html).toContain("生成改稿方案");
+		expect(html).toContain("玄幻 AI 初稿：开局承诺不清");
+		expect(html).toContain("都市 AI 初稿：Prompt 约束太泛");
+		expect(html).toContain("示例会展示：市场承诺");
+		expect(html).toContain("下一步：把开局承诺改成具体的羞辱、代价和反击目标");
 	});
 
 	it("renders quick review result when provided", () => {
@@ -61,6 +93,31 @@ describe("QuickExperiencePanel", () => {
 					readyReason: "文本量足够，适合做完整评分",
 					quickScore: 6.5,
 					confidence: 0.82,
+					issues: [
+						{
+							id: "issue-1",
+							severity: "high",
+							category: "conflict_pressure",
+							title: "冲突压力不足",
+							description: "开局有事件，但没有把失败代价压到主角身上。",
+							evidence: [
+								{
+									quote: "主角被公开否定，却发现旧案信物。",
+									locationHint: "第1段",
+									confidence: 0.86,
+								},
+								{
+									quote: "没有人真正阻止他继续参加试炼。",
+									locationHint: "中段",
+									confidence: 0.78,
+								},
+							],
+							readerImpact: "读者会觉得主角还没被逼到必须反击。",
+							fixAction: "把试炼资格和家族代价绑定到这场公开否定。",
+							promptConstraint: "前800字必须出现具体损失和反击目标。",
+							blocksNextStep: true,
+						},
+					],
 				}}
 				previousQuickReviewResult={{
 					title: "第一章 退婚",
@@ -117,6 +174,7 @@ describe("QuickExperiencePanel", () => {
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={true}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={vi.fn()}
 				onOpenModel={vi.fn()}
 				onOpenCritique={vi.fn()}
@@ -128,6 +186,17 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("典型玄幻废柴流开局");
 		expect(html).toContain("冲突压力不足");
 		expect(html).toContain("这章最大流失点：冲突压力不足");
+		expect(html).toContain("证据锚点");
+		expect(html).toContain("2 条");
+		expect(html).toContain("平均置信度");
+		expect(html).toContain("82%");
+		expect(html).toContain("最高优先级");
+		expect(html).toContain("高优先级");
+		expect(html).toContain("关键问题证据链");
+		expect(html).toContain("第1段：");
+		expect(html).toContain("置信度 86%");
+		expect(html).toContain("读者会觉得主角还没被逼到必须反击。");
+		expect(html).toContain("把试炼资格和家族代价绑定到这场公开否定。");
 		expect(html).toContain("补一句失败代价");
 		expect(html).toContain("可复制给写作 AI 的改稿 Prompt");
 		expect(html).toContain("请帮我改写这一章");
@@ -169,6 +238,7 @@ describe("QuickExperiencePanel", () => {
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={vi.fn()}
 				onOpenModel={vi.fn()}
 				onOpenCritique={vi.fn()}
@@ -203,6 +273,7 @@ describe("QuickExperiencePanel", () => {
 				onRun={vi.fn()}
 				onRerun={vi.fn()}
 				hasCachedResult={false}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={vi.fn()}
 				onOpenModel={vi.fn()}
 				onOpenCritique={vi.fn()}

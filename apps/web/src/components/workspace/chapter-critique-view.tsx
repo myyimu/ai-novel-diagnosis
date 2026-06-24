@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
+import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
 import {
 	aiSelfTests,
 	type AiSelfTestId,
@@ -81,7 +82,8 @@ export interface ChapterCritiqueViewProps {
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
-	onUseExampleChapter: () => void;
+	diagnosisExamples: DiagnosisExampleOption[];
+	onUseExampleChapter: (exampleId: string) => void;
 	onUseExampleReference: () => void;
 	onOpenModel: () => void;
 	onOpenBook: () => void;
@@ -285,6 +287,7 @@ export function ChapterCritiqueView({
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
+	diagnosisExamples,
 	onUseExampleChapter,
 	onUseExampleReference,
 	onOpenModel,
@@ -551,6 +554,7 @@ export function ChapterCritiqueView({
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={onUseExampleChapter}
 				onOpenModel={onOpenModel}
 				onOpenCritique={() =>

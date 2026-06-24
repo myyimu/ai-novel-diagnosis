@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { CheckCircle2, Clipboard, Loader2, Target } from "lucide-react";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
+import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
 import { summarizeRevisionTrend } from "@/lib/workspace-iteration";
 import type {
 	ProjectMethodologyCard,
@@ -30,6 +32,7 @@ export function QuickExperiencePanel({
 	onRun,
 	onRerun,
 	hasCachedResult,
+	diagnosisExamples,
 	onUseExample,
 	onOpenModel,
 	onOpenCritique,
@@ -53,11 +56,14 @@ export function QuickExperiencePanel({
 	onRun: () => void;
 	onRerun: () => void;
 	hasCachedResult: boolean;
-	onUseExample: () => void;
+	diagnosisExamples: DiagnosisExampleOption[];
+	onUseExample: (exampleId: string) => void;
 	onOpenModel: () => void;
 	onOpenCritique: () => void;
 	onOpenBook: () => void;
 }) {
+	const [selectedExampleId, setSelectedExampleId] = useState(diagnosisExamples[0]?.id ?? "");
+	const selectedExample = diagnosisExamples.find((example) => example.id === selectedExampleId);
 	const sellingPoints = Array.isArray(quickReviewResult?.sellingPoints)
 		? quickReviewResult.sellingPoints.filter(Boolean)
 		: [];
@@ -76,6 +82,7 @@ export function QuickExperiencePanel({
 		? quickReviewResult.methodologyCards.filter((card) => card && card.title)
 		: [];
 	const gate = buildGateView(quickReviewResult);
+	const evidenceSummary = buildEvidenceSummary(issues);
 	const quickScore =
 		typeof quickReviewResult?.quickScore === "number"
 			? `${quickReviewResult.quickScore}/10`
@@ -204,10 +211,34 @@ export function QuickExperiencePanel({
 								重新分析
 							</Button>
 						) : null}
+						{diagnosisExamples.length ? (
+							<select
+								aria-label="选择示例章节"
+								className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+								value={selectedExampleId}
+								onChange={(event) => setSelectedExampleId(event.target.value)}
+								disabled={loading}
+							>
+								{diagnosisExamples.map((example) => (
+									<option key={example.id} value={example.id}>
+										{example.label}
+									</option>
+								))}
+							</select>
+						) : null}
+						{selectedExample ? (
+							<div className="rounded-md border border-border bg-card p-3 text-xs leading-5 text-muted-foreground">
+								<p className="font-medium text-foreground">
+									示例会展示：
+									{formatIssueCategory(selectedExample.topIssueCategory)}
+								</p>
+								<p className="mt-1">下一步：{selectedExample.nextAction}</p>
+							</div>
+						) : null}
 						<Button
 							className="w-full"
 							variant="outline"
-							onClick={onUseExample}
+							onClick={() => onUseExample(selectedExampleId)}
 							disabled={loading}
 						>
 							填入示例章节
@@ -284,6 +315,28 @@ export function QuickExperiencePanel({
 							{quickReviewResult.gateReason ||
 								"这是当前稿件的改稿优先级建议，不代表平台流量预测。"}
 						</p>
+						{evidenceSummary ? (
+							<div className="mt-3 grid gap-2 sm:grid-cols-3">
+								<div className="rounded-md border border-border bg-card p-3">
+									<p className="text-xs text-muted-foreground">证据锚点</p>
+									<p className="mt-1 text-sm font-semibold">
+										{evidenceSummary.count} 条
+									</p>
+								</div>
+								<div className="rounded-md border border-border bg-card p-3">
+									<p className="text-xs text-muted-foreground">平均置信度</p>
+									<p className="mt-1 text-sm font-semibold">
+										{evidenceSummary.averageConfidence}%
+									</p>
+								</div>
+								<div className="rounded-md border border-border bg-card p-3">
+									<p className="text-xs text-muted-foreground">最高优先级</p>
+									<p className="mt-1 text-sm font-semibold">
+										{evidenceSummary.topSeverity}
+									</p>
+								</div>
+							</div>
+						) : null}
 					</div>
 					<div>
 						<p className="text-sm font-medium">现在还能打的卖点</p>
@@ -334,12 +387,18 @@ export function QuickExperiencePanel({
 												{issue.evidence.slice(0, 2).map((item, index) => (
 													<p
 														key={`${item.quote}-${index}`}
-														className="mt-1"
+														className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between"
 													>
-														{item.locationHint
-															? `${item.locationHint}：`
-															: ""}
-														{item.quote}
+														<span>
+															{item.locationHint
+																? `${item.locationHint}：`
+																: ""}
+															{item.quote}
+														</span>
+														<span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+															置信度{" "}
+															{formatConfidence(item.confidence)}
+														</span>
 													</p>
 												))}
 											</div>
@@ -637,6 +696,38 @@ function formatGateLabel(gate: string | undefined) {
 	};
 
 	return map[gate || ""] || "修改";
+}
+
+function buildEvidenceSummary(issues: QuickReviewResult["issues"] | undefined) {
+	const evidence = (issues || []).flatMap((issue) =>
+		Array.isArray(issue.evidence) ? issue.evidence : [],
+	);
+
+	if (!evidence.length) {
+		return null;
+	}
+
+	const averageConfidence = Math.round(
+		(evidence.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / evidence.length) *
+			100,
+	);
+	const topSeverity = (issues || []).some((issue) => issue.severity === "critical")
+		? "阻断"
+		: formatIssueSeverity((issues || [])[0]?.severity || "");
+
+	return {
+		count: evidence.length,
+		averageConfidence,
+		topSeverity,
+	};
+}
+
+function formatConfidence(confidence: number | undefined) {
+	if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+		return "待确认";
+	}
+
+	return `${Math.round(confidence * 100)}%`;
 }
 
 function buildReviewComparison(

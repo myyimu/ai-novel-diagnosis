@@ -50,6 +50,20 @@ const baseProps = {
 	onRunQuickExperience: vi.fn(),
 	onRerunQuickExperience: vi.fn(),
 	hasQuickReviewCache: false,
+	diagnosisExamples: [
+		{
+			id: "xuanhuan-ai-draft-opening-promise",
+			label: "玄幻 AI 初稿：开局承诺不清",
+			description: "把开局承诺改成具体的羞辱、代价和反击目标",
+			genre: "xuanhuan",
+			inputKind: "ai-draft" as const,
+			chapterTitle: "第一章 被逐出山门",
+			chapterText: "青岚宗外门钟声响了七下。",
+			previousPrompt: "请写一个玄幻废柴被逐出宗门的开头。",
+			topIssueCategory: "market_promise",
+			nextAction: "把开局承诺改成具体的羞辱、代价和反击目标",
+		},
+	],
 	onUseExampleChapter: vi.fn(),
 	onOpenModel: vi.fn(),
 	onOpenCritique: vi.fn(),
@@ -62,13 +76,16 @@ describe("OverviewView", () => {
 		const html = renderToStaticMarkup(<OverviewView {...baseProps} />);
 
 		expect(html).toContain("AI网文诊断台");
+		expect(html).toContain("先找出小说为什么没人追。");
+		expect(html).toContain("30 秒小说诊断");
+		expect(html).toContain("诊断闭环");
 		expect(html).toContain("找病因");
-		expect(html).toContain("当前模型");
 		expect(html).toContain("本地演示");
 		expect(html).toContain("深度质检进度");
 		expect(html).toContain("不是第一次使用入口");
 		expect(html).toContain("番茄小说");
 		expect(html).toContain("整书拆解");
+		expect(html).toContain("玄幻 AI 初稿：开局承诺不清");
 	});
 
 	it("shows latest score evidence when a report exists", () => {

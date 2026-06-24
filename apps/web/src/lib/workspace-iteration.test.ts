@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildDiagnosisDashboard,
 	buildProjectExportMarkdown,
+	buildRevisionComparison,
 	buildRevisionHistory,
 	createRevisionSession,
 	mergeProjectMethodologyCards,
@@ -240,6 +241,46 @@ describe("workspace iteration assets", () => {
 		expect(history.selected?.id).toBe(second.id);
 		expect(history.previous?.id).toBe(first.id);
 		expect(history.scoreDelta).toBe(1);
+		expect(history.comparison?.promptOutcome.status).toBe("partial");
+		expect(history.comparison?.repeatedIssues).toContain("章末钩子没有代价");
+	});
+
+	it("builds a structured adjacent revision comparison", () => {
+		const previous = createRevisionSession({
+			chapterTitle: "第一版",
+			chapterText: "版本一",
+			result: { ...baseResult, quickScore: 5.4, gateDecision: "rebuild" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const current = createRevisionSession({
+			chapterTitle: "第二版",
+			chapterText: "版本二",
+			result: {
+				...baseResult,
+				quickScore: 6.6,
+				gateDecision: "revise",
+				mainProblem: "新章末钩子还不够具体",
+				issues: [
+					{
+						...baseResult.issues![0]!,
+						id: "issue-2",
+						title: "新章末钩子还不够具体",
+					},
+				],
+			},
+			methodologyCardIds: [],
+			now: "2026-06-24T01:00:00.000Z",
+		});
+
+		const comparison = buildRevisionComparison({ current, previous });
+
+		expect(comparison.scoreDelta).toBe(1.2);
+		expect(comparison.gateChangeLabel).toBe("Gate 改善");
+		expect(comparison.promptOutcome.status).toBe("effective");
+		expect(comparison.resolvedIssues).toContain("章末钩子没有代价");
+		expect(comparison.newIssues).toContain("新章末钩子还不够具体");
+		expect(comparison.nextAction).toContain("方法论卡");
 	});
 
 	it("builds a project export markdown package", () => {

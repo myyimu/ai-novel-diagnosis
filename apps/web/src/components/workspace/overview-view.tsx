@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
+import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
 import type {
 	ProjectMethodologyCard,
 	QuickReviewInputKind,
@@ -93,7 +94,8 @@ interface OverviewViewProps {
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
-	onUseExampleChapter: () => void;
+	diagnosisExamples: DiagnosisExampleOption[];
+	onUseExampleChapter: (exampleId: string) => void;
 	onOpenModel: () => void;
 	onOpenCritique: () => void;
 	onOpenBook: () => void;
@@ -296,6 +298,7 @@ export function OverviewView({
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
+	diagnosisExamples,
 	onUseExampleChapter,
 	onOpenModel,
 	onOpenCritique,
@@ -306,60 +309,29 @@ export function OverviewView({
 
 	return (
 		<div className="space-y-6">
-			<section className="rounded-md border border-border bg-card p-5">
-				<div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
-					<div>
+			<section className="rounded-md border border-border bg-card px-4 py-3">
+				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+					<div className="min-w-0">
 						<p className="text-sm text-primary">AI网文诊断台</p>
-						<h2 className="mt-2 text-2xl font-semibold tracking-tight">
-							别急着重写，先找出小说为什么没人追。
+						<h2 className="mt-1 text-xl font-semibold tracking-tight">
+							先找出小说为什么没人追。
 						</h2>
-						<p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-							这不是一键写小说。先粘贴第一章，系统按“问题 → 正文证据 → 读者反应 →
-							修改优先级 → 改稿 Prompt”的链路诊断，改完再贴回来复诊。
+						<p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+							粘贴第一章，拿到问题、正文证据、读者反应和下一版改稿 Prompt。
 						</p>
 					</div>
-					<div className="grid gap-3">
-						<div className="rounded-md border border-border bg-background p-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<KeyRound className="size-4 text-primary" />
-								当前模型
-							</div>
-							<p className="mt-2 font-semibold">{providerLabel}</p>
-							<p className="mt-1 text-xs leading-5 text-muted-foreground">
+					<div className="flex shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm">
+						<KeyRound className="size-4 text-primary" />
+						<div>
+							<p className="font-medium">{providerLabel}</p>
+							<p className="text-xs text-muted-foreground">
 								{providerKind === "mock"
-									? "适合演示流程"
+									? "本地演示"
 									: providerModel || "使用预设模型"}
 							</p>
 						</div>
 					</div>
 				</div>
-			</section>
-
-			<section className="grid gap-4 md:grid-cols-3">
-				<PathCard
-					icon={Target}
-					label="第一步"
-					title="找病因"
-					description="只看一章，先定位读者为什么不想继续。"
-					active={!hasQuickResult}
-					done={hasQuickResult}
-				/>
-				<PathCard
-					icon={FileText}
-					label="第二步"
-					title="拿证据链"
-					description="把结论绑定正文证据、读者反应和修改优先级。"
-					active={hasQuickResult}
-					done={hasQuickResult}
-				/>
-				<PathCard
-					icon={CheckCircle2}
-					label="第三步"
-					title="改稿复诊"
-					description="贴回改后版本，看最大问题有没有真的变化。"
-					active={Boolean(previousQuickReviewResult && quickReviewResult)}
-					done={Boolean(previousQuickReviewResult && quickReviewResult)}
-				/>
 			</section>
 
 			<QuickExperiencePanel
@@ -381,11 +353,47 @@ export function OverviewView({
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}
+				diagnosisExamples={diagnosisExamples}
 				onUseExample={onUseExampleChapter}
 				onOpenModel={onOpenModel}
 				onOpenCritique={onOpenCritique}
 				onOpenBook={onOpenBook}
 			/>
+
+			<details className="rounded-md border border-border bg-card p-5">
+				<summary className="cursor-pointer list-none text-sm font-medium">
+					诊断闭环
+					<span className="ml-2 text-xs font-normal text-muted-foreground">
+						需要理解流程时再看
+					</span>
+				</summary>
+				<section className="mt-4 grid gap-4 md:grid-cols-3">
+					<PathCard
+						icon={Target}
+						label="第一步"
+						title="找病因"
+						description="只看一章，先定位读者为什么不想继续。"
+						active={!hasQuickResult}
+						done={hasQuickResult}
+					/>
+					<PathCard
+						icon={FileText}
+						label="第二步"
+						title="拿证据链"
+						description="把结论绑定正文证据、读者反应和修改优先级。"
+						active={hasQuickResult}
+						done={hasQuickResult}
+					/>
+					<PathCard
+						icon={CheckCircle2}
+						label="第三步"
+						title="改稿复诊"
+						description="贴回改后版本，看最大问题有没有真的变化。"
+						active={Boolean(previousQuickReviewResult && quickReviewResult)}
+						done={Boolean(previousQuickReviewResult && quickReviewResult)}
+					/>
+				</section>
+			</details>
 
 			<NextActionPanel
 				action={nextAction}

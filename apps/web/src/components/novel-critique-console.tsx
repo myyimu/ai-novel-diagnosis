@@ -37,6 +37,11 @@ import {
 	buildScoreEvidenceChain,
 } from "@/lib/research-library";
 import { apiUrl, type ApiEnvelope } from "@/lib/api-client";
+import {
+	diagnosisExampleOptions,
+	findDiagnosisExampleByChapterText,
+	getDiagnosisExampleOption,
+} from "@/lib/diagnosis-examples";
 import { providerPresets } from "@/lib/provider-presets";
 import { toQuickReviewErrorMessage } from "@/lib/quick-review-errors";
 import {
@@ -112,7 +117,6 @@ import {
 	defaultWorkspaceProject,
 	defaultProvider,
 	defaultReferenceText,
-	defaultUserText,
 	useWorkspaceStore,
 } from "@/stores/workspace-store";
 
@@ -1277,13 +1281,17 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setStatus("已恢复默认 AI 设置，并保存到本机浏览器。");
 	}
 
-	function useExampleChapter() {
-		setChapterTitle("第一章 考场重逢");
-		setChapterText(defaultUserText);
+	function useExampleChapter(exampleId?: string) {
+		const example = getDiagnosisExampleOption(exampleId);
+		setChapterTitle(example.chapterTitle);
+		setChapterText(example.chapterText);
+		setQuickReviewGenre(example.genre);
+		setQuickReviewInputKind(example.inputKind);
+		setQuickReviewPreviousPrompt(example.previousPrompt);
 		setPreviousQuickReviewResult(null);
 		setQuickReviewResult(null);
 		setScoreResult(null);
-		setStatus("已填入示例章节。示例只用于演示，你可以直接替换成自己的正文。");
+		setStatus(`已填入示例章节：${example.label}。示例只用于演示，你可以直接替换成自己的正文。`);
 	}
 
 	function useExampleReference() {
@@ -1631,6 +1639,20 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				setStatus("已使用缓存的快速点评；如需让 AI 重新点评，请点“重新分析”。");
 				return;
 			}
+		}
+
+		const matchedExample =
+			provider.kind === "mock" ? findDiagnosisExampleByChapterText(chapterText) : undefined;
+		if (matchedExample?.result) {
+			const result = matchedExample.result;
+			if (quickReviewResult) {
+				setPreviousQuickReviewResult(quickReviewResult);
+			}
+			setQuickReviewResult(result);
+			rememberQuickReview(cacheKey, result);
+			rememberQuickReviewIteration(result);
+			setStatus(`已载入示例诊断报告：${matchedExample.label}。`);
+			return;
 		}
 
 		setLoading("quick");
@@ -2106,6 +2128,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					onRunQuickExperience={runQuickExperience}
 					onRerunQuickExperience={() => runQuickExperience(true)}
 					hasQuickReviewCache={Boolean(quickReviewCacheHit)}
+					diagnosisExamples={diagnosisExampleOptions}
 					onUseExampleChapter={useExampleChapter}
 					onOpenModel={() => openView("provider")}
 					onOpenCritique={() => openView("chapter")}
@@ -2380,6 +2403,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					onRunQuickExperience={runQuickExperience}
 					onRerunQuickExperience={() => runQuickExperience(true)}
 					hasQuickReviewCache={Boolean(quickReviewCacheHit)}
+					diagnosisExamples={diagnosisExampleOptions}
 					onUseExampleChapter={useExampleChapter}
 					onUseExampleReference={useExampleReference}
 					onOpenModel={() => openView("provider")}

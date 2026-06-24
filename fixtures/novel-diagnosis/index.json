@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "novel-diagnosis-fixtures/v1",
+  "description": "Golden fixtures for AI网文诊断台 quick review examples and regression tests.",
+  "fixtures": [
+    "xuanhuan-ai-draft-opening-promise.json",
+    "urban-prompt-too-vague.json",
+    "romance-setting-load.json"
+  ]
+}

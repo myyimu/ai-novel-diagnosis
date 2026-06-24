@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "xuanhuan-ai-draft-opening-promise",
+  "title": "玄幻 AI 初稿：开局承诺不清",
+  "genre": "xuanhuan",
+  "inputKind": "ai-draft",
+  "chapterTitle": "第一章 被逐出山门",
+  "chapterText": "青岚宗外门钟声响了七下。\n\n沈照站在演武场中央，衣衫被雨水打湿，周围弟子议论纷纷。执事长老拿出一枚玉简，平静宣布他灵脉残损，三日内离宗。\n\n沈照低着头，没有争辩。他想起三年前师父救他入山，又想起这些年自己扫过的山道、抄过的经卷。他觉得世事无常，心中生出几分惆怅。\n\n长老说完便转身离去。师兄们陆续散开，只剩一个小师妹把旧伞塞给他，说山下路远，别淋坏了身子。\n\n沈照望着远处云雾，忽然觉得胸口那道旧伤微微发热。也许离开这里，反倒能看见更大的天地。",
+  "previousPrompt": "请写一个玄幻废柴被逐出宗门的开头，要有雨夜、宗门、旧伤和成长感。",
+  "expected": {
+    "gateDecision": "rebuild",
+    "topIssueCategory": "market_promise",
+    "scoreRange": [4.5, 5.5],
+    "mustContainEvidence": ["也许离开这里，反倒能看见更大的天地"],
+    "actionKeywords": ["公开羞辱", "具体损失", "反击目标"],
+    "nextAction": "把开局承诺改成具体的羞辱、代价和反击目标"
+  },
+  "result": {
+    "title": "第一章 被逐出山门",
+    "genre": "xuanhuan",
+    "inputKind": "ai-draft",
+    "positioning": "玄幻废柴被逐开局",
+    "sellingPoints": ["宗门放逐", "旧伤异动", "低谷翻身"],
+    "mainProblem": "开局有被逐事件，但没有兑现读者期待的羞辱、代价和反击承诺。",
+    "actionableFixes": [
+      "把放逐从通知改成公开羞辱，让主角当场失去具体资源或资格。",
+      "让旧伤异动立刻指向可验证的反击机会，而不是空泛成长感。",
+      "章末给出下一章必须看的目标：三日内夺回名额、揭穿陷害者或拿到禁地资格。"
+    ],
+    "recommendedPlatforms": [
+      {
+        "id": "fanqie",
+        "label": "番茄",
+        "fit": "medium",
+        "reason": "题材和逆袭框架匹配，但开头承诺太慢。"
+      }
+    ],
+    "readyForFullReview": false,
+    "readyReason": "开局承诺尚未成立，先重构第一章核心冲突。",
+    "quickScore": 5.0,
+    "confidence": 0.84,
+    "gateDecision": "rebuild",
+    "gateReason": "核心卖点只停留在氛围和设定，没有形成读者会追的明确期待。",
+    "oneLineDiagnosis": "这章像玄幻开场的背景稿，还不像能带动追读的第一章。",
+    "issues": [
+      {
+        "id": "issue-market-promise-1",
+        "severity": "critical",
+        "category": "market_promise",
+        "title": "被逐事件没有转成读者承诺",
+        "description": "读者看到废柴被逐，期待的是被低估、被羞辱、失去资格后的反击机会；当前只是平静宣布结果。",
+        "evidence": [
+          {
+            "quote": "执事长老拿出一枚玉简，平静宣布他灵脉残损，三日内离宗。",
+            "locationHint": "第2段",
+            "confidence": 0.86
+          },
+          {
+            "quote": "沈照低着头，没有争辩。",
+            "locationHint": "第3段",
+            "confidence": 0.82
+          }
+        ],
+        "readerImpact": "读者会觉得主角没有被逼到必须行动的地步，也不知道下一章为什么值得点开。",
+        "fixAction": "把放逐改成公开剥夺资格，并让主角当场发现一个能翻盘的证据或机会。",
+        "promptConstraint": "第一章前800字必须出现具体羞辱、具体损失和一个可执行反击目标。",
+        "blocksNextStep": true
+      },
+      {
+        "id": "issue-hook-1",
+        "severity": "high",
+        "category": "hook",
+        "title": "章末钩子只有情绪，没有具体悬念",
+        "description": "旧伤发热是可用钩子，但没有说明它带来什么风险或收益。",
+        "evidence": [
+          {
+            "quote": "也许离开这里，反倒能看见更大的天地。",
+            "locationHint": "末段",
+            "confidence": 0.88
+          }
+        ],
+        "readerImpact": "读者无法判断下一章会发生什么，只能得到泛泛成长预期。",
+        "fixAction": "让旧伤发热触发一条明确线索，例如禁地钥匙、仇人印记或被夺灵脉的证据。",
+        "promptConstraint": "章末必须写出下一章的具体问题，而不是抒情式展望。",
+        "blocksNextStep": true
+      }
+    ],
+    "strengths": [
+      {
+        "title": "低谷开局可用",
+        "evidence": "被逐出山门和旧伤异动能形成逆袭底盘。",
+        "keepAction": "保留放逐和旧伤，但把它们绑定到明确反击目标。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-market-promise-1", "issue-hook-1"],
+      "keep": ["宗门放逐", "旧伤异动", "雨夜压抑气氛"],
+      "change": ["把平静宣布改成公开羞辱", "把泛泛成长改成具体翻盘线索"],
+      "avoid": ["继续写师门回忆", "用大段心理描写替代冲突"],
+      "checkpoints": [
+        "读者能否在前800字知道主角失去了什么？",
+        "章末是否提出一个下一章必须解决的问题？"
+      ]
+    },
+    "promptDiagnosis": {
+      "originalPrompt": "请写一个玄幻废柴被逐出宗门的开头，要有雨夜、宗门、旧伤和成长感。",
+      "missingConstraints": ["没有要求公开羞辱", "没有要求具体反击目标", "没有要求章末追读钩子"],
+      "vagueInstructions": ["成长感", "更大的天地"],
+      "improvedPromptPrinciples": ["先写市场承诺，再写氛围", "每个设定必须服务冲突或钩子"]
+    },
+    "nextPrompt": {
+      "title": "重构玄幻被逐开局 Prompt",
+      "prompt": "请重写第一章前1500字。主角沈照在宗门演武场被公开逐出，必须出现三件事：1）具体羞辱：同门当众指出他灵脉残损并抢走试炼名额；2）具体损失：三日内离宗且失去师父遗物；3）具体反击目标：旧伤发热指向被夺灵脉的证据，章末让主角决定夜闯藏经阁找证据。减少回忆和抒情，所有描写都服务压迫、目标和下一章钩子。",
+      "linkedIssueIds": ["issue-market-promise-1", "issue-hook-1"],
+      "whyThisWorks": ["补足读者承诺", "把旧伤从氛围改成行动线索", "让章末有明确追读问题"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-opening-promise",
+        "sourceIssueId": "issue-market-promise-1",
+        "type": "opening_rule",
+        "title": "废柴开局必须先兑现承诺",
+        "triggerProblem": "被逐事件只有设定，没有读者承诺。",
+        "reusableRule": "废柴/被逐/退婚类开头要在前800字给出具体羞辱、具体损失和具体反击目标。",
+        "selfCheckQuestion": "读者能否一句话说出主角刚失去了什么、接下来要夺回什么？",
+        "promptTemplate": "请确保前800字出现具体羞辱、具体损失和具体反击目标。"
+      }
+    ]
+  }
+}

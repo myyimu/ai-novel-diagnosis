@@ -137,6 +137,58 @@ export function RevisionHistoryView({
 								<RotateCcw className="size-4 text-primary" />
 								<h2 className="text-base font-semibold">与上一版对比</h2>
 							</div>
+							{history.comparison ? (
+								<div className="mt-4 space-y-3">
+									<div className="grid gap-3 md:grid-cols-3">
+										<DetailStat
+											label="分数变化"
+											value={formatScoreDelta(history.comparison.scoreDelta)}
+										/>
+										<DetailStat
+											label="Gate 变化"
+											value={history.comparison.gateChangeLabel}
+										/>
+										<div
+											className={`rounded-md border p-3 ${formatPromptOutcomeClass(history.comparison.promptOutcome.status)}`}
+										>
+											<p className="text-xs text-muted-foreground">
+												Prompt 判断
+											</p>
+											<p className="mt-2 text-sm font-semibold">
+												{history.comparison.promptOutcome.label}
+											</p>
+											<p className="mt-1 text-xs leading-5 text-muted-foreground">
+												{history.comparison.promptOutcome.reason}
+											</p>
+										</div>
+									</div>
+									<div className="rounded-md border border-border bg-background p-3">
+										<p className="text-xs text-muted-foreground">问题变化</p>
+										<div className="mt-3 grid gap-3 md:grid-cols-3">
+											<IssueChangeList
+												label="已解决"
+												items={history.comparison.resolvedIssues}
+											/>
+											<IssueChangeList
+												label="仍重复"
+												items={history.comparison.repeatedIssues}
+											/>
+											<IssueChangeList
+												label="新出现"
+												items={history.comparison.newIssues}
+											/>
+										</div>
+									</div>
+									<div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+										<p className="text-xs text-muted-foreground">
+											下一版只做这件事
+										</p>
+										<p className="mt-2 text-sm leading-6">
+											{history.comparison.nextAction}
+										</p>
+									</div>
+								</div>
+							) : null}
 							<div className="mt-4 grid gap-3 md:grid-cols-2">
 								<CompareBlock
 									label="上一版问题"
@@ -234,6 +286,23 @@ export function RevisionHistoryView({
 	);
 }
 
+function IssueChangeList({ label, items }: { label: string; items: string[] }) {
+	return (
+		<div>
+			<p className="text-xs font-medium">{label}</p>
+			{items.length ? (
+				<ul className="mt-2 space-y-1 text-sm leading-5 text-muted-foreground">
+					{items.slice(0, 3).map((item) => (
+						<li key={item}>{item}</li>
+					))}
+				</ul>
+			) : (
+				<p className="mt-2 text-sm text-muted-foreground">暂无</p>
+			)}
+		</div>
+	);
+}
+
 function DetailStat({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="rounded-md border border-border bg-background p-3">
@@ -256,6 +325,17 @@ function formatScoreDelta(value: number | null) {
 	if (value === null) return "暂无上一版";
 	if (value === 0) return "持平";
 	return value > 0 ? `+${value}` : `${value}`;
+}
+
+function formatPromptOutcomeClass(status: string) {
+	const map: Record<string, string> = {
+		effective: "border-emerald-500/30 bg-emerald-500/5",
+		partial: "border-primary/30 bg-primary/10",
+		ineffective: "border-amber-500/30 bg-amber-500/5",
+		unknown: "border-border bg-background",
+	};
+
+	return map[status] || map.unknown;
 }
 
 function formatGateLabel(gate: string | undefined) {

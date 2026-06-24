@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "romance-setting-load",
+  "title": "言情开局：设定压过关系钩子",
+  "genre": "romance",
+  "inputKind": "human-draft",
+  "chapterTitle": "第一章 回到订婚夜",
+  "chapterText": "姜宁醒来时，墙上的挂钟正指向晚上八点。\n\n她记得自己上一世死在冬夜。那一年，姜家资金链断裂，父亲病倒，母亲远走，妹妹失踪，未婚夫陆迟则在发布会上宣布解除婚约。后来她独自经营工作室，三年后被合作伙伴背叛。\n\n这一次，她回到了订婚宴开始前。姜家别墅灯火通明，宾客名单、礼服品牌、酒店流程、媒体席位都摆在桌上。助理敲门进来，提醒她还有二十分钟下楼。\n\n姜宁翻开文件，看见陆迟的名字，手指停了很久。她知道今晚会有一场闹剧，也知道许多人会在宴会上看她笑话。她合上文件，对镜子里的自己说，这一次不能再输了。",
+  "previousPrompt": "",
+  "expected": {
+    "gateDecision": "revise",
+    "topIssueCategory": "setting_load",
+    "scoreRange": [6.0, 7.0],
+    "mustContainEvidence": ["宾客名单、礼服品牌、酒店流程、媒体席位"],
+    "actionKeywords": ["删除", "陆迟", "关系张力"],
+    "nextAction": "删掉背景账本，把订婚宴冲突和陆迟的关系钩子前置"
+  },
+  "result": {
+    "title": "第一章 回到订婚夜",
+    "genre": "romance",
+    "inputKind": "human-draft",
+    "positioning": "重生订婚宴逆转言情",
+    "sellingPoints": ["重生", "订婚宴", "前未婚夫关系钩子"],
+    "mainProblem": "设定信息太早铺开，真正的关系冲突和订婚宴钩子没有及时进入场面。",
+    "actionableFixes": [
+      "压缩上一世背景，只保留与今晚订婚宴直接相关的一两条伤害。",
+      "让陆迟或关键对手更早进入场景，制造关系张力。",
+      "把文件清单改成能触发反击的证据或选择。"
+    ],
+    "recommendedPlatforms": [
+      {
+        "id": "jinjiang",
+        "label": "晋江",
+        "fit": "medium",
+        "reason": "关系钩子有潜力，但开局需要更快进入人物互动。"
+      }
+    ],
+    "readyForFullReview": true,
+    "readyReason": "题材和核心场景可用，先压缩信息量并前置关系冲突。",
+    "quickScore": 6.4,
+    "confidence": 0.82,
+    "gateDecision": "revise",
+    "gateReason": "故事方向能成立，但第一章前半段把注意力消耗在背景账本上。",
+    "oneLineDiagnosis": "读者想看订婚宴翻盘，你先让她读了一页事故清单。",
+    "issues": [
+      {
+        "id": "issue-setting-load-1",
+        "severity": "high",
+        "category": "setting_load",
+        "title": "上一世信息一次性堆太多",
+        "description": "资金链、父母、妹妹、未婚夫、工作室和合作伙伴连续出现，超出第一章必要信息。",
+        "evidence": [
+          {
+            "quote": "父亲病倒，母亲远走，妹妹失踪，未婚夫陆迟则在发布会上宣布解除婚约。",
+            "locationHint": "第2段",
+            "confidence": 0.86
+          },
+          {
+            "quote": "宾客名单、礼服品牌、酒店流程、媒体席位都摆在桌上。",
+            "locationHint": "第3段",
+            "confidence": 0.84
+          }
+        ],
+        "readerImpact": "读者还没建立对男女主关系的兴趣，就先被背景信息拖慢。",
+        "fixAction": "只保留今晚会被当众解除婚约这一条核心伤害，其余信息放到后续触发。",
+        "promptConstraint": "第一章前1000字最多交代两个过去信息点，必须服务当前场景冲突。",
+        "blocksNextStep": true
+      },
+      {
+        "id": "issue-character-goal-1",
+        "severity": "medium",
+        "category": "character_goal",
+        "title": "女主目标还停在口号",
+        "description": "不能再输了是态度，不是今晚可执行的动作。",
+        "evidence": [
+          {
+            "quote": "这一次不能再输了。",
+            "locationHint": "末句",
+            "confidence": 0.8
+          }
+        ],
+        "readerImpact": "读者不知道女主下一步要改哪一件事，也不知道她会如何对抗陆迟。",
+        "fixAction": "章末让女主做一个具体选择：提前下楼、换掉证据文件、主动邀请陆迟谈判或当众改流程。",
+        "promptConstraint": "章末目标必须是今晚能执行的一步，而不是抽象决心。",
+        "blocksNextStep": false
+      }
+    ],
+    "strengths": [
+      {
+        "title": "订婚宴节点天然有戏",
+        "evidence": "重生回到订婚宴前二十分钟，天然具备倒计时和关系爆点。",
+        "keepAction": "保留订婚宴倒计时，把人物互动提前。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-setting-load-1", "issue-character-goal-1"],
+      "keep": ["重生回到订婚宴前", "陆迟关系钩子", "宴会倒计时"],
+      "change": ["删掉过多家族背景", "让陆迟或对手提前出现", "章末给出具体行动"],
+      "avoid": ["用清单交代所有前史", "用口号代替行动"],
+      "checkpoints": [
+        "前1000字是否已经出现关系对抗？",
+        "章末女主是否做出一个今晚可执行的选择？"
+      ]
+    },
+    "promptDiagnosis": {
+      "missingConstraints": ["缺少信息量上限", "缺少关系互动前置要求"],
+      "vagueInstructions": [],
+      "improvedPromptPrinciples": ["重生信息只保留当前场景要用的部分", "言情开局优先让关系张力上桌"]
+    },
+    "nextPrompt": {
+      "title": "压缩设定并前置关系钩子 Prompt",
+      "prompt": "请改写第一章前1200字。只保留姜宁上一世被陆迟当众解除婚约这一条核心伤害，删除资金链、父母、妹妹、工作室等暂时无关信息。场景从订婚宴前二十分钟开始，陆迟必须在前800字内出现或发来能改变宴会走向的信息。章末让姜宁做出一个具体行动：提前下楼并主动改掉原定订婚流程。重点写关系张力和倒计时，不写背景清单。",
+      "linkedIssueIds": ["issue-setting-load-1", "issue-character-goal-1"],
+      "whyThisWorks": ["降低首章信息负担", "把言情关系钩子前置", "让女主目标从口号变成行动"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-setting-budget",
+        "sourceIssueId": "issue-setting-load-1",
+        "type": "opening_rule",
+        "title": "开局设定只能服务当前场面",
+        "triggerProblem": "上一世背景一次性堆太多。",
+        "reusableRule": "第一章前1000字只保留当前场景马上会用到的信息，其余背景等冲突触发后再补。",
+        "selfCheckQuestion": "这条背景如果删掉，当前场面是否仍能成立？",
+        "promptTemplate": "前1000字最多交代两个过去信息点，且都必须服务当前场景冲突。"
+      }
+    ]
+  }
+}
