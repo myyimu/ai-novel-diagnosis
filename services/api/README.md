@@ -122,8 +122,25 @@ Swagger: http://127.0.0.1:3001/api/docs
 pnpm --filter api check
 pnpm --filter api test
 pnpm --filter api build
-pnpm --filter api db:push
+pnpm --filter api db:generate
+pnpm --filter api db:migrate
 ```
+
+## 数据库迁移
+
+真实 PostgreSQL 使用 `drizzle/migrations` 中的迁移文件，不再依赖临时 `db:push` 作为部署手段。
+
+```bash
+DATABASE_URL=postgres://user:pass@host:5432/db pnpm --filter api db:migrate
+```
+
+修改 `src/service/drizzle/schema.ts` 后，先生成迁移并提交生成的 SQL 与 meta 文件：
+
+```bash
+pnpm --filter api db:generate
+```
+
+未配置 `DATABASE_URL` 时，开发环境仍会使用 PGlite，并由 `DrizzleService` 创建本地兜底表结构。
 
 ## 维护原则
 

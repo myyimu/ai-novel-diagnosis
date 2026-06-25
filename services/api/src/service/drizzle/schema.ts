@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  real,
   integer,
   jsonb,
   pgTable,
@@ -60,7 +61,59 @@ export const bookAnalysisJobs = pgTable("book_analysis_jobs", {
   finishedAt: timestamp("finished_at", { precision: 3 }),
 });
 
+export const workspaceProjects = pgTable("workspace_projects", {
+  id: text("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+});
+
+export const revisionSessions = pgTable("revision_sessions", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  chapterTitle: text("chapter_title").notNull(),
+  genre: varchar("genre", { length: 64 }).notNull(),
+  inputKind: varchar("input_kind", { length: 64 }).notNull(),
+  textHash: text("text_hash").notNull(),
+  textLength: integer("text_length").notNull(),
+  quickScore: real("quick_score").notNull(),
+  gateDecision: varchar("gate_decision", { length: 32 }).notNull(),
+  mainProblem: text("main_problem").notNull(),
+  issueTitles: jsonb("issue_titles").notNull(),
+  issueCategories: jsonb("issue_categories").notNull(),
+  nextPrompt: text("next_prompt"),
+  revisionNote: text("revision_note"),
+  revisionNoteUpdatedAt: timestamp("revision_note_updated_at", {
+    precision: 3,
+  }),
+  methodologyCardIds: jsonb("methodology_card_ids").notNull(),
+});
+
+export const methodologyCards = pgTable("methodology_cards", {
+  projectCardId: text("project_card_id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  id: text("id").notNull(),
+  sourceIssueId: text("source_issue_id").notNull(),
+  type: varchar("type", { length: 64 }).notNull(),
+  title: text("title").notNull(),
+  triggerProblem: text("trigger_problem").notNull(),
+  reusableRule: text("reusable_rule").notNull(),
+  selfCheckQuestion: text("self_check_question").notNull(),
+  promptTemplate: text("prompt_template"),
+  firstSeenAt: timestamp("first_seen_at", { precision: 3 }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { precision: 3 }).notNull(),
+  sourceChapterTitle: text("source_chapter_title").notNull(),
+  sourceIssueTitle: text("source_issue_title"),
+  occurrenceCount: integer("occurrence_count").notNull(),
+  usageCount: integer("usage_count").notNull(),
+});
+
 export type AnalysisUploadSelect = typeof analysisUploads.$inferSelect;
 export type AnalysisUploadInsert = typeof analysisUploads.$inferInsert;
 export type BookAnalysisJobSelect = typeof bookAnalysisJobs.$inferSelect;
 export type BookAnalysisJobInsert = typeof bookAnalysisJobs.$inferInsert;
+export type WorkspaceProjectSelect = typeof workspaceProjects.$inferSelect;
+export type RevisionSessionSelect = typeof revisionSessions.$inferSelect;
+export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;

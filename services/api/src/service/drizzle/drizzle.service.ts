@@ -112,10 +112,9 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * bootstrapPgliteSchema applies the schema DDL to a fresh in-memory
-   * PGlite instance. We hand-write the DDL here because drizzle-kit
-   * migrations aren't generated for this template. Keep this block in
-   * sync with `schema.ts` whenever you add a table.
+   * bootstrapPgliteSchema applies the schema DDL to a local PGlite
+   * database. Real PostgreSQL uses Drizzle migrations; keep this local
+   * fallback DDL in sync with `schema.ts` and `drizzle/migrations`.
    */
   private async bootstrapPgliteSchema(): Promise<void> {
     await this.db.execute(sql`
@@ -163,6 +162,56 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     await this.db.execute(sql`
       ALTER TABLE "book_analysis_jobs"
       ADD COLUMN IF NOT EXISTS "partial_result" jsonb
+    `);
+    await this.db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "workspace_projects" (
+        "id" text PRIMARY KEY,
+        "name" varchar(255) NOT NULL,
+        "created_at" timestamp(3) DEFAULT now() NOT NULL,
+        "updated_at" timestamp(3) NOT NULL
+      )
+    `);
+    await this.db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "revision_sessions" (
+        "id" text PRIMARY KEY,
+        "project_id" text NOT NULL,
+        "created_at" timestamp(3) DEFAULT now() NOT NULL,
+        "updated_at" timestamp(3) NOT NULL,
+        "chapter_title" text NOT NULL,
+        "genre" varchar(64) NOT NULL,
+        "input_kind" varchar(64) NOT NULL,
+        "text_hash" text NOT NULL,
+        "text_length" integer NOT NULL,
+        "quick_score" real NOT NULL,
+        "gate_decision" varchar(32) NOT NULL,
+        "main_problem" text NOT NULL,
+        "issue_titles" jsonb NOT NULL,
+        "issue_categories" jsonb NOT NULL,
+        "next_prompt" text,
+        "revision_note" text,
+        "revision_note_updated_at" timestamp(3),
+        "methodology_card_ids" jsonb NOT NULL
+      )
+    `);
+    await this.db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "methodology_cards" (
+        "project_card_id" text PRIMARY KEY,
+        "project_id" text NOT NULL,
+        "id" text NOT NULL,
+        "source_issue_id" text NOT NULL,
+        "type" varchar(64) NOT NULL,
+        "title" text NOT NULL,
+        "trigger_problem" text NOT NULL,
+        "reusable_rule" text NOT NULL,
+        "self_check_question" text NOT NULL,
+        "prompt_template" text,
+        "first_seen_at" timestamp(3) NOT NULL,
+        "last_seen_at" timestamp(3) NOT NULL,
+        "source_chapter_title" text NOT NULL,
+        "source_issue_title" text,
+        "occurrence_count" integer NOT NULL,
+        "usage_count" integer NOT NULL
+      )
     `);
   }
 

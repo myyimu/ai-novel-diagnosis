@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # 执行 Drizzle 数据库迁移
-npx drizzle-kit migrate
+node dist/service/drizzle/run-migrations.js
 
 # 启动应用
-pm2-runtime dist/main.js
+node dist/main.js

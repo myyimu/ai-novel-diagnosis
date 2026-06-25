@@ -11,4 +11,4 @@ COPY .one-container/dist ./dist
 COPY .one-container/drizzle ./drizzle
 
 EXPOSE 3001
-CMD ["node", "dist/services/api/src/main.js"]
+CMD ["sh", "-c", "node dist/service/drizzle/run-migrations.js && node dist/main.js"]

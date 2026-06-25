@@ -192,7 +192,7 @@ if (/start:dev|nest start --watch|pnpm .*dev/.test(apiDockerfile)) {
 const preparedArtifacts = [
 	"apps/web/.one-container/standalone/apps/web/server.js",
 	"apps/web/.one-container/standalone/apps/web/.next/static",
-	"services/api/.one-container/dist/services/api/src/main.js",
+	"services/api/.one-container/dist/main.js",
 ];
 for (const artifact of preparedArtifacts) {
 	if (!existsSync(join(root, artifact))) {

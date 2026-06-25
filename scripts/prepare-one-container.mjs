@@ -27,6 +27,7 @@ const targets = {
 			run("pnpm", ["--filter", "api", "build"]);
 			run("pnpm", ["--filter", "api", "deploy", "--prod", "--legacy", this.outDir]);
 			copy("services/api/dist", join(root, this.outDir, "dist"));
+			copy("services/api/drizzle/migrations", join(root, this.outDir, "drizzle/migrations"));
 		},
 	},
 };
