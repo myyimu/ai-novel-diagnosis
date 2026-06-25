@@ -193,13 +193,13 @@ AI 生成稿诊断与 Prompt 迭代：
 
 - 支持把 AI 初稿和上一条 Prompt 一起纳入诊断，判断问题来自正文执行、结构承诺还是 Prompt 约束不足。
 - 诊断结果会逐步升级为结构化 issue，绑定证据、读者影响、改稿动作和 Prompt 约束。
-- Dashboard 会展示常见问题、复诊改善趋势、Gate 分布和 Prompt 有效率推断。
+- Dashboard 会展示常见问题、复诊改善趋势、Gate 分布和 Prompt 有效率归因，并给出项目级归因校准、置信度、诊断理由、信号、待补数据和可复制的模型/编辑复核提示。
 
 作者方法论沉淀：
 
 - 把反复出现的问题沉淀成开头规则、节奏规则、爽点规则、Prompt 规则和反面清单。
 - 方法论库不是历史任务列表，而是作者下次改稿前能复用的自查系统。
-- 复诊历史和方法论库可导出当前项目 Markdown 包，沉淀人工备注、问题轨迹和可复用 Prompt 模板。
+- 复诊历史和方法论库可导出当前项目 Markdown 包，沉淀人工备注、问题轨迹、Prompt 归因和可复用 Prompt 模板。
 
 深度章节质检：
 
@@ -339,6 +339,15 @@ API: http://127.0.0.1:3001/api/v1
 
 默认不配置 `DATABASE_URL` 时，API 会使用 `.local/pglite` 作为本地开发数据库。
 
+真实 PostgreSQL 部署使用 Drizzle migrations。初始迁移文件位于 `services/api/drizzle/migrations`；修改 `services/api/src/service/drizzle/schema.ts` 后，应执行：
+
+```bash
+pnpm --filter api db:generate
+pnpm --filter api db:migrate
+```
+
+Docker Compose / One 容器启动时会先执行运行时迁移脚本，再启动 API。PGlite 仅作为本地开发兜底，不替代生产 PostgreSQL。
+
 如果要启用“免费共享算力”入口，可以配置 OpenAI-compatible 共享线路：
 
 ```text
@@ -411,10 +420,10 @@ pnpm run doctor
 
 - 这是 Alpha / MVP，不保证 AI 拆解和评分完全准确。
 - Gate、Prompt 有效率和复诊改善只能作为改稿优先级参考，不代表平台流量预测。
-- 复诊历史、作者方法论库、诊断 Dashboard 和项目导出包已具备前端闭环，但仍以浏览器本地状态为主，后端持久化见 [诊断工作流化改造计划](./docs/diagnosis-workflow-implementation-plan.md)。
+- 复诊历史、作者方法论库、诊断 Dashboard 和项目导出包已接入后端持久化第一版；真实 PostgreSQL 部署已提供初始 Drizzle migration，后续 schema 变更需要生成新迁移。
+- Prompt 归因已经抽到共享 `ai-core` 引擎并输出解释信号和项目级校准建议，但仍需要真实案例校准，不能替代编辑判断。
 - 中间结果已经留存，失败或中断后的继续拆解已有基础入口；更细的半成品导出和跨会话复核持久化仍在迭代。
 - 关系图谱支持本地人工修正和导出记录，但修正记录暂未做独立数据库持久化。
-- 真实 PostgreSQL 部署时，如果 schema 有变化，需要运行 `pnpm --filter api db:push` 或生成迁移。
 - 当前没有账号系统，更适合本地单人部署。
 - 工具只提供拆解、学习、质检和导出能力；用户需要自行确认上传文本和导出素材的使用权与风险边界。
 

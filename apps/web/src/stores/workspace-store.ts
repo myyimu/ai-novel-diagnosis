@@ -1059,9 +1059,10 @@ export function mergeWorkspaceState(
 		persistedProvider && allowedPresets.includes(persistedProvider.preset)
 			? persistedProvider
 			: currentState.provider;
-	const projects = Array.isArray(persisted.projects) && persisted.projects.length
-		? persisted.projects
-		: currentState.projects;
+	const projects =
+		Array.isArray(persisted.projects) && persisted.projects.length
+			? persisted.projects
+			: currentState.projects;
 	const activeProjectId =
 		typeof persisted.activeProjectId === "string" &&
 		projects.some((project) => project.id === persisted.activeProjectId)

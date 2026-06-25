@@ -6,6 +6,7 @@ import type {
 	WorkspaceProject,
 } from "@/stores/workspace-store";
 import { hashString } from "@/lib/workspace-cache";
+import { buildPromptAttribution } from "@ai-novel-diagnosis/ai-core";
 
 export function createRevisionSession({
 	projectId = "default-project",
@@ -38,10 +39,16 @@ export function createRevisionSession({
 		gateDecision: result.gateDecision || "revise",
 		mainProblem: result.mainProblem || "未返回明确问题",
 		issueTitles: Array.isArray(result.issues)
-			? result.issues.map((issue) => issue.title).filter(Boolean).slice(0, 5)
+			? result.issues
+					.map((issue) => issue.title)
+					.filter(Boolean)
+					.slice(0, 5)
 			: [],
 		issueCategories: Array.isArray(result.issues)
-			? result.issues.map((issue) => issue.category).filter(Boolean).slice(0, 5)
+			? result.issues
+					.map((issue) => issue.category)
+					.filter(Boolean)
+					.slice(0, 5)
 			: [],
 		nextPrompt: result.nextPrompt?.prompt,
 		methodologyCardIds,
@@ -80,7 +87,9 @@ export function mergeProjectMethodologyCards({
 		const key = buildMethodologyKey(card);
 		const projectCardId = `method-${hashString(`${projectId}|${key}`)}`;
 		const existingIndex = nextCards.findIndex(
-			(item) => item.projectCardId === projectCardId && (item.projectId || "default-project") === projectId,
+			(item) =>
+				item.projectCardId === projectCardId &&
+				(item.projectId || "default-project") === projectId,
 		);
 		const sourceIssue = issues.find((issue) => issue.id === card.sourceIssueId);
 
@@ -137,7 +146,8 @@ export function summarizeRevisionTrend(sessions: RevisionSession[]) {
 		result[gate] = (result[gate] || 0) + 1;
 		return result;
 	}, {});
-	const mostCommonGate = Object.entries(gateCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "revise";
+	const mostCommonGate =
+		Object.entries(gateCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "revise";
 
 	return {
 		latest,
@@ -161,9 +171,7 @@ export function buildDiagnosisDashboard({
 	const latest = orderedSessions[0] ?? null;
 	const previous = orderedSessions[1] ?? null;
 	const scoreDelta =
-		latest && previous
-			? Number((latest.quickScore - previous.quickScore).toFixed(1))
-			: null;
+		latest && previous ? Number((latest.quickScore - previous.quickScore).toFixed(1)) : null;
 	const gateDistribution = buildCountRows(
 		orderedSessions.map((session) => session.gateDecision || "revise"),
 		formatGateLabel,
@@ -179,6 +187,7 @@ export function buildDiagnosisDashboard({
 		formatIssueCategory,
 	).slice(0, 6);
 	const promptEffectiveness = buildPromptEffectiveness(orderedSessions);
+	const promptAttribution = buildPromptAttribution(orderedSessions);
 	const qualityTrend = [...orderedSessions]
 		.reverse()
 		.slice(-8)
@@ -203,6 +212,7 @@ export function buildDiagnosisDashboard({
 		commonIssues,
 		categoryDistribution,
 		promptEffectiveness,
+		promptAttribution,
 		qualityTrend,
 		reusableMethodologyCards,
 	};
@@ -229,8 +239,7 @@ export function buildRevisionHistory({
 		selectedIndex >= 0 && selectedIndex < orderedSessions.length - 1
 			? orderedSessions[selectedIndex + 1]
 			: null;
-	const next =
-		selectedIndex > 0 ? orderedSessions[selectedIndex - 1] : null;
+	const next = selectedIndex > 0 ? orderedSessions[selectedIndex - 1] : null;
 	const scoreDelta =
 		selected && previous
 			? Number((selected.quickScore - previous.quickScore).toFixed(1))
@@ -285,6 +294,7 @@ export function buildProjectExportMarkdown({
 		`- 最新 Gate：${dashboard.latest ? formatGateLabel(dashboard.latest.gateDecision) : "暂无"}`,
 		`- 高频 Gate：${dashboard.gateDistribution[0]?.label || "暂无"}`,
 		`- Prompt 有效率：${formatPromptEffectiveness(dashboard.promptEffectiveness)}`,
+		`- Prompt 归因有效率：${formatPromptAttributionRate(dashboard.promptAttribution)}`,
 		`- 常见问题：${dashboard.commonIssues.map((issue) => issue.label).join("、") || "暂无"}`,
 		"",
 		"## 复诊轨迹",
@@ -324,6 +334,47 @@ export function buildProjectExportMarkdown({
 					"",
 				);
 			}
+		});
+	}
+
+	lines.push("## Prompt 归因", "");
+
+	if (!dashboard.promptAttribution.items.length) {
+		lines.push("暂无可归因复诊。", "");
+	} else {
+		lines.push(
+			"### 项目级归因校准",
+			"",
+			`- 状态：${dashboard.promptAttribution.calibration.readinessLabel}`,
+			`- 样本数：${dashboard.promptAttribution.calibration.sampleSize}`,
+			`- 平均置信度：${formatNullableAttributionConfidence(dashboard.promptAttribution.calibration.averageConfidence)}`,
+			`- 主导归因：${dashboard.promptAttribution.calibration.dominantCategory?.label || "暂无"}`,
+			`- 校准结论：${dashboard.promptAttribution.calibration.headline}`,
+			`- 下一步：${dashboard.promptAttribution.calibration.nextBestAction}`,
+			`- 待补证据：${dashboard.promptAttribution.calibration.evidenceGaps.join("；") || "暂无"}`,
+			"",
+			"模型/编辑复核提示：",
+			"",
+			"```text",
+			escapeCodeFence(dashboard.promptAttribution.calibration.modelAssistedReviewPrompt),
+			"```",
+			"",
+		);
+
+		dashboard.promptAttribution.items.forEach((item, index) => {
+			lines.push(
+				`### 单次归因 ${index + 1}. ${item.label}`,
+				"",
+				`- 版本：${item.previousTitle} -> ${item.currentTitle}`,
+				`- 分数变化：${item.scoreDelta >= 0 ? "+" : ""}${item.scoreDelta}`,
+				`- 置信度：${formatAttributionConfidence(item.confidence)}`,
+				`- 诊断理由：${item.diagnosisReason}`,
+				`- 证据：${item.evidence.join("；")}`,
+				`- 信号：${item.signalStrengths.map((signal) => `${signal.label}=${signal.value}`).join("；")}`,
+				`- 下一步：${item.nextAction}`,
+				`- 待补数据：${item.missingData.join("；") || "暂无"}`,
+				"",
+			);
 		});
 	}
 
@@ -507,8 +558,28 @@ function formatPromptEffectiveness(value: {
 	return `${value.rate}%（改善 ${value.improved}，持平 ${value.unchanged}，变差 ${value.worsened}）`;
 }
 
+function formatPromptAttributionRate(value: {
+	total: number;
+	effective: number;
+	rate: number | null;
+}) {
+	if (!value.total || value.rate === null) {
+		return "暂无可归因复诊";
+	}
+
+	return `${value.rate}%（${value.effective}/${value.total} 次归因为 Prompt 有效）`;
+}
+
+function formatAttributionConfidence(value: number) {
+	return `${Math.round(value * 100)}%`;
+}
+
+function formatNullableAttributionConfidence(value: number | null) {
+	return value === null ? "暂无" : formatAttributionConfidence(value);
+}
+
 function escapeMarkdown(value: string) {
-	return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, "\\$1");
+	return value.replace(/([\\`*_{}[\]()#+\-.!|>])/g, "\\$1");
 }
 
 function escapeCodeFence(value: string) {

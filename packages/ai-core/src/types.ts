@@ -200,12 +200,7 @@ export interface RecommendedPlatform {
   reason: string;
 }
 
-export type QuickReviewInputKind =
-  | "human-draft"
-  | "ai-draft"
-  | "idea"
-  | "outline"
-  | "prompt";
+export type QuickReviewInputKind = "human-draft" | "ai-draft" | "idea" | "outline" | "prompt";
 
 export type GateDecision = "continue" | "revise" | "rebuild" | "discard";
 

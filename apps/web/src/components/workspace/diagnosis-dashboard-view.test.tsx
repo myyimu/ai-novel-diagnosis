@@ -81,6 +81,14 @@ describe("DiagnosisDashboardView", () => {
 		expect(html).toContain("复诊次数");
 		expect(html).toContain("最近分数变化");
 		expect(html).toContain("Prompt 有效率");
+		expect(html).toContain("Prompt 有效");
+		expect(html).toContain("置信");
+		expect(html).toContain("诊断理由");
+		expect(html).toContain("归因校准");
+		expect(html).toContain("样本不足");
+		expect(html).toContain("模型/编辑复核提示");
+		expect(html).toContain("复制复核提示");
+		expect(html).toContain("下一步");
 		expect(html).toContain("质量趋势");
 		expect(html).toContain("Gate 分布");
 		expect(html).toContain("常见问题");

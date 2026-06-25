@@ -1,15 +1,18 @@
-import { deleteJson, getJson, postForm, postJson } from "@/lib/api-client";
+import { deleteJson, getJson, patchJson, postForm, postJson } from "@/lib/api-client";
 import type {
 	BookAnalysisJob,
 	BookUploadPreview,
 	PersistedResearchLibrary,
+	ProjectMethodologyCard,
 	ProviderForm,
 	QuickReviewInputKind,
 	QuickReviewResult,
 	ResearchComparisonResult,
 	ResearchQaResult,
+	RevisionSession,
 	RubricResult,
 	ScoreResult,
+	WorkspaceProject,
 } from "@/stores/workspace-store";
 
 export const REFERENCE_TEXT_MAX_LENGTH = 30000;
@@ -314,6 +317,53 @@ export function requestQuickReview({
 		genre: quickReviewGenre || undefined,
 		inputKind: quickReviewInputKind || undefined,
 		previousPrompt: quickReviewPreviousPrompt?.trim() || undefined,
+	});
+}
+
+export interface WorkspaceAssetsPayload {
+	projects: WorkspaceProject[];
+	revisionSessions: RevisionSession[];
+	methodologyCards: ProjectMethodologyCard[];
+}
+
+export function readWorkspaceAssets() {
+	return getJson<WorkspaceAssetsPayload>("/analysis/workspace/assets");
+}
+
+export function upsertWorkspaceProject(project: WorkspaceProject) {
+	return postJson<WorkspaceProject>("/analysis/workspace/projects", {
+		project,
+	});
+}
+
+export function upsertRevisionAssets({
+	project,
+	session,
+	methodologyCards,
+}: {
+	project: WorkspaceProject;
+	session: RevisionSession;
+	methodologyCards: ProjectMethodologyCard[];
+}) {
+	return postJson<WorkspaceAssetsPayload>("/analysis/workspace/revision-assets", {
+		project,
+		session,
+		methodologyCards,
+	});
+}
+
+export function updateRevisionSessionNote({
+	sessionId,
+	note,
+	updatedAt,
+}: {
+	sessionId: string;
+	note: string;
+	updatedAt: string;
+}) {
+	return patchJson<RevisionSession>(`/analysis/workspace/revision-sessions/${sessionId}/note`, {
+		note,
+		updatedAt,
 	});
 }
 

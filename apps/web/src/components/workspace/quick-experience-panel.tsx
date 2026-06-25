@@ -175,7 +175,8 @@ export function QuickExperiencePanel({
 									placeholder="如果正文来自 AI，把上一条写作 Prompt 粘贴到这里。系统会判断问题出在正文还是 Prompt。"
 								/>
 								<p className="text-xs leading-5 text-muted-foreground">
-									题材和来源只帮助模型少走弯路；上一条 Prompt 会参与诊断和下一轮改稿指令。
+									题材和来源只帮助模型少走弯路；上一条 Prompt
+									会参与诊断和下一轮改稿指令。
 								</p>
 							</div>
 						</div>
@@ -270,7 +271,9 @@ export function QuickExperiencePanel({
 					<div className="rounded-md border border-border bg-background p-4">
 						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<p className="text-sm font-medium">总判断</p>
-							<span className={`rounded-md border px-2 py-1 text-xs ${gate.className}`}>
+							<span
+								className={`rounded-md border px-2 py-1 text-xs ${gate.className}`}
+							>
 								{gate.label}
 							</span>
 						</div>
@@ -308,7 +311,10 @@ export function QuickExperiencePanel({
 							<p className="text-sm font-medium">关键问题证据链</p>
 							<div className="mt-3 space-y-3">
 								{issues.slice(0, 3).map((issue) => (
-									<div key={issue.id || issue.title} className="rounded-md border border-border bg-card p-3">
+									<div
+										key={issue.id || issue.title}
+										className="rounded-md border border-border bg-card p-3"
+									>
 										<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 											<p className="text-sm font-semibold">{issue.title}</p>
 											<span className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
@@ -322,10 +328,17 @@ export function QuickExperiencePanel({
 										</p>
 										{issue.evidence?.length ? (
 											<div className="mt-2 rounded-md border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
-												<p className="font-medium text-foreground">正文证据</p>
+												<p className="font-medium text-foreground">
+													正文证据
+												</p>
 												{issue.evidence.slice(0, 2).map((item, index) => (
-													<p key={`${item.quote}-${index}`} className="mt-1">
-														{item.locationHint ? `${item.locationHint}：` : ""}
+													<p
+														key={`${item.quote}-${index}`}
+														className="mt-1"
+													>
+														{item.locationHint
+															? `${item.locationHint}：`
+															: ""}
 														{item.quote}
 													</p>
 												))}
@@ -380,7 +393,10 @@ export function QuickExperiencePanel({
 							<p className="text-sm font-medium">可沉淀的方法论卡片</p>
 							<div className="mt-3 grid gap-3 md:grid-cols-2">
 								{methodologyCards.slice(0, 4).map((card) => (
-									<div key={card.id || card.title} className="rounded-md border border-border bg-card p-3">
+									<div
+										key={card.id || card.title}
+										className="rounded-md border border-border bg-card p-3"
+									>
 										<p className="text-sm font-semibold">{card.title}</p>
 										<p className="mt-2 text-sm leading-5 text-muted-foreground">
 											{card.reusableRule}
@@ -434,7 +450,8 @@ export function QuickExperiencePanel({
 							<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 								<p className="text-sm font-medium">项目迭代资产</p>
 								<span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-									{revisionSessions.length} 次复诊 · {projectMethodologyCards.length} 张方法论卡
+									{revisionSessions.length} 次复诊 ·{" "}
+									{projectMethodologyCards.length} 张方法论卡
 								</span>
 							</div>
 							{revisionTrend ? (
@@ -467,9 +484,14 @@ export function QuickExperiencePanel({
 							{latestProjectCards.length ? (
 								<div className="mt-3 grid gap-3 md:grid-cols-2">
 									{latestProjectCards.map((card) => (
-										<div key={card.projectCardId} className="rounded-md border border-border bg-card p-3">
+										<div
+											key={card.projectCardId}
+											className="rounded-md border border-border bg-card p-3"
+										>
 											<div className="flex items-start justify-between gap-3">
-												<p className="text-sm font-semibold">{card.title}</p>
+												<p className="text-sm font-semibold">
+													{card.title}
+												</p>
 												<span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
 													{card.occurrenceCount} 次
 												</span>

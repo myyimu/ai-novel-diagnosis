@@ -180,9 +180,40 @@ describe("workspace iteration assets", () => {
 		expect(dashboard.totalSessions).toBe(2);
 		expect(dashboard.scoreDelta).toBe(1);
 		expect(dashboard.promptEffectiveness.improved).toBe(1);
+		expect(dashboard.promptAttribution.rate).toBe(100);
+		expect(dashboard.promptAttribution.items[0]?.category).toBe("prompt_effective");
+		expect(dashboard.promptAttribution.items[0]?.diagnosisReason).toContain("上一轮 Prompt");
+		expect(dashboard.promptAttribution.items[0]?.confidence).toBeGreaterThan(0.5);
 		expect(dashboard.gateDistribution.map((row) => row.label)).toContain("修改");
 		expect(dashboard.categoryDistribution.map((row) => row.label)).toContain("钩子");
 		expect(dashboard.commonIssues[0]?.label).toBe("章末钩子没有代价");
+	});
+
+	it("attributes weak prompt outcomes to execution gaps when issues repeat", () => {
+		const first = createRevisionSession({
+			chapterTitle: "第一版",
+			chapterText: "版本一",
+			result: { ...baseResult, quickScore: 6.2, gateDecision: "revise" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const second = {
+			...createRevisionSession({
+				chapterTitle: "第二版",
+				chapterText: "版本二",
+				result: { ...baseResult, quickScore: 6.3, gateDecision: "revise" },
+				methodologyCardIds: [],
+				now: "2026-06-24T01:00:00.000Z",
+			}),
+			revisionNote: "这一版还没按 Prompt 补章末代价。",
+		};
+		const dashboard = buildDiagnosisDashboard({
+			sessions: [second, first],
+			methodologyCards: [],
+		});
+
+		expect(dashboard.promptAttribution.items[0]?.category).toBe("execution_gap");
+		expect(dashboard.promptAttribution.items[0]?.evidence).toContain("人工备注显示执行不足");
 	});
 
 	it("builds revision history with selected session and previous comparison", () => {
@@ -260,6 +291,12 @@ describe("workspace iteration assets", () => {
 		expect(markdown).toContain("这一版按 Prompt 补了章末代价。");
 		expect(markdown).toContain("方法论卡");
 		expect(markdown).toContain("Prompt 模板合集");
+		expect(markdown).toContain("Prompt 归因");
+		expect(markdown).toContain("Prompt 有效");
+		expect(markdown).toContain("项目级归因校准");
+		expect(markdown).toContain("模型/编辑复核提示");
+		expect(markdown).toContain("诊断理由");
+		expect(markdown).toContain("置信度");
 		expect(markdown).toContain("请补强章末代价。");
 	});
 });

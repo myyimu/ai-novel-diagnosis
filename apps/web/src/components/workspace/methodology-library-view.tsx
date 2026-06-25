@@ -81,10 +81,22 @@ export function MethodologyLibraryView({
 	return (
 		<div className="space-y-5">
 			<section className="grid gap-4 md:grid-cols-4">
-				<SummaryCard label="方法论卡" value={`${methodologyCards.length}`} detail="本项目已沉淀" />
-				<SummaryCard label="重复出现" value={`${repeatedCount}`} detail="优先转成固定自查项" />
+				<SummaryCard
+					label="方法论卡"
+					value={`${methodologyCards.length}`}
+					detail="本项目已沉淀"
+				/>
+				<SummaryCard
+					label="重复出现"
+					value={`${repeatedCount}`}
+					detail="优先转成固定自查项"
+				/>
 				<SummaryCard label="高频类型" value={topType} detail="当前最常见问题族" />
-				<SummaryCard label="Prompt 模板" value={`${promptTemplateCount}`} detail="可直接复制复用" />
+				<SummaryCard
+					label="Prompt 模板"
+					value={`${promptTemplateCount}`}
+					detail="可直接复制复用"
+				/>
 			</section>
 
 			<section className="rounded-md border border-border bg-card p-5">

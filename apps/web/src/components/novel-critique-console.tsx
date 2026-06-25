@@ -49,14 +49,19 @@ import {
 	parseList,
 	readBookAnalysisJob,
 	readResearchLibrary,
+	readWorkspaceAssets,
 	requestQuickReview,
 	requestReferenceProfile,
 	requestRubric,
 	requestScoreChapter,
 	resumeBookAnalysisJob,
 	testProviderConnection,
+	updateRevisionSessionNote,
 	uploadBookPreview,
+	upsertRevisionAssets,
+	upsertWorkspaceProject,
 	type ReferenceProfileResult,
+	type WorkspaceAssetsPayload,
 } from "@/lib/workspace-analysis-client";
 import {
 	buildReferenceProfileFacts,
@@ -98,9 +103,11 @@ import {
 	type BookUploadPreview,
 	type ProviderKind,
 	type ProviderPresetId,
+	type ProjectMethodologyCard,
 	type RubricResult,
 	type QuickReviewResult,
 	type ScoreResult,
+	type WorkspaceProject,
 	defaultBookText,
 	defaultWorkspaceProject,
 	defaultProvider,
@@ -438,7 +445,45 @@ function downloadText(filename: string, content: string, contentType: string) {
 }
 
 function toSafeFilename(value: string) {
-	return value.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-") || "project";
+	return (
+		value
+			.trim()
+			.replace(/[\\/:*?"<>|]+/g, "-")
+			.replace(/\s+/g, "-") || "project"
+	);
+}
+
+function mergeById<T extends { id: string }>(serverItems: T[], localItems: T[]) {
+	const seen = new Set<string>();
+	const result: T[] = [];
+
+	for (const item of [...serverItems, ...localItems]) {
+		if (seen.has(item.id)) {
+			continue;
+		}
+		seen.add(item.id);
+		result.push(item);
+	}
+
+	return result;
+}
+
+function mergeMethodologyCards(
+	serverItems: ProjectMethodologyCard[],
+	localItems: ProjectMethodologyCard[],
+) {
+	const seen = new Set<string>();
+	const result: ProjectMethodologyCard[] = [];
+
+	for (const item of [...serverItems, ...localItems]) {
+		if (seen.has(item.projectCardId)) {
+			continue;
+		}
+		seen.add(item.projectCardId);
+		result.push(item);
+	}
+
+	return result;
 }
 
 function FieldHelp({ text }: { text: string }) {
@@ -672,6 +717,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 	const chapterDraftTouchedRef = useRef(false);
 	const platformStrategyTouchedRef = useRef(false);
 	const activeBookPollJobIdRef = useRef<string | null>(null);
+	const workspaceAssetsLoadedRef = useRef(false);
 	const {
 		resetScoreProgress,
 		initializeScoreProgress,
@@ -683,8 +729,7 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		initializeReferenceProfileProgress,
 		updateReferenceProfileProgress,
 	} = useReferenceProfileProgressController(setReferenceProfileProgress);
-	const activeProject =
-		projects.find((project) => project.id === activeProjectId) ?? projects[0];
+	const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
 	const projectRevisionSessions = revisionSessions.filter(
 		(session) => (session.projectId || "default-project") === activeProjectId,
 	);
@@ -727,6 +772,35 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setStatus(`已切换到项目：${project?.name || "未命名项目"}`);
 	}
 
+	function applyWorkspaceAssets(assets: WorkspaceAssetsPayload) {
+		const hasAssets =
+			assets.projects.length ||
+			assets.revisionSessions.length ||
+			assets.methodologyCards.length;
+		if (!hasAssets) {
+			return;
+		}
+
+		setProjects((current) => mergeById(assets.projects, current));
+		setRevisionSessions((current) => mergeById(assets.revisionSessions, current));
+		setMethodologyCards((current) => mergeMethodologyCards(assets.methodologyCards, current));
+		setActiveProjectId((current) => {
+			const mergedProjects = mergeById(assets.projects, projects);
+			return mergedProjects.some((project) => project.id === current)
+				? current
+				: mergedProjects[0]?.id || defaultWorkspaceProject.id;
+		});
+	}
+
+	async function loadWorkspaceAssets() {
+		try {
+			const assets = await readWorkspaceAssets();
+			applyWorkspaceAssets(assets);
+		} catch {
+			// API 持久化是增强能力；离线时继续使用浏览器本地状态。
+		}
+	}
+
 	function createProject() {
 		const name = newProjectName.trim();
 		if (!name) {
@@ -747,6 +821,9 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setPreviousQuickReviewResult(null);
 		setQuickReviewResult(null);
 		setStatus(`已创建并切换到项目：${project.name}`);
+		void upsertWorkspaceProject(project).catch(() => {
+			setStatus("项目已在本地创建；后端暂时未同步成功。");
+		});
 	}
 
 	function saveRevisionNote(sessionId: string, note: string) {
@@ -768,15 +845,47 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 			),
 		);
 		setStatus("复诊备注已保存。");
+		void updateRevisionSessionNote({
+			sessionId,
+			note: note.trim(),
+			updatedAt: now,
+		}).catch(() => {
+			setStatus("复诊备注已本地保存；后端暂时未同步成功。");
+		});
 	}
 
-	function exportProjectMarkdown() {
+	async function exportProjectMarkdown() {
 		if (!projectRevisionSessions.length && !projectMethodologyCards.length) {
 			setStatus("当前项目还没有可导出的复诊记录或方法论卡。");
 			return;
 		}
 
 		const project = activeProject ?? defaultWorkspaceProject;
+		try {
+			const response = await fetch(
+				apiUrl(`/analysis/workspace/projects/${encodeURIComponent(project.id)}/export`),
+			);
+			if (response.ok) {
+				const content = await response.text();
+				const disposition = response.headers.get("content-disposition") || "";
+				const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
+				const filename = filenameMatch
+					? decodeURIComponent(filenameMatch[1])
+					: `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+							.toISOString()
+							.slice(0, 10)}.md`;
+				downloadText(
+					filename,
+					content,
+					response.headers.get("content-type") || "text/markdown;charset=utf-8",
+				);
+				setStatus(`项目导出完成：${filename}`);
+				return;
+			}
+		} catch {
+			// Fall back to browser-local export below.
+		}
+
 		const content = buildProjectExportMarkdown({
 			project,
 			revisionSessions: projectRevisionSessions,
@@ -919,6 +1028,15 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		});
 
 	useEffect(() => {
+		if (workspaceAssetsLoadedRef.current) {
+			return;
+		}
+
+		workspaceAssetsLoadedRef.current = true;
+		void loadWorkspaceAssets();
+	}, []);
+
+	useEffect(() => {
 		if (activeView === "library" && !persistedResearchLibrary) {
 			void loadResearchLibrary();
 		}
@@ -1047,6 +1165,9 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 
 	function rememberQuickReviewIteration(result: QuickReviewResult) {
 		const now = new Date().toISOString();
+		const project: WorkspaceProject = activeProject
+			? { ...activeProject, updatedAt: now }
+			: { ...defaultWorkspaceProject, updatedAt: now };
 		const mergedCards = mergeProjectMethodologyCards({
 			projectId: activeProjectId,
 			currentCards: methodologyCards,
@@ -1071,6 +1192,17 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
 			),
 		);
+		void upsertRevisionAssets({
+			project,
+			session,
+			methodologyCards: mergedCards.cards.filter(
+				(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
+			),
+		})
+			.then(applyWorkspaceAssets)
+			.catch(() => {
+				setStatus("复诊结果已本地保存；后端暂时未同步成功。");
+			});
 	}
 
 	function rememberRubric(key: string, result: RubricResult) {

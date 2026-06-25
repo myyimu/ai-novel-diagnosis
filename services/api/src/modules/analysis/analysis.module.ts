@@ -8,6 +8,7 @@ import { BookUploadService } from "./book-upload.service";
 import { ModelProviderService } from "./model-provider.service";
 import { ResearchLibraryService } from "./research-library.service";
 import { TextPreprocessorService } from "./text-preprocessor.service";
+import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
 
 @Module({
   controllers: [AnalysisController],
@@ -20,6 +21,7 @@ import { TextPreprocessorService } from "./text-preprocessor.service";
     ModelProviderService,
     ResearchLibraryService,
     TextPreprocessorService,
+    WorkspaceAssetsRepository,
   ],
 })
 export class AnalysisModule {}

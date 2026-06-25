@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -37,7 +38,14 @@ import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { QuickReviewDto } from "./dto/quick-review.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import { TestProviderDto } from "./dto/provider-config.dto";
+import {
+  UpdateRevisionNoteDto,
+  UpsertRevisionAssetsDto,
+  UpsertWorkspaceProjectDto,
+} from "./dto/workspace-assets.dto";
 import { ResearchLibraryService } from "./research-library.service";
+import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
+import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
 
 @ApiTags("analysis")
 @Controller("analysis")
@@ -45,6 +53,7 @@ export class AnalysisController {
   constructor(
     private readonly analysisService: AnalysisService,
     private readonly researchLibrary: ResearchLibraryService,
+    private readonly workspaceAssets: WorkspaceAssetsRepository,
   ) {}
 
   @Get("pipeline")
@@ -74,6 +83,74 @@ export class AnalysisController {
   @ApiResponse({ status: 200, description: "Structured quick review" })
   quickReview(@Body() body: QuickReviewDto) {
     return this.analysisService.quickReview(body);
+  }
+
+  @Get("workspace/assets")
+  @Public()
+  @ApiOperation({
+    summary:
+      "Read persisted workspace projects, revisions, and methodology cards",
+  })
+  listWorkspaceAssets() {
+    return this.workspaceAssets.listAssets();
+  }
+
+  @Post("workspace/projects")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: "Create or update a workspace project" })
+  upsertWorkspaceProject(@Body() body: UpsertWorkspaceProjectDto) {
+    return this.workspaceAssets.upsertProject(body.project);
+  }
+
+  @Post("workspace/revision-assets")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Persist one revision session and its methodology cards",
+  })
+  upsertRevisionAssets(@Body() body: UpsertRevisionAssetsDto) {
+    return this.workspaceAssets.upsertRevisionAssets({
+      project: body.project,
+      session: body.session,
+      methodologyCards: body.methodologyCards,
+    });
+  }
+
+  @Patch("workspace/revision-sessions/:sessionId/note")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: "Persist a human note for a revision session" })
+  updateRevisionNote(
+    @Param("sessionId") sessionId: string,
+    @Body() body: UpdateRevisionNoteDto,
+  ) {
+    return this.workspaceAssets.updateRevisionNote({
+      sessionId,
+      note: body.note,
+      updatedAt: body.updatedAt,
+    });
+  }
+
+  @Get("workspace/projects/:projectId/export")
+  @Public()
+  @ApiOperation({ summary: "Export a persisted workspace project as Markdown" })
+  async exportWorkspaceProject(
+    @Param("projectId") projectId: string,
+    @Res() response: Response,
+  ) {
+    const projectPackage =
+      await this.workspaceAssets.readProjectPackage(projectId);
+    const content = buildWorkspaceProjectMarkdown(projectPackage);
+    const filename = `ai-novel-diagnosis-${projectPackage.project.name}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.md`;
+    response.setHeader("content-type", "text/markdown;charset=utf-8");
+    response.setHeader(
+      "content-disposition",
+      `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    );
+    response.send(content);
   }
 
   @Post("provider/test")

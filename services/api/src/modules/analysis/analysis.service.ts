@@ -648,9 +648,7 @@ export class AnalysisService {
     };
   }
 
-  private normalizeQuickReviewInputKind(
-    value: unknown,
-  ): QuickReviewInputKind {
+  private normalizeQuickReviewInputKind(value: unknown): QuickReviewInputKind {
     const inputKind = this.asText(value).toLowerCase();
     if (
       ["human-draft", "ai-draft", "idea", "outline", "prompt"].includes(
@@ -811,8 +809,13 @@ export class AnalysisService {
         };
       })
       .filter(
-        (item): item is { quote: string; locationHint: string; confidence: number } =>
-          item !== null,
+        (
+          item,
+        ): item is {
+          quote: string;
+          locationHint: string;
+          confidence: number;
+        } => item !== null,
       )
       .slice(0, 3);
   }
@@ -845,8 +848,7 @@ export class AnalysisService {
       continue: "当前稿件有可用基础，可以继续打磨或进入深度质检。",
       revise: `当前稿件有潜力，但需要先解决“${topIssue}”。`,
       rebuild: `当前稿件的关键承诺或结构需要重构，优先处理“${topIssue}”。`,
-      discard:
-        "当前版本投入产出偏低，建议换角度重写或保留经验后另开一版。",
+      discard: "当前版本投入产出偏低，建议换角度重写或保留经验后另开一版。",
     };
     return reasonMap[gate];
   }
@@ -862,12 +864,14 @@ export class AnalysisService {
         const title = this.asText(source.title);
         if (!title) return [];
         const evidence = this.asText(source.evidence);
-        return [{
-          title,
-          ...(evidence ? { evidence } : {}),
-          keepAction:
-            this.asText(source.keepAction) || "下一版保留这个已有优势。",
-        }];
+        return [
+          {
+            title,
+            ...(evidence ? { evidence } : {}),
+            keepAction:
+              this.asText(source.keepAction) || "下一版保留这个已有优势。",
+          },
+        ];
       })
       .slice(0, 3);
   }
@@ -877,7 +881,9 @@ export class AnalysisService {
     issues: DiagnosisIssue[],
   ): QuickReviewResult["revisionPlan"] {
     const source =
-      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {};
     const priorityIssueIds = this.asTextList(source.priorityIssueIds).slice(
       0,
       3,
@@ -909,11 +915,18 @@ export class AnalysisService {
     previousPrompt?: string,
   ): QuickReviewResult["promptDiagnosis"] {
     const source =
-      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {};
     return {
       originalPrompt:
-        this.asText(source.originalPrompt) || previousPrompt?.trim() || undefined,
-      missingConstraints: this.asTextList(source.missingConstraints).slice(0, 4),
+        this.asText(source.originalPrompt) ||
+        previousPrompt?.trim() ||
+        undefined,
+      missingConstraints: this.asTextList(source.missingConstraints).slice(
+        0,
+        4,
+      ),
       vagueInstructions: this.asTextList(source.vagueInstructions).slice(0, 4),
       improvedPromptPrinciples: this.asTextList(
         source.improvedPromptPrinciples,
@@ -933,7 +946,9 @@ export class AnalysisService {
     },
   ): NonNullable<QuickReviewResult["nextPrompt"]> {
     const source =
-      value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {};
     const prompt = this.asText(source.prompt);
     const linkedIssueIds = this.asTextList(source.linkedIssueIds);
     return {
@@ -1034,7 +1049,9 @@ export class AnalysisService {
     const title = this.asText(source.title);
     if (!title) return null;
     const sourceIssueId =
-      this.asText(source.sourceIssueId) || issues[0]?.id || `issue-${index + 1}`;
+      this.asText(source.sourceIssueId) ||
+      issues[0]?.id ||
+      `issue-${index + 1}`;
     return {
       id: this.asText(source.id) || `method-${index + 1}`,
       sourceIssueId,
@@ -1329,8 +1346,7 @@ export class AnalysisService {
           confidence: 0,
         },
       ].filter((item) => item.quote),
-      readerImpact:
-        "如果只看演示结果，作者无法知道真实读者会在哪个位置流失。",
+      readerImpact: "如果只看演示结果，作者无法知道真实读者会在哪个位置流失。",
       fixAction: "切换共享站或付费模型后重试快速点评。",
       promptConstraint:
         "使用真实模型时，要求它基于正文证据输出问题、读者影响和改稿动作。",
@@ -1380,9 +1396,16 @@ export class AnalysisService {
         },
       ],
       revisionPlan: this.normalizeRevisionPlan(null, [issue]),
-      promptDiagnosis: this.normalizePromptDiagnosis(null, input.previousPrompt),
+      promptDiagnosis: this.normalizePromptDiagnosis(
+        null,
+        input.previousPrompt,
+      ),
       nextPrompt,
-      methodologyCards: this.normalizeMethodologyCards(null, [issue], nextPrompt.prompt),
+      methodologyCards: this.normalizeMethodologyCards(
+        null,
+        [issue],
+        nextPrompt.prompt,
+      ),
     };
   }
 

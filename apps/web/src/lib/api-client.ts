@@ -50,6 +50,21 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
 	return payload.data;
 }
 
+export async function patchJson<T>(path: string, body: unknown): Promise<T> {
+	const response = await fetch(apiUrl(path), {
+		method: "PATCH",
+		headers: {
+			"content-type": "application/json",
+		},
+		body: JSON.stringify(body),
+	});
+
+	const payload = await readApiEnvelope<T>(response);
+	assertApiResponse(response, payload);
+
+	return payload.data;
+}
+
 export async function postForm<T>(path: string, body: FormData): Promise<T> {
 	const response = await fetch(apiUrl(path), {
 		method: "POST",

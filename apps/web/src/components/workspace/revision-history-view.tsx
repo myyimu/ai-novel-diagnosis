@@ -37,7 +37,8 @@ export function RevisionHistoryView({
 					<div className="min-w-0">
 						<h2 className="text-lg font-semibold">复诊历史</h2>
 						<p className="mt-2 text-sm leading-6 text-muted-foreground">
-							当前项目还没有复诊记录。完成一次快速诊断后，这里会记录每一版的分数、Gate、问题和 Prompt。
+							当前项目还没有复诊记录。完成一次快速诊断后，这里会记录每一版的分数、Gate、问题和
+							Prompt。
 						</p>
 						<Button className="mt-4" onClick={onOpenDiagnosis}>
 							开始诊断
@@ -85,7 +86,9 @@ export function RevisionHistoryView({
 								}`}
 							>
 								<div className="flex items-center justify-between gap-3">
-									<p className="text-sm font-semibold">第 {history.sessions.length - index} 次复诊</p>
+									<p className="text-sm font-semibold">
+										第 {history.sessions.length - index} 次复诊
+									</p>
 									<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
 										{session.quickScore}/10
 									</span>
@@ -94,7 +97,8 @@ export function RevisionHistoryView({
 									{session.chapterTitle}
 								</p>
 								<p className="mt-1 text-xs text-muted-foreground">
-									{formatDateTime(session.createdAt)} · {formatGateLabel(session.gateDecision)}
+									{formatDateTime(session.createdAt)} ·{" "}
+									{formatGateLabel(session.gateDecision)}
 								</p>
 							</button>
 						);
@@ -165,7 +169,8 @@ export function RevisionHistoryView({
 							<div>
 								<h2 className="text-base font-semibold">本版人工备注</h2>
 								<p className="mt-1 text-xs leading-5 text-muted-foreground">
-									记录这一版实际按哪些建议改了，后续判断 Prompt 是否有效时会更清楚。
+									记录这一版实际按哪些建议改了，后续判断 Prompt
+									是否有效时会更清楚。
 								</p>
 							</div>
 							<Button
@@ -185,7 +190,9 @@ export function RevisionHistoryView({
 						/>
 						{selected.revisionNote ? (
 							<div className="mt-3 rounded-md border border-border bg-background p-3">
-								<p className="text-xs font-medium text-muted-foreground">已保存备注</p>
+								<p className="text-xs font-medium text-muted-foreground">
+									已保存备注
+								</p>
 								<p className="mt-1 text-sm leading-6">{selected.revisionNote}</p>
 							</div>
 						) : null}
@@ -205,7 +212,9 @@ export function RevisionHistoryView({
 									size="sm"
 									variant="outline"
 									onClick={() => {
-										void navigator.clipboard?.writeText(selected.nextPrompt || "");
+										void navigator.clipboard?.writeText(
+											selected.nextPrompt || "",
+										);
 									}}
 								>
 									<Clipboard className="mr-2 size-4" />

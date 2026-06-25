@@ -1,6 +1,7 @@
 "use client";
 
-import { BarChart3, ClipboardCheck, Layers3, TrendingUp } from "lucide-react";
+import { BarChart3, Clipboard, ClipboardCheck, Layers3, TrendingUp } from "lucide-react";
+import { useState } from "react";
 import { buildDiagnosisDashboard } from "@/lib/workspace-iteration";
 import type { ProjectMethodologyCard, RevisionSession } from "@/stores/workspace-store";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ export function DiagnosisDashboardView({
 	methodologyCards: ProjectMethodologyCard[];
 	onOpenDiagnosis: () => void;
 }) {
+	const [copyStatus, setCopyStatus] = useState("");
 	const dashboard = buildDiagnosisDashboard({ sessions: revisionSessions, methodologyCards });
 	const latestGate = dashboard.latest?.gateDecision || "revise";
 	const scoreDeltaLabel =
@@ -65,19 +67,17 @@ export function DiagnosisDashboardView({
 					icon={BarChart3}
 					label="Prompt 有效率"
 					value={
-						dashboard.promptEffectiveness.rate === null
+						dashboard.promptAttribution.rate === null
 							? "待观察"
-							: `${dashboard.promptEffectiveness.rate}%`
+							: `${dashboard.promptAttribution.rate}%`
 					}
-					detail={`${dashboard.promptEffectiveness.improved}/${dashboard.promptEffectiveness.comparable} 次复诊改善`}
+					detail={`${dashboard.promptAttribution.effective}/${dashboard.promptAttribution.total} 次归因为 Prompt 有效`}
 				/>
 				<MetricCard
 					icon={Layers3}
 					label="方法论卡"
 					value={`${dashboard.totalMethodologyCards}`}
-					detail={
-						dashboard.reusableMethodologyCards[0]?.title || "继续复诊后会自动沉淀"
-					}
+					detail={dashboard.reusableMethodologyCards[0]?.title || "继续复诊后会自动沉淀"}
 				/>
 			</section>
 
@@ -96,12 +96,17 @@ export function DiagnosisDashboardView({
 					</div>
 					<div className="mt-5 space-y-3">
 						{dashboard.qualityTrend.map((item) => (
-							<div key={item.id} className="grid gap-2 sm:grid-cols-[72px_1fr_120px] sm:items-center">
+							<div
+								key={item.id}
+								className="grid gap-2 sm:grid-cols-[72px_1fr_120px] sm:items-center"
+							>
 								<p className="text-xs text-muted-foreground">{item.label}</p>
 								<div className="h-3 overflow-hidden rounded-full bg-secondary">
 									<div
 										className="h-full rounded-full bg-primary"
-										style={{ width: `${Math.max(3, Math.min(100, item.score * 10))}%` }}
+										style={{
+											width: `${Math.max(3, Math.min(100, item.score * 10))}%`,
+										}}
 									/>
 								</div>
 								<p className="text-sm font-medium">
@@ -122,6 +127,110 @@ export function DiagnosisDashboardView({
 						<SmallStat label="持平" value={dashboard.promptEffectiveness.unchanged} />
 						<SmallStat label="变差" value={dashboard.promptEffectiveness.worsened} />
 					</div>
+					<div className="mt-4 rounded-md border border-border bg-background p-3">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<p className="text-sm font-semibold">归因校准</p>
+							<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+								{dashboard.promptAttribution.calibration.readinessLabel}
+							</span>
+						</div>
+						<p className="mt-2 text-xs leading-5 text-muted-foreground">
+							{dashboard.promptAttribution.calibration.headline}
+						</p>
+						<p className="mt-2 text-xs leading-5 text-muted-foreground">
+							下一步：{dashboard.promptAttribution.calibration.nextBestAction}
+						</p>
+						{dashboard.promptAttribution.calibration.evidenceGaps.length ? (
+							<p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+								待补证据：
+								{dashboard.promptAttribution.calibration.evidenceGaps.join("；")}
+							</p>
+						) : null}
+						<div className="mt-3 rounded-md border border-border bg-card p-3">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<p className="text-xs font-medium">模型/编辑复核提示</p>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={() => {
+										void navigator.clipboard?.writeText(
+											dashboard.promptAttribution.calibration
+												.modelAssistedReviewPrompt,
+										);
+										setCopyStatus("已复制复核提示");
+									}}
+								>
+									<Clipboard className="mr-2 size-4" />
+									复制复核提示
+								</Button>
+							</div>
+							<textarea
+								readOnly
+								className="mt-3 max-h-40 min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 text-muted-foreground outline-none"
+								value={
+									dashboard.promptAttribution.calibration
+										.modelAssistedReviewPrompt
+								}
+							/>
+							{copyStatus ? (
+								<p className="mt-2 text-xs leading-5 text-muted-foreground">
+									{copyStatus}
+								</p>
+							) : null}
+						</div>
+					</div>
+					<div className="mt-4 space-y-3">
+						{dashboard.promptAttribution.items.length ? (
+							dashboard.promptAttribution.items.slice(0, 3).map((item) => (
+								<div
+									key={item.id}
+									className="rounded-md border border-border bg-background p-3"
+								>
+									<div className="flex flex-wrap items-center justify-between gap-2">
+										<p className="text-sm font-semibold">{item.label}</p>
+										<div className="flex items-center gap-2">
+											<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+												置信 {formatConfidence(item.confidence)}
+											</span>
+											<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+												{item.scoreDelta >= 0 ? "+" : ""}
+												{item.scoreDelta}
+											</span>
+										</div>
+									</div>
+									<p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+										诊断理由：{item.diagnosisReason}
+									</p>
+									<div className="mt-2 flex flex-wrap gap-1.5">
+										{item.signalStrengths.slice(0, 3).map((signal) => (
+											<span
+												key={signal.label}
+												className="rounded-md bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"
+											>
+												{signal.label}：{signal.value}
+											</span>
+										))}
+									</div>
+									<p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+										证据：{item.evidence.join("；")}
+									</p>
+									<p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+										下一步：{item.nextAction}
+									</p>
+									{item.missingData.length ? (
+										<p className="mt-2 line-clamp-1 text-xs leading-5 text-muted-foreground">
+											待补：{item.missingData[0]}
+										</p>
+									) : null}
+								</div>
+							))
+						) : (
+							<p className="text-sm leading-6 text-muted-foreground">
+								至少需要两次复诊，并且上一版存在改稿 Prompt，才能生成归因。
+							</p>
+						)}
+					</div>
 				</div>
 			</section>
 
@@ -136,7 +245,10 @@ export function DiagnosisDashboardView({
 				<div className="mt-4 grid gap-3 lg:grid-cols-2">
 					{dashboard.reusableMethodologyCards.length ? (
 						dashboard.reusableMethodologyCards.map((card) => (
-							<div key={card.projectCardId} className="rounded-md border border-border bg-background p-4">
+							<div
+								key={card.projectCardId}
+								className="rounded-md border border-border bg-background p-4"
+							>
 								<div className="flex items-start justify-between gap-3">
 									<p className="text-sm font-semibold">{card.title}</p>
 									<span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
@@ -236,4 +348,8 @@ function formatGateLabel(gate: string | undefined) {
 		discard: "废稿",
 	};
 	return map[gate || ""] || "修改";
+}
+
+function formatConfidence(value: number) {
+	return `${Math.round(value * 100)}%`;
 }
