@@ -155,6 +155,7 @@ interface BookAnalysisExportResult {
 
 export type BookExportFormat =
   | "markdown"
+  | "reading-report"
   | "json"
   | "tavern-card"
   | "world-book"
@@ -188,6 +189,17 @@ export class BookExportService {
             mode === "originalized"
               ? this.withOriginalizedHeader(this.toMarkdown(analysis))
               : this.toMarkdown(analysis),
+        };
+      case "reading-report":
+        return {
+          filename: this.filename(analysis, "reading-report.md", mode),
+          contentType: "text/markdown; charset=utf-8",
+          content:
+            mode === "originalized"
+              ? this.withOriginalizedHeader(
+                  this.toReadingReportMarkdown(analysis),
+                )
+              : this.toReadingReportMarkdown(analysis),
         };
       case "json":
         return {
@@ -778,6 +790,94 @@ export class BookExportService {
     return lines.join("\n");
   }
 
+  private toReadingReportMarkdown(analysis: BookAnalysisExportResult) {
+    const support = analysis.writingSupport;
+    const coreAppeal = analysis.book?.coreAppeal || [];
+    const keyRelationships = this.relationshipEdges(analysis).slice(0, 6);
+    const chapterFunctions = support?.chapterFunctionTable || [];
+    const promises = support?.readerPromiseChecklist || [];
+    const foreshadowing = support?.foreshadowingLedger || [];
+    const timeline = this.readingTimeline(chapterFunctions, analysis.chronicle);
+    const plotlineTakeaways = (analysis.plotlines || [])
+      .map((line) => line.reusablePattern)
+      .filter((item): item is string => Boolean(item));
+    const mindMap = this.readingMindMap({
+      corePromise:
+        promises[0]?.promise ||
+        coreAppeal.join(" + ") ||
+        analysis.book?.oneSentencePremise ||
+        "待补",
+      timeline,
+      keyRelationships,
+      promises,
+      foreshadowing,
+      takeaways: [
+        ...plotlineTakeaways,
+        ...(support?.qualityDiagnosis?.strengths || []),
+      ],
+    });
+    const takeaways = [
+      ...plotlineTakeaways,
+      ...(support?.qualityDiagnosis?.strengths || []),
+      ...(analysis.originalizationReport?.safeToLearn || []),
+    ].slice(0, 6);
+
+    return [
+      `# ${analysis.book?.title || "整书"} 拆书阅读报告`,
+      "",
+      "这份报告只保留最适合阅读理解和创作复盘的内容。完整角色卡、世界书、JSON 和工具导入格式请使用资料版导出。",
+      "",
+      "## 这本书靠什么留住读者",
+      "",
+      `一句话设定：${analysis.book?.oneSentencePremise || "无"}`,
+      "",
+      "核心吸引力：",
+      ...this.list(coreAppeal),
+      "",
+      "## 理解版思维导图",
+      ...mindMap,
+      "",
+      "## 故事阶段时间轴",
+      ...timeline,
+      "",
+      "## 关键关系故事线",
+      ...this.list(this.relationshipStoryline(keyRelationships)),
+      "",
+      "## 关键关系为什么重要",
+      ...this.list(
+        keyRelationships.map((edge) => this.relationshipReadingLine(edge)),
+      ),
+      "",
+      "## 伏笔和未完成期待",
+      ...this.list([
+        ...promises.map(
+          (item) =>
+            `${item.promise}：${item.status || "待观察"}；下一步检查：${item.nextCheck || "待补"}`,
+        ),
+        ...foreshadowing.map(
+          (item) =>
+            `第 ${item.setupChapter || "?"} 章：${item.setup} -> ${item.payoff || "待回收"}；风险：${item.risk || "待补"}`,
+        ),
+      ]),
+      "",
+      "## 作者可以先学什么",
+      ...this.list(takeaways),
+      "",
+      "## 不要照搬",
+      ...this.list([
+        ...(analysis.exportPackage?.doNotCopyList || []),
+        ...(analysis.originalizationReport?.mustTransform || []),
+      ]),
+      "",
+      "## 下一步怎么用",
+      ...this.list([
+        "先复述这本书的核心读者承诺，再决定你的新书承诺要改成什么。",
+        "只学习阶段功能、关系功能和伏笔管理，不复用原作专名、人物关系网和事件链。",
+        "如果要继续用 AI 写作，把“核心承诺、主角压力、关键关系、章末钩子”写进下一条 Prompt。",
+      ]),
+    ].join("\n");
+  }
+
   private toDoNotCopyMarkdown(analysis: BookAnalysisExportResult) {
     return [
       `# ${analysis.book?.title || "整书拆解"} Do Not Copy 清单`,
@@ -957,6 +1057,250 @@ export class BookExportService {
         importNotes: analysis.generationAssets?.worldBook?.importNotes || "",
       },
     };
+  }
+
+  private readingTimeline(
+    chapterFunctions?: Array<{
+      chapterOrder?: number;
+      title?: string;
+      function?: string;
+      goal?: string;
+      conflict?: string;
+      hook?: string;
+    }>,
+    chronicle?: Array<{
+      order?: number;
+      event?: string;
+      storyFunction?: string;
+    }>,
+  ) {
+    const source = chapterFunctions?.length
+      ? chapterFunctions.map((item) => ({
+          order: item.chapterOrder,
+          title: item.title,
+          function: item.function,
+          goal: item.goal,
+          conflict: item.conflict,
+          hook: item.hook,
+        }))
+      : (chronicle || []).map((item) => ({
+          order: item.order,
+          title: `事件 ${item.order || "?"}`,
+          function: item.storyFunction,
+          goal: item.event,
+          conflict: item.storyFunction,
+          hook: item.storyFunction,
+        }));
+    if (!source.length) {
+      return ["- 暂无足够章节功能数据。"];
+    }
+    const groupSize = source.length <= 4 ? 1 : Math.ceil(source.length / 4);
+    const lines: string[] = [];
+    for (let index = 0; index < source.length; index += groupSize) {
+      const group = source.slice(index, index + groupSize);
+      const first = group[0];
+      const last = group[group.length - 1];
+      if (!first || !last) {
+        continue;
+      }
+      const range =
+        first.order === last.order
+          ? `第 ${first.order || "?"} 章`
+          : `第 ${first.order || "?"}-${last.order || "?"} 章`;
+      lines.push(
+        `- ${range}：${first.function || "阶段功能待补"}；触发：${first.goal || "待补"}；压力：${first.conflict || "待补"}；钩子：${last.hook || "待补"}`,
+      );
+    }
+    return lines;
+  }
+
+  private readingMindMap(input: {
+    corePromise: string;
+    timeline: string[];
+    keyRelationships: Array<{
+      sourceLabel?: string;
+      targetLabel?: string;
+      label?: string;
+      relation?: string[];
+      tension?: string;
+      evidence?: string[];
+      firstSeenChapter?: number;
+    }>;
+    promises: Array<{ promise?: string; nextCheck?: string }>;
+    foreshadowing: Array<{
+      setup?: string;
+      payoff?: string;
+      risk?: string;
+    }>;
+    takeaways: string[];
+  }) {
+    const firstRelationship = input.keyRelationships[0];
+    const relationshipLabel = firstRelationship
+      ? `${firstRelationship.sourceLabel} / ${firstRelationship.targetLabel}`
+      : "关键关系待补";
+    const firstPromise =
+      input.promises[0]?.promise ||
+      input.foreshadowing[0]?.setup ||
+      "伏笔期待待补";
+    const firstPayoff =
+      input.promises[0]?.nextCheck ||
+      input.foreshadowing[0]?.payoff ||
+      input.foreshadowing[0]?.risk ||
+      "兑现方式待补";
+
+    return this.list([
+      `中心承诺：${input.corePromise}`,
+      `主角压力：${input.timeline[0] || "先补清主角的损失、目标和必须行动的理由。"}`,
+      `关系钩子：${relationshipLabel}；${firstRelationship ? this.relationshipFunction(firstRelationship) : "先找出制造压力、交易、误解或情绪拉扯的关系。"}`,
+      `冲突升级：${input.timeline.slice(0, 3).join(" / ") || "按章节整理触发、升级、转折和阶段兑现。"}`,
+      `伏笔期待：${firstPromise}；${firstPayoff}`,
+      `可学写法：${input.takeaways[0] || "把能迁移的结构动作和不能照搬的表面元素分开。"}`,
+    ]);
+  }
+
+  private relationshipEdges(analysis: BookAnalysisExportResult) {
+    const relationships = analysis.relationships as
+      | {
+          nodes?: Array<{ id?: string; label?: string }>;
+          edges?: Array<{
+            source?: string;
+            target?: string;
+            label?: string;
+            relation?: string[];
+            tension?: string;
+            weight?: number;
+            evidence?: string[];
+            firstSeenChapter?: number;
+          }>;
+        }
+      | undefined;
+    const labels = new Map(
+      (relationships?.nodes || [])
+        .filter((node) => node.id)
+        .map((node) => [node.id as string, node.label || node.id || ""]),
+    );
+    return (relationships?.edges || [])
+      .filter((edge) => edge.source && edge.target)
+      .sort((left, right) => (right.weight || 0) - (left.weight || 0))
+      .map((edge) => ({
+        ...edge,
+        sourceLabel: labels.get(edge.source || "") || edge.source || "",
+        targetLabel: labels.get(edge.target || "") || edge.target || "",
+      }));
+  }
+
+  private relationshipStoryline(
+    edges: Array<{
+      sourceLabel?: string;
+      targetLabel?: string;
+      label?: string;
+      relation?: string[];
+      tension?: string;
+      evidence?: string[];
+      firstSeenChapter?: number;
+    }>,
+  ) {
+    return [...edges]
+      .sort((left, right) => {
+        const chapterDelta =
+          (left.firstSeenChapter || 999999) -
+          (right.firstSeenChapter || 999999);
+        return (
+          chapterDelta ||
+          (right.evidence?.length || 0) - (left.evidence?.length || 0)
+        );
+      })
+      .slice(0, 6)
+      .map((edge) => {
+        const chapter = edge.firstSeenChapter
+          ? `第 ${edge.firstSeenChapter} 章`
+          : "章节待补";
+        const evidence = edge.evidence?.[0]
+          ? `；证据：${edge.evidence[0]}`
+          : "";
+        return `${chapter}：${edge.sourceLabel} / ${edge.targetLabel}；${this.relationshipFunction(edge)}；${this.relationshipExpectation(edge)}；可学：${this.relationshipLearnableMove(edge)}${evidence}`;
+      });
+  }
+
+  private relationshipReadingLine(edge: {
+    sourceLabel?: string;
+    targetLabel?: string;
+    label?: string;
+    relation?: string[];
+    tension?: string;
+    evidence?: string[];
+    firstSeenChapter?: number;
+  }) {
+    const relation = edge.relation?.join("、") || edge.label || "关系";
+    const evidence = edge.evidence?.[0] ? `；证据：${edge.evidence[0]}` : "";
+    const firstSeen = edge.firstSeenChapter
+      ? `；第 ${edge.firstSeenChapter} 章进入故事`
+      : "";
+    return `${edge.sourceLabel} -> ${edge.targetLabel}：${relation}；故事功能：${this.relationshipFunction(edge)}；读者期待：${this.relationshipExpectation(edge)}；可学：${this.relationshipLearnableMove(edge)}${firstSeen}${evidence}`;
+  }
+
+  private relationshipFunction(edge: {
+    label?: string;
+    relation?: string[];
+    tension?: string;
+  }) {
+    const text = `${edge.label || ""} ${edge.tension || ""} ${(edge.relation || []).join(" ")}`;
+    if (/敌|压|仇|威胁|对抗|剥夺|打压/.test(text)) {
+      return "制造压力，让主角必须行动或反击";
+    }
+    if (/师|导师|教|传承|保护|引导/.test(text)) {
+      return "提供门槛和有限帮助，避免直接替主角解决问题";
+    }
+    if (/交易|利用|试探|信息/.test(text)) {
+      return "制造利益交换，让读者期待信任或背叛";
+    }
+    if (/暧昧|爱|婚|亲密|羁绊/.test(text)) {
+      return "制造关系拉扯，推动情绪期待";
+    }
+    return "帮助读者理解阵营、压力和选择";
+  }
+
+  private relationshipExpectation(edge: {
+    sourceLabel?: string;
+    targetLabel?: string;
+    label?: string;
+    relation?: string[];
+    tension?: string;
+  }) {
+    const from = edge.sourceLabel || "一方";
+    const to = edge.targetLabel || "另一方";
+    const text = `${edge.label || ""} ${edge.tension || ""} ${(edge.relation || []).join(" ")}`;
+    if (/敌|压|仇|威胁|对抗|剥夺|打压/.test(text)) {
+      return `读者会期待 ${from} 如何摆脱或反击 ${to}`;
+    }
+    if (/交易|利用|试探/.test(text)) {
+      return `读者会期待 ${from} 和 ${to} 的合作会不会变成背叛`;
+    }
+    if (/暧昧|爱|婚|亲密|羁绊/.test(text)) {
+      return `读者会期待 ${from} 和 ${to} 的关系何时推进或破裂`;
+    }
+    return `读者会期待 ${from} 和 ${to} 的关系下一步怎么变化`;
+  }
+
+  private relationshipLearnableMove(edge: {
+    label?: string;
+    relation?: string[];
+    tension?: string;
+  }) {
+    const text = `${edge.label || ""} ${edge.tension || ""} ${(edge.relation || []).join(" ")}`;
+    if (/敌|压|仇|威胁|对抗|剥夺|打压/.test(text)) {
+      return "压迫关系要绑定具体损失和反击机会";
+    }
+    if (/师|导师|教|传承|保护|引导/.test(text)) {
+      return "导师关系要先设门槛，再给有限帮助";
+    }
+    if (/交易|利用|试探|信息/.test(text)) {
+      return "交易关系要写清双方各自想要什么，以及不信任会带来什么风险";
+    }
+    if (/暧昧|爱|婚|亲密|羁绊/.test(text)) {
+      return "情感关系要让误解、选择和代价推动";
+    }
+    return "关系卡要写清故事功能：它提供压力、资源、误解、诱惑还是阻碍";
   }
 
   private list(items?: Array<string | undefined>) {

@@ -78,4 +78,20 @@ describe("extractJson", () => {
       b: [1, 2, 3],
     });
   });
+
+  it("completes JSON that was truncated before closing containers", () => {
+    expect(extractJson('{"title":"demo","items":[{"name":"a"}')).toEqual({
+      title: "demo",
+      items: [{ name: "a" }],
+    });
+  });
+
+  it("drops a dangling object key from truncated JSON", () => {
+    expect(
+      extractJson('{"title":"demo","items":[{"name":"a"}],"next":'),
+    ).toEqual({
+      title: "demo",
+      items: [{ name: "a" }],
+    });
+  });
 });

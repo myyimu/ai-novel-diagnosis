@@ -76,6 +76,7 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     try {
       const client = await this.pool!.connect();
       client.release();
+      await this.applyDatabaseCompatibilityMigrations();
       this.logger.log("Database connection established");
     } catch (error) {
       this.logger.error(
@@ -109,6 +110,17 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   /** isConfigured returns true when a real DATABASE_URL was set. */
   isConfigured(): boolean {
     return this.mode === "postgres";
+  }
+
+  async queryRows<T = Record<string, unknown>>(
+    queryText: string,
+    params: unknown[] = [],
+  ): Promise<T[]> {
+    const result =
+      this.mode === "postgres"
+        ? await this.pool!.query(queryText, params)
+        : await this.pglite!.query(queryText, params);
+    return this.rowsFromQueryResult(result) as T[];
   }
 
   /**
@@ -213,6 +225,105 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         "usage_count" integer NOT NULL
       )
     `);
+    await this.applyDatabaseCompatibilityMigrations();
+  }
+
+  private async applyDatabaseCompatibilityMigrations(): Promise<void> {
+    const tables = await this.getExistingTables();
+
+    if (tables.has("users")) {
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "created" timestamp(3) DEFAULT now() NOT NULL
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "updated" timestamp(3) DEFAULT now() NOT NULL
+      `);
+      await this.db.execute(sql`
+        UPDATE "users"
+        SET "updated" = now()
+        WHERE "updated" IS NULL
+      `);
+    }
+
+    if (tables.has("analysis_uploads")) {
+      await this.db.execute(sql`
+        ALTER TABLE "analysis_uploads"
+        ADD COLUMN IF NOT EXISTS "created" timestamp(3) DEFAULT now() NOT NULL
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "analysis_uploads"
+        ADD COLUMN IF NOT EXISTS "updated" timestamp(3) DEFAULT now() NOT NULL
+      `);
+      await this.db.execute(sql`
+        UPDATE "analysis_uploads"
+        SET "created" = COALESCE("created", now()),
+            "updated" = COALESCE("updated", now())
+        WHERE "created" IS NULL OR "updated" IS NULL
+      `);
+    }
+
+    if (tables.has("book_analysis_jobs")) {
+      await this.db.execute(sql`
+        ALTER TABLE "book_analysis_jobs"
+        ADD COLUMN IF NOT EXISTS "partial_result" jsonb
+      `);
+    }
+
+    if (tables.has("workspace_projects")) {
+      await this.db.execute(sql`
+        ALTER TABLE "workspace_projects"
+        ADD COLUMN IF NOT EXISTS "created_at" timestamp(3) DEFAULT now() NOT NULL
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "workspace_projects"
+        ADD COLUMN IF NOT EXISTS "updated_at" timestamp(3) DEFAULT now() NOT NULL
+      `);
+    }
+
+    if (tables.has("revision_sessions")) {
+      await this.db.execute(sql`
+        ALTER TABLE "revision_sessions"
+        ADD COLUMN IF NOT EXISTS "revision_note" text
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "revision_sessions"
+        ADD COLUMN IF NOT EXISTS "revision_note_updated_at" timestamp(3)
+      `);
+    }
+  }
+
+  private async getExistingTables(): Promise<Set<string>> {
+    const result = await this.db.execute(sql`
+      SELECT "table_name"
+      FROM "information_schema"."tables"
+      WHERE "table_schema" = 'public'
+    `);
+    const rows = this.rowsFromQueryResult(result);
+
+    return new Set(
+      rows
+        .map((row) =>
+          typeof row === "object" && row !== null && "table_name" in row
+            ? String(row.table_name)
+            : "",
+        )
+        .filter(Boolean),
+    );
+  }
+
+  private rowsFromQueryResult(result: unknown): unknown[] {
+    if (Array.isArray(result)) return result;
+    if (
+      result &&
+      typeof result === "object" &&
+      "rows" in result &&
+      Array.isArray(result.rows)
+    ) {
+      return result.rows;
+    }
+    return [];
   }
 
   private async rebuildPglite(): Promise<void> {

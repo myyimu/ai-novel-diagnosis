@@ -30,7 +30,7 @@ AI网文诊断台是本地部署的 AI 小说第一章改稿急诊工具。
 
 - 第一章改稿急诊室：默认入口，承接“粘贴第一章 -> 改稿急诊 -> 改稿 Prompt -> 复诊”。
 - 深度章节质检：进阶入口。导入成熟样本，AI 识别市场定位，生成 Rubric，再评分自己的章节。
-- 拆书图谱：进阶亮点入口。上传 TXT，预览章节切分，启动 Map-Reduce 整书拆解，沉淀角色、关系、时间线、世界书、图谱和写作资产。
+- 拆书图谱：进阶学习入口。上传 TXT，预览章节切分，启动 Map-Reduce 整书拆解，先生成拆书导览、理解版思维导图、关系故事线和故事阶段时间轴，再进入角色、世界书、完整图谱和写作资产。
 - 样本研究：进阶研究入口。把已完成拆解的样本变成可追溯的题材、卖点、图谱资产和对比判断。
 - 历史任务：恢复入口。服务重启后也能重新打开上传记录和整书拆解结果。
 - 导出资产：输出入口。下载报告、结构化数据、角色卡、世界书、图谱资产和避险清单。
@@ -94,7 +94,7 @@ TXT 上传
 -> 全书 Reduce 归纳
 -> 任务结果持久化
 -> `/book` 内打开历史任务或导出工具
--> 图谱/时间线/世界书展示和导出
+-> 拆书导览/关系故事线/图谱/时间线/世界书展示和导出
 ```
 
 整书任务会持久化中间结果：每完成一个章节 map，系统会把该章拆解 JSON 写入 `.local/analysis/jobs/{jobId}/maps/`，并在 job 记录里更新 `partialResult`。如果模型 token 额度不足、网络失败或 reduce 失败，上传记录、章节切分预览、已完成章节 map 和失败状态仍会保留。
@@ -194,7 +194,7 @@ TXT 上传
 - `GET /api/v1/analysis/book/jobs/:jobId`: 查询整书异步任务状态。
 - `GET /api/v1/analysis/book/jobs/:jobId/search`: 搜索整书拆解证据锚点。
 - `GET /api/v1/analysis/book/jobs`: 读取任务历史。
-- `GET /api/v1/analysis/book/jobs/:jobId/export`: 导出 Markdown、JSON、Tavern 角色卡、World Book、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包、Do Not Copy 清单，支持 `mode=notes|originalized`。
+- `GET /api/v1/analysis/book/jobs/:jobId/export`: 导出拆书阅读报告、完整 Markdown、JSON、Tavern 角色卡、World Book、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包、Do Not Copy 清单，支持 `mode=notes|originalized`。
 - `GET /api/v1/analysis/research/library`: 读取持久化研究库资产。
 - `POST /api/v1/analysis/research/compare`: 多书横向对比。
 - `POST /api/v1/analysis/research/ask`: 基于研究库证据回答问题。

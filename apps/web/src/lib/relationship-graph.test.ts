@@ -143,6 +143,32 @@ describe("relationship graph helpers", () => {
 		expect(graph.communities.length).toBe(2);
 	});
 
+	it("ignores empty relationship records from partial provider output", () => {
+		const partialResult = {
+			...result,
+			relationships: {
+				nodes: [null, undefined, { id: "", label: "无编号角色", type: "character" }],
+				edges: [
+					null,
+					undefined,
+					{ source: "无编号角色", target: "", label: "待补", tension: "信息不足" },
+				],
+			},
+		} as unknown as BookAnalysisResult;
+
+		const graph = buildRelationshipGraph(partialResult, "cluster");
+
+		expect(graph.nodes.map((node) => node.label)).toEqual(
+			expect.arrayContaining(["无编号角色", "target-1"]),
+		);
+		expect(graph.edges[0]).toEqual(
+			expect.objectContaining({
+				source: "无编号角色",
+				target: "target-1",
+			}),
+		);
+	});
+
 	it("builds timeline versions and export payloads", () => {
 		const graph = buildRelationshipGraph(result, "timeline");
 		const versions = buildRelationshipGraphVersions(graph);

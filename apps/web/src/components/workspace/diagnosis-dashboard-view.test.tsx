@@ -64,7 +64,7 @@ describe("DiagnosisDashboardView", () => {
 			/>,
 		);
 
-		expect(html).toContain("诊断 Dashboard");
+		expect(html).toContain("诊断看板");
 		expect(html).toContain("先完成一次快速诊断");
 		expect(html).toContain("开始诊断");
 	});
@@ -80,6 +80,9 @@ describe("DiagnosisDashboardView", () => {
 
 		expect(html).toContain("复诊次数");
 		expect(html).toContain("最近分数变化");
+		expect(html).toContain("编辑建议");
+		expect(html).toContain("按建议复诊");
+		expect(html).toContain("优先处理：章末钩子没有代价");
 		expect(html).toContain("Prompt 有效率");
 		expect(html).toContain("Prompt 有效");
 		expect(html).toContain("置信");

@@ -17,6 +17,49 @@ export interface ProviderChatOptions {
   };
 }
 
+interface OpenAICompatibleContentPart {
+  type?: string;
+  text?: string;
+  content?: string;
+  reasoning_content?: string;
+  reasoning?: string;
+}
+
+interface OpenAICompatibleChatChoice {
+  message?: {
+    content?: string | Array<string | OpenAICompatibleContentPart> | null;
+    reasoning_content?: string | null;
+    reasoning?: string | null;
+    refusal?: string | null;
+    tool_calls?: Array<{
+      function?: {
+        arguments?: string | null;
+      };
+    }> | null;
+    [key: string]: unknown;
+  };
+  text?: string | null;
+  finish_reason?: string | null;
+  reasoning_content?: string | null;
+  reasoning?: string | null;
+  [key: string]: unknown;
+}
+
+interface ExtractedProviderContent {
+  text: string;
+  source:
+    | "message_content"
+    | "reasoning_content"
+    | "content_with_reasoning"
+    | "choice_text"
+    | "tool_call_arguments"
+    | "empty";
+}
+
+interface OpenAICompatibleChatResponse {
+  choices?: OpenAICompatibleChatChoice[];
+}
+
 const providerPresets: Array<
   ProviderPreset & { id: NonNullable<ProviderConfigDto["preset"]> }
 > = [
@@ -107,10 +150,18 @@ const defaultSharedGpuFallback = {
 // Keep the default generous, while still allowing env override per deployment.
 const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MAX_ERROR_BODY_LENGTH = 1_000;
+const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 
 function providerTimeoutMs() {
   const raw = Number(process.env.PROVIDER_REQUEST_TIMEOUT_MS);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PROVIDER_TIMEOUT_MS;
+}
+
+function providerLengthRetryMaxOutputTokens() {
+  const raw = Number(process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS);
+  return Number.isFinite(raw) && raw > 0
+    ? raw
+    : DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS;
 }
 
 function isPrivateIpAddress(address: string) {
@@ -237,6 +288,7 @@ export class ModelProviderService {
     provider: ProviderConfigDto,
     messages: ProviderMessage[],
     options: ProviderChatOptions,
+    hasRetriedLength = false,
   ): Promise<string> {
     if (!provider.baseUrl || !provider.model) {
       if (provider.preset === "shared-gpu") {
@@ -310,17 +362,212 @@ export class ModelProviderService {
       );
     }
 
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new BadRequestException(
-        "Provider response did not include message content.",
+    const data = (await response.json()) as OpenAICompatibleChatResponse;
+    const firstChoice = data.choices?.[0];
+    const extracted = this.extractOpenAICompatibleContent(firstChoice, options);
+    if (
+      this.isLengthTruncated(firstChoice) &&
+      this.canRetryLength(options, hasRetriedLength)
+    ) {
+      return this.callOpenAICompatible(
+        provider,
+        messages,
+        {
+          ...options,
+          maxOutputTokens: this.lengthRetryMaxOutputTokens(options),
+        },
+        true,
       );
     }
 
-    return content;
+    if (this.isLengthTruncated(firstChoice) && !extracted.text) {
+      throw new BadRequestException(
+        this.describeLengthTruncatedProviderContent(firstChoice, options),
+      );
+    }
+
+    if (!extracted.text) {
+      throw new BadRequestException(
+        this.describeMissingProviderContent(firstChoice),
+      );
+    }
+
+    return extracted.text;
+  }
+
+  private isLengthTruncated(choice: OpenAICompatibleChatChoice | undefined) {
+    return choice?.finish_reason === "length";
+  }
+
+  private canRetryLength(
+    options: ProviderChatOptions,
+    hasRetriedLength: boolean,
+  ) {
+    if (hasRetriedLength) {
+      return false;
+    }
+
+    return (
+      this.lengthRetryMaxOutputTokens(options) > (options.maxOutputTokens ?? 0)
+    );
+  }
+
+  private lengthRetryMaxOutputTokens(options: ProviderChatOptions) {
+    const configuredMax = providerLengthRetryMaxOutputTokens();
+    const requested = options.maxOutputTokens ?? 0;
+    return Math.min(configuredMax, Math.max(4096, requested * 4));
+  }
+
+  private extractOpenAICompatibleContent(
+    choice: OpenAICompatibleChatChoice | undefined,
+    options: ProviderChatOptions,
+  ): ExtractedProviderContent {
+    const messageContent = this.extractMessageContent(choice);
+    const reasoningContent = this.extractReasoningContent(choice);
+
+    if (
+      messageContent &&
+      reasoningContent &&
+      !options.jsonSchema &&
+      !this.looksLikeJsonContent(messageContent)
+    ) {
+      return {
+        text: `<think>\n${reasoningContent}\n</think>\n${messageContent}`,
+        source: "content_with_reasoning",
+      };
+    }
+
+    if (messageContent) {
+      return { text: messageContent, source: "message_content" };
+    }
+
+    if (reasoningContent) {
+      return { text: reasoningContent, source: "reasoning_content" };
+    }
+
+    const toolCallArguments = this.extractToolCallArguments(choice);
+    if (toolCallArguments) {
+      return { text: toolCallArguments, source: "tool_call_arguments" };
+    }
+
+    if (typeof choice?.text === "string" && choice.text.trim()) {
+      return { text: choice.text, source: "choice_text" };
+    }
+
+    return { text: "", source: "empty" };
+  }
+
+  private looksLikeJsonContent(content: string) {
+    const trimmed = content.trimStart();
+    return trimmed.startsWith("{") || trimmed.startsWith("[");
+  }
+
+  private extractMessageContent(
+    choice: OpenAICompatibleChatChoice | undefined,
+  ) {
+    const messageContent = choice?.message?.content;
+    if (typeof messageContent === "string" && messageContent.trim()) {
+      return messageContent;
+    }
+    if (Array.isArray(messageContent)) {
+      const text = messageContent
+        .map((part) => {
+          if (typeof part === "string") {
+            return part;
+          }
+          if (typeof part?.text === "string") {
+            return part.text;
+          }
+          if (typeof part?.content === "string") {
+            return part.content;
+          }
+          if (typeof part?.reasoning_content === "string") {
+            return part.reasoning_content;
+          }
+          if (typeof part?.reasoning === "string") {
+            return part.reasoning;
+          }
+          return "";
+        })
+        .join("")
+        .trim();
+      if (text) {
+        return text;
+      }
+    }
+    return "";
+  }
+
+  private extractReasoningContent(
+    choice: OpenAICompatibleChatChoice | undefined,
+  ) {
+    const candidates = [
+      choice?.message?.reasoning_content,
+      choice?.message?.reasoning,
+      choice?.reasoning_content,
+      choice?.reasoning,
+    ];
+    return (
+      candidates
+        .find((item) => typeof item === "string" && item.trim())
+        ?.trim() ?? ""
+    );
+  }
+
+  private extractToolCallArguments(
+    choice: OpenAICompatibleChatChoice | undefined,
+  ) {
+    const toolCalls = choice?.message?.tool_calls;
+    if (!Array.isArray(toolCalls)) {
+      return "";
+    }
+
+    return toolCalls
+      .map((toolCall) => toolCall.function?.arguments?.trim() || "")
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+  }
+
+  private describeMissingProviderContent(
+    choice: OpenAICompatibleChatChoice | undefined,
+  ) {
+    if (!choice) {
+      return "Provider response did not include choices.";
+    }
+
+    const messageKeys = choice.message ? Object.keys(choice.message) : [];
+    const choiceKeys = Object.keys(choice);
+    const refusal =
+      typeof choice.message?.refusal === "string" &&
+      choice.message.refusal.trim()
+        ? ` refusal=${choice.message.refusal.slice(0, 120)}`
+        : "";
+    const finishReason = choice.finish_reason
+      ? ` finish_reason=${choice.finish_reason}`
+      : "";
+    return `Provider response did not include message content.${finishReason} choice_keys=${choiceKeys.join(",") || "none"} message_keys=${messageKeys.join(",") || "none"}${refusal}`;
+  }
+
+  private describeLengthTruncatedProviderContent(
+    choice: OpenAICompatibleChatChoice | undefined,
+    options: ProviderChatOptions,
+  ) {
+    const retryMax = this.lengthRetryMaxOutputTokens(options);
+    const requested = options.maxOutputTokens ?? "default";
+    return `模型输出被截断，Provider 没有返回完整可用正文。finish_reason=length requested_max_tokens=${requested} retry_max_tokens=${retryMax}。请换用更大输出额度/非推理模型，或缩短待分析文本后重试。${this.describeProviderShape(choice)}`;
+  }
+
+  private describeProviderShape(
+    choice: OpenAICompatibleChatChoice | undefined,
+  ) {
+    if (!choice) {
+      return " provider_shape=missing_choice";
+    }
+
+    const messageKeys = choice.message ? Object.keys(choice.message) : [];
+    const choiceKeys = Object.keys(choice);
+    return ` choice_keys=${choiceKeys.join(",") || "none"} message_keys=${messageKeys.join(",") || "none"}`;
   }
 
   private shouldUseJsonSchema(provider: ProviderConfigDto) {

@@ -201,6 +201,15 @@ export function buildDiagnosisDashboard({
 	const reusableMethodologyCards = [...methodologyCards]
 		.sort((a, b) => b.occurrenceCount - a.occurrenceCount)
 		.slice(0, 6);
+	const coach = buildDashboardCoach({
+		latest,
+		previous,
+		scoreDelta,
+		commonIssues,
+		categoryDistribution,
+		promptAttribution,
+		reusableMethodologyCards,
+	});
 
 	return {
 		totalSessions: orderedSessions.length,
@@ -215,6 +224,65 @@ export function buildDiagnosisDashboard({
 		promptAttribution,
 		qualityTrend,
 		reusableMethodologyCards,
+		coach,
+	};
+}
+
+function buildDashboardCoach({
+	latest,
+	previous,
+	scoreDelta,
+	commonIssues,
+	categoryDistribution,
+	promptAttribution,
+	reusableMethodologyCards,
+}: {
+	latest: RevisionSession | null;
+	previous: RevisionSession | null;
+	scoreDelta: number | null;
+	commonIssues: Array<{ id: string; label: string; count: number; percent: number }>;
+	categoryDistribution: Array<{ id: string; label: string; count: number; percent: number }>;
+	promptAttribution: ReturnType<typeof buildPromptAttribution>;
+	reusableMethodologyCards: ProjectMethodologyCard[];
+}) {
+	const latestGate = latest?.gateDecision || "revise";
+	const topIssue = commonIssues[0]?.label || latest?.mainProblem || "最大流失点待补";
+	const topCategory = categoryDistribution[0]?.label || "问题类型待观察";
+	const topMethodology = reusableMethodologyCards[0];
+	const promptAction = promptAttribution.calibration.nextBestAction;
+	const scoreAction =
+		scoreDelta === null
+			? "先完成第二次复诊，建立同一章节或同一开局的可比较基线。"
+			: scoreDelta >= 0.5
+				? "分数在改善，下一轮只处理仍然重复出现的最大问题，不要同时大改所有内容。"
+				: scoreDelta <= -0.5
+					? "质量回落，先回看上一版改动是否牺牲了开局承诺、冲突压力或章末钩子。"
+					: "分数基本持平，下一轮 Prompt 要把修改动作写成可检查事件。";
+	const methodologyAction = topMethodology
+		? `把「${topMethodology.title}」固化为写前自查项；它已经出现 ${topMethodology.occurrenceCount} 次。`
+		: "继续复诊 2-3 次，让系统把重复问题沉淀成作者自己的方法论卡。";
+
+	let headline = "先抓最大重复问题，再做下一轮复诊";
+	let explanation = `当前最该关注「${topIssue}」，它属于「${topCategory}」方向。`;
+	if (latestGate === "discard") {
+		headline = "当前稿件接近废稿，先停下局部修补";
+		explanation = "不要继续微调句子，先重做核心承诺、主角压力和开局事件。";
+	} else if (latestGate === "rebuild") {
+		headline = "下一步应重构，不是润色";
+		explanation = `先重构「${topIssue}」，再回到复诊确认 Gate 是否能回到修改或继续。`;
+	} else if (latestGate === "continue" && scoreDelta !== null && scoreDelta >= 0) {
+		headline = "趋势可继续，进入小步迭代";
+		explanation = "当前方向有改善迹象，下一轮只补最影响追读的剩余问题。";
+	} else if (scoreDelta !== null && scoreDelta < 0) {
+		headline = "趋势回落，先复盘上一轮改法";
+		explanation = "不要急着生成新 Prompt，先确认上一轮改动是否解决了原问题。";
+	}
+
+	return {
+		headline,
+		explanation,
+		nextActions: [`优先处理：${topIssue}`, scoreAction, promptAction, methodologyAction],
+		hasComparableRevision: Boolean(previous),
 	};
 }
 
@@ -445,6 +513,16 @@ export function buildProjectExportMarkdown({
 		`- Prompt 有效率：${formatPromptEffectiveness(dashboard.promptEffectiveness)}`,
 		`- Prompt 归因有效率：${formatPromptAttributionRate(dashboard.promptAttribution)}`,
 		`- 常见问题：${dashboard.commonIssues.map((issue) => issue.label).join("、") || "暂无"}`,
+		"",
+		"## 编辑建议",
+		"",
+		`- 判断：${dashboard.coach.headline}`,
+		`- 说明：${dashboard.coach.explanation}`,
+		`- 是否已有可比较复诊：${dashboard.coach.hasComparableRevision ? "是" : "否"}`,
+		"",
+		"下一步动作：",
+		"",
+		...dashboard.coach.nextActions.map((action, index) => `${index + 1}. ${action}`),
 		"",
 		"## 复诊轨迹",
 		"",

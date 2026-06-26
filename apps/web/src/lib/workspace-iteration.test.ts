@@ -188,6 +188,9 @@ describe("workspace iteration assets", () => {
 		expect(dashboard.gateDistribution.map((row) => row.label)).toContain("修改");
 		expect(dashboard.categoryDistribution.map((row) => row.label)).toContain("钩子");
 		expect(dashboard.commonIssues[0]?.label).toBe("章末钩子没有代价");
+		expect(dashboard.coach.headline).toContain("最大重复问题");
+		expect(dashboard.coach.nextActions[0]).toContain("章末钩子没有代价");
+		expect(dashboard.coach.nextActions.join(" ")).toContain("钩子必须绑定代价");
 	});
 
 	it("attributes weak prompt outcomes to execution gaps when issues repeat", () => {
@@ -327,6 +330,9 @@ describe("workspace iteration assets", () => {
 
 		expect(markdown).toContain("AI网文诊断台项目导出");
 		expect(markdown).toContain("项目概览");
+		expect(markdown).toContain("编辑建议");
+		expect(markdown).toContain("下一步动作");
+		expect(markdown).toContain("优先处理：章末钩子没有代价");
 		expect(markdown).toContain("复诊轨迹");
 		expect(markdown).toContain("人工备注");
 		expect(markdown).toContain("这一版按 Prompt 补了章末代价。");

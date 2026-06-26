@@ -22,12 +22,12 @@ pnpm run start:local
 
 推荐使用以上任一入口。
 
-- `scripts/start-local.cmd`: beginner-friendly entry, suitable for double-click or direct execution.
-- `scripts/start-local.cmd -a`: auto-install mode, skips confirmation prompts when dependencies are missing.
+- `scripts/start-local.cmd`: beginner-friendly entry, suitable for double-click or direct execution. Rerunning it closes the old API/Web console windows and restarts this project's services.
+- `scripts/start-local.cmd -a`: auto-install mode, skips confirmation prompts when dependencies are missing, and still restarts this project's services.
 - `pnpm run start:local`: starts the same PowerShell flow from the workspace root.
 
-- `scripts/start-local.cmd`：适合双击或直接执行，最适合普通用户。
-- `scripts/start-local.cmd -a`：自动安装模式，缺依赖时尽量少交互。
+- `scripts/start-local.cmd`：适合双击或直接执行，最适合普通用户；重复运行会关闭旧的 API/Web 黑窗口并重启本项目服务。
+- `scripts/start-local.cmd -a`：自动安装模式，缺依赖时尽量少交互，也会重启本项目服务。
 - `pnpm run start:local`：从工作区根目录进入同一套启动流程。
 
 ## What The Script Does / 脚本会做什么
@@ -41,11 +41,12 @@ Before opening the API and Web windows, the startup flow now does the following:
 5. Ensure `pnpm` is available, preferring `corepack` and falling back to `npm install -g`.
 6. Check whether workspace dependencies are installed.
 7. If dependencies are missing, run `pnpm install` from the workspace root.
-8. Reuse existing healthy project services when possible.
-9. If default ports are occupied by other services, search nearby ports.
-10. Start the API and Web dev servers in separate PowerShell windows.
-11. Write runtime logs to `.local/run-logs`.
-12. Open the Web URL automatically unless `-NoBrowser` is used.
+8. Serialize repeated launcher runs so two double-clicks do not start competing API/Web processes.
+9. Restart existing project services when using the `.cmd` entry, closing the old console windows first and waiting for old ports to be released; reuse is reserved for the PowerShell entry without `-Kill`.
+10. If default ports are still occupied by other services, search nearby ports.
+11. Start the API and Web dev servers in separate PowerShell windows.
+12. Write runtime logs to `.local/run-logs`.
+13. Open the Web URL automatically unless `-NoBrowser` is used.
 
 在打开 API 和 Web 窗口之前，脚本现在会按下面顺序执行：
 
@@ -56,11 +57,12 @@ Before opening the API and Web windows, the startup flow now does the following:
 5. 确保 `pnpm` 可用，优先使用 `corepack`，失败再回退到 `npm install -g`。
 6. 检查工作区依赖是否已安装。
 7. 如果依赖缺失，在工作区根目录自动执行 `pnpm install`。
-8. 优先复用已经健康运行的本项目服务。
-9. 如果默认端口被其他服务占用，自动尝试附近端口。
-10. 最后分别打开 API 和 Web 的 PowerShell 开发窗口。
-11. 把运行日志写入 `.local/run-logs`。
-12. 除非使用 `-NoBrowser`，否则启动后自动打开 Web 页面。
+8. 对重复启动做串行化处理，避免连续双击时两个启动器同时抢 API/Web 端口。
+9. 使用 `.cmd` 入口时会先关闭旧黑窗口、等待旧端口释放，再重启本项目服务；不带 `-Kill` 的 PowerShell 入口才会优先复用。
+10. 如果默认端口仍然被其他服务占用，自动尝试附近端口。
+11. 最后分别打开 API 和 Web 的 PowerShell 开发窗口。
+12. 把运行日志写入 `.local/run-logs`。
+13. 除非使用 `-NoBrowser`，否则启动后自动打开 Web 页面。
 
 ## Arguments / 参数
 

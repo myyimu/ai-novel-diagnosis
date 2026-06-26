@@ -111,6 +111,10 @@ export const graphLayoutOptions: Array<{ id: RelationshipGraphLayout; label: str
 	{ id: "timeline", label: "时间线" },
 ];
 
+function asArray<T>(value: T[] | null | undefined): T[] {
+	return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
 export function resolveEdgeTone(
 	edge: Pick<RelationshipGraphEdge, "label" | "tension" | "positivity">,
 ) {
@@ -748,8 +752,8 @@ export function buildRelationshipGraph(
 		return nodeByKey.get(id)!;
 	}
 
-	result.relationships.nodes.forEach(addNode);
-	result.characters.forEach((character) => {
+	asArray(result.relationships?.nodes).forEach(addNode);
+	asArray(result.characters).forEach((character) => {
 		addNode({
 			id: character.sourceName,
 			label: character.sourceName,
@@ -761,33 +765,37 @@ export function buildRelationshipGraph(
 		});
 	});
 
-	const edges: RelationshipGraphEdge[] = result.relationships.edges.map((edge, index) => {
-		const sourceId = keyAliases.get(edge.source) || edge.source;
-		const targetId = keyAliases.get(edge.target) || edge.target;
-		const sourceNode =
-			nodeByKey.get(sourceId) ||
-			addNode({ id: sourceId, label: edge.source, type: "unknown" });
-		const targetNode =
-			nodeByKey.get(targetId) ||
-			addNode({ id: targetId, label: edge.target, type: "unknown" });
-		sourceNode.degree += 1;
-		targetNode.degree += 1;
-		return {
-			id: `edge-${index}`,
-			source: sourceNode.id,
-			target: targetNode.id,
-			label: edge.label,
-			tension: edge.tension,
-			relation: edge.relation?.length ? edge.relation : [edge.label].filter(Boolean),
-			weight: edge.weight ?? 1,
-			positivity: edge.positivity ?? 0,
-			evidence: edge.evidence ?? [],
-			firstSeenChapter: edge.firstSeenChapter,
-			confidence: edge.confidence,
-			sourceNode,
-			targetNode,
-		};
-	});
+	const edges: RelationshipGraphEdge[] = asArray(result.relationships?.edges)
+		.filter((edge) => edge?.source || edge?.target)
+		.map((edge, index) => {
+			const source = edge.source || `source-${index + 1}`;
+			const target = edge.target || `target-${index + 1}`;
+			const sourceId = keyAliases.get(source) || source;
+			const targetId = keyAliases.get(target) || target;
+			const sourceNode =
+				nodeByKey.get(sourceId) ||
+				addNode({ id: sourceId, label: source, type: "unknown" });
+			const targetNode =
+				nodeByKey.get(targetId) ||
+				addNode({ id: targetId, label: target, type: "unknown" });
+			sourceNode.degree += 1;
+			targetNode.degree += 1;
+			return {
+				id: `edge-${index}`,
+				source: sourceNode.id,
+				target: targetNode.id,
+				label: edge.label,
+				tension: edge.tension,
+				relation: edge.relation?.length ? edge.relation : [edge.label].filter(Boolean),
+				weight: edge.weight ?? 1,
+				positivity: edge.positivity ?? 0,
+				evidence: edge.evidence ?? [],
+				firstSeenChapter: edge.firstSeenChapter,
+				confidence: edge.confidence,
+				sourceNode,
+				targetNode,
+			};
+		});
 
 	const nodes = [...nodeByKey.values()].sort((left, right) => {
 		const degreeDelta = right.degree - left.degree;

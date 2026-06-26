@@ -9,6 +9,8 @@
 
 AI网文诊断台是本地 AI 小说诊断、改稿复诊与 Prompt 迭代工具。它不是一键写小说工具，而是帮作者回答：这篇稿子哪里不好，为什么没有流量，读者为什么第一章就走？
 
+功能覆盖：AI Novel Diagnosis Desk 是一站式 AI 网文诊断工作台，可自动解析小说文本，生成小说人物关系图谱，诊断读者流失原因，并输出可执行的智能改稿 Prompt。
+
 粘贴第一章或 AI 生成初稿，它会定位最大流失点，用正文证据解释问题，给出修改优先级，并生成能直接复制给写作 AI 的改稿 Prompt。改完后再贴回来复诊，看问题是不是真的被解决。
 
 进阶时，它还能做 AI 拆书：拆角色、关系、世界观、时间线和写作结构，帮你学习成熟作品怎么留住读者，而不是照搬内容。
@@ -45,7 +47,7 @@ API: http://127.0.0.1:3001/api/v1
 - 一份可复制的改稿 Prompt：不是泛泛点评，而是能交给写作 AI 继续改的任务说明。
 - 一次复诊对比：改稿前后重新跑，判断这次修改有没有真正解决问题。
 - 一批可沉淀的方法论卡片：把反复出现的问题变成自查规则和 Prompt 规则。
-- 一套进阶资产：成熟样本 Rubric、整书角色/世界观拆解、关系图谱、时间线和导出包。
+- 一套进阶学习资产：成熟样本 Rubric、拆书阅读报告、理解版思维导图、关键关系故事线、关系图谱和导出包。
 
 ## 示例诊断报告
 
@@ -187,7 +189,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 当你已经有完整 TXT 或多个样本时，再进入整书拆解：
 
 ```text
-上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 关系图谱复核 -> 导出角色卡/世界书/续写包
+上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 拆书导览 -> 关系故事线 -> 图谱复核 -> 导出阅读报告/写作资产
 ```
 
 当前页面入口已经收敛：`/` 是第一章诊断台，`/dashboard` 是诊断看板，`/methodology` 是方法论库，`/revisions` 是复诊历史，`/critique` 是深度质检，`/book` 是拆书图谱，`/library` 是样本研究，`/history` 是历史任务，`/export` 是导出资产，`/model` 是 AI 设置。`/workspace`、`/starter` 保留为兼容路由，会回到首页。
@@ -204,14 +206,14 @@ AI 生成稿诊断与 Prompt 迭代：
 
 - 支持把 AI 初稿和上一条 Prompt 一起纳入诊断，判断问题来自正文执行、结构承诺还是 Prompt 约束不足。
 - 诊断结果会逐步升级为结构化 issue，绑定证据、读者影响、改稿动作和 Prompt 约束。
-- Dashboard 会展示常见问题、复诊改善趋势、Gate 分布和 Prompt 有效率归因，并给出项目级归因校准、置信度、诊断理由、信号、待补数据和可复制的模型/编辑复核提示。
+- 诊断看板会展示常见问题、复诊改善趋势、Gate 分布和 Prompt 有效率归因，并给出编辑建议、项目级归因校准、置信度、诊断理由、信号、待补数据和可复制的模型/编辑复核提示。
 - 示例诊断资产沉淀在 `fixtures/novel-diagnosis`，覆盖玄幻、都市和言情开局，可作为演示、回归测试和后续真实模型 golden 对照。
 
 作者方法论沉淀：
 
 - 把反复出现的问题沉淀成开头规则、节奏规则、爽点规则、Prompt 规则和反面清单。
 - 方法论库不是历史任务列表，而是作者下次改稿前能复用的自查系统。
-- 复诊历史和方法论库可导出当前项目 Markdown 包，沉淀人工备注、问题轨迹、Prompt 归因和可复用 Prompt 模板。
+- 复诊历史和方法论库可导出当前项目 Markdown 包，沉淀编辑建议、人工备注、问题轨迹、Prompt 归因和可复用 Prompt 模板。
 
 深度章节质检：
 
@@ -223,13 +225,13 @@ AI 生成稿诊断与 Prompt 迭代：
 
 - 上传 TXT，清洗文本、预览章节切分，异步执行 Map-Reduce 拆书。
 - 每章 map 完成后写入本地文件，token 不足或任务失败时不至于白跑。
-- 生成角色、势力、地点、世界观、故事线、大事纪和可导出写作资产。
+- 先生成拆书导览、理解版思维导图、关键关系故事线和故事阶段时间轴，再进入完整角色、世界观、图谱和写作资产。
 
 关系图谱工作台：
 
-- 把整书拆解结果转成可点击图谱，支持总览、复核、时间线、节点拖拽和图谱导出。
+- 把整书拆解结果转成可点击图谱，支持总览、复核、时间线、节点拖拽和图谱导出；完整图谱是二次探索入口，不是第一眼入口。
 - 对弱证据关系、孤立节点和疑似重复节点做确认、改标签、合并或忽略。
-- 导出 Markdown、JSON、Tavern 角色卡、世界书、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包和“不要照搬”清单。
+- 导出区按任务分成“先读懂”“继续创作”“资料归档/工具导入”，支持拆书阅读报告、完整学习报告、JSON、Tavern 角色卡、世界书、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包和“不要照搬”清单。
 
 ## 技术栈
 
@@ -351,6 +353,10 @@ API: http://127.0.0.1:3001/api/v1
 
 默认不配置 `DATABASE_URL` 时，API 会使用 `.local/pglite` 作为本地开发数据库。
 
+上传 TXT 和整书拆解中间产物默认存放在 `.local/analysis`。这是本地开发明文存储，目录已被 `.gitignore` 忽略，不应提交上传文本、模型输出、本地数据库或 API Key。
+
+如果处理真实作者稿件或商业稿件，可以设置 `ANALYSIS_STORAGE_KEY` 启用本地隐私模式。启用后，上传原文、标准化文本和上传快照会以 AES-256-GCM 写成 `.enc` 文件；API 会在读取时透明解密。请妥善保存这个密钥，丢失后已加密的本地上传无法恢复。
+
 真实 PostgreSQL 部署使用 Drizzle migrations。初始迁移文件位于 `services/api/drizzle/migrations`；修改 `services/api/src/service/drizzle/schema.ts` 后，应执行：
 
 ```bash
@@ -432,7 +438,7 @@ pnpm run doctor
 
 - 这是 Alpha / MVP，不保证 AI 拆解和评分完全准确。
 - Gate、Prompt 有效率和复诊改善只能作为改稿优先级参考，不代表平台流量预测。
-- 复诊历史、作者方法论库、诊断 Dashboard 和项目导出包已接入后端持久化第一版；真实 PostgreSQL 部署已提供初始 Drizzle migration，后续 schema 变更需要生成新迁移。
+- 复诊历史、作者方法论库、诊断看板和项目导出包已接入后端持久化第一版；真实 PostgreSQL 部署已提供初始 Drizzle migration，后续 schema 变更需要生成新迁移。
 - Prompt 归因已经抽到共享 `ai-core` 引擎并输出解释信号和项目级校准建议，但仍需要真实案例校准，不能替代编辑判断。
 - 中间结果已经留存，失败或中断后的继续拆解已有基础入口；更细的半成品导出和跨会话复核持久化仍在迭代。
 - 关系图谱支持本地人工修正和导出记录，但修正记录暂未做独立数据库持久化。
@@ -453,6 +459,8 @@ pnpm run doctor
 - 产品定位与 AI 生成稿质检方向文档：见 [docs/product-positioning-ai-draft-diagnosis.md](./docs/product-positioning-ai-draft-diagnosis.md)。
 - 诊断工作流化改造计划：见 [docs/diagnosis-workflow-implementation-plan.md](./docs/diagnosis-workflow-implementation-plan.md)。
 - 产品评审与迭代规划：见 [docs/product-review-roadmap.md](./docs/product-review-roadmap.md)。
+- 内容易懂性评审：见 [docs/content-clarity-review.md](./docs/content-clarity-review.md)。
+- 拆书结果可理解性评审：见 [docs/book-disassembly-comprehension-review.md](./docs/book-disassembly-comprehension-review.md)。
 - 贡献说明：见 [CONTRIBUTING.md](./CONTRIBUTING.md)
 - 安全策略：见 [SECURITY.md](./SECURITY.md)
 - GitHub 社交预览图候选稿：见 [docs/assets/github-social-preview.png](./docs/assets/github-social-preview.png)。

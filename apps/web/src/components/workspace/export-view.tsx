@@ -22,6 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiUrl, type ApiEnvelope } from "@/lib/api-client";
 import {
+	buildBookComprehensionMap,
+	buildRelationshipReadingInsight,
+	type BookComprehensionMap,
+} from "@/lib/book-comprehension";
+import {
 	applyRelationshipGraphCorrections,
 	buildRelationshipGraph,
 	buildRelationshipGraphExport,
@@ -40,6 +45,7 @@ import type { BookAnalysisJob, BookAnalysisResult } from "@/stores/workspace-sto
 
 export type BookExportFormat =
 	| "markdown"
+	| "reading-report"
 	| "json"
 	| "tavern-card"
 	| "world-book"
@@ -163,64 +169,94 @@ function ExportCenter({
 		return null;
 	}
 
-	const formats: Array<{
-		id: BookExportFormat;
-		label: string;
+	const formatGroups: Array<{
+		id: string;
+		title: string;
 		description: string;
-		recommended?: boolean;
+		formats: Array<{
+			id: BookExportFormat;
+			label: string;
+			description: string;
+			recommended?: boolean;
+		}>;
 	}> = [
 		{
-			id: "markdown",
-			label: "学习报告",
-			description: "最适合新手阅读、复盘和保存笔记。",
-			recommended: true,
+			id: "understand",
+			title: "先读懂",
+			description: "给作者、编辑或团队复盘使用，优先解释这本书为什么有人追。",
+			formats: [
+				{
+					id: "reading-report",
+					label: "拆书阅读报告",
+					description: "先讲清留人结构、思维导图、关系故事线和可学写法。",
+					recommended: true,
+				},
+				{
+					id: "markdown",
+					label: "完整学习报告",
+					description: "保留完整拆书资产，适合深入复盘和保存笔记。",
+				},
+				{
+					id: "do-not-copy",
+					label: "避险清单",
+					description: "列出不建议照搬的角色、设定和桥段。",
+				},
+			],
 		},
 		{
-			id: "do-not-copy",
-			label: "避险清单",
-			description: "列出不建议照搬的角色、设定和桥段。",
-			recommended: true,
+			id: "create",
+			title: "继续创作",
+			description: "把拆书结果转换成新书规划、Prompt 或续写上下文。",
+			formats: [
+				{
+					id: "outline",
+					label: "卷纲/大纲",
+					description: "把拆解结果整理成可继续创作的结构提纲。",
+					recommended: true,
+				},
+				{
+					id: "prompt-pack",
+					label: "改写提示词包",
+					description: "给 AI 续写或改稿时使用，适合已有创作方向。",
+				},
+				{
+					id: "continuation-pack",
+					label: "续写数据包",
+					description: "结构化上下文，适合程序或高级工作流。",
+				},
+				{
+					id: "style-bible",
+					label: "风格说明书",
+					description: "总结叙事节奏、表达习惯和场景组织方式。",
+				},
+			],
 		},
 		{
-			id: "outline",
-			label: "卷纲/大纲",
-			description: "把拆解结果整理成可继续创作的结构提纲。",
-			recommended: true,
-		},
-		{
-			id: "prompt-pack",
-			label: "改写提示词包",
-			description: "给 AI 续写或改稿时使用，适合已有创作方向。",
-		},
-		{
-			id: "continuation-pack",
-			label: "续写数据包",
-			description: "结构化上下文，适合程序或高级工作流。",
-		},
-		{
-			id: "style-bible",
-			label: "风格说明书",
-			description: "总结叙事节奏、表达习惯和场景组织方式。",
-		},
-		{
-			id: "json",
-			label: "完整 JSON",
-			description: "给开发者、自动化脚本或二次处理使用。",
-		},
-		{
-			id: "tavern-card",
-			label: "角色卡",
-			description: "导入 Tavern/SillyTavern 一类工具。",
-		},
-		{
-			id: "world-book",
-			label: "世界书",
-			description: "导入世界观、组织、地点和关键词触发条目。",
-		},
-		{
-			id: "sillytavern-world-info",
-			label: "SillyTavern 世界信息",
-			description: "给 SillyTavern 的 World Info 格式使用。",
+			id: "archive",
+			title: "资料归档 / 工具导入",
+			description: "给开发者、自动化脚本或外部写作工具使用。",
+			formats: [
+				{
+					id: "json",
+					label: "完整 JSON",
+					description: "给开发者、自动化脚本或二次处理使用。",
+				},
+				{
+					id: "tavern-card",
+					label: "角色卡",
+					description: "导入 Tavern/SillyTavern 一类工具。",
+				},
+				{
+					id: "world-book",
+					label: "世界书",
+					description: "导入世界观、组织、地点和关键词触发条目。",
+				},
+				{
+					id: "sillytavern-world-info",
+					label: "SillyTavern 世界信息",
+					description: "给 SillyTavern 的 World Info 格式使用。",
+				},
+			],
 		},
 	];
 	const modes: Array<{
@@ -273,30 +309,53 @@ function ExportCenter({
 				当前模式：{selectedMode.label}。{selectedMode.description}
 			</p>
 			<ExportRiskNotice mode={mode} />
-			<div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-				{formats.map((format) => (
-					<Button
-						key={format.id}
-						variant="outline"
-						className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
-						onClick={() => onExport(format.id, mode)}
-						disabled={loading !== null}
+			<div className="mt-4 grid gap-4 xl:grid-cols-3">
+				{formatGroups.map((group) => (
+					<div
+						key={group.id}
+						className="rounded-md border border-border bg-background p-4"
 					>
-						<span className="flex w-full items-start gap-2">
-							{loading === "export" ? (
-								<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
-							) : null}
-							<span>
-								<span className="block font-medium">
-									{format.label}
-									{format.recommended ? "（推荐）" : ""}
-								</span>
-								<span className="mt-1 block text-xs leading-5 text-muted-foreground">
-									{format.description}
-								</span>
-							</span>
-						</span>
-					</Button>
+						<div className="min-h-20">
+							<p className="text-sm font-semibold">{group.title}</p>
+							<p className="mt-2 text-xs leading-5 text-muted-foreground">
+								{group.description}
+							</p>
+						</div>
+						<div className="mt-3 space-y-2">
+							{group.formats.map((format) => (
+								<Button
+									key={format.id}
+									variant="outline"
+									className={`h-auto w-full justify-start whitespace-normal px-4 py-3 text-left ${
+										format.recommended
+											? "border-primary/50 bg-primary/10"
+											: "bg-card"
+									}`}
+									onClick={() => onExport(format.id, mode)}
+									disabled={loading !== null}
+								>
+									<span className="flex w-full items-start gap-2">
+										{loading === "export" ? (
+											<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+										) : null}
+										<span>
+											<span className="flex flex-wrap items-center gap-2 font-medium">
+												{format.label}
+												{format.recommended ? (
+													<span className="rounded-md border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+														首选
+													</span>
+												) : null}
+											</span>
+											<span className="mt-1 block text-xs leading-5 text-muted-foreground">
+												{format.description}
+											</span>
+										</span>
+									</span>
+								</Button>
+							))}
+						</div>
+					</div>
 				))}
 			</div>
 		</section>
@@ -455,6 +514,13 @@ function RelationshipGraphPanel({
 	);
 	const selectedNode = visibleNodes.find((node) => node.id === selectedNodeId);
 	const selectedEdge = visibleEdges.find((edge) => edge.id === selectedEdgeId);
+	const selectedEdgeInsight = selectedEdge
+		? buildRelationshipReadingInsight(
+				selectedEdge,
+				selectedEdge.sourceNode.label,
+				selectedEdge.targetNode.label,
+			)
+		: null;
 	const relatedEdges = selectedNode
 		? visibleEdges.filter(
 				(edge) => edge.source === selectedNode.id || edge.target === selectedNode.id,
@@ -1077,29 +1143,53 @@ function RelationshipGraphPanel({
 								))}
 							{timelineEdges
 								.slice(0, workbenchView === "timeline" ? 12 : 6)
-								.map((edge) => (
-									<button
-										key={`timeline-${edge.id}`}
-										type="button"
-										onClick={() => {
-											setSelectedEdgeId(edge.id);
-											setSelectedNodeId(edge.source);
-										}}
-										className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-left hover:border-primary"
-									>
-										<span className="font-medium">
-											{edge.firstSeenChapter
-												? `第 ${edge.firstSeenChapter} 章`
-												: "章节未知"}
-										</span>
-										<span className="ml-2 text-muted-foreground">
-											{edge.sourceNode.label} {"->"} {edge.targetNode.label} ·{" "}
-											{edge.relation.join("、") || edge.label}
-										</span>
-									</button>
-								))}
+								.map((edge) => {
+									const insight = buildRelationshipReadingInsight(
+										edge,
+										edge.sourceNode.label,
+										edge.targetNode.label,
+									);
+									return (
+										<button
+											key={`timeline-${edge.id}`}
+											type="button"
+											onClick={() => {
+												setSelectedEdgeId(edge.id);
+												setSelectedNodeId(edge.source);
+											}}
+											className="block w-full rounded-md border border-border bg-background px-2 py-1.5 text-left hover:border-primary"
+										>
+											<span className="font-medium">
+												{edge.firstSeenChapter
+													? `第 ${edge.firstSeenChapter} 章`
+													: "章节未知"}
+											</span>
+											<span className="ml-2 text-muted-foreground">
+												{edge.sourceNode.label} {"->"}{" "}
+												{edge.targetNode.label} ·{" "}
+												{edge.relation.join("、") || edge.label}
+											</span>
+											<span className="mt-1 block leading-5 text-muted-foreground">
+												{insight.storyFunction}
+											</span>
+											{workbenchView === "timeline" ? (
+												<span className="mt-1 block leading-5 text-muted-foreground">
+													{insight.readerExpectation}
+												</span>
+											) : null}
+										</button>
+									);
+								})}
 							{timelineEdges.length === 0 ? (
-								<p className="text-muted-foreground">还没有可排序的关系时间线。</p>
+								<GuidanceEmptyState
+									title="关系时间线还排不出来"
+									reason="当前关系边缺少首次出现章节，系统无法按章节展示关系何时进入故事。"
+									actions={[
+										"重新拆解时保留章节标题和人物首次互动段落。",
+										"先在复核页确认高权重关系，再补充或修正首次出现章节。",
+										"如果只想学习结构，可以先看上方关键关系故事线。",
+									]}
+								/>
 							) : null}
 						</div>
 					</div>
@@ -1438,6 +1528,22 @@ function RelationshipGraphPanel({
 							<p className="mt-1 text-muted-foreground">
 								张力：{selectedEdge.tension}
 							</p>
+							{selectedEdgeInsight ? (
+								<div className="mt-3 rounded-md border border-border bg-background p-3">
+									<p className="text-xs font-semibold text-muted-foreground">
+										这条关系怎么帮助故事留人
+									</p>
+									<p className="mt-2 text-sm">
+										{selectedEdgeInsight.storyFunction}
+									</p>
+									<p className="mt-2 text-sm text-muted-foreground">
+										{selectedEdgeInsight.readerExpectation}
+									</p>
+									<p className="mt-2 text-xs leading-5 text-muted-foreground">
+										可学：{selectedEdgeInsight.learnableMove}
+									</p>
+								</div>
+							) : null}
 							<p className="mt-1 text-muted-foreground">
 								权重 {selectedEdge.weight}/10 · 情绪{" "}
 								{selectedEdge.positivity > 0 ? "+" : ""}
@@ -1487,6 +1593,11 @@ function RelationshipGraphPanel({
 											? edge.targetNode
 											: edge.sourceNode;
 									const tone = resolveEdgeTone(edge);
+									const insight = buildRelationshipReadingInsight(
+										edge,
+										edge.sourceNode.label,
+										edge.targetNode.label,
+									);
 									return (
 										<button
 											key={edge.id}
@@ -1505,6 +1616,9 @@ function RelationshipGraphPanel({
 											</span>
 											<span className="mt-1 block text-xs text-muted-foreground">
 												{edge.label} · {edge.tension}
+											</span>
+											<span className="mt-1 block text-xs leading-5 text-muted-foreground">
+												{insight.storyFunction}
 											</span>
 										</button>
 									);
@@ -1544,9 +1658,17 @@ function RelationshipGraphPanel({
 				))}
 			</div>
 			{visibleEdges.length === 0 ? (
-				<p className="mt-4 rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
-					当前整书结果还没有关系边。可以先完成整书拆解，或在后续版本补充关系抽取增强。
-				</p>
+				<div className="mt-4">
+					<GuidanceEmptyState
+						title="完整图谱暂时没有可用关系"
+						reason="当前结果没有可展示的关系边。对作者来说，这通常意味着输入文本缺少人物互动，或人物别名导致关系被分散。"
+						actions={[
+							"先补充主角与反派、导师、盟友、交易对象之间的直接互动章节。",
+							"在原文开头追加角色别名表，例如：张三=主角=少主。",
+							"重新拆解后优先查看关键关系故事线，再进入完整图谱复核。",
+						]}
+					/>
+				</div>
 			) : null}
 		</div>
 	);
@@ -1584,6 +1706,7 @@ export function BookAnalysisPanel({
 	const styleCard = result.transferableStyleCard;
 	const boundaryCheck = result.referenceBoundaryCheck;
 	const searchable = Boolean(job?.id && result.mapReduce?.chunkEvidenceIndex?.length);
+	const comprehensionMap = buildBookComprehensionMap(result);
 
 	async function runEvidenceSearch(queryOverride?: string) {
 		const nextQuery = (queryOverride ?? searchQuery).trim();
@@ -1623,7 +1746,10 @@ export function BookAnalysisPanel({
 
 	return (
 		<section className="space-y-6">
-			<div className="rounded-md border border-border bg-card p-5">
+			<div
+				id="book-result-overview"
+				className="scroll-mt-24 rounded-md border border-border bg-card p-5"
+			>
 				<div className="flex items-center gap-2">
 					<Network className="size-5 text-primary" />
 					<h2 className="text-lg font-semibold">整书拆解结果</h2>
@@ -1685,7 +1811,10 @@ export function BookAnalysisPanel({
 					</div>
 				) : null}
 				{result.mapReduce ? (
-					<div className="mt-5 rounded-md border border-border bg-background p-4 text-sm">
+					<div
+						id="book-result-evidence"
+						className="mt-5 scroll-mt-24 rounded-md border border-border bg-background p-4 text-sm"
+					>
 						<div className="flex items-center justify-between gap-3">
 							<p className="font-semibold">逐章汇总拆解</p>
 							<span>
@@ -1850,8 +1979,20 @@ export function BookAnalysisPanel({
 				) : null}
 			</div>
 
+			<BookResultPathNav
+				hasEvidence={Boolean(result.mapReduce)}
+				hasStyleCard={Boolean(styleCard)}
+				characterCount={result.characters.length}
+				graphEdgeCount={result.relationships.edges.length}
+			/>
+
+			<BookComprehensionGuide map={comprehensionMap} />
+
 			{styleCard ? (
-				<div className="rounded-md border border-border bg-card p-5">
+				<div
+					id="book-result-style"
+					className="scroll-mt-24 rounded-md border border-border bg-card p-5"
+				>
 					<h3 className="font-semibold">可迁移风格卡</h3>
 					<p className="mt-2 text-sm text-muted-foreground">
 						提炼可学习的写法规则，不用于仿写作者，也不复用原作可识别内容。
@@ -1904,7 +2045,10 @@ export function BookAnalysisPanel({
 				</div>
 			) : null}
 
-			<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+			<div
+				id="book-result-assets"
+				className="grid scroll-mt-24 items-start gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]"
+			>
 				<div className="flex flex-col rounded-md border border-border bg-card p-5 xl:h-[620px]">
 					<h3 className="font-semibold">世界观设计</h3>
 					<div className="mt-4 space-y-4 text-sm xl:flex-1 xl:overflow-y-auto xl:pr-2">
@@ -1943,12 +2087,17 @@ export function BookAnalysisPanel({
 				</div>
 			</div>
 
-			<RelationshipGraphPanel
-				result={result}
-				onSearchEvidence={searchable ? runGraphReviewSearch : undefined}
-			/>
+			<div id="book-result-graph" className="scroll-mt-24">
+				<RelationshipGraphPanel
+					result={result}
+					onSearchEvidence={searchable ? runGraphReviewSearch : undefined}
+				/>
+			</div>
 
-			<details className="rounded-md border border-border bg-background p-5">
+			<details
+				id="book-result-advanced"
+				className="scroll-mt-24 rounded-md border border-border bg-background p-5"
+			>
 				<summary className="cursor-pointer list-none">
 					<div className="flex items-center justify-between gap-3">
 						<div>
@@ -2519,6 +2668,435 @@ export function BookAnalysisPanel({
 				</div>
 			</details>
 		</section>
+	);
+}
+
+function BookResultPathNav({
+	hasEvidence,
+	hasStyleCard,
+	characterCount,
+	graphEdgeCount,
+}: {
+	hasEvidence: boolean;
+	hasStyleCard: boolean;
+	characterCount: number;
+	graphEdgeCount: number;
+}) {
+	const items = [
+		{
+			href: "#book-result-guide",
+			label: "先读懂",
+			description: "导览和思维图",
+		},
+		hasEvidence
+			? {
+					href: "#book-result-evidence",
+					label: "查证据",
+					description: "逐章摘要和原文锚点",
+				}
+			: null,
+		hasStyleCard
+			? {
+					href: "#book-result-style",
+					label: "学写法",
+					description: "风格和可迁移规则",
+				}
+			: null,
+		{
+			href: "#book-result-assets",
+			label: "看人物世界",
+			description: `${characterCount} 张人物卡`,
+		},
+		{
+			href: "#book-result-graph",
+			label: "探索图谱",
+			description: `${graphEdgeCount} 条关系边`,
+		},
+		{
+			href: "#book-result-advanced",
+			label: "高级详情",
+			description: "写作包和风险清单",
+		},
+	].filter(Boolean) as Array<{
+		href: string;
+		label: string;
+		description: string;
+	}>;
+
+	return (
+		<nav className="rounded-md border border-border bg-card p-4" aria-label="拆书结果阅读路径">
+			<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+				<div>
+					<p className="text-sm font-semibold">推荐阅读路径</p>
+					<p className="mt-1 text-xs leading-5 text-muted-foreground">
+						先理解留人结构，再查证据和完整资产；完整图谱适合二次探索，不是第一眼入口。
+					</p>
+				</div>
+				<a
+					href="#book-result-guide"
+					className="inline-flex h-9 items-center justify-center rounded-md border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary transition hover:bg-primary/15"
+				>
+					从导览开始
+				</a>
+			</div>
+			<div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+				{items.map((item, index) => (
+					<a
+						key={item.href}
+						href={item.href}
+						className="rounded-md border border-border bg-background p-3 text-sm transition hover:border-primary/60 hover:bg-primary/5"
+					>
+						<span className="text-xs text-muted-foreground">
+							{String(index + 1).padStart(2, "0")}
+						</span>
+						<span className="mt-1 block font-medium">{item.label}</span>
+						<span className="mt-1 block text-xs leading-5 text-muted-foreground">
+							{item.description}
+						</span>
+					</a>
+				))}
+			</div>
+		</nav>
+	);
+}
+
+function GuidanceEmptyState({
+	title,
+	reason,
+	actions,
+}: {
+	title: string;
+	reason: string;
+	actions: string[];
+}) {
+	return (
+		<div className="rounded-md border border-dashed border-border bg-background p-4 text-sm">
+			<p className="font-medium">{title}</p>
+			<p className="mt-2 leading-6 text-muted-foreground">{reason}</p>
+			<div className="mt-3">
+				<p className="text-xs font-semibold text-muted-foreground">下一步动作</p>
+				<ul className="mt-2 space-y-1 text-xs leading-5 text-muted-foreground">
+					{actions.map((action) => (
+						<li key={action} className="border-l-2 border-primary/40 pl-2">
+							{action}
+						</li>
+					))}
+				</ul>
+			</div>
+		</div>
+	);
+}
+
+function BookComprehensionGuide({ map }: { map: BookComprehensionMap }) {
+	const [copyStatus, setCopyStatus] = useState("");
+
+	return (
+		<div
+			id="book-result-guide"
+			className="scroll-mt-24 rounded-md border border-primary/30 bg-primary/10 p-5"
+		>
+			<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<div className="flex items-center gap-2">
+						<Network className="size-5 text-primary" />
+						<h3 className="font-semibold">拆书导览</h3>
+					</div>
+					<p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+						先按“为什么能留住读者”看懂这本书，再去看完整图谱、角色卡和导出资产。
+					</p>
+				</div>
+				<div className="rounded-md border border-primary/30 bg-background px-3 py-2 text-sm">
+					<p className="text-xs text-muted-foreground">核心承诺</p>
+					<p className="mt-1 font-medium">{map.corePromise || "待补"}</p>
+				</div>
+			</div>
+
+			<div className="mt-5 rounded-md border border-border bg-card p-4">
+				<p className="text-base font-semibold">{map.headline}</p>
+				{map.whyItWorks.length ? (
+					<div className="mt-3 flex flex-wrap gap-2">
+						{map.whyItWorks.slice(0, 5).map((item) => (
+							<span
+								key={item}
+								className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
+							>
+								{item}
+							</span>
+						))}
+					</div>
+				) : null}
+			</div>
+
+			<div className="mt-5 rounded-md border border-border bg-card p-4">
+				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+					<div>
+						<h4 className="text-sm font-semibold">理解版思维导图</h4>
+						<p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+							先从中心承诺往外看：主角为什么必须动、关系为什么有拉力、冲突怎样升级、读者还在等什么，以及作者能学哪一招。
+						</p>
+					</div>
+					<div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+						<p className="text-xs text-muted-foreground">中心问题</p>
+						<p className="mt-1 font-medium">{map.corePromise || map.headline}</p>
+					</div>
+				</div>
+				<div className="mt-4 grid gap-3 lg:grid-cols-5">
+					{map.mindMapBranches.map((branch) => (
+						<div
+							key={branch.id}
+							className="flex min-h-48 flex-col rounded-md border border-border bg-background p-3 text-sm"
+						>
+							<p className="font-semibold">{branch.title}</p>
+							<p className="mt-2 text-xs leading-5 text-muted-foreground">
+								{branch.summary}
+							</p>
+							<ul className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
+								{branch.items.slice(0, 3).map((item) => (
+									<li key={item} className="border-l-2 border-primary/40 pl-2">
+										{item}
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</div>
+			</div>
+
+			<div className="mt-5 rounded-md border border-border bg-card p-4">
+				<div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+					<div>
+						<h4 className="text-sm font-semibold">关键关系故事线</h4>
+						<p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+							先按章节看关系怎么进入故事、制造什么追读问题，再去完整图谱里探索更多人物和势力。
+						</p>
+					</div>
+					<a
+						href="#book-result-graph"
+						className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium transition hover:border-primary/60"
+					>
+						查看完整图谱
+					</a>
+				</div>
+				<div className="mt-4 grid gap-3 lg:grid-cols-3">
+					{map.relationshipStoryline.length ? (
+						map.relationshipStoryline.map((beat) => (
+							<div
+								key={beat.id}
+								className="rounded-md border border-border bg-background p-3 text-sm"
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									<span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
+										{beat.chapterLabel}
+									</span>
+									<p className="font-medium">{beat.title}</p>
+								</div>
+								<p className="mt-3 text-muted-foreground">{beat.storyEvent}</p>
+								<p className="mt-2">{beat.readerQuestion}</p>
+								<p className="mt-2 text-xs leading-5 text-muted-foreground">
+									可学：{beat.writingMove}
+								</p>
+								<p className="mt-2 border-l-2 border-primary/40 pl-2 text-xs leading-5 text-muted-foreground">
+									证据：{beat.evidence}
+								</p>
+							</div>
+						))
+					) : (
+						<GuidanceEmptyState
+							title="关系故事线还不够清楚"
+							reason="当前拆书结果没有抽到可用关系边，所以系统还不能判断谁在制造压力、交易、误解或情绪拉扯。"
+							actions={[
+								"重新拆解时尽量保留人物称呼、对话和冲突段落，不要只上传摘要。",
+								"如果原文角色别名很多，先在文本前补一小段角色名表。",
+								"先用完整学习报告确认章节摘要是否准确，再复查关系图谱。",
+							]}
+						/>
+					)}
+				</div>
+			</div>
+
+			<div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+				<div className="rounded-md border border-border bg-card p-4">
+					<div className="flex items-center justify-between gap-3">
+						<h4 className="text-sm font-semibold">故事阶段时间轴</h4>
+						<span className="text-xs text-muted-foreground">
+							{map.readingPath.length} 个阶段
+						</span>
+					</div>
+					<div className="mt-4 space-y-3">
+						{map.readingPath.length ? (
+							map.readingPath.map((phase, index) => (
+								<div
+									key={phase.id}
+									className="grid gap-3 rounded-md border border-border bg-background p-3 sm:grid-cols-[34px_1fr]"
+								>
+									<div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+										{index + 1}
+									</div>
+									<div className="min-w-0">
+										<div className="flex flex-wrap items-center gap-2">
+											<p className="font-medium">{phase.phase}</p>
+											<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+												{phase.chapterRange}
+											</span>
+										</div>
+										<p className="mt-2 text-sm text-muted-foreground">
+											触发：{phase.trigger}
+										</p>
+										<p className="mt-1 text-sm text-muted-foreground">
+											升级：{phase.escalation}
+										</p>
+										<p className="mt-1 text-sm text-muted-foreground">
+											钩子：{phase.openHook}
+										</p>
+										<p className="mt-2 text-sm">
+											{phase.readerReasonToContinue}
+										</p>
+										<p className="mt-1 text-xs leading-5 text-muted-foreground">
+											可学：{phase.learnableMove}
+										</p>
+									</div>
+								</div>
+							))
+						) : (
+							<GuidanceEmptyState
+								title="故事阶段还没有形成时间轴"
+								reason="系统缺少章节功能或大事纪数据，所以暂时不能把故事拆成触发、升级、转折和阶段钩子。"
+								actions={[
+									"确认上传文本有清晰章节标题，或至少保留章节分隔符。",
+									"优先上传开局到一个阶段小高潮的连续内容，不要只上传零散片段。",
+									"重新拆解后先看逐章汇总，确认每章目标、冲突和钩子是否被识别。",
+								]}
+							/>
+						)}
+					</div>
+				</div>
+
+				<div className="space-y-5">
+					<div className="rounded-md border border-border bg-card p-4">
+						<h4 className="text-sm font-semibold">关键关系为什么重要</h4>
+						<div className="mt-4 space-y-3">
+							{map.keyRelationships.length ? (
+								map.keyRelationships.slice(0, 4).map((relationship) => (
+									<div
+										key={relationship.id}
+										className="rounded-md border border-border bg-background p-3"
+									>
+										<div className="flex flex-wrap items-center gap-2">
+											<p className="font-medium">
+												{relationship.from}
+												{" -> "}
+												{relationship.to}
+											</p>
+											<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+												{relationship.state}
+											</span>
+										</div>
+										<p className="mt-2 text-sm text-muted-foreground">
+											{relationship.storyFunction}
+										</p>
+										<p className="mt-1 text-sm">
+											{relationship.readerExpectation}
+										</p>
+										<p className="mt-1 text-xs leading-5 text-muted-foreground">
+											可学：{relationship.learnableMove}
+										</p>
+									</div>
+								))
+							) : (
+								<GuidanceEmptyState
+									title="关键关系解释不足"
+									reason="缺少可排序的高权重关系边，系统无法判断哪条关系最能解释读者为什么继续看。"
+									actions={[
+										"补充主角与压迫者、盟友、导师、交易对象之间的关键互动段落。",
+										"重新拆解时开启逐章证据索引，方便回查关系证据。",
+										"先人工确认人物卡名称是否重复或被拆成多个别名。",
+									]}
+								/>
+							)}
+						</div>
+					</div>
+
+					<div className="rounded-md border border-border bg-card p-4">
+						<h4 className="text-sm font-semibold">伏笔和未完成期待</h4>
+						<div className="mt-4 space-y-2">
+							{map.promiseMap.length ? (
+								map.promiseMap.slice(0, 5).map((item) => (
+									<div
+										key={item.id}
+										className="rounded-md border border-border bg-background p-3 text-sm"
+									>
+										<p className="font-medium">{item.promise}</p>
+										<p className="mt-1 text-muted-foreground">
+											{item.progress} · {item.payoffOrRisk}
+										</p>
+									</div>
+								))
+							) : (
+								<GuidanceEmptyState
+									title="伏笔和读者期待还没沉淀出来"
+									reason="当前结果没有明确的读者承诺或伏笔账本，所以还不能判断读者下一章最想看到什么被兑现。"
+									actions={[
+										"检查前三章是否有未解决问题、秘密、承诺、威胁或反击机会。",
+										"如果文本偏设定说明，先补一段主角被迫行动的冲突场景。",
+										"重新拆解后优先看读者承诺清单，而不是先看世界观资料。",
+									]}
+								/>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div className="mt-5 rounded-md border border-border bg-card p-4">
+				<h4 className="text-sm font-semibold">作者可以先学这几招</h4>
+				<div className="mt-4 grid gap-3 lg:grid-cols-2">
+					{map.beginnerTakeaways.map((takeaway) => (
+						<div
+							key={takeaway.id}
+							className="rounded-md border border-border bg-background p-3 text-sm"
+						>
+							<p className="font-medium">{takeaway.rule}</p>
+							<p className="mt-2 text-muted-foreground">{takeaway.why}</p>
+							<p className="mt-2">怎么用：{takeaway.howToUse}</p>
+							<p className="mt-1 text-xs leading-5 text-muted-foreground">
+								避开：{takeaway.avoid}
+							</p>
+						</div>
+					))}
+				</div>
+			</div>
+
+			<div className="mt-5 rounded-md border border-border bg-card p-4">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+					<div>
+						<h4 className="text-sm font-semibold">把这次拆书结果用于新书</h4>
+						<p className="mt-1 text-sm leading-6 text-muted-foreground">
+							这不是让 AI
+							照着原作写，而是把读者承诺、阶段升级和关系功能转成原创开局任务。
+						</p>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							void navigator.clipboard?.writeText(map.applicationPrompt);
+							setCopyStatus("已复制新书应用 Prompt");
+						}}
+					>
+						复制 Prompt
+					</Button>
+				</div>
+				<textarea
+					readOnly
+					className="mt-4 max-h-72 min-h-44 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 text-muted-foreground outline-none"
+					value={map.applicationPrompt}
+				/>
+				{copyStatus ? (
+					<p className="mt-2 text-xs text-muted-foreground">{copyStatus}</p>
+				) : null}
+			</div>
+		</div>
 	);
 }
 

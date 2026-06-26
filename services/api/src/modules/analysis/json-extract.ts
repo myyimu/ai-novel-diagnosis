@@ -265,6 +265,70 @@ function extractBalancedJsonObject(content: string) {
   return end > start ? content.slice(start, end + 1) : undefined;
 }
 
+function truncateDanglingJsonTail(content: string) {
+  let candidate = content.trimEnd();
+  candidate = candidate.replace(/,\s*"[^"]*"\s*:\s*$/, "");
+  candidate = candidate.replace(/,\s*$/, "");
+  candidate = candidate.replace(/:\s*$/, "");
+  return candidate;
+}
+
+function completeTruncatedJsonCandidate(content: string) {
+  const objectStart = content.indexOf("{");
+  const arrayStart = content.indexOf("[");
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (starts.length === 0) {
+    return undefined;
+  }
+
+  const start = Math.min(...starts);
+  let candidate = content.slice(start).trim();
+  const stack: Array<"{" | "["> = [];
+  let inString = false;
+  let escaped = false;
+
+  for (const char of candidate) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = inString;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      stack.push(char);
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      stack.pop();
+    }
+  }
+
+  candidate = truncateDanglingJsonTail(candidate);
+  if (inString) {
+    candidate += '"';
+  }
+
+  for (let index = stack.length - 1; index >= 0; index -= 1) {
+    candidate += stack[index] === "{" ? "}" : "]";
+  }
+
+  return candidate;
+}
+
 export function extractJson(content: string) {
   const trimmed = content.trim();
   const direct = tryParseJson(trimmed);
@@ -306,9 +370,12 @@ export function extractJson(content: string) {
 
   const balanced = extractBalancedJsonObject(trimmed);
   if (balanced) {
-    try {
-      return JSON.parse(balanced);
-    } catch (error) {
+    const parsedBalanced = tryParseJson(balanced);
+    if (parsedBalanced !== undefined) {
+      return parsedBalanced;
+    }
+
+    {
       const repairedBalanced = tryParseJson(lightRepairJsonString(balanced));
       if (repairedBalanced !== undefined) {
         return repairedBalanced;
@@ -319,9 +386,14 @@ export function extractJson(content: string) {
       if (targetedBalanced !== undefined) {
         return targetedBalanced;
       }
-      throw new BadRequestException(
-        `Provider response JSON parse failed: ${(error as Error).message}`,
-      );
+    }
+  }
+
+  const completed = completeTruncatedJsonCandidate(trimmed);
+  if (completed) {
+    const parsedCompleted = tryParseJson(lightRepairJsonString(completed));
+    if (parsedCompleted !== undefined) {
+      return parsedCompleted;
     }
   }
 

@@ -630,12 +630,13 @@ issue -> severity -> category -> evidence -> reader impact -> fix action -> gate
 本项目可借鉴为：
 
 ```text
-诊断 Dashboard
+诊断看板
 -> 最近诊断
 -> 常见问题分布
 -> Prompt 有效率
 -> 复诊改善趋势
 -> 方法论卡片增长
+-> 编辑建议和下一步动作
 ```
 
 这比当前“历史任务”更贴合新定位。
@@ -668,7 +669,7 @@ issue -> severity -> category -> evidence -> reader impact -> fix action -> gate
 6. 复诊必须判断上一轮 Prompt 是否有效。
 7. 方法论库优先沉淀“作者如何指挥 AI”，而不是只沉淀剧情事实。
 8. 报告要作者友好，复杂 JSON 留给系统，不直接甩给用户。
-9. Dashboard 应展示诊断质量趋势，而不是只展示任务列表。
+9. 诊断看板应展示诊断质量趋势、编辑建议和下一步动作，而不是只展示任务列表。
 
 具体落地计划见 [AI 网文诊断台工作流化改造计划](./diagnosis-workflow-implementation-plan.md)。
 

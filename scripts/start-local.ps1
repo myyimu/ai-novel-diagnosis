@@ -26,6 +26,28 @@ $PgliteDir = Join-Path $RootPath ".local/pglite-runtime"
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
 New-Item -ItemType Directory -Force -Path $PgliteDir | Out-Null
 
+$script:StartLocalMutex = [System.Threading.Mutex]::new($false, "Local\AiNovelDiagnosisStartLocal")
+$script:StartLocalMutexAcquired = $false
+try {
+	$script:StartLocalMutexAcquired = $script:StartLocalMutex.WaitOne([TimeSpan]::FromSeconds(60))
+}
+catch [System.Threading.AbandonedMutexException] {
+	$script:StartLocalMutexAcquired = $true
+}
+if (-not $script:StartLocalMutexAcquired) {
+	Write-Error "Another start-local launcher is still preparing services. Close it or retry after it finishes."
+}
+
+trap {
+	if ($script:StartLocalMutexAcquired) {
+		$script:StartLocalMutex.ReleaseMutex() | Out-Null
+	}
+	if ($script:StartLocalMutex) {
+		$script:StartLocalMutex.Dispose()
+	}
+	break
+}
+
 $checkEnvScript = Join-Path $PSScriptRoot "check-env.ps1"
 if ($env:START_LOCAL_ENV_CHECKED -ne "1" -and (Test-Path $checkEnvScript)) {
 	& $checkEnvScript -AutoInstall
@@ -166,46 +188,122 @@ function Get-ListeningConnections($Port) {
 	return @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 }
 
-function Test-CanBindLocalPort($Port) {
-	$listener = $null
+function Test-CanBindSocket($Address, $Port, [switch]$DualMode) {
+	$socket = $null
 	try {
-		$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse("127.0.0.1"), $Port)
-		$listener.Start()
+		$socket = [System.Net.Sockets.Socket]::new($Address.AddressFamily, [System.Net.Sockets.SocketType]::Stream, [System.Net.Sockets.ProtocolType]::Tcp)
+		if ($DualMode -and $Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+			$socket.DualMode = $true
+		}
+		$socket.Bind([System.Net.IPEndPoint]::new($Address, $Port))
+		$socket.Listen(1)
 		return $true
 	} catch {
 		return $false
 	} finally {
-		if ($listener) {
-			$listener.Stop()
+		if ($socket) {
+			$socket.Close()
+			$socket.Dispose()
 		}
 	}
+}
+
+function Test-CanBindLocalPort($Port) {
+	return (Test-CanBindSocket ([System.Net.IPAddress]::Any) $Port) -and
+		(Test-CanBindSocket ([System.Net.IPAddress]::IPv6Any) $Port -DualMode)
 }
 
 function Test-PortInUse($Port) {
 	return (Get-ListeningConnections $Port).Count -gt 0 -or -not (Test-CanBindLocalPort $Port)
 }
 
+function Wait-ForPortRelease($Port, $TimeoutSeconds = 10) {
+	$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+	while ((Get-Date) -lt $deadline) {
+		if (-not (Test-PortInUse $Port)) {
+			Start-Sleep -Milliseconds 250
+			if (-not (Test-PortInUse $Port)) {
+				return $true
+			}
+		}
+		Start-Sleep -Milliseconds 250
+	}
+
+	return -not (Test-PortInUse $Port)
+}
+
+function Test-PortReadyForStart($Port) {
+	if (Test-PortInUse $Port) {
+		return $false
+	}
+
+	Start-Sleep -Milliseconds 250
+	return -not (Test-PortInUse $Port)
+}
+
 function Get-ProcessInfo($ProcessId) {
 	return Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
 }
 
+function Get-DecodedEncodedCommand($CommandLine) {
+	if ([string]::IsNullOrWhiteSpace($CommandLine)) {
+		return ""
+	}
+
+	$match = [regex]::Match($CommandLine, "(?i)(?:-|/)enc(?:odedcommand)?\s+`"?(?<value>[A-Za-z0-9+/=]+)`"?")
+	if (-not $match.Success) {
+		return ""
+	}
+
+	try {
+		return [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($match.Groups["value"].Value))
+	} catch {
+		return ""
+	}
+}
+
+function Test-ProcessCommandContains($Proc, $Text) {
+	if (-not ($Proc -and $Text)) {
+		return $false
+	}
+
+	if ($Proc.CommandLine -and $Proc.CommandLine.Contains($Text)) {
+		return $true
+	}
+
+	$decodedCommand = Get-DecodedEncodedCommand $Proc.CommandLine
+	return $decodedCommand.Contains($Text)
+}
+
 function Test-ProjectProcess($ProcessId) {
-	$proc = Get-ProcessInfo $ProcessId
-	return [bool]($proc -and $proc.CommandLine -and $proc.CommandLine.Contains($RootPath))
+	$current = Get-ProcessInfo $ProcessId
+	$visited = @{}
+	while ($current -and -not $visited.ContainsKey($current.ProcessId)) {
+		$visited[$current.ProcessId] = $true
+		if (Test-ProcessCommandContains $current $RootPath) {
+			return $true
+		}
+		if (-not $current.ParentProcessId) {
+			break
+		}
+		$current = Get-ProcessInfo $current.ParentProcessId
+	}
+
+	return $false
 }
 
 function Test-ProjectServiceProcess($Proc, $Kind) {
-	if (-not ($Proc -and $Proc.CommandLine -and $Proc.CommandLine.Contains($RootPath))) {
+	if (-not (Test-ProcessCommandContains $Proc $RootPath)) {
 		return $false
 	}
 
 	if ($Kind -eq "api") {
-		return $Proc.CommandLine.Contains("\services\api\") -or $Proc.CommandLine.Contains("/services/api/")
+		return (Test-ProcessCommandContains $Proc "\services\api\") -or (Test-ProcessCommandContains $Proc "/services/api/")
 	}
 
-	return $Proc.CommandLine.Contains("\apps\web\") -or
-		$Proc.CommandLine.Contains("/apps/web/") -or
-		$Proc.CommandLine.Contains("next\dist\server\lib\start-server")
+	return (Test-ProcessCommandContains $Proc "\apps\web\") -or
+		(Test-ProcessCommandContains $Proc "/apps/web/") -or
+		(Test-ProcessCommandContains $Proc "next\dist\server\lib\start-server")
 }
 
 function Get-ProjectServiceProcesses($Kind) {
@@ -241,26 +339,78 @@ function Stop-ProcessTreeById($ProcessId) {
 	}
 }
 
+function Test-StartLocalHostProcess($Proc) {
+	if (-not ($Proc -and $Proc.CommandLine)) {
+		return $false
+	}
+
+	if ($Proc.ProcessId -eq $PID) {
+		return $false
+	}
+
+	$name = if ($Proc.Name) { $Proc.Name.ToLowerInvariant() } else { "" }
+	return ($name -eq "powershell.exe" -or $name -eq "pwsh.exe") -and
+		$Proc.CommandLine.Contains("-EncodedCommand") -and
+		($Proc.CommandLine.Contains("-NoExit") -or (Test-ProcessCommandContains $Proc $RootPath))
+}
+
+function Get-StartLocalHostProcessId($ProcessId) {
+	$current = Get-ProcessInfo $ProcessId
+	$visited = @{}
+
+	while ($current -and $current.ParentProcessId -and -not $visited.ContainsKey($current.ProcessId)) {
+		$visited[$current.ProcessId] = $true
+		$parent = Get-ProcessInfo $current.ParentProcessId
+		if (Test-StartLocalHostProcess $parent) {
+			return $parent.ProcessId
+		}
+		$current = $parent
+	}
+
+	return $null
+}
+
+function Stop-ProjectServiceProcessTree($ProcessId) {
+	$hostProcessId = Get-StartLocalHostProcessId $ProcessId
+	if ($hostProcessId) {
+		Write-Host "Closing old service window (PID $hostProcessId)"
+		Stop-ProcessTreeById $hostProcessId
+		return
+	}
+
+	Stop-ProcessTreeById $ProcessId
+}
+
 function Stop-ProjectPortProcesses($Port) {
 	$stopped = $false
 	foreach ($conn in Get-ListeningConnections $Port) {
 		$ownerProcessId = $conn.OwningProcess
 		if (Test-ProjectProcess $ownerProcessId) {
-			Stop-ProcessTreeById $ownerProcessId
+			Stop-ProjectServiceProcessTree $ownerProcessId
 			$stopped = $true
 		}
 	}
 	if ($stopped) {
-		Start-Sleep -Seconds 1
+		Wait-ForPortRelease $Port | Out-Null
 	}
 	return $stopped
 }
 
 function Stop-ProjectServiceProcesses($Kind) {
+	$ports = @{}
 	foreach ($proc in Get-ProjectServiceProcesses $Kind) {
-		Stop-ProcessTreeById $proc.ProcessId
+		foreach ($conn in Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq $proc.ProcessId }) {
+			$ports[[int]$conn.LocalPort] = $true
+		}
+		Stop-ProjectServiceProcessTree $proc.ProcessId
 	}
-	Start-Sleep -Seconds 1
+	if ($ports.Count -gt 0) {
+		foreach ($port in $ports.Keys) {
+			Wait-ForPortRelease $port | Out-Null
+		}
+	} else {
+		Start-Sleep -Seconds 1
+	}
 }
 
 function Test-ApiHealthy($Port) {
@@ -332,7 +482,7 @@ function Resolve-ServicePort($PreferredPort, $Kind, [switch]$ForceRestartProject
 
 	$lastPort = $PreferredPort + $PortSearchLimit
 	for ($port = $PreferredPort; $port -le $lastPort; $port++) {
-		if (-not (Test-PortInUse $port)) {
+		if (Test-PortReadyForStart $port) {
 			return @{
 				Port = $port
 				Reuse = $false
@@ -359,12 +509,15 @@ function Resolve-ServicePort($PreferredPort, $Kind, [switch]$ForceRestartProject
 
 			Write-Host "Restarting stale $Kind service on port $port"
 			Stop-ProjectPortProcesses $port | Out-Null
-			if (-not (Test-PortInUse $port)) {
+			if (Test-PortReadyForStart $port) {
 				return @{
 					Port = $port
 					Reuse = $false
 				}
 			}
+
+			Write-Host "Port $port is still releasing after stopping this project's $Kind service; trying next port."
+			continue
 		}
 
 		$owners = (Get-PortOwnerDescriptions $port) -join ", "
@@ -497,3 +650,10 @@ if (-not $NoBrowser) {
 }
 
 Write-Host "Close the opened API/Web PowerShell windows to stop the dev servers."
+
+if ($script:StartLocalMutexAcquired) {
+	$script:StartLocalMutex.ReleaseMutex() | Out-Null
+}
+if ($script:StartLocalMutex) {
+	$script:StartLocalMutex.Dispose()
+}

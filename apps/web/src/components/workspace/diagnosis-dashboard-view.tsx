@@ -1,6 +1,13 @@
 "use client";
 
-import { BarChart3, Clipboard, ClipboardCheck, Layers3, TrendingUp } from "lucide-react";
+import {
+	BarChart3,
+	Clipboard,
+	ClipboardCheck,
+	Layers3,
+	ListChecks,
+	TrendingUp,
+} from "lucide-react";
 import { useState } from "react";
 import { buildDiagnosisDashboard } from "@/lib/workspace-iteration";
 import type { ProjectMethodologyCard, RevisionSession } from "@/stores/workspace-store";
@@ -31,7 +38,7 @@ export function DiagnosisDashboardView({
 				<div className="flex items-start gap-3">
 					<BarChart3 className="mt-0.5 size-5 text-primary" />
 					<div className="min-w-0">
-						<h2 className="text-lg font-semibold">诊断 Dashboard</h2>
+						<h2 className="text-lg font-semibold">诊断看板</h2>
 						<p className="mt-2 text-sm leading-6 text-muted-foreground">
 							先完成一次快速诊断，系统会开始记录复诊趋势、Prompt 效果和常见问题。
 						</p>
@@ -79,6 +86,36 @@ export function DiagnosisDashboardView({
 					value={`${dashboard.totalMethodologyCards}`}
 					detail={dashboard.reusableMethodologyCards[0]?.title || "继续复诊后会自动沉淀"}
 				/>
+			</section>
+
+			<section className="rounded-md border border-primary/30 bg-primary/10 p-5">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+					<div>
+						<div className="flex items-center gap-2">
+							<ListChecks className="size-5 text-primary" />
+							<h2 className="text-lg font-semibold">编辑建议</h2>
+						</div>
+						<p className="mt-2 text-sm leading-6 text-muted-foreground">
+							{dashboard.coach.headline}
+						</p>
+						<p className="mt-1 text-sm leading-6 text-muted-foreground">
+							{dashboard.coach.explanation}
+						</p>
+					</div>
+					<Button variant="outline" onClick={onOpenDiagnosis}>
+						按建议复诊
+					</Button>
+				</div>
+				<div className="mt-4 grid gap-3 lg:grid-cols-4">
+					{dashboard.coach.nextActions.map((action, index) => (
+						<div key={action} className="rounded-md border border-border bg-card p-3">
+							<p className="text-xs text-muted-foreground">
+								{String(index + 1).padStart(2, "0")}
+							</p>
+							<p className="mt-2 text-sm leading-6">{action}</p>
+						</div>
+					))}
+				</div>
 			</section>
 
 			<section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">

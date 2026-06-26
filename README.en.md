@@ -9,6 +9,8 @@ Do not rush into AI rewriting. First find out why readers do not continue.
 
 AI Novel Diagnosis Desk is a local AI novel diagnosis and book-analysis tool. It is not a one-click novel generator. It helps writers answer: what is wrong with my story, why does it get no traffic, and why do readers drop off in chapter one?
 
+Feature coverage: AI Novel Diagnosis Desk is an all-in-one AI webnovel diagnosis workspace for automatic novel text parsing, character relationship graph generation, reader drop-off diagnosis, and actionable revision prompt generation.
+
 Paste your first chapter, and it identifies the biggest retention problem, explains the issue with evidence from the text, gives a revision priority, and generates a prompt you can copy into your writing AI. After revision, paste the new version back in and run a retest.
 
 For advanced use, it also supports AI book analysis: characters, relationships, worldbuilding, timelines, story structure, and exportable writing assets for learning mature works without copying them.
@@ -340,6 +342,8 @@ Uploaded text and intermediate full-book analysis artifacts are stored under:
 ```text
 .local/analysis
 ```
+
+By default, local upload storage is plaintext for easier development and debugging. For real manuscripts or commercial drafts, set `ANALYSIS_STORAGE_KEY` to enable local privacy mode. When the key is set, uploaded raw text, normalized text, and upload snapshots are stored as AES-256-GCM `.enc` files and decrypted transparently by the API. Keep this key safe; encrypted local uploads cannot be recovered if the key is lost.
 
 Chapter map results are saved under:
 

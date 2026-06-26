@@ -370,6 +370,28 @@ function wait(ms: number) {
 	return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function isTransientFetchError(error: unknown) {
+	const message = error instanceof Error ? error.message : String(error);
+	const normalized = message.toLowerCase();
+
+	return (
+		error instanceof TypeError ||
+		normalized.includes("failed to fetch") ||
+		normalized.includes("networkerror") ||
+		normalized.includes("load failed")
+	);
+}
+
+function toBookPollingNetworkMessage(error: unknown) {
+	const message = error instanceof Error ? error.message : String(error);
+
+	if (isTransientFetchError(error)) {
+		return "本地 API 连接暂时中断，正在自动重连";
+	}
+
+	return message || "读取整书拆解任务失败";
+}
+
 interface BookJobProgressDetail {
 	outline: {
 		current: number;
@@ -1725,6 +1747,9 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 		setStatus("正在准备上传文本并创建整书异步拆解任务...");
 		try {
 			const upload = bookUpload ?? (await uploadBookForPreview(false));
+			if (!upload) {
+				return;
+			}
 			const createdUploadJob = await createBookAnalysisJobFromUpload(
 				upload.id,
 				providerPayload,
@@ -1775,11 +1800,45 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 
 		activeBookPollJobIdRef.current = jobId;
 		let latestSnapshot: BookAnalysisJob | null = null;
+		let transientFetchFailures = 0;
+		const maxTransientFetchFailures = options?.background ? 60 : 12;
+
+		const readJobSnapshot = async (includeResult: boolean) => {
+			try {
+				const snapshot = await readBookAnalysisJob(jobId, includeResult);
+				transientFetchFailures = 0;
+				return snapshot;
+			} catch (error) {
+				if (!isTransientFetchError(error)) {
+					throw error;
+				}
+
+				transientFetchFailures += 1;
+				if (!options?.silent) {
+					setStatus(
+						transientFetchFailures === 1
+							? "本地 API 连接暂时中断，正在自动重连..."
+							: `本地 API 连接仍未恢复，正在第 ${transientFetchFailures} 次重试...`,
+					);
+				}
+
+				if (transientFetchFailures >= maxTransientFetchFailures) {
+					throw new Error(
+						`${toBookPollingNetworkMessage(error)}。任务已保留，API 恢复后可从历史任务继续打开。`,
+					);
+				}
+
+				return null;
+			}
+		};
 
 		try {
 			for (let attempt = 0; attempt < (options?.maxAttempts ?? 120); attempt += 1) {
 				await wait(1000);
-				const latestJob = await readBookAnalysisJob(jobId, false);
+				const latestJob = await readJobSnapshot(false);
+				if (!latestJob) {
+					continue;
+				}
 				latestSnapshot = latestJob;
 				setBookJob(latestJob);
 				updateBookAnalysisCacheByJobId(jobId, latestJob);
@@ -1788,7 +1847,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				}
 
 				if (latestJob.status === "succeeded") {
-					const completedJob = await readBookAnalysisJob(jobId, true);
+					const completedJob = await readJobSnapshot(true);
+					if (!completedJob) {
+						continue;
+					}
 					setBookJob(completedJob);
 					if (completedJob.result) {
 						latestJob.result = completedJob.result;
@@ -1804,7 +1866,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 				}
 
 				if (latestJob.status === "failed") {
-					const failedJob = await readBookAnalysisJob(jobId, true);
+					const failedJob = await readJobSnapshot(true);
+					if (!failedJob) {
+						continue;
+					}
 					setBookJob(failedJob);
 					if (failedJob.result) {
 						setBookAnalysisResult(failedJob.result);
@@ -1834,6 +1899,16 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 	}
 
 	async function uploadBookForPreview(manageLoading = true) {
+		const hasBookFile = Boolean(bookFile);
+		const hasBookText = Boolean(bookText.trim());
+		if (!hasBookFile && !hasBookText) {
+			setStatus("请先上传 TXT 文件，或在文本框粘贴整书内容。");
+			return null;
+		}
+		if (bookFile && bookFile.size === 0) {
+			setStatus("这个 TXT 文件是空的，请换一个有正文内容的文件。");
+			return null;
+		}
 		if (manageLoading) {
 			setLoading("upload");
 		}
