@@ -344,7 +344,9 @@ function toProgressPercent(current: number, total: number) {
 	return Math.max(0, Math.min(100, Math.round((current / total) * 100)));
 }
 
-export function getBookJobProgressDetail(job: BookAnalysisJob | null): BookJobProgressDetail | null {
+export function getBookJobProgressDetail(
+	job: BookAnalysisJob | null,
+): BookJobProgressDetail | null {
 	if (!job) {
 		return null;
 	}

@@ -17,13 +17,17 @@ Recommended commands:
 ```powershell
 scripts/start-local.cmd
 scripts/start-local.cmd -a
+scripts/restart-local.cmd
+scripts/reset-local.cmd
 pnpm run start:local
 ```
 
 推荐使用以上任一入口。
 
-- `scripts/start-local.cmd`: beginner-friendly entry, suitable for double-click or direct execution. Rerunning it closes the old API/Web console windows and restarts this project's services.
+- `scripts/start-local.cmd`: beginner-friendly entry, suitable for double-click or direct execution. It reuses existing project services when possible; use `--kill` to force a restart.
 - `scripts/start-local.cmd -a`: auto-install mode, skips confirmation prompts when dependencies are missing, and still restarts this project's services.
+- `scripts/restart-local.cmd`: explicit restart command, equivalent to `.cmd --kill`.
+- `scripts/reset-local.cmd`: explicit reset command, equivalent to `.cmd --kill --reset-pglite`.
 - `pnpm run start:local`: starts the same PowerShell flow from the workspace root.
 
 - `scripts/start-local.cmd`：适合双击或直接执行，最适合普通用户；重复运行会关闭旧的 API/Web 黑窗口并重启本项目服务。
@@ -72,6 +76,8 @@ The beginner-friendly `.cmd` entry supports:
 scripts/start-local.cmd
 scripts/start-local.cmd -a
 scripts/start-local.cmd --auto-install
+scripts/restart-local.cmd
+scripts/reset-local.cmd
 ```
 
 The PowerShell entry is better when you need startup options:
@@ -85,6 +91,7 @@ pnpm run start:local -- -PortSearchLimit 30
 
 - `-NoBrowser`: start services without opening the browser.
 - `-Kill`: restart existing project-owned API/Web processes instead of reusing them.
+- `-ResetPglite`: delete `.local/pglite-runtime` before startup and recreate it (for corrupted local DB/runtime recovery).
 - `-WebPort`: preferred Web port, default `3000`.
 - `-ApiPort`: preferred API port, default `3001`.
 - `-PortSearchLimit`: how far to search after the preferred port, default `20`.
@@ -95,6 +102,8 @@ pnpm run start:local -- -PortSearchLimit 30
 scripts/start-local.cmd
 scripts/start-local.cmd -a
 scripts/start-local.cmd --auto-install
+scripts/restart-local.cmd
+scripts/reset-local.cmd
 ```
 
 需要传递启动参数时，更适合使用 PowerShell 入口：

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  boolean,
   real,
   integer,
   jsonb,
@@ -61,6 +62,28 @@ export const bookAnalysisJobs = pgTable("book_analysis_jobs", {
   finishedAt: timestamp("finished_at", { precision: 3 }),
 });
 
+export const modelUsageEvents = pgTable("model_usage_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => randomUUID()),
+  jobId: text("job_id"),
+  stage: varchar("stage", { length: 64 }),
+  component: varchar("component", { length: 64 }),
+  requestKind: varchar("request_kind", { length: 64 }),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  preset: varchar("preset", { length: 64 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  promptTokens: integer("prompt_tokens").notNull(),
+  completionTokens: integer("completion_tokens").notNull(),
+  totalTokens: integer("total_tokens").notNull(),
+  requestMs: integer("request_ms").notNull(),
+  estimated: boolean("estimated").notNull(),
+  success: boolean("success").notNull(),
+  error: text("error"),
+  metadata: jsonb("metadata").notNull(),
+  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+});
+
 export const workspaceProjects = pgTable("workspace_projects", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -117,3 +140,4 @@ export type BookAnalysisJobInsert = typeof bookAnalysisJobs.$inferInsert;
 export type WorkspaceProjectSelect = typeof workspaceProjects.$inferSelect;
 export type RevisionSessionSelect = typeof revisionSessions.$inferSelect;
 export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;
+export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;

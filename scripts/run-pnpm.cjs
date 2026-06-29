@@ -11,20 +11,10 @@ function run(command, commandArgs) {
   });
 }
 
-function hasPnpm() {
-  const lookup = process.platform === "win32"
-    ? spawnSync("where.exe", ["pnpm"], { stdio: "ignore", shell: false })
-    : spawnSync("which", ["pnpm"], { stdio: "ignore", shell: false });
+let result = run("corepack", ["pnpm", ...args]);
 
-  return lookup.status === 0;
-}
-
-let result = hasPnpm()
-  ? run("pnpm", args)
-  : run("corepack", ["pnpm", ...args]);
-
-if (result.error && result.error.code === "ENOENT" && hasPnpm()) {
-  result = run("corepack", ["pnpm", ...args]);
+if (result.error && result.error.code === "ENOENT") {
+  result = run("pnpm", args);
 }
 
 if (result.error) {

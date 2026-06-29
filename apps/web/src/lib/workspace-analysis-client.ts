@@ -83,6 +83,18 @@ export function testProviderConnection(provider: ProviderForm) {
 	});
 }
 
+export function testProviderConnectionWithTimeout(provider: ProviderForm, timeoutMs?: number) {
+	return postJson<Record<string, unknown>>(
+		"/analysis/provider/test",
+		{
+			provider,
+		},
+		{
+			timeoutMs,
+		},
+	);
+}
+
 export function requestReferenceProfile({
 	provider,
 	referenceTitle,

@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run pnpm run check
-        run: pnpm --filter @ai-novel-first-step/ai-core check
+        run: pnpm --filter @ai-novel-diagnosis/ai-core check
       - name: Run pnpm run test
-        run: pnpm --filter @ai-novel-first-step/ai-core test
+        run: pnpm --filter @ai-novel-diagnosis/ai-core test
       - name: Run pnpm run build
-        run: pnpm --filter @ai-novel-first-step/ai-core build
+        run: pnpm --filter @ai-novel-diagnosis/ai-core build

@@ -3,7 +3,9 @@ param(
 	[int]$ApiPort = 3001,
 	[int]$PortSearchLimit = 20,
 	[switch]$NoBrowser,
-	[switch]$Kill
+	[switch]$Kill,
+	[switch]$ResetPglite,
+	[switch]$RecoveryRetry
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +25,19 @@ $WebDir = Join-Path $RootPath "apps/web"
 $LogsDir = Join-Path $RootPath ".local/run-logs"
 $PgliteDir = Join-Path $RootPath ".local/pglite-runtime"
 
+function Test-PathExists($Path) {
+	return Test-Path -LiteralPath $Path
+}
+
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
+
+if ($ResetPglite) {
+	Write-Host "Resetting local PGlite runtime data directory: $PgliteDir"
+	if (Test-PathExists $PgliteDir) {
+		Remove-Item -LiteralPath $PgliteDir -Recurse -Force -ErrorAction SilentlyContinue
+	}
+}
+
 New-Item -ItemType Directory -Force -Path $PgliteDir | Out-Null
 
 $script:StartLocalMutex = [System.Threading.Mutex]::new($false, "Local\AiNovelDiagnosisStartLocal")
@@ -80,10 +94,6 @@ function Get-PnpmCommand {
 	return $null
 }
 
-function Test-PathExists($Path) {
-	return Test-Path -LiteralPath $Path
-}
-
 function Test-WorkspaceDependenciesInstalled {
 	if (-not (Test-PathExists (Join-Path $RootPath "node_modules"))) {
 		return @{
@@ -112,15 +122,15 @@ function Test-WorkspaceDependenciesInstalled {
 			if ($result.ExitCode -ne 0) {
 				$messageParts = @()
 				if (Test-PathExists $tempOutputPath) {
-					$stdoutContent = (Get-Content $tempOutputPath -Raw -ErrorAction SilentlyContinue).Trim()
+					$stdoutContent = Get-Content $tempOutputPath -Raw -ErrorAction SilentlyContinue
 					if (-not [string]::IsNullOrWhiteSpace($stdoutContent)) {
-						$messageParts += $stdoutContent
+						$messageParts += $stdoutContent.Trim()
 					}
 				}
 				if (Test-PathExists $tempErrorPath) {
-					$stderrContent = (Get-Content $tempErrorPath -Raw -ErrorAction SilentlyContinue).Trim()
+					$stderrContent = Get-Content $tempErrorPath -Raw -ErrorAction SilentlyContinue
 					if (-not [string]::IsNullOrWhiteSpace($stderrContent)) {
-						$messageParts += $stderrContent
+						$messageParts += $stderrContent.Trim()
 					}
 				}
 				$message = if ($messageParts.Count -gt 0) {
@@ -615,7 +625,8 @@ if (-not $webSelection.Reuse) {
 	}
 	$WebCommand = @"
 ${ChildEncodingSetup}
-`$env:NEXT_PUBLIC_API_BASE_URL="$ApiBaseUrl"
+	`$env:NEXT_PUBLIC_API_BASE_URL="$ApiBaseUrl"
+`$env:API_INTERNAL_BASE_URL="$ApiBaseUrl"
 `$LogFile="$WebLog"
 $webPnpmCommand 2>&1 | ForEach-Object { Write-Utf8LogLine `$LogFile `$_ }
 "@
@@ -642,7 +653,30 @@ while ($waited -lt $maxWait) {
 	Write-Host "." -NoNewline
 }
 if ($waited -ge $maxWait) {
-	Write-Host " timeout. Check $ApiLog"
+	Write-Host " timeout."
+	if (-not $RecoveryRetry) {
+		Write-Host "Retrying with a fresh PGlite runtime because the API is not answering /health ..."
+		Stop-ProjectServiceProcesses "api" | Out-Null
+		$restartArgs = @(
+			"-Kill",
+			"-ResetPglite",
+			"-RecoveryRetry",
+			"-WebPort",
+			$WebPort,
+			"-ApiPort",
+			$ApiPort,
+			"-PortSearchLimit",
+			$PortSearchLimit
+		)
+		if ($NoBrowser) {
+			$restartArgs += "-NoBrowser"
+		}
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @restartArgs
+		Exit $LASTEXITCODE
+	}
+
+	Write-Host " still unreachable after recovery retry. Check $ApiLog"
+	Exit 1
 }
 
 if (-not $NoBrowser) {

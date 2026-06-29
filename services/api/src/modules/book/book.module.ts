@@ -19,8 +19,8 @@ import { TextPreprocessorService } from "./text-preprocessor.service";
     BookUploadService,
     TextPreprocessorService,
   ],
-  // AnalysisPersistenceRepository is exported for LibraryModule; the rest are
-  // private to the book module.
-  exports: [AnalysisPersistenceRepository],
+  // Exported for LibraryModule (distillBookSkill needs BookAnalysisService;
+  // research-library aggregations need AnalysisPersistenceRepository).
+  exports: [AnalysisPersistenceRepository, BookAnalysisService],
 })
 export class BookModule {}

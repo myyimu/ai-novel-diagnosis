@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -23,6 +23,7 @@ import { type Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
 import { AnalyzeBookDto } from "@/modules/analysis/dto/analyze-book.dto";
 import { CreateBookJobFromUploadDto } from "@/modules/analysis/dto/create-book-job-from-upload.dto";
+import { DistillBookSkillDto } from "@/modules/analysis/dto/distill-book-skill.dto";
 import { PreprocessBookDto } from "@/modules/analysis/dto/preprocess-book.dto";
 import { BookAnalysisService } from "./book-analysis.service";
 import {
@@ -150,6 +151,25 @@ export class BookController {
     response.send(exported.content);
   }
 
+  @Post("book/skills/distill")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary:
+      "Distill a cross-sample SKILL.md from multiple succeeded book analysis jobs (L3)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Distilled skill markdown with sample size and confidence",
+  })
+  distillBookSkill(@Body() body: DistillBookSkillDto) {
+    return this.bookAnalysis.distillBookSkill({
+      jobIds: body.jobIds,
+      groupBy: body.groupBy,
+      groupValue: body.groupValue,
+    });
+  }
+
   @Post("book/uploads")
   @HttpCode(201)
   @Public()
@@ -175,12 +195,14 @@ export class BookController {
   @ApiOperation({ summary: "Upload a TXT novel and preview chapter splitting" })
   uploadBook(
     @UploadedFile() file: { originalname?: string; buffer?: Buffer },
-    @Body() body: { title?: string; genre?: string },
+    @Body()
+    body: { title?: string; genre?: string; encoding?: string },
   ) {
     return this.bookAnalysis.uploadBookFile({
       title: body.title,
       genre: body.genre || "other",
       file,
+      encoding: body.encoding,
     });
   }
 
@@ -197,9 +219,7 @@ export class BookController {
   @Public()
   @ApiOperation({ summary: "List recent uploaded TXT files" })
   listBookUploads(@Query("limit") limit?: string) {
-    return this.bookAnalysis.listBookUploads(
-      limit ? Number(limit) : undefined,
-    );
+    return this.bookAnalysis.listBookUploads(limit ? Number(limit) : undefined);
   }
 
   @Post("book/uploads/:uploadId/jobs")
@@ -215,6 +235,11 @@ export class BookController {
     return this.bookAnalysis.createBookAnalysisJobFromUpload({
       uploadId,
       provider: body.provider,
+      ...(body.author ? { author: body.author } : {}),
+      ...(body.platform ? { platform: body.platform } : {}),
+      ...(body.publishedYear !== undefined
+        ? { publishedYear: body.publishedYear }
+        : {}),
     });
   }
 }

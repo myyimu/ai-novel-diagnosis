@@ -32,6 +32,7 @@ export interface CreateUploadInput {
   title?: string;
   genre: string;
   file: UploadedTxtFile;
+  encoding?: string;
 }
 
 @Injectable()
@@ -68,7 +69,10 @@ export class BookUploadService {
       throw new BadRequestException("Only .txt files are supported.");
     }
 
-    const rawText = input.file.buffer.toString("utf8");
+    const rawText = this.decodeUploadedFileText(
+      input.file.buffer,
+      input.encoding,
+    );
     const preprocessing = this.textPreprocessor.preprocess(rawText);
     const normalizedText = preprocessing.chapters
       .map((chapter) => `${chapter.title}\n${chapter.text}`)
@@ -200,6 +204,213 @@ export class BookUploadService {
       }
     }
     return undefined;
+  }
+
+  private decodeUploadedFileText(
+    raw: Buffer,
+    preferredEncoding?: string,
+  ): string {
+    const withBomRemoved = this.stripTextBom(raw);
+    const preferred = this.normalizeEncodingPreference(preferredEncoding);
+    if (preferred) {
+      const candidates = this.uniqueBuffers([withBomRemoved, raw]);
+      for (const candidate of candidates) {
+        try {
+          return this.decodeBuffer(
+            candidate,
+            preferred,
+            preferred === "latin1",
+          );
+        } catch {
+          /* try other decoding paths */
+        }
+      }
+    }
+
+    const candidateBuffers = this.uniqueBuffers([withBomRemoved, raw]);
+    const utf16Hint = this.isLikelyUtf16(withBomRemoved);
+    const encodings = [
+      ...new Set([
+        ...(utf16Hint ? ["utf-16le", "utf-16be"] : []),
+        "utf-8",
+        "utf-16le",
+        "utf-16be",
+        "gbk",
+        "gb18030",
+        "gb2312",
+      ]),
+    ];
+    const scored: Array<{ text: string; score: number; encoding: string }> = [];
+
+    for (const encoding of encodings) {
+      for (const candidate of candidateBuffers) {
+        let decoded: string;
+        try {
+          decoded = this.decodeBuffer(
+            candidate,
+            encoding,
+            encoding === "latin1",
+          );
+        } catch {
+          continue;
+        }
+
+        scored.push({
+          text: decoded,
+          score: this.scoreDecodedText(decoded),
+          encoding,
+        });
+      }
+    }
+
+    if (!scored.length) {
+      return this.decodeBuffer(withBomRemoved, "latin1", true);
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    if (best.score < 0) {
+      return this.decodeBuffer(withBomRemoved, "latin1", true);
+    }
+    return best.text;
+  }
+
+  private scoreDecodedText(text: string): number {
+    if (!text.trim().length) {
+      return -10000;
+    }
+
+    let replacementCount = 0;
+    let controlCount = 0;
+    let printableCount = 0;
+    let cjkCount = 0;
+
+    for (const char of text) {
+      if (char === "\uFFFD") {
+        replacementCount += 1;
+        continue;
+      }
+
+      const code = char.codePointAt(0) ?? 0;
+
+      if (
+        code === 0x0000 ||
+        (code <= 0x08 && code !== 0x09) ||
+        code === 0x0b ||
+        code === 0x0c ||
+        (code >= 0x0e && code < 0x20)
+      ) {
+        controlCount += 1;
+        continue;
+      }
+
+      if (
+        (code >= 0x4e00 && code <= 0x9fff) ||
+        (code >= 0x3400 && code <= 0x4dbf) ||
+        /[A-Za-z0-9]/.test(char) ||
+        /[\u3000-\u303f\u3040-\u30ff]/.test(char) ||
+        "，。？！；：“”‘’（）《》【】、".includes(char) ||
+        /\s/.test(char)
+      ) {
+        printableCount += 1;
+      }
+
+      if (code >= 0x4e00 && code <= 0x9fff) {
+        cjkCount += 1;
+      }
+    }
+
+    const length = text.length || 1;
+    return (
+      printableCount * 4 +
+      cjkCount -
+      replacementCount * 64 -
+      controlCount * 128 -
+      Math.max(0, length - printableCount - cjkCount - replacementCount) * 2
+    );
+  }
+
+  private decodeBuffer(
+    buffer: Buffer,
+    encoding: string,
+    latin1Fallback = false,
+  ): string {
+    if (latin1Fallback) {
+      return buffer.toString("latin1");
+    }
+    return new TextDecoder(encoding, { fatal: true }).decode(buffer);
+  }
+
+  private normalizeEncodingPreference(
+    preferredEncoding?: string,
+  ): string | undefined {
+    const normalized = preferredEncoding?.trim().toLowerCase();
+    if (!normalized || normalized === "auto") {
+      return undefined;
+    }
+
+    const aliasMap: Record<string, string> = {
+      "utf-8": "utf-8",
+      utf8: "utf-8",
+      "utf-16": "utf-16le",
+      utf16: "utf-16le",
+      "utf-16le": "utf-16le",
+      utf16le: "utf-16le",
+      "utf-16be": "utf-16be",
+      utf16be: "utf-16be",
+      gbk: "gbk",
+      gb2312: "gb2312",
+      "gb-2312": "gb2312",
+      gb18030: "gb18030",
+      "gb-18030": "gb18030",
+      ansi: "gb18030",
+      "windows-1252": "latin1",
+      latin1: "latin1",
+    };
+
+    return aliasMap[normalized];
+  }
+
+  private uniqueBuffers(buffers: Buffer[]): Buffer[] {
+    const unique: Buffer[] = [];
+    for (const current of buffers) {
+      if (!unique.some((entry) => entry.equals(current))) {
+        unique.push(current);
+      }
+    }
+    return unique;
+  }
+
+  private isLikelyUtf16(raw: Buffer): boolean {
+    if (raw.length < 32) {
+      return false;
+    }
+    const sample = raw.subarray(0, Math.min(raw.length, 4096));
+    let zeroBytes = 0;
+    for (const byte of sample) {
+      if (byte === 0x00) {
+        zeroBytes += 1;
+      }
+    }
+    return zeroBytes / sample.length >= 0.2;
+  }
+
+  private stripTextBom(raw: Buffer): Buffer {
+    if (
+      raw.length >= 3 &&
+      raw[0] === 0xef &&
+      raw[1] === 0xbb &&
+      raw[2] === 0xbf
+    ) {
+      return raw.subarray(3);
+    }
+    if (raw.length >= 2 && raw[0] === 0xff && raw[1] === 0xfe) {
+      return raw.subarray(2);
+    }
+    if (raw.length >= 2 && raw[0] === 0xfe && raw[1] === 0xff) {
+      return raw.subarray(2);
+    }
+    return raw;
   }
 
   private async listSnapshotUploads(): Promise<AnalysisUploadSnapshot[]> {

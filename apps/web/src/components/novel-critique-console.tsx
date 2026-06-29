@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import {
@@ -16,10 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChapterCritiqueView } from "@/components/workspace/chapter-critique-view";
 import { DiagnosisDashboardView } from "@/components/workspace/diagnosis-dashboard-view";
-import {
-	BookAnalysisPanel,
-	ExportView,
-} from "@/components/workspace/export-view";
+import { BookAnalysisPanel, ExportView } from "@/components/workspace/export-view";
 import { LibraryView } from "@/components/workspace/library-view";
 import { MethodologyLibraryView } from "@/components/workspace/methodology-library-view";
 import { OverviewView } from "@/components/workspace/overview-view";
@@ -27,10 +24,7 @@ import { RevisionHistoryView } from "@/components/workspace/revision-history-vie
 import { StarterView } from "@/components/workspace/starter-view";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { providerPresets } from "@/lib/provider-presets";
-import {
-	useWorkspaceHandlers,
-	type LoadingState,
-} from "@/hooks/use-workspace-handlers";
+import { useWorkspaceHandlers, type LoadingState } from "@/hooks/use-workspace-handlers";
 import {
 	getBookJobProgressDetail,
 	competitionLevelOptions,
@@ -557,7 +551,10 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					chapterProjectSteps={h.chapterProjectSteps}
 					platformLabel={h.platformLabel}
 					readingModeLabel={h.readingModeLabel}
-					competitionLevelLabel={h.optionLabel(competitionLevelOptions, h.competitionLevel)}
+					competitionLevelLabel={h.optionLabel(
+						competitionLevelOptions,
+						h.competitionLevel,
+					)}
 					pushStageLabel={h.optionLabel(pushStageOptions, h.pushStage)}
 					competitionNotes={h.competitionNotes}
 					bookTitle={h.bookUpload?.title || h.bookTitle || "未填写书名"}
@@ -969,7 +966,11 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 					</section>
 
 					<BookUploadPreviewPanel upload={h.bookUpload} />
-					<BookJobPanel job={h.bookJob} loading={h.loading} onResume={h.resumeBookAnalysis} />
+					<BookJobPanel
+						job={h.bookJob}
+						loading={h.loading}
+						onResume={h.resumeBookAnalysis}
+					/>
 					<section className="rounded-md border border-border bg-card p-5">
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div>
@@ -980,13 +981,17 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 							</div>
 							<div className="flex flex-wrap gap-2">
 								<Button
-									variant={h.bookUtilityPanel === "history" ? "default" : "outline"}
+									variant={
+										h.bookUtilityPanel === "history" ? "default" : "outline"
+									}
 									onClick={() => h.openBookUtility("history")}
 								>
 									历史记录
 								</Button>
 								<Button
-									variant={h.bookUtilityPanel === "exports" ? "default" : "outline"}
+									variant={
+										h.bookUtilityPanel === "exports" ? "default" : "outline"
+									}
 									onClick={() => h.openBookUtility("exports")}
 									disabled={
 										!h.bookJob ||
@@ -1031,7 +1036,11 @@ export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceVi
 						onOpenJob={h.openHistoryJob}
 						onDeleteJob={h.deleteHistoryJob}
 					/>
-					<BookJobPanel job={h.bookJob} loading={h.loading} onResume={h.resumeBookAnalysis} />
+					<BookJobPanel
+						job={h.bookJob}
+						loading={h.loading}
+						onResume={h.resumeBookAnalysis}
+					/>
 					<BookAnalysisPanel result={h.bookAnalysisResult} job={h.bookJob} />
 				</>
 			) : null}

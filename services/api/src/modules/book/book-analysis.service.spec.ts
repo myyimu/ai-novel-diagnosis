@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+﻿import { BadRequestException } from "@nestjs/common";
 import { BookAnalysisService } from "./book-analysis.service";
 
 function createBookService(options?: {
@@ -563,5 +563,139 @@ describe("BookAnalysisService", () => {
     expect(completedResult.mapReduce).toHaveProperty("chapterMaps");
     expect(completedResult.mapReduce.chapterMaps).toHaveLength(2);
     expect(completedResult.mapReduce.strategy).toContain("preprocess");
+  });
+
+  describe("distillBookSkill", () => {
+    it("aggregates multiple jobs into a distilled skill", async () => {
+      const job1 = {
+        id: "job-1",
+        status: "succeeded",
+        result: { transferableStyleCard: { styleRules: ["规则 A"] } },
+        inputSummary: { title: "书 1", genre: "xuanhuan", author: "作者 A" },
+      };
+      const job2 = {
+        id: "job-2",
+        status: "succeeded",
+        result: { transferableStyleCard: { styleRules: ["规则 A"] } },
+        inputSummary: { title: "书 2", genre: "xuanhuan", author: "作者 A" },
+      };
+
+      const bookJobs = {
+        get: jest.fn(async (jobId: string) => {
+          if (jobId === "job-1") return job1;
+          if (jobId === "job-2") return job2;
+          throw new Error("unknown job");
+        }),
+      };
+
+      const bookExports = {
+        buildSkillSource: jest.fn((result, opts) => ({
+          jobId: opts.jobId,
+          title: opts.jobId === "job-1" ? "书 1" : "书 2",
+          genre: "xuanhuan",
+          generatedAt: opts.generatedAt,
+          metadata: opts.metadata,
+          styleCard: result.transferableStyleCard,
+          styleBible: {},
+          consistencyChecklist: [],
+          boundary: {},
+          riskNotice: {},
+        })),
+        distillSkill: jest.fn(() => ({
+          filename: "distilled.md",
+          contentType: "text/markdown",
+          content: "# Distilled",
+          sampleSize: 2,
+          confidence: "medium",
+        })),
+      };
+
+      const service = new BookAnalysisService(
+        {} as never,
+        bookJobs as never,
+        {} as never,
+        { chat: jest.fn() } as never,
+        {} as never,
+        bookExports as never,
+      );
+
+      const result = await service.distillBookSkill({
+        jobIds: ["job-1", "job-2"],
+        groupBy: "author",
+        groupValue: "作者 A",
+      });
+
+      expect(result.sampleSize).toBe(2);
+      expect(result.confidence).toBe("medium");
+      expect(bookExports.buildSkillSource).toHaveBeenCalledTimes(2);
+      expect(bookExports.distillSkill).toHaveBeenCalledTimes(1);
+
+      const calls = bookExports.distillSkill.mock.calls as unknown as Array<
+        [Array<{ jobId: string; metadata?: { author?: string } }>, unknown]
+      >;
+      const sources = calls[0]![0];
+      expect(sources).toHaveLength(2);
+      expect(sources[0]!.metadata!.author).toBe("作者 A");
+      expect(sources[1]!.metadata!.author).toBe("作者 A");
+    });
+
+    it("throws BadRequestException when no jobIds provided", async () => {
+      const service = new BookAnalysisService(
+        {} as never,
+        {} as never,
+        {} as never,
+        { chat: jest.fn() } as never,
+        {} as never,
+        {} as never,
+      );
+
+      await expect(
+        service.distillBookSkill({
+          jobIds: [],
+          groupBy: "author",
+          groupValue: "作者",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("throws BadRequestException when any job has no result", async () => {
+      const job1 = {
+        id: "job-1",
+        status: "succeeded",
+        result: { transferableStyleCard: {} },
+        inputSummary: { title: "书 1", genre: "xuanhuan" },
+      };
+      const job2 = {
+        id: "job-2",
+        status: "running",
+        result: undefined,
+        inputSummary: { title: "书 2", genre: "xuanhuan" },
+      };
+
+      const bookJobs = {
+        get: jest.fn(async (jobId: string) => {
+          if (jobId === "job-1") return job1;
+          if (jobId === "job-2") return job2;
+          throw new Error("unknown job");
+        }),
+      };
+
+      const service = new BookAnalysisService(
+        {} as never,
+        bookJobs as never,
+        {} as never,
+        { chat: jest.fn() } as never,
+        {} as never,
+        {} as never,
+      );
+
+      await expect(
+        service.distillBookSkill({
+          jobIds: ["job-1", "job-2"],
+          groupBy: "author",
+          groupValue: "作者",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

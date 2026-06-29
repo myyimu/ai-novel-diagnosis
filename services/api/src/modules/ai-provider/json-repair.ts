@@ -1,7 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 import { ProviderConfigDto } from "./dto/provider-config.dto";
 import { extractJson } from "./json-extract";
-import { ModelProviderService } from "./model-provider.service";
+import {
+  ModelProviderService,
+  type ProviderChatOptions,
+} from "./model-provider.service";
 
 /**
  * Parse a model response as JSON, falling back to a one-shot LLM repair pass
@@ -15,6 +18,7 @@ export async function parseJsonWithRepair(
   provider: ProviderConfigDto,
   content: string,
   taskLabel: string,
+  chatOptions: ProviderChatOptions = {},
 ) {
   try {
     return extractJson(content);
@@ -46,7 +50,10 @@ ${errorMessage}
 ${content}`,
         },
       ],
-      { maxOutputTokens: 3200 },
+      {
+        ...chatOptions,
+        maxOutputTokens: chatOptions.maxOutputTokens ?? 3200,
+      },
     );
 
     try {

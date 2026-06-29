@@ -93,4 +93,119 @@ describe("BookExportService", () => {
     expect(exported.content).toContain("主角 -> 评审会：压迫、反击");
     expect(exported.content).toContain("不要复用原作关系网");
   });
+
+  it("builds a BookSkillSource with metadata for L3 aggregation", () => {
+    const service = new BookExportService();
+
+    const result = {
+      transferableStyleCard: {
+        styleRules: ["规则 A", "规则 B"],
+      },
+      generationAssets: {
+        styleBible: {
+          narrativePOV: "第三人称限制",
+          proseRules: ["短句为主"],
+        },
+      },
+      referenceBoundaryCheck: {
+        doNotReuse: ["角色名 A"],
+      },
+      usageRiskNotice: {
+        summary: "仅供学习",
+      },
+    };
+
+    const source = service.buildSkillSource(result, {
+      jobId: "job-1",
+      generatedAt: "2026-06-27T00:00:00Z",
+      metadata: {
+        author: "作者 A",
+        platform: "起点",
+        publishedYear: 2020,
+      },
+    });
+
+    expect(source.jobId).toBe("job-1");
+    expect(source.metadata?.author).toBe("作者 A");
+    expect(source.metadata?.platform).toBe("起点");
+    expect(source.metadata?.publishedYear).toBe(2020);
+    expect(source.styleCard?.styleRules).toEqual(["规则 A", "规则 B"]);
+    expect(source.styleBible?.narrativePOV).toBe("第三人称限制");
+    expect(source.boundary?.doNotReuse).toEqual(["角色名 A"]);
+    expect(source.riskNotice?.summary).toBe("仅供学习");
+  });
+
+  it("distills multiple BookSkillSources into aggregated skill", () => {
+    const service = new BookExportService();
+
+    const source1 = {
+      jobId: "job-1",
+      title: "书 1",
+      genre: "xuanhuan",
+      generatedAt: "2026-06-27T00:00:00Z",
+      metadata: { author: "作者 A" },
+      styleCard: {
+        styleRules: ["规则 A", "规则 B"],
+      },
+      styleBible: {},
+      boundary: {},
+      riskNotice: {},
+    };
+
+    const source2 = {
+      jobId: "job-2",
+      title: "书 2",
+      genre: "xuanhuan",
+      generatedAt: "2026-06-27T00:00:00Z",
+      metadata: { author: "作者 A" },
+      styleCard: {
+        styleRules: ["规则 A", "规则 C"],
+      },
+      styleBible: {},
+      boundary: {},
+      riskNotice: {},
+    };
+
+    const result = service.distillSkill([source1, source2], {
+      groupBy: "author",
+      groupValue: "作者 A",
+      generatedAt: "2026-06-27T00:00:00Z",
+    });
+
+    expect(result.filename).toContain("author-method");
+    expect(result.contentType).toBe("text/markdown; charset=utf-8");
+    expect(result.sampleSize).toBe(2);
+    expect(result.confidence).toBe("medium-low");
+    expect(result.content).toContain("规则 A"); // High confidence (both have it)
+    expect(result.content).toContain("规则 B"); // Low confidence (only one has it)
+    expect(result.content).toContain("规则 C"); // Low confidence (only one has it)
+  });
+
+  it("threads metadata through export() for skill-md format", () => {
+    const service = new BookExportService();
+
+    const result = {
+      book: { title: "测试书", genre: "xuanhuan" },
+      transferableStyleCard: {
+        styleRules: ["规则"],
+      },
+      generationAssets: {
+        styleBible: {},
+      },
+    };
+
+    const exported = service.export(result, "skill-md", "notes", {
+      author: "作者 A",
+      platform: "起点",
+      publishedYear: 2020,
+    });
+
+    expect(exported.filename).toContain("测试书");
+    expect(exported.contentType).toBe("text/markdown; charset=utf-8");
+    expect(exported.content).toContain("规则");
+    // Metadata should be embedded in the skill frontmatter
+    expect(exported.content).toContain("作者 A");
+    expect(exported.content).toContain("起点");
+    expect(exported.content).toContain("2020");
+  });
 });

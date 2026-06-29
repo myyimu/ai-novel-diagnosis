@@ -20,11 +20,27 @@ export class ProviderConfigDto {
   @ApiPropertyOptional({
     description:
       "Provider preset used to prefill base URL and model. User-owned key is still sent per request only.",
-    enum: ["custom", "shared-gpu", "deepseek", "doubao", "qwen", "ollama"],
+    enum: [
+      "custom",
+      "shared-gpu",
+      "deepseek",
+      "doubao",
+      "qwen",
+      "ollama",
+      "new-api",
+    ],
     example: "deepseek",
   })
   @IsOptional()
-  @IsIn(["custom", "shared-gpu", "deepseek", "doubao", "qwen", "ollama"])
+  @IsIn([
+    "custom",
+    "shared-gpu",
+    "deepseek",
+    "doubao",
+    "qwen",
+    "ollama",
+    "new-api",
+  ])
   preset?: ProviderPresetId;
 
   @ApiProperty({

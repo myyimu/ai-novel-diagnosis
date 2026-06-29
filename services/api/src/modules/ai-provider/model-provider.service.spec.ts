@@ -176,6 +176,38 @@ describe("ModelProviderService shared-gpu fallback", () => {
     );
   });
 
+  it("normalizes base URL values that already contain the chat/completions suffix", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    });
+    global.fetch = fetchMock as never;
+
+    const service = new ModelProviderService();
+    const result = await service.chat(
+      {
+        preset: "custom",
+        kind: "openai-compatible",
+        baseUrl: "https://api.openai.com/v1/chat/completions",
+        apiKey: "sk-test",
+        model: "gpt-test",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "hello" }],
+    );
+
+    expect(result).toBe('{"ok":true}');
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+
   it("accepts OpenAI-compatible content parts arrays", async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
@@ -541,5 +573,81 @@ describe("ModelProviderService shared-gpu fallback", () => {
     expect(result).toBe('{"ok":true}');
     expect(firstBody.response_format.type).toBe("json_schema");
     expect(secondBody.response_format).toEqual({ type: "json_object" });
+  });
+
+  it("returns a submitted-ok sentinel in test mode without polling the queue", async () => {
+    // Test mode should skip the polling loop entirely and return immediately
+    // after submission succeeds.
+    const fetchMock = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "queued-task-1" }),
+    });
+    global.fetch = fetchMock as never;
+    jest.spyOn(global, "setTimeout").mockImplementation(((
+      callback: (...args: unknown[]) => void,
+    ) => {
+      callback();
+      return 0 as never;
+    }) as unknown as typeof setTimeout);
+
+    const service = new ModelProviderService();
+    const result = await service.test({
+      preset: "shared-gpu",
+      kind: "openai-compatible",
+      baseUrl: "",
+      apiKey: "",
+      model: "",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, provider: "openai-compatible" }),
+    );
+    expect("raw" in result ? result.raw : "").toContain("(test mode)");
+    expect("raw" in result ? result.raw : "").toContain("queued-task-1");
+    // Only the submission fetch — no polling loop in test mode.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://aihorde.net/api/v2/generate/text/async",
+      expect.any(Object),
+    );
+  });
+
+  it("uses the short test-mode timeout for openai-compatible providers", async () => {
+    // Confirm the fetch sees a tight AbortSignal whose timeout fired quickly.
+    const fetchMock = jest.fn().mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_, reject) => {
+          const signal = init.signal as AbortSignal | undefined;
+          const fail = () => {
+            const err = new Error("aborted") as Error & { name: string };
+            err.name = "AbortError";
+            reject(err);
+          };
+          if (signal?.aborted) {
+            fail();
+            return;
+          }
+          signal?.addEventListener("abort", fail);
+        }),
+    );
+    global.fetch = fetchMock as never;
+    // Drive the timer immediately so the test doesn't actually wait 15s.
+    jest.spyOn(global, "setTimeout").mockImplementation(((
+      callback: (...args: unknown[]) => void,
+    ) => {
+      callback();
+      return 0 as never;
+    }) as unknown as typeof setTimeout);
+
+    const service = new ModelProviderService();
+    await expect(
+      service.test({
+        preset: "ollama",
+        kind: "openai-compatible",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "",
+        model: "test-model",
+      }),
+    ).rejects.toThrow(/连接测试在.*15.*秒内无响应/);
   });
 });

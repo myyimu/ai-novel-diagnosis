@@ -12,6 +12,9 @@ const HOP_BY_HOP_HEADERS = new Set([
 	"upgrade",
 ]);
 
+const PROXY_REQUEST_TIMEOUT_MS = 20_000;
+const UPSTREAM_REQUEST_TIMEOUT_MS = 30_000;
+
 type RouteContext = {
 	params: Promise<{
 		path: string[];
@@ -47,10 +50,31 @@ function createResponseHeaders(headers: Headers) {
 	return responseHeaders;
 }
 
+function buildProxyTimeoutError(message = "request timeout") {
+	return JSON.stringify({
+		code: -1,
+		message,
+		data: null,
+	});
+}
+
+function isAbortError(error: unknown): error is DOMException {
+	return error instanceof DOMException && error.name === "AbortError";
+}
+
+function isProviderTestPath(path: string[]) {
+	return (
+		path.length >= 3 && path[0] === "analysis" && path[1] === "provider" && path[2] === "test"
+	);
+}
+
 async function proxy(request: NextRequest, context: RouteContext) {
 	const { path } = await context.params;
 	const upstreamUrl = new URL(`${getApiBaseUrl()}/${path.map(encodeURIComponent).join("/")}`);
 	upstreamUrl.search = request.nextUrl.search;
+	const timeoutMs = isProviderTestPath(path)
+		? PROXY_REQUEST_TIMEOUT_MS
+		: UPSTREAM_REQUEST_TIMEOUT_MS;
 
 	const hasBody = request.method !== "GET" && request.method !== "HEAD";
 	const init: ProxyRequestInit = {
@@ -61,12 +85,50 @@ async function proxy(request: NextRequest, context: RouteContext) {
 		duplex: hasBody ? "half" : undefined,
 	};
 
-	const response = await fetch(upstreamUrl, init);
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers: createResponseHeaders(response.headers),
-	});
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => {
+		controller.abort(new DOMException("Request timeout", "AbortError"));
+	}, timeoutMs);
+
+	try {
+		const response = await fetch(upstreamUrl, {
+			...init,
+			signal: controller.signal,
+		});
+		return new Response(response.body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers: createResponseHeaders(response.headers),
+		});
+	} catch (error) {
+		if (isAbortError(error)) {
+			const timeoutMessage = isProviderTestPath(path)
+				? "Provider test timed out, please check API service reachability or retry later"
+				: "Request timed out, please retry later";
+			return new Response(buildProxyTimeoutError(timeoutMessage), {
+				status: 504,
+				headers: {
+					"content-type": "application/json",
+				},
+			});
+		}
+
+		return new Response(
+			JSON.stringify({
+				code: -1,
+				message: "Provider test proxy failed. Check network or server status",
+				data: null,
+			}),
+			{
+				status: 502,
+				headers: {
+					"content-type": "application/json",
+				},
+			},
+		);
+	} finally {
+		clearTimeout(timeoutId);
+	}
 }
 
 export const GET = proxy;

@@ -71,4 +71,13 @@ export const providerPresets: Record<ProviderPresetId, ProviderPreset> = {
 		jsonMode: false,
 		needsApiKey: false,
 	},
+	"new-api": {
+		label: "new-api（DeepSeek 兼容）",
+		kind: "openai-compatible",
+		baseUrl: "https://new-api.rugao.me/v1",
+		model: "deepseek-v4-flash",
+		modelOptions: ["deepseek-v4-flash"],
+		jsonMode: false,
+		needsApiKey: true,
+	},
 };

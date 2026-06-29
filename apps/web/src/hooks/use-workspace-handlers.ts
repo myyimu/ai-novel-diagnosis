@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -102,6 +102,8 @@ import {
 import {
 	type BookAnalysisResult,
 	type BookAnalysisJob,
+	type ProviderConfigHistoryEntry,
+	type ProviderForm,
 	type ProviderPresetId,
 	type QuickReviewResult,
 	type RubricResult,
@@ -129,11 +131,111 @@ export type LoadingState =
 	| "export"
 	| null;
 
+const TEXT_FILE_DECODER_CANDIDATES = [
+	"utf-8",
+	"utf-16le",
+	"utf-16be",
+	"gb18030",
+	"gbk",
+	"gb2312",
+] as const;
+
+function stripTextFileBom(bytes: Uint8Array) {
+	if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+		return bytes.subarray(3);
+	}
+	if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+		return bytes.subarray(2);
+	}
+	if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+		return bytes.subarray(2);
+	}
+	return bytes;
+}
+
+function scoreDecodedText(text: string) {
+	if (!text.trim()) {
+		return Number.NEGATIVE_INFINITY;
+	}
+
+	let replacementCount = 0;
+	let controlCount = 0;
+	let readableCount = 0;
+	let cjkCount = 0;
+
+	for (const char of text) {
+		if (char === "\uFFFD") {
+			replacementCount += 1;
+			continue;
+		}
+
+		const code = char.codePointAt(0) ?? 0;
+		if (
+			code === 0x0000 ||
+			(code <= 0x08 && code !== 0x09) ||
+			code === 0x0b ||
+			code === 0x0c ||
+			(code >= 0x0e && code < 0x20)
+		) {
+			controlCount += 1;
+			continue;
+		}
+
+		if (
+			(code >= 0x4e00 && code <= 0x9fff) ||
+			(code >= 0x3400 && code <= 0x4dbf) ||
+			/[A-Za-z0-9]/.test(char) ||
+			/[\u3000-\u303f\u3040-\u30ff]/.test(char) ||
+			" ,.!?;:'\"()[]{}<>-_/\n\r\t".includes(char) ||
+			"，。？！；：“”‘’（）《》【】、".includes(char)
+		) {
+			readableCount += 1;
+		}
+
+		if (code >= 0x4e00 && code <= 0x9fff) {
+			cjkCount += 1;
+		}
+	}
+
+	const unknownCount = Math.max(0, text.length - readableCount - replacementCount - controlCount);
+	return (
+		readableCount * 4 +
+		cjkCount * 3 -
+		replacementCount * 200 -
+		controlCount * 120 -
+		unknownCount * 2
+	);
+}
+
+async function readTextFileWithAutoEncoding(file: File) {
+	const rawBytes = new Uint8Array(await file.arrayBuffer());
+	const bytes = stripTextFileBom(rawBytes);
+	const decodedCandidates: Array<{ text: string; score: number }> = [];
+
+	for (const encoding of TEXT_FILE_DECODER_CANDIDATES) {
+		try {
+			const text = new TextDecoder(encoding, { fatal: true }).decode(bytes);
+			decodedCandidates.push({ text, score: scoreDecodedText(text) });
+		} catch {
+			/* try next encoding */
+		}
+	}
+
+	if (!decodedCandidates.length) {
+		return new TextDecoder().decode(bytes);
+	}
+
+	decodedCandidates.sort((left, right) => right.score - left.score);
+	return decodedCandidates[0]?.text ?? new TextDecoder().decode(bytes);
+}
+
 export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const router = useRouter();
 	const {
 		provider,
 		setProvider,
+		providerConfigHistory,
+		setProviderConfigHistory,
 		referenceTitle,
 		setReferenceTitle,
 		genre,
@@ -265,6 +367,86 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const platformStrategyTouchedRef = useRef(false);
 	const activeBookPollJobIdRef = useRef<string | null>(null);
 	const workspaceAssetsLoadedRef = useRef(false);
+
+	const PROVIDER_CONFIG_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+	const PROVIDER_CONFIG_HISTORY_MAX_ENTRIES = 30;
+
+	function resolveStoreValue<T>(value: T | ((current: T) => T), current: T): T {
+		return typeof value === "function" ? (value as (current: T) => T)(current) : value;
+	}
+
+	function normalizeProviderConfig(provider: ProviderForm): ProviderForm {
+		return {
+			...provider,
+			baseUrl: (provider.baseUrl || "").trim(),
+			model: (provider.model || "").trim(),
+			apiKey: provider.apiKey || "",
+		};
+	}
+
+	function areProviderFormsEqual(left: ProviderForm, right: ProviderForm) {
+		return (
+			left.preset === right.preset &&
+			left.kind === right.kind &&
+			left.baseUrl === right.baseUrl &&
+			left.apiKey === right.apiKey &&
+			left.model === right.model &&
+			left.temperature === right.temperature &&
+			left.jsonMode === right.jsonMode
+		);
+	}
+
+	function pruneProviderConfigHistory(history: ProviderConfigHistoryEntry[]) {
+		return history
+			.filter((entry) => {
+				const timestamp = Date.parse(entry.createdAt);
+				return (
+					Boolean(entry?.id) &&
+					Number.isFinite(timestamp) &&
+					timestamp >= Date.now() - PROVIDER_CONFIG_HISTORY_RETENTION_MS
+				);
+			})
+			.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+			.slice(0, PROVIDER_CONFIG_HISTORY_MAX_ENTRIES);
+	}
+
+	function providerHistoryLabel(providerConfig: ProviderForm) {
+		const presetLabel = providerPresets[providerConfig.preset].label;
+		const modelText = providerConfig.model || "未设置模型";
+		const baseUrlText = providerConfig.baseUrl || "未设置 Base URL";
+		return `${presetLabel} · ${modelText} · ${baseUrlText}`;
+	}
+
+	function createProviderHistoryId() {
+		return `provider-config-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+	}
+
+	function setProviderWithHistory(
+		nextProvider: ProviderForm | ((current: ProviderForm) => ProviderForm),
+	) {
+		setProvider((current) => {
+			const nextValue = resolveStoreValue(nextProvider, current);
+			const normalized = normalizeProviderConfig(nextValue);
+			setProviderConfigHistory((history) => {
+				const normalizedHistory = pruneProviderConfigHistory(history);
+				const exists = normalizedHistory.some((entry) =>
+					areProviderFormsEqual(entry.provider, normalized),
+				);
+				if (exists) {
+					return normalizedHistory;
+				}
+
+				const record: ProviderConfigHistoryEntry = {
+					id: createProviderHistoryId(),
+					createdAt: new Date().toISOString(),
+					title: providerHistoryLabel(normalized),
+					provider: normalized,
+				};
+				return pruneProviderConfigHistory([record, ...normalizedHistory]);
+			});
+			return normalized;
+		});
+	}
 
 	/* ──────────── progress controllers ──────────── */
 
@@ -498,40 +680,37 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const platformLabel = optionLabel(platformOptions, platform);
 	const audienceLabel = optionLabel(audienceOptions, audience);
 	const readingModeLabel = optionLabel(readingModeOptions, readingMode);
-	const {
-		chapterProjectSteps,
-		chapterCompletion,
-		nextChapterAction,
-	} = buildChapterWorkspaceSummary({
-		platformLabel,
-		audienceLabel,
-		readingModeLabel,
-		referenceText,
-		referenceFileName,
-		chapterText,
-		quickReviewResult,
-		referenceProfileApplied,
-		category,
-		theme,
-		rubricResult,
-		scoreResult,
-		performanceValues: [
-			impressions,
-			clickThroughRate,
-			validReadRate,
-			read30sRate,
-			read60sRate,
-			bottomRate,
-			followRate,
-			bookshelfRate,
-			firstChapterCompletionRate,
-			nextChapterClickRate,
-			threeChapterRetentionRate,
-			avgReadProgressRate,
-			paidUnlockRate,
-		],
-		performanceSnapshotNote,
-	});
+	const { chapterProjectSteps, chapterCompletion, nextChapterAction } =
+		buildChapterWorkspaceSummary({
+			platformLabel,
+			audienceLabel,
+			readingModeLabel,
+			referenceText,
+			referenceFileName,
+			chapterText,
+			quickReviewResult,
+			referenceProfileApplied,
+			category,
+			theme,
+			rubricResult,
+			scoreResult,
+			performanceValues: [
+				impressions,
+				clickThroughRate,
+				validReadRate,
+				read30sRate,
+				read60sRate,
+				bottomRate,
+				followRate,
+				bookshelfRate,
+				firstChapterCompletionRate,
+				nextChapterClickRate,
+				threeChapterRetentionRate,
+				avgReadProgressRate,
+				paidUnlockRate,
+			],
+			performanceSnapshotNote,
+		});
 	const { bookStatusText, bookCompletion } = buildBookWorkspaceSummary({
 		bookJob,
 		bookUpload,
@@ -808,16 +987,30 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	async function testProvider() {
 		setLoading("provider");
 		setStatus("正在测试模型服务...");
+		const timeoutMs = 120000;
+		const timeoutSignal = new Promise<never>((_, reject) => {
+			const timer = setTimeout(() => {
+				clearTimeout(timer);
+				reject(new Error("模型测试超时（120s），请检查网络或模型服务可用性。"));
+			}, timeoutMs);
+		});
+
 		try {
-			const result = await testProviderConnection(providerPayload);
+			const startedAt = Date.now();
+			const result = await Promise.race([
+				testProviderConnection(providerPayload),
+				timeoutSignal,
+			]);
 			const providerName = providerPresets[provider.preset].label;
 			const modelName =
 				provider.kind === "mock"
 					? "本地演示"
 					: provider.model || String(result.model || "未指定模型");
-			setStatus(`模型服务可用：${providerName} · ${modelName}`);
+			const duration = Date.now() - startedAt;
+			setStatus(`模型服务可用：${providerName} · ${modelName}（${duration}ms）`);
 		} catch (error) {
-			setStatus((error as Error).message);
+			const message = error instanceof Error ? error.message : "模型测试失败，请稍后重试。";
+			setStatus(`模型测试失败：${message}`);
 		} finally {
 			setLoading(null);
 		}
@@ -825,7 +1018,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	function applyProviderPreset(presetId: ProviderPresetId) {
 		const preset = providerPresets[presetId];
-		setProvider((current) => ({
+		setProviderWithHistory((current) => ({
 			...current,
 			preset: presetId,
 			kind: preset.kind,
@@ -837,8 +1030,24 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	function resetProviderSettings() {
-		setProvider(defaultProvider);
+		setProviderWithHistory(defaultProvider);
 		setStatus("已恢复默认 AI 设置，并保存到本机浏览器。");
+	}
+
+	function applyProviderConfigHistory(historyId: string) {
+		const historyItem = providerConfigHistory.find((item) => item.id === historyId);
+		if (!historyItem) {
+			setStatus("未找到对应的 AI 设置历史。");
+			return;
+		}
+
+		setProviderWithHistory(historyItem.provider);
+		setStatus(`已启用历史配置：${historyItem.title}`);
+	}
+
+	function deleteProviderConfigHistory(historyId: string) {
+		setProviderConfigHistory((current) => current.filter((item) => item.id !== historyId));
+		setStatus("已删除该条 AI 设置记录。");
 	}
 
 	function useExampleChapter(exampleId?: string) {
@@ -1046,7 +1255,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}
 
 		try {
-			const text = await file.text();
+			const text = await readTextFileWithAutoEncoding(file);
 			platformStrategyTouchedRef.current = false;
 			setReferenceText(text);
 			setReferenceFileName(file.name);
@@ -1312,15 +1521,42 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			return;
 		}
 
+		const targetJobId = bookJob.id;
 		setLoading("book");
 		setBookAnalysisResult(null);
 		setStatus("正在从已完成章节继续整书拆解...");
+		const cacheKey = buildBookAnalysisCacheKey();
 		try {
-			const resumedJob = await resumeBookAnalysisJob(bookJob.id, providerPayload);
+			const resumedJob = await resumeBookAnalysisJob(targetJobId, providerPayload);
 			setBookJob(resumedJob);
+			rememberBookAnalysis(cacheKey, resumedJob, null);
 			await followBookJob(resumedJob.id);
 		} catch (error) {
-			setStatus((error as Error).message);
+			const message = error instanceof Error ? error.message : String(error);
+			const notFoundMessage = `Book analysis job not found: ${targetJobId}`;
+			if (message.includes(notFoundMessage) && bookJob.uploadId) {
+				setStatus("上次任务记录已失效，尝试基于同一上传文件重新创建任务...");
+				try {
+					const recreatedJob = await createBookAnalysisJobFromUpload(
+						bookJob.uploadId,
+						providerPayload,
+					);
+					setBookJob(recreatedJob);
+					rememberBookAnalysis(cacheKey, recreatedJob, null);
+					setStatus(`任务已重建：${recreatedJob.id}`);
+					await followBookJob(recreatedJob.id);
+					return;
+				} catch (recreateError) {
+					setStatus(
+						recreateError instanceof Error
+							? recreateError.message
+							: "重建任务失败，请稍后重试。",
+					);
+					return;
+				}
+			}
+
+			setStatus(message);
 		} finally {
 			setLoading(null);
 		}
@@ -1692,7 +1928,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			return;
 		}
 
-		const text = await file.text();
+		const text = await readTextFileWithAutoEncoding(file);
 		setBookText(text);
 	}
 
@@ -1773,7 +2009,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		/* provider */
 		provider,
-		setProvider,
+		setProvider: setProviderWithHistory,
+		providerConfigHistory,
+		applyProviderConfigHistory,
+		deleteProviderConfigHistory,
 		providerPayload,
 		selectedProviderPreset,
 		providerModelOptions,

@@ -130,9 +130,7 @@ export function WorkspaceShell<TView extends string>({
 	children: ReactNode;
 }) {
 	const hasAdvanced = Boolean(advancedNavItems && advancedNavItems.length > 0);
-	const activeIsAdvanced = Boolean(
-		advancedNavItems?.some((item) => item.id === activeView),
-	);
+	const activeIsAdvanced = Boolean(advancedNavItems?.some((item) => item.id === activeView));
 	// 当前停留在高级页面时默认展开，避免视觉上"找不到自己在哪儿"
 	const [advancedOpen, setAdvancedOpen] = useState(activeIsAdvanced);
 
@@ -196,10 +194,7 @@ export function WorkspaceShell<TView extends string>({
 								/>
 							</button>
 							{advancedOpen ? (
-								<nav
-									aria-label="高级功能"
-									className="mt-1 space-y-1 text-sm"
-								>
+								<nav aria-label="高级功能" className="mt-1 space-y-1 text-sm">
 									{advancedNavItems!.map(renderNavButton)}
 								</nav>
 							) : null}

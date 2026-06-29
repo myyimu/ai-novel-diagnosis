@@ -22,9 +22,7 @@ import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
 @ApiTags("analysis")
 @Controller("analysis/workspace")
 export class WorkspaceController {
-  constructor(
-    private readonly workspaceAssets: WorkspaceAssetsRepository,
-  ) {}
+  constructor(private readonly workspaceAssets: WorkspaceAssetsRepository) {}
 
   @Get("assets")
   @Public()

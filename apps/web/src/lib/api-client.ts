@@ -1,10 +1,43 @@
-export interface ApiEnvelope<T> {
+﻿export interface ApiEnvelope<T> {
 	code: number;
 	message: string;
 	data: T;
 }
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+
+type ApiRequestOptions = {
+	timeoutMs?: number;
+};
+
+type TimeoutHandle = {
+	signal: AbortSignal;
+	clear: () => void;
+};
+
+function createTimeoutHandle(timeoutMs?: number): TimeoutHandle | null {
+	if (!timeoutMs) {
+		return null;
+	}
+
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => {
+		controller.abort(new DOMException("Request timeout", "AbortError"));
+	}, timeoutMs);
+
+	return {
+		signal: controller.signal,
+		clear: () => clearTimeout(timeoutId),
+	};
+}
+
+function isAbortError(error: unknown): error is DOMException {
+	return error instanceof DOMException && error.name === "AbortError";
+}
+
+function formatTimeoutError(timeoutMs: number) {
+	return `请求超时 (${timeoutMs}ms)，请检查模型服务或网络后重试`;
+}
 
 export function apiUrl(path: string) {
 	return `${API_BASE_URL}${path}`;
@@ -35,47 +68,96 @@ function assertApiResponse<T>(
 	}
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
-	const response = await fetch(apiUrl(path), {
-		method: "POST",
-		headers: {
-			"content-type": "application/json",
-		},
-		body: JSON.stringify(body),
-	});
+async function requestJson<T>(
+	path: string,
+	requestInit: RequestInit,
+	options: ApiRequestOptions = {},
+): Promise<T> {
+	const timeoutHandle = createTimeoutHandle(options.timeoutMs);
+	let response: Response;
+	try {
+		response = await fetch(apiUrl(path), {
+			...requestInit,
+			signal: timeoutHandle?.signal,
+		});
+	} catch (error) {
+		timeoutHandle?.clear();
+		if (isAbortError(error)) {
+			throw new Error(formatTimeoutError(options.timeoutMs ?? 0));
+		}
+		throw error instanceof Error ? error : new Error(`Request failed: ${requestInit.method}`);
+	}
 
+	timeoutHandle?.clear();
 	const payload = await readApiEnvelope<T>(response);
-	assertApiResponse(response, payload);
+	assertApiResponse(response, payload, `Request failed: ${requestInit.method}`);
 
 	return payload.data;
 }
 
-export async function patchJson<T>(path: string, body: unknown): Promise<T> {
-	const response = await fetch(apiUrl(path), {
-		method: "PATCH",
-		headers: {
-			"content-type": "application/json",
+export async function postJson<T>(
+	path: string,
+	body: unknown,
+	options: ApiRequestOptions = {},
+): Promise<T> {
+	return requestJson<T>(
+		path,
+		{
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+			},
+			body: JSON.stringify(body),
 		},
-		body: JSON.stringify(body),
-	});
-
-	const payload = await readApiEnvelope<T>(response);
-	assertApiResponse(response, payload);
-
-	return payload.data;
+		options,
+	);
 }
 
-export async function postForm<T>(path: string, body: FormData): Promise<T> {
-	const response = await fetch(apiUrl(path), {
-		method: "POST",
-		body,
-	});
+export async function patchJson<T>(
+	path: string,
+	body: unknown,
+	options: ApiRequestOptions = {},
+): Promise<T> {
+	return requestJson<T>(
+		path,
+		{
+			method: "PATCH",
+			headers: {
+				"content-type": "application/json",
+			},
+			body: JSON.stringify(body),
+		},
+		options,
+	);
+}
 
+export async function postForm<T>(
+	path: string,
+	body: FormData,
+	options: ApiRequestOptions = {},
+): Promise<T> {
+	const timeoutHandle = createTimeoutHandle(options.timeoutMs);
+	let response: Response;
+
+	try {
+		response = await fetch(apiUrl(path), {
+			method: "POST",
+			body,
+			signal: timeoutHandle?.signal,
+		});
+	} catch (error) {
+		timeoutHandle?.clear();
+		if (isAbortError(error)) {
+			throw new Error(formatTimeoutError(options.timeoutMs ?? 0));
+		}
+		throw error instanceof Error ? error : new Error("Request failed");
+	}
+
+	timeoutHandle?.clear();
 	const payload = await readApiEnvelope<T>(response);
-
 	if (!response.ok || payload?.code !== 0) {
 		if (response.status === 413) {
-			throw new Error("上传文件过大。当前单个 TXT 最多支持 50MB。");
+			throw new Error("上传文件超过 50MB 限制，请压缩后重试");
 		}
 		throw new Error(payload?.message || `Request failed: ${response.status}`);
 	}
@@ -83,20 +165,22 @@ export async function postForm<T>(path: string, body: FormData): Promise<T> {
 	return payload.data;
 }
 
-export async function getJson<T>(path: string): Promise<T> {
-	const response = await fetch(apiUrl(path));
-	const payload = await readApiEnvelope<T>(response);
-	assertApiResponse(response, payload);
-
-	return payload.data;
+export async function getJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+	return requestJson<T>(
+		path,
+		{
+			method: "GET",
+		},
+		options,
+	);
 }
 
-export async function deleteJson<T>(path: string): Promise<T> {
-	const response = await fetch(apiUrl(path), {
-		method: "DELETE",
-	});
-	const payload = await readApiEnvelope<T>(response);
-	assertApiResponse(response, payload);
-
-	return payload.data;
+export async function deleteJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+	return requestJson<T>(
+		path,
+		{
+			method: "DELETE",
+		},
+		options,
+	);
 }

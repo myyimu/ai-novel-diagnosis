@@ -1,4 +1,13 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  compileBookSkill,
+  compileDistilledSkill,
+  type BookSkillSource,
+} from "./book-skill-compiler";
+import {
+  aggregateBookSkills,
+  type SkillGroupBy,
+} from "./book-skill-aggregator";
 
 interface BookAnalysisExportResult {
   book?: {
@@ -6,6 +15,24 @@ interface BookAnalysisExportResult {
     genre?: string;
     oneSentencePremise?: string;
     coreAppeal?: string[];
+  };
+  transferableStyleCard?: {
+    coreStyleTags?: string[];
+    narrativeVoice?: string;
+    sentenceRhythm?: string;
+    paragraphPattern?: string;
+    dialoguePattern?: string;
+    sensoryFocus?: string[];
+    pleasureMechanisms?: string[];
+    hookPatterns?: string[];
+    styleRules?: string[];
+    antiPatterns?: string[];
+  };
+  referenceBoundaryCheck?: {
+    doNotReuse?: string[];
+    needsTransformation?: string[];
+    learnablePatterns?: string[];
+    safeRewriteMoves?: string[];
   };
   characters?: Array<{
     sourceName?: string;
@@ -164,16 +191,77 @@ export type BookExportFormat =
   | "style-bible"
   | "outline"
   | "prompt-pack"
-  | "do-not-copy";
+  | "do-not-copy"
+  | "skill-md";
 
 export type BookExportMode = "notes" | "originalized";
 
 @Injectable()
 export class BookExportService {
+  /**
+   * Build a BookSkillSource from a single book analysis result, carrying
+   * provenance metadata so the L3 aggregator can cite author / platform / year.
+   */
+  buildSkillSource(
+    result: unknown,
+    opts: {
+      jobId: string;
+      generatedAt: string;
+      metadata?: { author?: string; platform?: string; publishedYear?: number };
+    },
+  ): BookSkillSource {
+    const analysis = result as BookAnalysisExportResult;
+    const title = analysis.book?.title?.trim() || "untitled-book";
+    const genre = analysis.book?.genre?.trim() || "other";
+    return {
+      jobId: opts.jobId,
+      title,
+      genre,
+      generatedAt: opts.generatedAt,
+      ...(opts.metadata ? { metadata: opts.metadata } : {}),
+      styleCard: analysis.transferableStyleCard,
+      styleBible: analysis.generationAssets?.styleBible,
+      consistencyChecklist: analysis.generationAssets?.consistencyChecklist,
+      boundary: analysis.referenceBoundaryCheck,
+      riskNotice: analysis.usageRiskNotice,
+    };
+  }
+
+  /**
+   * Distill multiple BookSkillSources into a single cross-sample SKILL.md.
+   * Pure rendering — the caller (service) handles IO (loading jobs, building
+   * sources) and passes them in.
+   */
+  distillSkill(
+    sources: BookSkillSource[],
+    options: { groupBy: SkillGroupBy; groupValue: string; generatedAt: string },
+  ): {
+    filename: string;
+    contentType: string;
+    content: string;
+    sampleSize: number;
+    confidence: string;
+  } {
+    const distilled = aggregateBookSkills({
+      sources,
+      options: { groupBy: options.groupBy, groupValue: options.groupValue },
+      generatedAt: options.generatedAt,
+    });
+    const compiled = compileDistilledSkill(distilled);
+    return {
+      filename: compiled.filename,
+      contentType: "text/markdown; charset=utf-8",
+      content: compiled.content,
+      sampleSize: distilled.sampleSize,
+      confidence: distilled.confidence,
+    };
+  }
+
   export(
     result: unknown,
     format: BookExportFormat,
     mode: BookExportMode = "notes",
+    metadata?: { author?: string; platform?: string; publishedYear?: number },
   ) {
     const sourceAnalysis = result as BookAnalysisExportResult;
     const analysis =
@@ -299,9 +387,28 @@ export class BookExportService {
           contentType: "text/markdown; charset=utf-8",
           content: this.toDoNotCopyMarkdown(analysis),
         };
+      case "skill-md":
+        return this.toSkillExport(analysis, metadata);
       default:
         throw new BadRequestException(`Unsupported export format: ${format}`);
     }
+  }
+
+  private toSkillExport(
+    analysis: BookAnalysisExportResult,
+    metadata?: { author?: string; platform?: string; publishedYear?: number },
+  ) {
+    const source = this.buildSkillSource(analysis, {
+      jobId: "exported",
+      generatedAt: new Date().toISOString(),
+      metadata,
+    });
+    const compiled = compileBookSkill(source);
+    return {
+      filename: compiled.filename,
+      contentType: "text/markdown; charset=utf-8",
+      content: compiled.content,
+    };
   }
 
   private toOriginalizedAnalysis(

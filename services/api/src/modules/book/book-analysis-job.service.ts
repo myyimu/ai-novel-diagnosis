@@ -51,6 +51,10 @@ export interface BookAnalysisJobSnapshot {
     title: string;
     genre: string;
     textLength: number;
+    /** Optional metadata for cross-sample distillation (L2). */
+    author?: string;
+    platform?: string;
+    publishedYear?: number;
   };
   progress: BookAnalysisJobProgress;
   preprocessing?: Omit<BookPreprocessResult, "chapters"> & {

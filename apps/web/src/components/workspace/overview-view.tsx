@@ -140,9 +140,7 @@ function Collapsible({
 				</div>
 				{rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
 			</button>
-			{open ? (
-				<div className="border-t border-border px-5 pb-5 pt-4">{children}</div>
-			) : null}
+			{open ? <div className="border-t border-border px-5 pb-5 pt-4">{children}</div> : null}
 		</section>
 	);
 }

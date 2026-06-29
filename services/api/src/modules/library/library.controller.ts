@@ -1,13 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Post,
-  Query,
-} from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Public } from "@/core/decorators/public.decorators";
+import { DistillBookSkillDto } from "@/modules/analysis/dto/distill-book-skill.dto";
+import { BookAnalysisService } from "@/modules/book/book-analysis.service";
 import { AskResearchLibraryDto } from "./dto/ask-research-library.dto";
 import { CompareResearchBooksDto } from "./dto/compare-research-books.dto";
 import { ResearchLibraryService } from "./research-library.service";
@@ -15,7 +10,10 @@ import { ResearchLibraryService } from "./research-library.service";
 @ApiTags("analysis")
 @Controller("analysis/research")
 export class LibraryController {
-  constructor(private readonly researchLibrary: ResearchLibraryService) {}
+  constructor(
+    private readonly researchLibrary: ResearchLibraryService,
+    private readonly bookAnalysis: BookAnalysisService,
+  ) {}
 
   @Get("library")
   @Public()
@@ -46,5 +44,19 @@ export class LibraryController {
   })
   askResearchLibrary(@Body() body: AskResearchLibraryDto): Promise<unknown> {
     return this.researchLibrary.answerQuestion(body);
+  }
+
+  @Post("distill")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Distill a cross-sample SKILL.md from multiple book-analysis jobs",
+  })
+  distillBookSkill(@Body() body: DistillBookSkillDto): Promise<unknown> {
+    return this.bookAnalysis.distillBookSkill({
+      jobIds: body.jobIds,
+      groupBy: body.groupBy,
+      groupValue: body.groupValue,
+    });
   }
 }

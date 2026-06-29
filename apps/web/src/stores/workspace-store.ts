@@ -32,6 +32,13 @@ export interface ProviderForm {
 	jsonMode: boolean;
 }
 
+export interface ProviderConfigHistoryEntry {
+	id: string;
+	createdAt: string;
+	title: string;
+	provider: ProviderForm;
+}
+
 export const defaultProvider: ProviderForm = {
 	preset: "shared-gpu",
 	kind: "openai-compatible",
@@ -41,6 +48,9 @@ export const defaultProvider: ProviderForm = {
 	temperature: 0.2,
 	jsonMode: false,
 };
+
+const PROVIDER_CONFIG_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const PROVIDER_CONFIG_HISTORY_MAX_ENTRIES = 30;
 
 export type ScoreProgressStatus = "pending" | "checking" | "completed" | "failed";
 export type AiSelfTestId =
@@ -726,6 +736,7 @@ export interface WorkspaceStoreState {
 	projects: WorkspaceProject[];
 	activeProjectId: string;
 	provider: ProviderForm;
+	providerConfigHistory: ProviderConfigHistoryEntry[];
 	referenceTitle: string;
 	genre: string;
 	platform: string;
@@ -796,6 +807,7 @@ interface WorkspaceStoreActions {
 	setProjects: StoreSetter<WorkspaceProject[]>;
 	setActiveProjectId: StoreSetter<string>;
 	setProvider: StoreSetter<ProviderForm>;
+	setProviderConfigHistory: StoreSetter<ProviderConfigHistoryEntry[]>;
 	setReferenceTitle: StoreSetter<string>;
 	setGenre: StoreSetter<string>;
 	setPlatform: StoreSetter<string>;
@@ -875,6 +887,7 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	projects: [defaultWorkspaceProject],
 	activeProjectId: defaultWorkspaceProject.id,
 	provider: defaultProvider,
+	providerConfigHistory: [],
 	referenceTitle: "",
 	genre: "xuanhuan",
 	platform: "fanqie",
@@ -985,6 +998,7 @@ const persistableWorkspaceKeys = [
 	"quickReviewGenre",
 	"quickReviewInputKind",
 	"quickReviewPreviousPrompt",
+	"providerConfigHistory",
 	"rubricResult",
 	"scoreResult",
 	"quickReviewResult",
@@ -1023,12 +1037,59 @@ function toPersistedBookJob(job: BookAnalysisJob | null): BookAnalysisJob | null
 	};
 }
 
+function pruneProviderConfigHistory(
+	rawHistory: unknown,
+	now = Date.now(),
+): ProviderConfigHistoryEntry[] {
+	if (!Array.isArray(rawHistory)) {
+		return [];
+	}
+
+	return rawHistory
+		.filter((entry): entry is ProviderConfigHistoryEntry => {
+			if (!entry || typeof entry !== "object") {
+				return false;
+			}
+
+			const typed = entry as {
+				id?: unknown;
+				createdAt?: unknown;
+				title?: unknown;
+				provider?: unknown;
+			};
+			if (
+				typeof typed.id !== "string" ||
+				typeof typed.createdAt !== "string" ||
+				typeof typed.title !== "string" ||
+				typeof typed.provider !== "object" ||
+				typed.provider === null
+			) {
+				return false;
+			}
+
+			const timestamp = Date.parse(typed.createdAt);
+			return (
+				Number.isFinite(timestamp) &&
+				timestamp >= now - PROVIDER_CONFIG_HISTORY_RETENTION_MS
+			);
+		})
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+		.slice(0, PROVIDER_CONFIG_HISTORY_MAX_ENTRIES);
+}
+
 export function partializeWorkspaceState(state: WorkspaceStoreState): PersistedWorkspaceState {
 	return persistableWorkspaceKeys.reduce((result, key) => {
 		if (key === "bookJob") {
 			result.bookJob = toPersistedBookJob(
 				state.bookJob,
 			) as PersistedWorkspaceState["bookJob"];
+			return result;
+		}
+
+		if (key === "providerConfigHistory") {
+			result.providerConfigHistory = pruneProviderConfigHistory(
+				state.providerConfigHistory,
+			) as PersistedWorkspaceState["providerConfigHistory"];
 			return result;
 		}
 
@@ -1062,11 +1123,15 @@ export function mergeWorkspaceState(
 		"doubao",
 		"qwen",
 		"ollama",
+		"new-api",
 	];
 	const safeProvider =
 		persistedProvider && allowedPresets.includes(persistedProvider.preset)
 			? persistedProvider
 			: currentState.provider;
+	const providerConfigHistory = pruneProviderConfigHistory(
+		(persisted as { providerConfigHistory?: unknown }).providerConfigHistory,
+	);
 	const projects =
 		Array.isArray(persisted.projects) && persisted.projects.length
 			? persisted.projects
@@ -1082,6 +1147,7 @@ export function mergeWorkspaceState(
 		...persisted,
 		projects,
 		activeProjectId,
+		providerConfigHistory,
 		provider: safeProvider
 			? {
 					...currentState.provider,
@@ -1109,6 +1175,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setProjects: makeSetter("projects"),
 				setActiveProjectId: makeSetter("activeProjectId"),
 				setProvider: makeSetter("provider"),
+				setProviderConfigHistory: makeSetter("providerConfigHistory"),
 				setReferenceTitle: makeSetter("referenceTitle"),
 				setGenre: makeSetter("genre"),
 				setPlatform: makeSetter("platform"),

@@ -22,6 +22,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 			temperature: 0.2,
 			jsonMode: false,
 		},
+		providerConfigHistory: [],
 		referenceTitle: "",
 		genre: "xuanhuan",
 		platform: "fanqie",

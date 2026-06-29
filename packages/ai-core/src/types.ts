@@ -2,7 +2,14 @@ export type Genre = "xuanhuan" | "urban" | "romance" | "suspense" | "infinite-fl
 
 export type ProviderKind = "mock" | "openai-compatible";
 
-export type ProviderPresetId = "custom" | "shared-gpu" | "deepseek" | "doubao" | "qwen" | "ollama";
+export type ProviderPresetId =
+  | "custom"
+  | "shared-gpu"
+  | "deepseek"
+  | "doubao"
+  | "qwen"
+  | "ollama"
+  | "new-api";
 
 export interface ProviderPreset {
   label: string;

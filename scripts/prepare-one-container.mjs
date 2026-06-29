@@ -10,8 +10,8 @@ const targets = {
 		dir: "apps/web",
 		outDir: "apps/web/.one-container",
 		prepare() {
-			run("pnpm", ["--filter", "web", "build"]);
-			run("pnpm", ["--filter", "web", "deploy", "--prod", "--legacy", this.outDir]);
+			runPnpm(["--filter", "web", "build"]);
+			runPnpm(["--filter", "web", "deploy", "--prod", "--legacy", this.outDir]);
 
 			const standalone = join(root, this.outDir, "standalone");
 			mkdirSync(standalone, { recursive: true });
@@ -24,8 +24,8 @@ const targets = {
 		dir: "services/api",
 		outDir: "services/api/.one-container",
 		prepare() {
-			run("pnpm", ["--filter", "api", "build"]);
-			run("pnpm", ["--filter", "api", "deploy", "--prod", "--legacy", this.outDir]);
+			runPnpm(["--filter", "api", "build"]);
+			runPnpm(["--filter", "api", "deploy", "--prod", "--legacy", this.outDir]);
 			copy("services/api/dist", join(root, this.outDir, "dist"));
 			copy("services/api/drizzle/migrations", join(root, this.outDir, "drizzle/migrations"));
 		},
@@ -50,6 +50,10 @@ function run(command, args) {
 	}
 }
 
+function runPnpm(args) {
+	run("corepack", ["pnpm", ...args]);
+}
+
 function clean(relativePath) {
 	const absolutePath = join(root, relativePath);
 	if (!absolutePath.startsWith(root)) {
@@ -64,14 +68,18 @@ function copy(fromRelativePath, toAbsolutePath) {
 		throw new Error(`Missing build artifact: ${fromRelativePath}`);
 	}
 	mkdirSync(toAbsolutePath, { recursive: true });
-	cpSync(fromAbsolutePath, toAbsolutePath, { recursive: true, force: true });
+	cpSync(fromAbsolutePath, toAbsolutePath, {
+		dereference: true,
+		force: true,
+		recursive: true,
+	});
 }
 
 for (const target of Object.values(targets)) {
 	clean(target.outDir);
 }
 
-run("pnpm", ["--filter", "@ai-novel-diagnosis/ai-core", "build"]);
+runPnpm(["--filter", "@ai-novel-diagnosis/ai-core", "build"]);
 targets.web.prepare();
 targets.api.prepare();
 

@@ -79,12 +79,10 @@ describe("OverviewView", () => {
 		expect(html).toContain("先找出小说为什么没人追。");
 		expect(html).toContain("30 秒小说诊断");
 		expect(html).toContain("诊断闭环");
-		expect(html).toContain("找病因");
+		expect(html).toContain("需要理解流程时再展开看。");
 		expect(html).toContain("本地演示");
-		expect(html).toContain("深度质检进度");
-		expect(html).toContain("不是第一次使用入口");
-		expect(html).toContain("番茄小说");
-		expect(html).toContain("整书拆解");
+		expect(html).toContain("进阶能力");
+		expect(html).toContain("深度质检、整书拆解、样本研究和数据快照。");
 		expect(html).toContain("玄幻 AI 初稿：开局承诺不清");
 	});
 

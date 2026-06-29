@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+﻿import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { ProviderPreset } from "@ai-novel-diagnosis/ai-core";
@@ -15,6 +15,12 @@ export interface ProviderChatOptions {
     name: string;
     schema: Record<string, unknown>;
   };
+  /**
+   * "Test mode" — shorten timeouts and skip the AI Horde polling loop so
+   * /provider/test returns within ~15s even when shared-gpu queue is busy.
+   * Real diagnosis paths leave this undefined.
+   */
+  testMode?: boolean;
 }
 
 interface OpenAICompatibleContentPart {
@@ -152,6 +158,12 @@ const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MAX_ERROR_BODY_LENGTH = 1_000;
 const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 
+// Test-mode budgets: /provider/test must return fast so authors get clear
+// feedback. The shared-gpu path skips the polling loop entirely — submission
+// success is enough to validate the queue accepted our call.
+const TEST_MODE_TIMEOUT_MS = 15_000;
+const TEST_MODE_MAX_OUTPUT_TOKENS = 64;
+
 function providerTimeoutMs() {
   const raw = Number(process.env.PROVIDER_REQUEST_TIMEOUT_MS);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PROVIDER_TIMEOUT_MS;
@@ -196,43 +208,100 @@ function isAllowedLocalOllama(provider: ProviderConfigDto, url: URL) {
 
 @Injectable()
 export class ModelProviderService {
+  private readonly logger = new Logger(ModelProviderService.name);
+
   getPresets() {
     return providerPresets;
   }
 
   async test(provider: ProviderConfigDto) {
+    const startedAt = Date.now();
     const resolved = this.resolve(provider);
-    if (resolved.kind === "mock") {
-      return {
-        ok: true,
-        provider: "mock",
-        preset: provider.preset || "custom",
-        message: "mock provider ready",
-      };
-    }
-
-    const result = await this.chat(
-      resolved,
-      [
-        {
-          role: "system",
-          content: "你是连接测试器。只返回 JSON，不要解释。",
-        },
-        {
-          role: "user",
-          content: '请返回 {"ok":true,"message":"connected"}',
-        },
-      ],
-      { maxOutputTokens: 256 },
+    const presetTag = provider.preset || "custom";
+    const path =
+      resolved.kind === "mock"
+        ? "mock"
+        : this.shouldUseSharedGpuFallback(provider, resolved)
+          ? "shared-gpu-fallback"
+          : "openai-compatible";
+    this.logger.log(
+      {
+        action: "provider.test.start",
+        preset: presetTag,
+        kind: resolved.kind,
+        path,
+      },
+      "/provider/test invoked",
     );
 
-    return {
-      ok: true,
-      provider: resolved.kind,
-      preset: provider.preset || "custom",
-      model: resolved.model,
-      raw: result,
-    };
+    try {
+      if (resolved.kind === "mock") {
+        const result = {
+          ok: true,
+          provider: "mock",
+          preset: presetTag,
+          message: "mock provider ready",
+        };
+        this.logger.log(
+          {
+            action: "provider.test.done",
+            preset: presetTag,
+            path,
+            ok: true,
+            durationMs: Date.now() - startedAt,
+          },
+          "/provider/test ok",
+        );
+        return result;
+      }
+
+      const result = await this.chat(
+        resolved,
+        [
+          {
+            role: "system",
+            content: "你是连接测试器。只返回 JSON，不要解释。",
+          },
+          {
+            role: "user",
+            content: '请返回 {"ok":true,"message":"connected"}',
+          },
+        ],
+        { maxOutputTokens: TEST_MODE_MAX_OUTPUT_TOKENS, testMode: true },
+      );
+
+      this.logger.log(
+        {
+          action: "provider.test.done",
+          preset: presetTag,
+          path,
+          ok: true,
+          durationMs: Date.now() - startedAt,
+          model: resolved.model,
+        },
+        "/provider/test ok",
+      );
+
+      return {
+        ok: true,
+        provider: resolved.kind,
+        preset: presetTag,
+        model: resolved.model,
+        raw: result,
+      };
+    } catch (error) {
+      this.logger.warn(
+        {
+          action: "provider.test.failed",
+          preset: presetTag,
+          path,
+          durationMs: Date.now() - startedAt,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        "/provider/test failed",
+      );
+      throw error;
+    }
   }
 
   async chat(
@@ -312,7 +381,7 @@ export class ModelProviderService {
       );
     }
 
-    const url = `${provider.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const url = `${this.normalizeBaseUrl(provider.baseUrl)}/chat/completions`;
     const body: Record<string, unknown> = {
       model: provider.model,
       messages,
@@ -342,11 +411,15 @@ export class ModelProviderService {
       headers.authorization = `Bearer ${provider.apiKey}`;
     }
 
-    const response = await this.fetchWithTimeout(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const response = await this.fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+      options.testMode ? TEST_MODE_TIMEOUT_MS : undefined,
+    );
 
     if (!response.ok && options.jsonSchema && body.response_format) {
       return this.callOpenAICompatible(provider, messages, {
@@ -624,6 +697,7 @@ export class ModelProviderService {
           slow_workers: true,
         }),
       },
+      options.testMode ? TEST_MODE_TIMEOUT_MS : undefined,
     );
 
     if (!submitResponse.ok) {
@@ -638,6 +712,14 @@ export class ModelProviderService {
       throw new BadRequestException(
         "免费共享算力提交成功，但没有返回任务 ID。",
       );
+    }
+
+    if (options.testMode) {
+      // Test mode validates the endpoint + credentials by confirming the
+      // queue accepted our submission. We deliberately skip the polling
+      // loop so /provider/test can return in ~1-2s instead of waiting
+      // 6-10s for an actual generation that the user doesn't need.
+      return `(test mode) shared-gpu task ${queued.id} submitted ok; real diagnosis calls will wait for the result.`;
     }
 
     for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -692,6 +774,11 @@ export class ModelProviderService {
       .join("\n\n");
   }
 
+  private normalizeBaseUrl(baseUrl: string) {
+    const trimmed = baseUrl.trim().replace(/\/+$/, "");
+    return trimmed.replace(/\/chat\/completions\/?$/i, "");
+  }
+
   private async assertSafeProviderBaseUrl(provider: ProviderConfigDto) {
     if (!provider.baseUrl) {
       return;
@@ -731,9 +818,14 @@ export class ModelProviderService {
     }
   }
 
-  private async fetchWithTimeout(url: string, init: RequestInit) {
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutOverrideMs?: number,
+  ) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), providerTimeoutMs());
+    const timeoutMs = timeoutOverrideMs ?? providerTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, {
         ...init,
@@ -741,9 +833,11 @@ export class ModelProviderService {
       });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new BadRequestException(
-          "Provider request timed out. Retry later, switch to a faster provider, or raise PROVIDER_REQUEST_TIMEOUT_MS.",
-        );
+        const hint =
+          timeoutOverrideMs !== undefined
+            ? `连接测试在 ${Math.round(timeoutMs / 1000)} 秒内无响应：检查 baseUrl 是否能正常访问，或换一个更快的 provider。`
+            : "Provider request timed out. Retry later, switch to a faster provider, or raise PROVIDER_REQUEST_TIMEOUT_MS.";
+        throw new BadRequestException(hint);
       }
       throw error;
     } finally {

@@ -2,7 +2,7 @@
   "name": "ai-novel-diagnosis",
   "private": true,
   "version": "0.0.0",
-  "description": "AI网文诊断台：本地 AI 小说诊断与 AI 拆书工具，找出网文为什么没人追，并生成改稿 Prompt。",
+  "description": "AI-powered webnovel diagnosis and writing assistant.",
   "license": "MIT",
   "author": "myyimu <xiaoke5211@gmail.com>",
   "homepage": "https://github.com/myyimu/ai-novel-diagnosis#readme",
@@ -61,6 +61,8 @@
     "format": "node scripts/run-pnpm.cjs -r --if-present format",
     "typecheck": "node scripts/run-pnpm.cjs -r --if-present typecheck",
     "check": "node scripts/run-pnpm.cjs -r --if-present check",
+    "check:ci-four": "node scripts/check-ci-four.mjs",
+    "skill:foundation:check": "bash scripts/skill-foundation/run-foundation-checks.sh",
     "test": "node scripts/run-pnpm.cjs -r --if-present test",
     "ci": "node scripts/run-pnpm.cjs run check && node scripts/run-pnpm.cjs run test && node scripts/run-pnpm.cjs run build",
     "prepare": "husky",
@@ -79,3 +81,4 @@
     ]
   }
 }
+

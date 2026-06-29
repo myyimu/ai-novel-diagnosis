@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+﻿import { BadRequestException, Injectable } from "@nestjs/common";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
-import { asText, asTextList, clampNumber } from "@/modules/analysis/shared/coercion";
+import {
+  asText,
+  asTextList,
+  clampNumber,
+} from "@/modules/analysis/shared/coercion";
 import { AnalyzeBookDto } from "@/modules/analysis/dto/analyze-book.dto";
 import { PreprocessBookDto } from "@/modules/analysis/dto/preprocess-book.dto";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
@@ -117,6 +121,11 @@ export class BookAnalysisService {
         title: input.title,
         genre: input.genre,
         textLength: input.text.length,
+        ...(input.author ? { author: input.author } : {}),
+        ...(input.platform ? { platform: input.platform } : {}),
+        ...(input.publishedYear !== undefined
+          ? { publishedYear: input.publishedYear }
+          : {}),
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);
@@ -265,6 +274,7 @@ export class BookAnalysisService {
   async uploadBookFile(input: {
     title?: string;
     genre: string;
+    encoding?: string;
     file: UploadedTxtFile;
   }) {
     const upload = await this.bookUploads.createUpload(input);
@@ -302,7 +312,60 @@ export class BookAnalysisService {
       );
     }
 
-    return this.bookExports.export(job.result, format, mode);
+    return this.bookExports.export(
+      job.result,
+      format,
+      mode,
+      this.extractJobMetadata(job),
+    );
+  }
+
+  /**
+   * Distill a cross-sample SKILL.md from multiple succeeded book-analysis jobs.
+   * The caller picks groupBy + groupValue; metadata for each source is read
+   * from each job's inputSummary so the aggregator can cite provenance.
+   */
+  async distillBookSkill(input: {
+    jobIds: string[];
+    groupBy: "author" | "genre" | "platform";
+    groupValue: string;
+  }) {
+    if (!input.jobIds.length) {
+      throw new BadRequestException(
+        "distillBookSkill requires at least one jobId.",
+      );
+    }
+
+    const jobs = await Promise.all(
+      input.jobIds.map((jobId) =>
+        this.readBookAnalysisJobWithDerivedResult(jobId, {
+          includeResult: true,
+        }),
+      ),
+    );
+
+    for (const job of jobs) {
+      if (!job.result) {
+        throw new BadRequestException(
+          `Job ${job.id} does not have exportable assets yet.`,
+        );
+      }
+    }
+
+    const generatedAt = new Date().toISOString();
+    const sources = jobs.map((job) =>
+      this.bookExports.buildSkillSource(job.result, {
+        jobId: job.id,
+        generatedAt,
+        metadata: this.extractJobMetadata(job),
+      }),
+    );
+
+    return this.bookExports.distillSkill(sources, {
+      groupBy: input.groupBy,
+      groupValue: input.groupValue,
+      generatedAt,
+    });
   }
 
   private async readBookAnalysisJobWithDerivedResult(
@@ -325,9 +388,28 @@ export class BookAnalysisService {
     };
   }
 
+  private extractJobMetadata(job: BookAnalysisJobSnapshot): {
+    author?: string;
+    platform?: string;
+    publishedYear?: number;
+  } {
+    return {
+      ...(job.inputSummary.author ? { author: job.inputSummary.author } : {}),
+      ...(job.inputSummary.platform
+        ? { platform: job.inputSummary.platform }
+        : {}),
+      ...(job.inputSummary.publishedYear !== undefined
+        ? { publishedYear: job.inputSummary.publishedYear }
+        : {}),
+    };
+  }
+
   async createBookAnalysisJobFromUpload(input: {
     uploadId: string;
     provider: ProviderConfigDto;
+    author?: string;
+    platform?: string;
+    publishedYear?: number;
   }) {
     const upload = await this.bookUploads.getUpload(input.uploadId);
     const text = await this.bookUploads.readNormalizedText(input.uploadId);
@@ -343,6 +425,11 @@ export class BookAnalysisService {
         title: upload.title,
         genre: upload.genre,
         textLength: text.length,
+        ...(input.author ? { author: input.author } : {}),
+        ...(input.platform ? { platform: input.platform } : {}),
+        ...(input.publishedYear !== undefined
+          ? { publishedYear: input.publishedYear }
+          : {}),
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);
@@ -1634,11 +1721,7 @@ export class BookAnalysisService {
       const [left, right] = [source, target].sort();
       const key = `${left}--${right}`;
       const relation = this.mergeReducerList(
-        [
-          ...asTextList(item.relation),
-          asText(item.label),
-          asText(item.type),
-        ],
+        [...asTextList(item.relation), asText(item.label), asText(item.type)],
         8,
       );
       const existing = edgeMap.get(key);
@@ -1668,8 +1751,7 @@ export class BookAnalysisService {
       edgeMap.set(key, {
         source: existing?.source || source,
         target: existing?.target || target,
-        label:
-          relation[0] || existing?.label || asText(item.label) || "关系",
+        label: relation[0] || existing?.label || asText(item.label) || "关系",
         tension:
           asText(item.tension) ||
           existing?.tension ||
@@ -1803,8 +1885,7 @@ export class BookAnalysisService {
             (
               relationships.edges.reduce(
                 (sum, edge) =>
-                  sum +
-                  clampNumber(Number(edge.confidence ?? 0.7), 0, 1, 0.7),
+                  sum + clampNumber(Number(edge.confidence ?? 0.7), 0, 1, 0.7),
                 0,
               ) / edgeCount
             ).toFixed(2),
@@ -1896,9 +1977,7 @@ export class BookAnalysisService {
     const fallback = options?.fallback;
     const evidenceSnippets = this.mergeReducerList(
       asTextList(raw.evidenceSnippets)
-        .concat(
-          (raw.sourceAnchors || []).map((item) => asText(item?.quote)),
-        )
+        .concat((raw.sourceAnchors || []).map((item) => asText(item?.quote)))
         .concat(fallback?.evidenceSnippets || []),
       3,
     );
@@ -2152,7 +2231,12 @@ export class BookAnalysisService {
       { maxOutputTokens: 3072 },
     );
 
-    return parseJsonWithRepair(this.modelProviders, input.provider, content, "整书汇总");
+    return parseJsonWithRepair(
+      this.modelProviders,
+      input.provider,
+      content,
+      "整书汇总",
+    );
   }
 
   private bookChapterOutlinePrompt(

@@ -32,9 +32,12 @@ describe("BookAnalysisJobService", () => {
   }
 
   it("omits heavy chapter map payloads from job snapshots", () => {
-    const service = new BookAnalysisJobService({
-      markInterruptedJobsFailed: jest.fn(),
-    } as never, mockConfigService as never);
+    const service = new BookAnalysisJobService(
+      {
+        markInterruptedJobsFailed: jest.fn(),
+      } as never,
+      mockConfigService as never,
+    );
 
     const snapshot = (
       service as unknown as {
@@ -83,7 +86,10 @@ describe("BookAnalysisJobService", () => {
 
   it("deletes completed persisted jobs", async () => {
     const repository = createRepositoryMock();
-    const service = new BookAnalysisJobService(repository as never, mockConfigService as never);
+    const service = new BookAnalysisJobService(
+      repository as never,
+      mockConfigService as never,
+    );
 
     await expect(service.delete("job-1")).resolves.toEqual({
       deleted: true,
@@ -113,7 +119,10 @@ describe("BookAnalysisJobService", () => {
         },
       })),
     });
-    const service = new BookAnalysisJobService(repository as never, mockConfigService as never);
+    const service = new BookAnalysisJobService(
+      repository as never,
+      mockConfigService as never,
+    );
 
     await expect(service.delete("job-1")).rejects.toThrow(
       "Running book analysis jobs cannot be deleted.",

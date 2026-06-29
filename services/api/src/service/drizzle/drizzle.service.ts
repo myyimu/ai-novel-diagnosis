@@ -13,8 +13,39 @@ import {
   type NodePgDatabase,
 } from "drizzle-orm/node-postgres";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import * as schema from "./schema";
+
+const DEFAULT_DATABASE_CONNECT_TIMEOUT_MS = 5_000;
+
+function getDatabaseConnectTimeoutMs() {
+  const raw = Number(process.env.DATABASE_CONNECT_TIMEOUT_MS);
+  if (Number.isFinite(raw) && raw > 0) {
+    return raw;
+  }
+  return DEFAULT_DATABASE_CONNECT_TIMEOUT_MS;
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("Database operation timed out"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
 
 /**
  * DrizzleService picks a driver based on DATABASE_URL.
@@ -39,7 +70,10 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     const url = process.env.DATABASE_URL?.trim();
     if (url) {
       this.mode = "postgres";
-      this.pool = new Pool({ connectionString: url });
+      this.pool = new Pool({
+        connectionString: url,
+        connectionTimeoutMillis: getDatabaseConnectTimeoutMs(),
+      });
       this.db = drizzleNodePg(this.pool, { schema });
     } else {
       this.mode = "pglite";
@@ -74,7 +108,10 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     try {
-      const client = await this.pool!.connect();
+      const client: PoolClient = await withTimeout(
+        this.pool!.connect(),
+        getDatabaseConnectTimeoutMs(),
+      );
       client.release();
       await this.applyDatabaseCompatibilityMigrations();
       this.logger.log("Database connection established");
@@ -99,7 +136,10 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   async isHealthy(): Promise<boolean> {
     if (this.mode === "pglite") return true;
     try {
-      const client = await this.pool!.connect();
+      const client: PoolClient = await withTimeout(
+        this.pool!.connect(),
+        getDatabaseConnectTimeoutMs(),
+      );
       client.release();
       return true;
     } catch {
@@ -225,6 +265,31 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         "usage_count" integer NOT NULL
       )
     `);
+    await this.db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "model_usage_events" (
+        "id" text PRIMARY KEY,
+        "job_id" text,
+        "stage" varchar(64),
+        "component" varchar(64),
+        "request_kind" varchar(64),
+        "provider" varchar(64) NOT NULL,
+        "preset" varchar(64) NOT NULL,
+        "model" varchar(128) NOT NULL,
+        "prompt_tokens" integer NOT NULL,
+        "completion_tokens" integer NOT NULL,
+        "total_tokens" integer NOT NULL,
+        "request_ms" integer NOT NULL,
+        "estimated" boolean NOT NULL,
+        "success" boolean NOT NULL,
+        "error" text,
+        "metadata" jsonb NOT NULL,
+        "created_at" timestamp(3) DEFAULT now() NOT NULL
+      )
+    `);
+    await this.db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "model_usage_events_job_id_idx"
+      ON "model_usage_events" ("job_id")
+    `);
     await this.applyDatabaseCompatibilityMigrations();
   }
 
@@ -292,6 +357,100 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         ADD COLUMN IF NOT EXISTS "revision_note_updated_at" timestamp(3)
       `);
     }
+
+    if (tables.has("model_usage_events")) {
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "job_id" text
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "stage" varchar(64)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "component" varchar(64)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "request_kind" varchar(64)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "provider" varchar(64)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "preset" varchar(64)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "model" varchar(128)
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "prompt_tokens" integer
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "completion_tokens" integer
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "total_tokens" integer
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "request_ms" integer
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "estimated" boolean
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "success" boolean
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "error" text
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "metadata" jsonb
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "model_usage_events"
+        ADD COLUMN IF NOT EXISTS "created_at" timestamp(3) DEFAULT now() NOT NULL
+      `);
+    } else {
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "model_usage_events" (
+          "id" text PRIMARY KEY,
+          "job_id" text,
+          "stage" varchar(64),
+          "component" varchar(64),
+          "request_kind" varchar(64),
+          "provider" varchar(64) NOT NULL,
+          "preset" varchar(64) NOT NULL,
+          "model" varchar(128) NOT NULL,
+          "prompt_tokens" integer NOT NULL,
+          "completion_tokens" integer NOT NULL,
+          "total_tokens" integer NOT NULL,
+          "request_ms" integer NOT NULL,
+          "estimated" boolean NOT NULL,
+          "success" boolean NOT NULL,
+          "error" text,
+          "metadata" jsonb NOT NULL,
+          "created_at" timestamp(3) DEFAULT now() NOT NULL
+        )
+      `);
+    }
+
+    await this.db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "model_usage_events_job_id_idx"
+      ON "model_usage_events" ("job_id")
+    `);
   }
 
   private async getExistingTables(): Promise<Set<string>> {

@@ -63,8 +63,8 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("生成改稿方案");
 		expect(html).toContain("玄幻 AI 初稿：开局承诺不清");
 		expect(html).toContain("都市 AI 初稿：Prompt 约束太泛");
-		expect(html).toContain("示例会展示：市场承诺");
-		expect(html).toContain("下一步：把开局承诺改成具体的羞辱、代价和反击目标");
+		expect(html).toContain("当前 16 字，还差 34 字");
+		expect(html).toContain("可选：指定题材、稿件来源和上一条 Prompt");
 	});
 
 	it("renders quick review result when provided", () => {

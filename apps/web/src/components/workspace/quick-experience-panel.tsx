@@ -226,10 +226,10 @@ export function QuickExperiencePanel({
 				</div>
 				<div className="flex flex-col gap-2 rounded-md border border-border bg-background p-4">
 					<Button
-					className="w-full"
-					onClick={onRun}
-					disabled={loading || isChapterTooShort}
-				>
+						className="w-full"
+						onClick={onRun}
+						disabled={loading || isChapterTooShort}
+					>
 						{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 						生成改稿方案
 					</Button>
@@ -243,12 +243,7 @@ export function QuickExperiencePanel({
 							重新分析
 						</Button>
 					) : null}
-					<Button
-						className="w-full"
-						variant="ghost"
-						size="sm"
-						onClick={onOpenModel}
-					>
+					<Button className="w-full" variant="ghost" size="sm" onClick={onOpenModel}>
 						选择模型
 					</Button>
 					{hasCachedResult ? (
@@ -299,9 +294,7 @@ export function QuickExperiencePanel({
 						<TriangleAlert className="mt-0.5 size-5 shrink-0" />
 						<div className="min-w-0 flex-1">
 							<p className="text-sm font-semibold">诊断未完成</p>
-							<p className="mt-1 text-sm leading-6 break-words">
-								{quickReviewError}
-							</p>
+							<p className="mt-1 text-sm leading-6 break-words">{quickReviewError}</p>
 							<div className="mt-3 flex flex-wrap gap-2">
 								<Button size="sm" onClick={onRun} disabled={loading}>
 									重试

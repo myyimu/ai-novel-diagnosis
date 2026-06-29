@@ -356,7 +356,12 @@ export class AnalysisService {
     });
 
     return this.normalizeQuickReviewResult(
-      await parseJsonWithRepair(this.modelProviders, provider, content, "章节急诊"),
+      await parseJsonWithRepair(
+        this.modelProviders,
+        provider,
+        content,
+        "章节急诊",
+      ),
       input,
     );
   }
@@ -540,11 +545,9 @@ export class AnalysisService {
       confidence: clampNumber(source.confidence, 0, 1, 0.5),
       gateDecision,
       gateReason:
-        asText(source.gateReason) ||
-        this.buildGateReason(gateDecision, issues),
+        asText(source.gateReason) || this.buildGateReason(gateDecision, issues),
       oneLineDiagnosis:
-        asText(source.oneLineDiagnosis) ||
-        `这稿最该先解决：${mainProblem}`,
+        asText(source.oneLineDiagnosis) || `这稿最该先解决：${mainProblem}`,
       issues,
       strengths: this.normalizeStrengths(source.strengths),
       revisionPlan: this.normalizeRevisionPlan(source.revisionPlan, issues),
@@ -663,8 +666,7 @@ export class AnalysisService {
         asText(source.readerImpact) ||
         "读者可能无法形成明确期待，继续阅读动力会下降。",
       fixAction:
-        asText(source.fixAction) ||
-        "先围绕这个问题做局部改写，不要整章重写。",
+        asText(source.fixAction) || "先围绕这个问题做局部改写，不要整章重写。",
       promptConstraint:
         asText(source.promptConstraint) ||
         "下一轮 Prompt 必须明确要求解决这个问题。",
@@ -777,8 +779,7 @@ export class AnalysisService {
           {
             title,
             ...(evidence ? { evidence } : {}),
-            keepAction:
-              asText(source.keepAction) || "下一版保留这个已有优势。",
+            keepAction: asText(source.keepAction) || "下一版保留这个已有优势。",
           },
         ];
       })
@@ -793,10 +794,7 @@ export class AnalysisService {
       value && typeof value === "object"
         ? (value as Record<string, unknown>)
         : {};
-    const priorityIssueIds = asTextList(source.priorityIssueIds).slice(
-      0,
-      3,
-    );
+    const priorityIssueIds = asTextList(source.priorityIssueIds).slice(0, 3);
     const change = asTextList(source.change).slice(0, 4);
     const checkpoints = asTextList(source.checkpoints).slice(0, 4);
     return {
@@ -829,13 +827,8 @@ export class AnalysisService {
         : {};
     return {
       originalPrompt:
-        asText(source.originalPrompt) ||
-        previousPrompt?.trim() ||
-        undefined,
-      missingConstraints: asTextList(source.missingConstraints).slice(
-        0,
-        4,
-      ),
+        asText(source.originalPrompt) || previousPrompt?.trim() || undefined,
+      missingConstraints: asTextList(source.missingConstraints).slice(0, 4),
       vagueInstructions: asTextList(source.vagueInstructions).slice(0, 4),
       improvedPromptPrinciples: asTextList(
         source.improvedPromptPrinciples,
@@ -958,9 +951,7 @@ export class AnalysisService {
     const title = asText(source.title);
     if (!title) return null;
     const sourceIssueId =
-      asText(source.sourceIssueId) ||
-      issues[0]?.id ||
-      `issue-${index + 1}`;
+      asText(source.sourceIssueId) || issues[0]?.id || `issue-${index + 1}`;
     return {
       id: asText(source.id) || `method-${index + 1}`,
       sourceIssueId,
@@ -1049,17 +1040,14 @@ export class AnalysisService {
       label: asText(source.label) || recommendedPlatformLabels[id],
       fit: this.normalizeRecommendedFit(source.fit),
       reason:
-        asText(source.reason) ||
-        "题材和节奏与该平台当前常见消费方式更匹配。",
+        asText(source.reason) || "题材和节奏与该平台当前常见消费方式更匹配。",
     };
   }
 
   private normalizeRecommendedPlatformId(
     value: unknown,
   ): RecommendedPlatformId | null {
-    const platformId = asText(
-      value,
-    ).toLowerCase() as RecommendedPlatformId;
+    const platformId = asText(value).toLowerCase() as RecommendedPlatformId;
     if (
       [
         "qidian",
@@ -1424,7 +1412,12 @@ export class AnalysisService {
       },
     );
 
-    return parseJsonWithRepair(this.modelProviders, input.provider, content, "章节评分");
+    return parseJsonWithRepair(
+      this.modelProviders,
+      input.provider,
+      content,
+      "章节评分",
+    );
   }
 
   private buildRubricPrompt(input: BuildRubricDto): string {
