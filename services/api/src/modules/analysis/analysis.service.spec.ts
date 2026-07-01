@@ -43,6 +43,26 @@ const scoreResultJson = JSON.stringify({
   ],
   strongestPoint: "冲突关系明确",
   weakestPoint: "失败代价还不够具体",
+  issues: [
+    {
+      id: "score-issue-1",
+      severity: "high",
+      category: "conflict_pressure",
+      title: "失败代价还不够具体",
+      description: "考场重逢有压迫感，但主角若失败会失去什么还需要更早落地。",
+      evidence: [
+        {
+          quote: "否则家族会被剥夺试炼资格",
+          locationHint: "中段",
+          confidence: 0.8,
+        },
+      ],
+      readerImpact: "读者会知道有危机，但还没感到主角必须立刻反击。",
+      fixAction: "把家族损失前置，并写成当场发生的具体剥夺。",
+      promptConstraint: "改稿时前500字必须写清失败代价和阻碍者。",
+      blocksNextStep: true,
+    },
+  ],
   styleFit: {
     score: 7,
     platformRisk: "开头解释略多",
@@ -179,6 +199,9 @@ describe("AnalysisService", () => {
 
     await service.quickReview({
       provider,
+      coreSellingPoint: "隐世强者拒绝权力，用不争制造反差爽感。",
+      mustKeepMechanisms: "倒计时、拒绝邀请、论坛体。",
+      targetReaderPleasures: "读者想看别人误判主角和权力系统被带偏。",
       chapterText:
         "The protagonist is humiliated in public, then finds an old clue from a family case and accepts a dangerous trial on the spot.",
     });
@@ -200,6 +223,16 @@ describe("AnalysisService", () => {
     expect(messages[1].content).toContain("严格返回这个 JSON 结构");
     expect(messages[1].content).toContain("gateDecision");
     expect(messages[1].content).toContain("issues");
+    expect(messages[1].content).toContain("用户声明的核心卖点");
+    expect(messages[1].content).toContain("隐世强者拒绝权力");
+    expect(messages[1].content).toContain("吸纳的网文工艺诊断标准");
+    expect(messages[1].content).toContain("最小剧情循环");
+    expect(messages[1].content).toContain("学结构，不搬内容");
+    expect(messages[1].content).toContain("诊断前先执行“一刀切误判防护层”");
+    expect(messages[1].content).toContain("先判断机制是否成立");
+    expect(messages[1].content).toContain(
+      "不能把特殊机制一刀切归因为 AI 痕迹或结构缺陷",
+    );
   });
 
   it("should keep mock quick review local without calling the provider", async () => {
@@ -285,6 +318,12 @@ describe("AnalysisService", () => {
     const result = await service.scoreChapter(scoreInput);
 
     expect(result.totalScore).toBe(7.1);
+    expect(result.issues?.[0]).toMatchObject({
+      category: "conflict_pressure",
+      evidence: expect.arrayContaining([
+        expect.objectContaining({ quote: expect.stringContaining("试炼资格") }),
+      ]),
+    });
     expect(modelProviders.chat).toHaveBeenCalledWith(
       scoreInput.provider,
       expect.any(Array),
@@ -304,6 +343,11 @@ describe("AnalysisService", () => {
     expect(messages[1].content).toContain("评分指标：");
     expect(messages[1].content).toContain("opening-promise / 开局承诺强度");
     expect(messages[1].content).toContain("补充上下文与严格输出要求");
+    expect(messages[1].content).toContain("吸纳的网文工艺诊断标准");
+    expect(messages[1].content).toContain("钩子与回收");
+    expect(messages[1].content).toContain("学结构，不搬内容");
+    expect(messages[1].content).toContain('"issues"');
+    expect(messages[1].content).toContain("issues 必须输出 1-5 条");
     expect(messages[1].content).toContain("严格返回这个 JSON 结构");
   });
 

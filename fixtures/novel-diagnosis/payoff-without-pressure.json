@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "payoff-without-pressure",
+  "title": "爽点问题：没有压迫就直接反杀",
+  "genre": "urban",
+  "inputKind": "ai-draft",
+  "chapterTitle": "第一章 他一眼看穿",
+  "chapterText": "宴会厅里，林砚刚进门，几个富二代就围了上来。\n\n王少笑着说他穿得寒酸，不该出现在这里。林砚没有生气，只是随手拿起桌上的合同，看了一眼就指出金额少写了一个零。\n\n全场瞬间安静。王少脸色大变，负责人连忙鞠躬道歉，众人纷纷震惊，觉得林砚深不可测。\n\n林砚把合同放回桌上，淡淡说道：“这种小把戏，骗不了我。”",
+  "previousPrompt": "写一个都市隐藏大佬打脸富二代的开局，要爽。",
+  "expected": {
+    "gateDecision": "revise",
+    "topIssueCategory": "payoff",
+    "scoreRange": [5.0, 6.0],
+    "mustContainEvidence": ["看了一眼就指出金额少写了一个零"],
+    "actionKeywords": ["损失", "赔偿", "反应层"],
+    "nextAction": "补足爽点前的压迫、失败代价和反应层",
+    "storyCraftSignals": ["爽点", "压迫", "代价"]
+  },
+  "result": {
+    "title": "第一章 他一眼看穿",
+    "genre": "urban",
+    "inputKind": "ai-draft",
+    "positioning": "都市隐藏大佬打脸开局",
+    "sellingPoints": ["身份反差", "公开打脸", "商业识破"],
+    "mainProblem": "爽点释放太快，缺少压迫、代价和反应层铺垫。",
+    "actionableFixes": ["先让羞辱造成具体损失", "让合同错误威胁到女主或项目", "延长质疑到震惊的反应层"],
+    "recommendedPlatforms": [
+      {
+        "id": "fanqie",
+        "label": "番茄",
+        "fit": "优先发布",
+        "reason": "都市打脸适配，但需要更强情绪债。"
+      }
+    ],
+    "readyForFullReview": true,
+    "readyReason": "题材方向可用，爽点结构需要补强。",
+    "quickScore": 5.6,
+    "confidence": 0.8,
+    "gateDecision": "revise",
+    "gateReason": "爽点有雏形，但读者还没被压住就已经看到主角赢。",
+    "oneLineDiagnosis": "这章直接给主角赢，少了让读者想看他赢的情绪债。",
+    "issues": [
+      {
+        "id": "issue-payoff-1",
+        "severity": "high",
+        "category": "payoff",
+        "title": "爽点没有经过压迫和代价",
+        "description": "打脸结果出现得太快，主角几乎没有承受损失，也没有让对手的压迫升级。",
+        "evidence": [
+          {
+            "quote": "林砚没有生气，只是随手拿起桌上的合同，看了一眼就指出金额少写了一个零。",
+            "locationHint": "第2段",
+            "confidence": 0.86
+          }
+        ],
+        "readerImpact": "读者还没积累愤怒或期待，反杀就已经结束，爽点会显得轻飘。",
+        "fixAction": "先让王少用合同逼林砚背锅或让重要项目受损，再让林砚用证据反击。",
+        "promptConstraint": "爽点必须按压迫、失败代价、反击证据、围观反应、余波升级五步写。",
+        "blocksNextStep": true
+      }
+    ],
+    "strengths": [
+      {
+        "title": "隐藏大佬反差可用",
+        "evidence": "寒酸外表和识破合同形成反差。",
+        "keepAction": "保留合同识破，但把它放到更强压迫之后。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-payoff-1"],
+      "keep": ["宴会厅", "合同错误", "隐藏能力"],
+      "change": ["反击太快", "围观震惊太泛"],
+      "avoid": ["随手看一眼就解决", "所有人同时震惊"],
+      "checkpoints": ["反击前是否有具体损失？", "反击后是否有余波升级？"]
+    },
+    "promptDiagnosis": {
+      "originalPrompt": "写一个都市隐藏大佬打脸富二代的开局，要爽。",
+      "missingConstraints": ["没有定义爽点循环", "没有要求失败代价"],
+      "vagueInstructions": ["要爽"],
+      "improvedPromptPrinciples": ["先定义读者为什么想看主角赢，再写赢。"]
+    },
+    "nextPrompt": {
+      "title": "补强都市打脸爽点循环",
+      "prompt": "请重写宴会厅打脸段。保留林砚识破合同错误，但反击前必须先写王少用合同逼林砚承担赔偿、女主项目即将被取消、旁人跟着踩一脚。反击时林砚拿出合同编号和到账记录，不要只写“看一眼”。反击后分三层写反应：王少失控、负责人改口、女主重新评价，并在章末引出合同背后的更大操盘人。",
+      "linkedIssueIds": ["issue-payoff-1"],
+      "whyThisWorks": ["补出压迫和代价", "让爽点有反应层", "用余波立下一章期待"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-payoff-loop",
+        "sourceIssueId": "issue-payoff-1",
+        "type": "payoff_rule",
+        "title": "爽点不能直接给结果",
+        "triggerProblem": "主角没被压迫就直接赢。",
+        "reusableRule": "打脸爽点至少要有压迫、代价、反击证据、反应层和余波升级。",
+        "selfCheckQuestion": "读者在主角反击前，是否已经明确希望他赢？",
+        "promptTemplate": "请按压迫、代价、反击证据、反应层、余波升级五步重写爽点。"
+      }
+    ]
+  }
+}

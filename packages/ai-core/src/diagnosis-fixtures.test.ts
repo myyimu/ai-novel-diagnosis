@@ -31,6 +31,7 @@ interface DiagnosisFixture {
     mustContainEvidence: string[];
     actionKeywords: string[];
     nextAction: string;
+    storyCraftSignals?: string[];
   };
   result: QuickReviewResult;
 }
@@ -117,6 +118,22 @@ describe("novel diagnosis golden fixtures", () => {
       ].join("\n");
       for (const keyword of fixture.expected.actionKeywords) {
         expect(actionText).toContain(keyword);
+      }
+      if (fixture.expected.storyCraftSignals?.length) {
+        const issueText = (fixture.result.issues ?? [])
+          .map((issue) =>
+            [
+              issue.title,
+              issue.description,
+              issue.readerImpact,
+              issue.fixAction,
+              issue.promptConstraint,
+            ].join("\n"),
+          )
+          .join("\n");
+        for (const signal of fixture.expected.storyCraftSignals) {
+          expect(issueText).toContain(signal);
+        }
       }
       for (const issueId of fixture.result.nextPrompt?.linkedIssueIds ?? []) {
         expect(issueIds.has(issueId)).toBe(true);

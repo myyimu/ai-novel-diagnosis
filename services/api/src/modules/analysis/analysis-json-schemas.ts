@@ -302,6 +302,7 @@ export const scoreJsonSchema = objectSchema({
   scores: arraySchema(scoreItemSchema),
   strongestPoint: stringSchema,
   weakestPoint: stringSchema,
+  issues: arraySchema(diagnosisIssueSchema),
   styleFit: objectSchema({
     score: numberSchema,
     platformRisk: stringSchema,

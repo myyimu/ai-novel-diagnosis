@@ -1,4 +1,5 @@
 import type { RubricMetric } from "./types";
+import { STORY_CRAFT_RUBRIC_METRICS } from "./story-craft";
 
 export const DEFAULT_RUBRIC_METRICS: RubricMetric[] = [
   {
@@ -41,4 +42,5 @@ export const DEFAULT_RUBRIC_METRICS: RubricMetric[] = [
       high: "结尾制造明确升级，读者想立刻进入下一章。",
     },
   },
+  ...STORY_CRAFT_RUBRIC_METRICS,
 ];

@@ -4,6 +4,10 @@
   "fixtures": [
     "xuanhuan-ai-draft-opening-promise.json",
     "urban-prompt-too-vague.json",
-    "romance-setting-load.json"
+    "romance-setting-load.json",
+    "ai-flavor-summary-ending.json",
+    "payoff-without-pressure.json",
+    "hook-no-recovery.json",
+    "dialogue-exposition-load.json"
   ]
 }

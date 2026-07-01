@@ -139,6 +139,7 @@ export interface ScoreResult {
   }>;
   strongestPoint: string;
   weakestPoint: string;
+  issues?: DiagnosisIssue[];
   styleFit?: {
     score: number;
     platformRisk: string;

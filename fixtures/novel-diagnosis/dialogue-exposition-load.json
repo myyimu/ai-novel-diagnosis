@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "dialogue-exposition-load",
+  "title": "对话问题：角色像说明书",
+  "genre": "romance",
+  "inputKind": "ai-draft",
+  "chapterTitle": "第一章 婚约规则",
+  "chapterText": "咖啡馆里，沈若坐在靠窗的位置。\n\n陆辞把一份协议推到她面前，说：“根据我们两家二十年前签订的婚约，你必须在本月十五日前与我完成订婚仪式，否则沈氏集团将失去陆家提供的三千万周转资金。你目前的家庭状况是父亲病重、公司现金流断裂、继母试图夺权，所以你没有拒绝我的资格。”\n\n沈若点头，说：“我明白你的意思。也就是说，我现在处在经济、亲情和公司治理三重压力之下，而你掌握关键资源。”\n\n陆辞说：“正是如此。”",
+  "previousPrompt": "写一个豪门婚约开局，要把背景讲清楚。",
+  "expected": {
+    "gateDecision": "revise",
+    "topIssueCategory": "setting_load",
+    "scoreRange": [4.8, 5.8],
+    "mustContainEvidence": ["你目前的家庭状况是父亲病重"],
+    "actionKeywords": ["动作", "试探", "威胁"],
+    "nextAction": "把设定说明拆成动作、文件细节和潜台词对抗",
+    "storyCraftSignals": ["对话", "说明书", "潜台词"]
+  },
+  "result": {
+    "title": "第一章 婚约规则",
+    "genre": "romance",
+    "inputKind": "ai-draft",
+    "positioning": "豪门婚约关系压迫开局",
+    "sellingPoints": ["协议婚约", "资金胁迫", "关系拉扯"],
+    "mainProblem": "关键信息全靠人物台词说明，对话缺少潜台词和关系压迫。",
+    "actionableFixes": ["把背景拆进协议条款和动作", "让陆辞用半句话压迫而不是完整科普", "让沈若通过反问或沉默暴露处境"],
+    "recommendedPlatforms": [
+      {
+        "id": "jinjiang",
+        "label": "晋江",
+        "fit": "可作为第二选择",
+        "reason": "关系张力题材匹配，但对话需要更自然。"
+      }
+    ],
+    "readyForFullReview": true,
+    "readyReason": "设定清楚但表达方式需要重写。",
+    "quickScore": 5.2,
+    "confidence": 0.83,
+    "gateDecision": "revise",
+    "gateReason": "冲突基础成立，但对话像人物在替作者讲设定。",
+    "oneLineDiagnosis": "这章不是信息不够，而是信息进入正文的方式太硬。",
+    "issues": [
+      {
+        "id": "issue-dialogue-load-1",
+        "severity": "high",
+        "category": "setting_load",
+        "title": "对话承担了说明书功能",
+        "description": "陆辞和沈若的台词直接罗列背景、金额、家庭状况和压力类型，没有潜台词和角色拉扯。",
+        "evidence": [
+          {
+            "quote": "你目前的家庭状况是父亲病重、公司现金流断裂、继母试图夺权，所以你没有拒绝我的资格。",
+            "locationHint": "第2段",
+            "confidence": 0.9
+          },
+          {
+            "quote": "我现在处在经济、亲情和公司治理三重压力之下，而你掌握关键资源。",
+            "locationHint": "第3段",
+            "confidence": 0.88
+          }
+        ],
+        "readerImpact": "读者会感觉角色在背设定，关系压迫被解释掉，情绪进入不了场景。",
+        "fixAction": "用协议金额、医院催款短信、沈若按住签字笔等动作承载背景，让台词只保留压迫和试探。",
+        "promptConstraint": "对话不能完整解释人物处境；每句台词必须带立场、试探、威胁或遮掩。",
+        "blocksNextStep": true
+      }
+    ],
+    "strengths": [
+      {
+        "title": "关系压力清楚",
+        "evidence": "婚约、资金和父亲病重能形成女主困境。",
+        "keepAction": "保留压力结构，换成更自然的呈现方式。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-dialogue-load-1"],
+      "keep": ["婚约协议", "三千万周转资金", "父亲病重"],
+      "change": ["科普式台词", "自我总结式回应"],
+      "avoid": ["也就是说", "正是如此", "三重压力"],
+      "checkpoints": ["遮掉人名后，两个人的台词是否仍有不同立场？"]
+    },
+    "promptDiagnosis": {
+      "originalPrompt": "写一个豪门婚约开局，要把背景讲清楚。",
+      "missingConstraints": ["没有要求潜台词", "没有限制设定解释"],
+      "vagueInstructions": ["背景讲清楚"],
+      "improvedPromptPrinciples": ["背景清楚不等于角色把背景讲出来。"]
+    },
+    "nextPrompt": {
+      "title": "把说明书对话改成关系拉扯",
+      "prompt": "请重写咖啡馆对话。保留婚约协议、三千万周转资金、父亲病重和继母夺权，但不要让角色完整解释背景。用协议第一页的违约条款、医院催款短信、沈若攥紧签字笔、陆辞只点出“十五号前签”来呈现压力。陆辞台词要短，带威胁和试探；沈若不要总结处境，用反问或沉默反击。",
+      "linkedIssueIds": ["issue-dialogue-load-1"],
+      "whyThisWorks": ["把信息放回场景", "让对话有潜台词", "保留关系压迫"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-dialogue-control",
+        "sourceIssueId": "issue-dialogue-load-1",
+        "type": "anti_pattern",
+        "title": "对话不能替作者讲设定",
+        "triggerProblem": "人物台词直接罗列背景。",
+        "reusableRule": "设定通过文件、动作、短信、物件和选择进入；对话只承担立场、试探、威胁和遮掩。",
+        "selfCheckQuestion": "这句台词如果删掉，是否只是少了一段设定说明，而不是少了角色关系？",
+        "promptTemplate": "把背景拆进动作和道具，台词只写立场、潜台词和关系压力。"
+      }
+    ]
+  }
+}

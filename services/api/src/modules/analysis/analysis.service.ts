@@ -16,6 +16,7 @@ import {
   buildChapterTriagePrompt,
   createPreviewReport,
   DEFAULT_RUBRIC_METRICS,
+  formatStoryCraftPromptBrief,
 } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
@@ -388,6 +389,18 @@ export class AnalysisService {
 类型提示：${input.genre || "请自行判断"}
 输入来源：${this.normalizeQuickReviewInputKind(input.inputKind)}
 上一条 Prompt：${input.previousPrompt?.trim() || "未提供"}
+用户声明的核心卖点：${input.coreSellingPoint?.trim() || "未提供"}
+必须保留的机制/装置：${input.mustKeepMechanisms?.trim() || "未提供"}
+目标读者爽点/笑点/期待：${input.targetReaderPleasures?.trim() || "未提供"}
+
+${formatStoryCraftPromptBrief()}
+
+诊断前先执行“一刀切误判防护层”：
+1. 当你发现重复、违和、系统化、缺少代价、缺少冲突、热梗不自然、日常太轻、主角不行动等风险时，必须先判断它是文本缺陷，还是目标读者会买账的风格化机制、题材惯例、喜剧机制、叙事装置或作者声线。
+2. 对倒计时、系统面板、弹幕/论坛体、聊天记录、档案/审讯记录、规则条款、网络热梗、沙雕重复句式、反套路废话、日常弱冲突、主角拒绝权力/拒绝行动等内容，先判断机制是否成立，再判断呈现是否像 AI、系统提示或堆梗。
+3. 如果机制成立，不要建议删除机制；改法应是小说化呈现、降频、换句式、补上下文反馈、让他人产生动作、安排回收或增强角色专属细节。
+4. 如果机制不成立，说明它为什么没有服务核心卖点或目标读者期待，再建议删除、替换或重构。
+5. revisionPlan.keep 和 strengths 必须保护仍然有效的特殊卖点；actionableFixes 和 nextPrompt 不能误删用户声明必须保留的机制。
 
 严格返回这个 JSON 结构：
 {
@@ -419,7 +432,7 @@ export class AnalysisService {
       "severity": "critical | high | medium | low",
       "category": "opening | hook | character_goal | conflict_pressure | payoff | pacing | setting_load | prose_ai_flavor | prompt_constraint | market_promise | other",
       "title": "问题标题",
-      "description": "问题说明",
+      "description": "问题说明，若涉及特殊机制，必须说明它是缺陷、可用机制但呈现有问题，还是目标读者爽点",
       "evidence": [{"quote": "原文短证据", "locationHint": "开头/中段/结尾/第N段", "confidence": 0.8}],
       "readerImpact": "读者会如何流失或降低期待",
       "fixAction": "下一步具体改法",
@@ -471,7 +484,8 @@ export class AnalysisService {
 7. issues 返回 1-3 条，必须有原文证据；没有证据时降低 confidence。
 8. gateDecision 只表示当前稿件改稿优先级，不预测平台流量。
 9. 如果提供上一条 Prompt，promptDiagnosis 必须指出 Prompt 缺口；未提供则返回空数组。
-10. nextPrompt 必须能直接复制给写作 AI，用于改这一版稿，不要另起炉灶。`,
+10. nextPrompt 必须能直接复制给写作 AI，用于改这一版稿，不要另起炉灶。
+11. 对用户声明的核心卖点、必须保留机制和目标读者爽点，必须先做“保留价值”判断，再给出改法；不能把特殊机制一刀切归因为 AI 痕迹或结构缺陷。`,
         },
       ],
     };
@@ -1448,6 +1462,8 @@ export class AnalysisService {
 成熟章节：
 ${input.referenceText}
 
+${formatStoryCraftPromptBrief()}
+
 请严格返回这个 JSON 结构：
 {
   "mode": "llm-rubric",
@@ -1627,6 +1643,8 @@ ${this.scoreChapterPrompt(input)}`,
 数据指标口径：${performanceSnapshot.guidance}
 AI 自测增强：${aiSelfTest.summary}
 
+${formatStoryCraftPromptBrief()}
+
 Rubric：
 ${JSON.stringify(input.rubric, null, 2)}
 
@@ -1648,6 +1666,20 @@ ${JSON.stringify(input.rubric, null, 2)}
   ],
   "strongestPoint": "最强项",
   "weakestPoint": "最大短板",
+  "issues": [
+    {
+      "id": "score-issue-1",
+      "severity": "critical | high | medium | low",
+      "category": "opening | hook | character_goal | conflict_pressure | payoff | pacing | setting_load | prose_ai_flavor | prompt_constraint | market_promise | other",
+      "title": "问题标题",
+      "description": "问题说明，必须对应某个扣分项或跨指标结构问题",
+      "evidence": [{"quote": "用户章节中的短证据", "locationHint": "开头/中段/结尾/第N段", "confidence": 0.8}],
+      "readerImpact": "这个问题会如何影响点击后留存、追读、付费或收藏",
+      "fixAction": "可执行修改动作",
+      "promptConstraint": "下一轮改稿 Prompt 必须加入的约束",
+      "blocksNextStep": true
+    }
+  ],
   "styleFit": {
     "score": 7,
     "platformRisk": "和目标平台不匹配的最大风险",
@@ -1713,16 +1745,19 @@ ${JSON.stringify(input.rubric, null, 2)}
 2. score 是 0 到 10 的数字。
 3. evidence 必须来自用户章节，不要引用参考章节。
 4. fix 必须是可执行改法，不要只说“加强描写”。
-5. 评分不是文学奖评分，而是目标平台读者是否愿意继续读的商业阅读体验评分。
-6. 如果关键词没有直接出现但隐性期待已经被结构满足，要说明；如果关键词出现但没有承载期待，也要扣分。
-7. 数据表现只做归因辅助，不要把低数据直接等同于文本差；要结合章节证据判断可能原因。
-8. 必须按目标平台和阅读场景判断指标权重：长篇追更以首章完读、加书架/收藏、下一章点击、前3章留存、追更为核心；短篇付费以全文完读、平均阅读进度、付费解锁为核心；阅读60s在长篇里只作低权重参考。
-9. 平台推荐策略只能作为假设和经验归因，不能写成平台内部算法结论；要结合正文证据判断是否能提高点击、有效阅读、收藏/追更或付费转化。
-10. revisionPrompt 要写给另一个“负责改文的 AI”，让它知道怎么改文；不要让它重新开新故事。
-11. 如果启用 AI 自测增强，必须由你基于用户章节自行执行测试，不要要求用户填结果；测试结论只能作为辅助证据，仍要回到章节文本和 Rubric。
-12. revisionPrompt 必须吸收 selfTestFit.promptAddons，把“遮挡人名、跳读、共情、设定复盘、删句、文本自然度”转化为改文 AI 可执行的约束。
-13. 必须额外诊断爽点疲劳：如果连续用同一种打脸、隐藏实力或围观惊呼填充，要给出类型轮换、代价或关系推进的改法。
-14. 必须额外诊断钩子回收：章末钩子要说明属于悬念、危机、反转、期待、情感或信息揭示，并指出下一章前段应如何回收。
+5. issues 必须输出 1-5 条，按影响优先级排序；每条都必须有原文 evidence、readerImpact、fixAction 和 promptConstraint。
+6. issues 要把跨指标问题归并成作者能行动的问题，不要把每个低分项机械复制成一条 issue。
+7. 评分不是文学奖评分，而是目标平台读者是否愿意继续读的商业阅读体验评分。
+8. 如果关键词没有直接出现但隐性期待已经被结构满足，要说明；如果关键词出现但没有承载期待，也要扣分。
+9. 数据表现只做归因辅助，不要把低数据直接等同于文本差；要结合章节证据判断可能原因。
+10. 必须按目标平台和阅读场景判断指标权重：长篇追更以首章完读、加书架/收藏、下一章点击、前3章留存、追更为核心；短篇付费以全文完读、平均阅读进度、付费解锁为核心；阅读60s在长篇里只作低权重参考。
+11. 平台推荐策略只能作为假设和经验归因，不能写成平台内部算法结论；要结合正文证据判断是否能提高点击、有效阅读、收藏/追更或付费转化。
+12. revisionPrompt 要写给另一个“负责改文的 AI”，让它知道怎么改文；不要让它重新开新故事。
+13. 如果启用 AI 自测增强，必须由你基于用户章节自行执行测试，不要要求用户填结果；测试结论只能作为辅助证据，仍要回到章节文本和 Rubric。
+14. revisionPrompt 必须吸收 selfTestFit.promptAddons，把“遮挡人名、跳读、共情、设定复盘、删句、文本自然度”转化为改文 AI 可执行的约束。
+15. 必须额外诊断爽点疲劳：如果连续用同一种打脸、隐藏实力或围观惊呼填充，要给出类型轮换、代价或关系推进的改法。
+16. 必须额外诊断钩子回收：章末钩子要说明属于悬念、危机、反转、期待、情感或信息揭示，并指出下一章前段应如何回收。
+17. 必须按“学结构，不搬内容”的边界处理成熟样本和研究库素材；只能迁移读者需求、情绪链、节奏和功能位，不得建议复用可识别人物、专有名词、关系网、事件链或标志性台词。
 `.trim();
   }
 

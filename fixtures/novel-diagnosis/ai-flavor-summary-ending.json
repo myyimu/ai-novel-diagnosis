@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "ai-flavor-summary-ending",
+  "title": "AI 初稿：章尾总结升华",
+  "genre": "urban",
+  "inputKind": "ai-draft",
+  "chapterTitle": "第一章 命运的齿轮",
+  "chapterText": "凌晨的急诊大厅灯火通明。\n\n许临被主任当众退回申请表，理由是他资历太浅，不配进专家会诊组。旁边几个同事低声笑起来，有人把他的病例夹推到地上。\n\n他弯腰捡起病例，发现夹层里多了一张旧病历。病历上的签名，正是三年前害死他父亲的那个名字。\n\n许临站在走廊尽头，望着窗外渐亮的天色。他知道，从这一刻开始，命运的齿轮终于开始转动。属于他的全新人生，即将翻开崭新的一页。",
+  "previousPrompt": "请写一个都市医生逆袭开头，要有打压、旧案线索和命运感。",
+  "expected": {
+    "gateDecision": "revise",
+    "topIssueCategory": "prose_ai_flavor",
+    "scoreRange": [5.4, 6.4],
+    "mustContainEvidence": ["命运的齿轮终于开始转动"],
+    "actionKeywords": ["动作", "病历", "章尾"],
+    "nextAction": "把章尾总结升华改成可回收的动作钩子",
+    "storyCraftSignals": ["章尾总结", "动作", "钩子"]
+  },
+  "result": {
+    "title": "第一章 命运的齿轮",
+    "genre": "urban",
+    "inputKind": "ai-draft",
+    "positioning": "都市医生旧案逆袭开局",
+    "sellingPoints": ["医院打压", "旧案病历", "医生反击"],
+    "mainProblem": "章尾把旧案线索写成 AI 式总结升华，削弱了追读钩子。",
+    "actionableFixes": ["删掉命运式总结", "用病历上的具体异常收尾", "让主角立刻做一个调查动作"],
+    "recommendedPlatforms": [
+      {
+        "id": "fanqie",
+        "label": "番茄",
+        "fit": "优先发布",
+        "reason": "打压和旧案线适合快节奏测试。"
+      }
+    ],
+    "readyForFullReview": true,
+    "readyReason": "核心冲突可用，优先处理文本自然度和章尾钩子。",
+    "quickScore": 5.9,
+    "confidence": 0.82,
+    "gateDecision": "revise",
+    "gateReason": "开局事件可用，但表达方式暴露明显 AI 腔。",
+    "oneLineDiagnosis": "这章不是没冲突，而是章尾把冲突写成了空泛总结。",
+    "issues": [
+      {
+        "id": "issue-prose-ai-1",
+        "severity": "high",
+        "category": "prose_ai_flavor",
+        "title": "章尾总结升华破坏追读",
+        "description": "旧病历本来能形成钩子，但章尾总结把悬念解释成命运感，读者没有具体问题可追。",
+        "evidence": [
+          {
+            "quote": "命运的齿轮终于开始转动。属于他的全新人生，即将翻开崭新的一页。",
+            "locationHint": "末段",
+            "confidence": 0.92
+          }
+        ],
+        "readerImpact": "读者会闻到 AI 腔和作者替读者下结论的味道，旧案悬念没有被动作承接。",
+        "fixAction": "删掉章尾总结，用主角翻到病历第二页、发现死亡时间被改过这一类动作钩子收束。",
+        "promptConstraint": "章尾禁止命运、全新人生、崭新篇章等总结词，必须用动作、线索或对话收住。",
+        "blocksNextStep": true
+      }
+    ],
+    "strengths": [
+      {
+        "title": "旧案线索有效",
+        "evidence": "旧病历和父亲死亡案能形成长期追读。",
+        "keepAction": "保留病历线索，但用具体异常替代升华句。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-prose-ai-1"],
+      "keep": ["医院打压", "旧病历", "父亲旧案"],
+      "change": ["章尾总结", "命运式表达"],
+      "avoid": ["命运的齿轮", "崭新的一页", "他终于明白"],
+      "checkpoints": ["末段是否留下一个具体可回收问题？"]
+    },
+    "promptDiagnosis": {
+      "originalPrompt": "请写一个都市医生逆袭开头，要有打压、旧案线索和命运感。",
+      "missingConstraints": ["没有限制章尾总结体", "没有要求具体线索回收"],
+      "vagueInstructions": ["命运感"],
+      "improvedPromptPrinciples": ["用动作和证据制造命运感，不直接说命运。"]
+    },
+    "nextPrompt": {
+      "title": "去掉章尾 AI 腔",
+      "prompt": "请只改最后三段。保留主任打压、旧病历和父亲旧案。删除“命运的齿轮”“全新人生”“崭新一页”等总结升华句，章尾改成许临发现病历死亡时间被人改过，并把病例夹塞进外套准备去档案室查证。不要新增无关人物。",
+      "linkedIssueIds": ["issue-prose-ai-1"],
+      "whyThisWorks": ["把空泛总结改成动作", "让旧案钩子可回收"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-no-summary-ending",
+        "sourceIssueId": "issue-prose-ai-1",
+        "type": "anti_pattern",
+        "title": "章尾不用命运式总结",
+        "triggerProblem": "章尾用命运和新篇章替代具体钩子。",
+        "reusableRule": "章尾要用动作、线索、对话或危机收束，不能让作者跳出来总结意义。",
+        "selfCheckQuestion": "删掉最后一句总结后，章尾是否仍有一个具体问题让读者想看下一章？",
+        "promptTemplate": "章尾禁止总结升华，用具体动作、线索或对话制造下一章钩子。"
+      }
+    ]
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "novel-diagnosis-fixture/v1",
+  "id": "hook-no-recovery",
+  "title": "钩子问题：章末有悬念但不可回收",
+  "genre": "suspense",
+  "inputKind": "human-draft",
+  "chapterTitle": "第一章 雨夜来电",
+  "chapterText": "暴雨砸在派出所的玻璃上。\n\n陈述刚整理完失踪案卷宗，值班电话突然响起。电话那头是个女人，声音很轻，说她看见了三年前已经死亡的赵闻。\n\n陈述追问地点，对方却只说了一句“他们都在看着你”，电话随即断线。\n\n他调出通话记录，号码归属地显示为空。屏幕暗下去前，又弹出一条匿名短信：真相马上就会出现。",
+  "expected": {
+    "gateDecision": "revise",
+    "topIssueCategory": "hook",
+    "scoreRange": [5.2, 6.2],
+    "mustContainEvidence": ["真相马上就会出现"],
+    "actionKeywords": ["回收", "下一章", "具体地点"],
+    "nextAction": "把抽象预告改成下一章可立即追查的线索",
+    "storyCraftSignals": ["钩子", "回收", "下一章"]
+  },
+  "result": {
+    "title": "第一章 雨夜来电",
+    "genre": "suspense",
+    "inputKind": "human-draft",
+    "positioning": "悬疑旧案来电开局",
+    "sellingPoints": ["死亡人物现身", "匿名来电", "旧案重启"],
+    "mainProblem": "章末悬念停在抽象预告，没有给下一章可回收的调查入口。",
+    "actionableFixes": ["把短信改成具体地点或物证", "让主角马上做一个追查动作", "明确下一章前段要回收哪条线索"],
+    "recommendedPlatforms": [
+      {
+        "id": "qidian",
+        "label": "起点",
+        "fit": "可作为第二选择",
+        "reason": "旧案悬疑可用，但需要更强线索链。"
+      }
+    ],
+    "readyForFullReview": true,
+    "readyReason": "基本悬念成立，但钩子回收路径不足。",
+    "quickScore": 5.8,
+    "confidence": 0.79,
+    "gateDecision": "revise",
+    "gateReason": "读者会好奇，但不知道下一章能看到什么具体进展。",
+    "oneLineDiagnosis": "这章有悬念，没有下一章可执行的回收点。",
+    "issues": [
+      {
+        "id": "issue-hook-recovery-1",
+        "severity": "high",
+        "category": "hook",
+        "title": "章末钩子不可回收",
+        "description": "死亡人物现身是有效悬念，但“真相马上出现”只是预告，没有地点、物证或行动入口。",
+        "evidence": [
+          {
+            "quote": "屏幕暗下去前，又弹出一条匿名短信：真相马上就会出现。",
+            "locationHint": "末段",
+            "confidence": 0.88
+          }
+        ],
+        "readerImpact": "读者会觉得作者在吊胃口，而不是给出下一章立刻可验证的线索。",
+        "fixAction": "把短信改成具体地点、时间或物证照片，并让陈述决定马上去查。",
+        "promptConstraint": "章末钩子必须说明下一章前500字要回收什么线索。",
+        "blocksNextStep": true
+      }
+    ],
+    "strengths": [
+      {
+        "title": "旧案重启有吸引力",
+        "evidence": "三年前死亡的人再次出现。",
+        "keepAction": "保留死亡人物现身，但增加可追查线索。"
+      }
+    ],
+    "revisionPlan": {
+      "priorityIssueIds": ["issue-hook-recovery-1"],
+      "keep": ["雨夜来电", "死亡人物", "旧案卷宗"],
+      "change": ["抽象短信", "无地点悬念"],
+      "avoid": ["真相马上出现", "更大的秘密即将揭开"],
+      "checkpoints": ["下一章前500字是否能回收短信线索？"]
+    },
+    "promptDiagnosis": {
+      "missingConstraints": ["没有要求钩子回收路径"],
+      "vagueInstructions": ["保持悬念"],
+      "improvedPromptPrinciples": ["悬念要变成下一章可追查的物证或地点。"]
+    },
+    "nextPrompt": {
+      "title": "给章末钩子加回收路径",
+      "prompt": "请只改最后两段。保留女人来电和三年前死亡人物赵闻。把匿名短信“真相马上就会出现”改成一张附带定位的照片：赵闻站在废弃医院三楼窗边，照片时间显示三分钟前。章末让陈述拿上卷宗和录音笔出门。下一章前500字必须回收这个废弃医院线索。",
+      "linkedIssueIds": ["issue-hook-recovery-1"],
+      "whyThisWorks": ["把悬念改成行动入口", "明确下一章回收点"]
+    },
+    "methodologyCards": [
+      {
+        "id": "method-hook-recovery",
+        "sourceIssueId": "issue-hook-recovery-1",
+        "type": "hook_rule",
+        "title": "章末钩子必须能在下一章回收",
+        "triggerProblem": "章末只有抽象预告。",
+        "reusableRule": "悬疑钩子要给地点、物证、人物动作或截止时间，让下一章前段可以立刻回收。",
+        "selfCheckQuestion": "下一章前500字能否直接处理这个钩子？",
+        "promptTemplate": "章末钩子必须提供下一章可立即追查的地点、物证或行动目标。"
+      }
+    ]
+  }
+}
