@@ -57,6 +57,7 @@ export class LibraryController {
       jobIds: body.jobIds,
       groupBy: body.groupBy,
       groupValue: body.groupValue,
+      format: body.format,
     });
   }
 }

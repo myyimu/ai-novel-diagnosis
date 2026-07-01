@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsOptional,
   IsString,
   MinLength,
 } from "class-validator";
@@ -37,4 +38,15 @@ export class DistillBookSkillDto {
   @IsString()
   @MinLength(1)
   groupValue!: string;
+
+  @ApiProperty({
+    description:
+      "Output format. skill-md returns one SKILL.md file; skill-package returns a directory-style skill package as a JSON file tree.",
+    example: "skill-package",
+    enum: ["skill-md", "skill-package"],
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(["skill-md", "skill-package"])
+  format?: "skill-md" | "skill-package";
 }

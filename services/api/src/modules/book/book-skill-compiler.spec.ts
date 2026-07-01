@@ -1,6 +1,8 @@
 import {
   compileBookSkill,
+  compileBookSkillPackage,
   compileDistilledSkill,
+  compileDistilledSkillPackage,
   type BookSkillSource,
 } from "./book-skill-compiler";
 import type { DistilledSkillData } from "./book-skill-aggregator";
@@ -109,6 +111,37 @@ describe("compileBookSkill", () => {
       }),
     );
     expect(result.content).toContain("叙事声音**：_未识别_");
+  });
+});
+
+describe("compileBookSkillPackage", () => {
+  it("emits a directory-style skill package with references and scripts", () => {
+    const result = compileBookSkillPackage(makeSource());
+
+    expect(result.filename).toBe("book-structure-废墟纪元.skill-package.json");
+    expect(result.contentType).toBe("application/json; charset=utf-8");
+    expect(result.rootDir).toBe("book-structure-废墟纪元");
+    expect(result.files.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        "book-structure-废墟纪元/SKILL.md",
+        "book-structure-废墟纪元/references/style-dna.md",
+        "book-structure-废墟纪元/references/boundary.md",
+        "book-structure-废墟纪元/references/quality-gates.md",
+        "book-structure-废墟纪元/scripts/check-ai-patterns.js",
+        "book-structure-废墟纪元/scripts/check-degeneration.js",
+        "book-structure-废墟纪元/agents/openai.yaml",
+        "book-structure-废墟纪元/skill-package.json",
+      ]),
+    );
+    const skill = result.files.find((file) => file.path.endsWith("SKILL.md"));
+    expect(skill?.content).toContain("name: book-structure-废墟纪元");
+    expect(skill?.content).toContain("references/style-dna.md");
+    const packageJson = JSON.parse(result.content) as {
+      type: string;
+      files: Array<{ path: string }>;
+    };
+    expect(packageJson.type).toBe("codex-skill-package");
+    expect(packageJson.files).toHaveLength(result.files.length);
   });
 });
 
@@ -243,5 +276,31 @@ describe("compileDistilledSkill", () => {
     );
     expect(result.content).toContain("置信度：**low**");
     expect(result.content).toContain("样本只有 1 本");
+  });
+});
+
+describe("compileDistilledSkillPackage", () => {
+  it("emits cross-sample references with evidence and boundary files", () => {
+    const result = compileDistilledSkillPackage(makeDistilledData());
+
+    expect(result.filename).toBe("author-method-猫腻.skill-package.json");
+    expect(result.files.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        "author-method-猫腻/SKILL.md",
+        "author-method-猫腻/references/style-dna.md",
+        "author-method-猫腻/references/boundary.md",
+        "author-method-猫腻/scripts/check-ai-patterns.js",
+      ]),
+    );
+    const style = result.files.find((file) =>
+      file.path.endsWith("references/style-dna.md"),
+    );
+    const boundary = result.files.find((file) =>
+      file.path.endsWith("references/boundary.md"),
+    );
+    expect(style?.content).toContain("开篇压低主角处境 _(3 本)_");
+    expect(style?.content).toContain("| jobId |");
+    expect(boundary?.content).toContain("范闲");
+    expect(boundary?.content).toContain("来自《庆余年》");
   });
 });

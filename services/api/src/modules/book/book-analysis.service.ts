@@ -329,6 +329,7 @@ export class BookAnalysisService {
     jobIds: string[];
     groupBy: "author" | "genre" | "platform";
     groupValue: string;
+    format?: "skill-md" | "skill-package";
   }) {
     if (!input.jobIds.length) {
       throw new BadRequestException(
@@ -365,6 +366,7 @@ export class BookAnalysisService {
       groupBy: input.groupBy,
       groupValue: input.groupValue,
       generatedAt,
+      format: input.format,
     });
   }
 

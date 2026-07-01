@@ -167,6 +167,7 @@ export class BookController {
       jobIds: body.jobIds,
       groupBy: body.groupBy,
       groupValue: body.groupValue,
+      format: body.format,
     });
   }
 

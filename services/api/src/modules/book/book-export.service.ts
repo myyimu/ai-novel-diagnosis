@@ -1,13 +1,16 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import {
   compileBookSkill,
+  compileBookSkillPackage,
   compileDistilledSkill,
+  compileDistilledSkillPackage,
   type BookSkillSource,
 } from "./book-skill-compiler";
 import {
   aggregateBookSkills,
   type SkillGroupBy,
 } from "./book-skill-aggregator";
+import { buildSkillPackageZip } from "./skill-package-zip";
 
 interface BookAnalysisExportResult {
   book?: {
@@ -192,7 +195,9 @@ export type BookExportFormat =
   | "outline"
   | "prompt-pack"
   | "do-not-copy"
-  | "skill-md";
+  | "skill-md"
+  | "skill-package"
+  | "skill-zip";
 
 export type BookExportMode = "notes" | "originalized";
 
@@ -234,19 +239,37 @@ export class BookExportService {
    */
   distillSkill(
     sources: BookSkillSource[],
-    options: { groupBy: SkillGroupBy; groupValue: string; generatedAt: string },
+    options: {
+      groupBy: SkillGroupBy;
+      groupValue: string;
+      generatedAt: string;
+      format?: "skill-md" | "skill-package";
+    },
   ): {
     filename: string;
     contentType: string;
     content: string;
     sampleSize: number;
     confidence: string;
+    files?: Array<{ path: string; content: string; executable?: boolean }>;
   } {
     const distilled = aggregateBookSkills({
       sources,
       options: { groupBy: options.groupBy, groupValue: options.groupValue },
       generatedAt: options.generatedAt,
     });
+    if (options.format === "skill-package") {
+      const compiled = compileDistilledSkillPackage(distilled);
+      return {
+        filename: compiled.filename,
+        contentType: compiled.contentType,
+        content: compiled.content,
+        sampleSize: distilled.sampleSize,
+        confidence: distilled.confidence,
+        files: compiled.files,
+      };
+    }
+
     const compiled = compileDistilledSkill(distilled);
     return {
       filename: compiled.filename,
@@ -389,6 +412,10 @@ export class BookExportService {
         };
       case "skill-md":
         return this.toSkillExport(analysis, metadata);
+      case "skill-package":
+        return this.toSkillPackageExport(analysis, metadata);
+      case "skill-zip":
+        return this.toSkillZipExport(analysis, metadata);
       default:
         throw new BadRequestException(`Unsupported export format: ${format}`);
     }
@@ -408,6 +435,40 @@ export class BookExportService {
       filename: compiled.filename,
       contentType: "text/markdown; charset=utf-8",
       content: compiled.content,
+    };
+  }
+
+  private toSkillPackageExport(
+    analysis: BookAnalysisExportResult,
+    metadata?: { author?: string; platform?: string; publishedYear?: number },
+  ) {
+    const source = this.buildSkillSource(analysis, {
+      jobId: "exported",
+      generatedAt: new Date().toISOString(),
+      metadata,
+    });
+    const compiled = compileBookSkillPackage(source);
+    return {
+      filename: compiled.filename,
+      contentType: compiled.contentType,
+      content: compiled.content,
+    };
+  }
+
+  private toSkillZipExport(
+    analysis: BookAnalysisExportResult,
+    metadata?: { author?: string; platform?: string; publishedYear?: number },
+  ) {
+    const source = this.buildSkillSource(analysis, {
+      jobId: "exported",
+      generatedAt: new Date().toISOString(),
+      metadata,
+    });
+    const compiled = compileBookSkillPackage(source);
+    return {
+      filename: `${compiled.rootDir}.zip`,
+      contentType: "application/zip",
+      content: buildSkillPackageZip(compiled.files),
     };
   }
 

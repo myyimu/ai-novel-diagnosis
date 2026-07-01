@@ -181,6 +181,62 @@ describe("BookExportService", () => {
     expect(result.content).toContain("规则 C"); // Low confidence (only one has it)
   });
 
+  it("distills multiple BookSkillSources into a directory-style skill package", () => {
+    const service = new BookExportService();
+
+    const source1 = {
+      jobId: "job-1",
+      title: "书 1",
+      genre: "xuanhuan",
+      generatedAt: "2026-06-27T00:00:00Z",
+      metadata: { author: "作者 A" },
+      styleCard: {
+        styleRules: ["规则 A", "规则 B"],
+        pleasureMechanisms: ["爽点 A"],
+      },
+      styleBible: {},
+      boundary: {
+        doNotReuse: ["角色名 A"],
+      },
+      riskNotice: {},
+    };
+
+    const source2 = {
+      jobId: "job-2",
+      title: "书 2",
+      genre: "xuanhuan",
+      generatedAt: "2026-06-27T00:00:00Z",
+      metadata: { author: "作者 A" },
+      styleCard: {
+        styleRules: ["规则 A", "规则 C"],
+        pleasureMechanisms: ["爽点 A"],
+      },
+      styleBible: {},
+      boundary: {},
+      riskNotice: {},
+    };
+
+    const result = service.distillSkill([source1, source2], {
+      groupBy: "author",
+      groupValue: "作者 A",
+      generatedAt: "2026-06-27T00:00:00Z",
+      format: "skill-package",
+    });
+
+    expect(result.filename).toBe("author-method-作者-A.skill-package.json");
+    expect(result.contentType).toBe("application/json; charset=utf-8");
+    expect(result.files?.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        "author-method-作者-A/SKILL.md",
+        "author-method-作者-A/references/style-dna.md",
+        "author-method-作者-A/scripts/check-degeneration.js",
+      ]),
+    );
+    expect(result.content).toContain("codex-skill-package");
+    expect(result.sampleSize).toBe(2);
+    expect(result.confidence).toBe("medium-low");
+  });
+
   it("threads metadata through export() for skill-md format", () => {
     const service = new BookExportService();
 
@@ -207,5 +263,71 @@ describe("BookExportService", () => {
     expect(exported.content).toContain("作者 A");
     expect(exported.content).toContain("起点");
     expect(exported.content).toContain("2020");
+  });
+
+  it("exports a directory-style skill package from a single book result", () => {
+    const service = new BookExportService();
+
+    const exported = service.export(
+      {
+        book: { title: "测试书", genre: "xuanhuan" },
+        transferableStyleCard: {
+          styleRules: ["规则"],
+          pleasureMechanisms: ["爽点"],
+        },
+        referenceBoundaryCheck: {
+          doNotReuse: ["专名"],
+        },
+        generationAssets: {
+          styleBible: {
+            proseRules: ["短句推进"],
+          },
+        },
+      },
+      "skill-package",
+    );
+
+    expect(exported.filename).toBe("book-structure-测试书.skill-package.json");
+    expect(exported.contentType).toBe("application/json; charset=utf-8");
+    expect(typeof exported.content).toBe("string");
+    const payload = JSON.parse(exported.content as string) as {
+      type: string;
+      files: Array<{ path: string; content: string }>;
+    };
+    expect(payload.type).toBe("codex-skill-package");
+    expect(payload.files.map((file) => file.path)).toContain(
+      "book-structure-测试书/references/boundary.md",
+    );
+    expect(
+      payload.files.find((file) =>
+        file.path.endsWith("references/style-dna.md"),
+      )?.content,
+    ).toContain("短句推进");
+  });
+
+  it("exports a zipped skill package from a single book result", () => {
+    const service = new BookExportService();
+
+    const exported = service.export(
+      {
+        book: { title: "测试书", genre: "xuanhuan" },
+        transferableStyleCard: {
+          styleRules: ["规则"],
+        },
+        generationAssets: {
+          styleBible: {},
+        },
+      },
+      "skill-zip",
+    );
+
+    expect(exported.filename).toBe("book-structure-测试书.zip");
+    expect(exported.contentType).toBe("application/zip");
+    expect(Buffer.isBuffer(exported.content)).toBe(true);
+    const zip = exported.content as Buffer;
+    expect(zip.readUInt32LE(0)).toBe(0x04034b50);
+    expect(zip.includes(Buffer.from("book-structure-测试书/SKILL.md"))).toBe(
+      true,
+    );
   });
 });

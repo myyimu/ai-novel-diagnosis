@@ -71,6 +71,21 @@ export interface CompiledBookSkill {
   content: string;
 }
 
+export interface SkillPackageFile {
+  path: string;
+  content: string;
+  executable?: boolean;
+}
+
+export interface CompiledSkillPackage {
+  filename: string;
+  contentType: string;
+  skillName: string;
+  rootDir: string;
+  files: SkillPackageFile[];
+  content: string;
+}
+
 /**
  * Slugify a title for the skill name. Keeps CJK characters as-is; drops
  * whitespace and punctuation that would break Claude Code's skill-name parser
@@ -477,3 +492,425 @@ export function compileDistilledSkill(
 
   return { filename, content };
 }
+
+export function compileBookSkillPackage(
+  source: BookSkillSource,
+): CompiledSkillPackage {
+  const slug = slugify(source.title);
+  const skillName = `book-structure-${slug}`;
+  const description =
+    `单本结构学习 skill 包，蒸馏自《${source.title.trim()}》。` +
+    "用于写同题材作品时调用结构、爽点、风格边界和质量门禁。";
+  const generatedAt = source.generatedAt;
+  const files = buildSkillPackageFiles({
+    skillName,
+    description,
+    title: `学习《${source.title}》的结构`,
+    generatedAt,
+    skillBody: buildBookPackageSkillBody(source),
+    styleReference: buildBookStyleReference(source),
+    boundaryReference: buildBookBoundaryReference(source),
+    qualityReference: buildQualityReference(),
+    metadata: {
+      kind: "single-book",
+      sourceJobIds: [source.jobId],
+      sampleSize: 1,
+      confidence: "low",
+    },
+  });
+
+  return toCompiledSkillPackage(skillName, files);
+}
+
+export function compileDistilledSkillPackage(
+  data: DistilledSkillData,
+): CompiledSkillPackage {
+  const slug = slugify(data.groupValue);
+  const skillName = `${data.groupBy}-method-${slug}`;
+  const groupLabel = GROUP_BY_LABEL[data.groupBy];
+  const description =
+    `${groupLabel}写作方法论 skill 包，蒸馏自 ${data.sampleSize} 本样本。` +
+    "用于调用跨样本结构规律、频次证据、写作边界和质量门禁。";
+  const files = buildSkillPackageFiles({
+    skillName,
+    description,
+    title: `${groupLabel}写作方法论：${data.groupValue}`,
+    generatedAt: data.generatedAt,
+    skillBody: buildDistilledPackageSkillBody(data),
+    styleReference: buildDistilledStyleReference(data),
+    boundaryReference: buildDistilledBoundaryReference(data),
+    qualityReference: buildQualityReference(),
+    metadata: {
+      kind: "distilled",
+      groupBy: data.groupBy,
+      groupValue: data.groupValue,
+      sourceJobIds: data.sources.map((source) => source.jobId),
+      sampleSize: data.sampleSize,
+      confidence: data.confidence,
+    },
+  });
+
+  return toCompiledSkillPackage(skillName, files);
+}
+
+function buildSkillPackageFiles(input: {
+  skillName: string;
+  description: string;
+  title: string;
+  generatedAt: string;
+  skillBody: string;
+  styleReference: string;
+  boundaryReference: string;
+  qualityReference: string;
+  metadata: Record<string, unknown>;
+}): SkillPackageFile[] {
+  const root = input.skillName;
+  return [
+    {
+      path: `${root}/SKILL.md`,
+      content: [
+        "---",
+        `name: ${input.skillName}`,
+        `description: ${escapeYamlString(input.description)}`,
+        "---",
+        "",
+        `# ${input.title}`,
+        "",
+        input.skillBody,
+      ].join("\n"),
+    },
+    {
+      path: `${root}/references/style-dna.md`,
+      content: input.styleReference,
+    },
+    {
+      path: `${root}/references/boundary.md`,
+      content: input.boundaryReference,
+    },
+    {
+      path: `${root}/references/quality-gates.md`,
+      content: input.qualityReference,
+    },
+    {
+      path: `${root}/scripts/check-ai-patterns.js`,
+      content: CHECK_AI_PATTERNS_SCRIPT,
+      executable: true,
+    },
+    {
+      path: `${root}/scripts/check-degeneration.js`,
+      content: CHECK_DEGENERATION_SCRIPT,
+      executable: true,
+    },
+    {
+      path: `${root}/agents/openai.yaml`,
+      content: buildOpenAiYaml(input.skillName, input.description),
+    },
+    {
+      path: `${root}/skill-package.json`,
+      content: `${JSON.stringify(
+        {
+          schema: "ai-novel-diagnosis.skill-package.v1",
+          skillName: input.skillName,
+          generatedAt: input.generatedAt,
+          ...input.metadata,
+        },
+        null,
+        2,
+      )}\n`,
+    },
+  ];
+}
+
+function toCompiledSkillPackage(
+  skillName: string,
+  files: SkillPackageFile[],
+): CompiledSkillPackage {
+  const rootDir = skillName;
+  const filename = `${skillName}.skill-package.json`;
+  const contentType = "application/json; charset=utf-8";
+  const content = `${JSON.stringify(
+    {
+      type: "codex-skill-package",
+      version: 1,
+      rootDir,
+      skillName,
+      files,
+    },
+    null,
+    2,
+  )}\n`;
+
+  return { filename, contentType, skillName, rootDir, files, content };
+}
+
+function buildBookPackageSkillBody(source: BookSkillSource): string {
+  return [
+    "Use this skill when the user wants to write, revise, or diagnose a new novel using this book as a structural reference without copying its protected expression.",
+    "",
+    "## Workflow",
+    "",
+    "1. Read `references/style-dna.md` before proposing plot, voice, pacing, or reader-pleasure decisions.",
+    "2. Read `references/boundary.md` before generating names, settings, events, powers, relationships, or scene chains.",
+    "3. Preserve transferable mechanisms; transform identity-bound details into new names, causes, stakes, and event order.",
+    "4. Before final delivery, run the scripts in `scripts/` when a draft file is available, then apply `references/quality-gates.md`.",
+    "",
+    "## Source",
+    "",
+    `- Job: \`${source.jobId}\``,
+    `- Book: 《${source.title}》`,
+    `- Genre: ${source.genre}`,
+    `- Confidence: low (single sample)`,
+  ].join("\n");
+}
+
+function buildDistilledPackageSkillBody(data: DistilledSkillData): string {
+  return [
+    "Use this skill when the user wants to write, revise, or diagnose a work using cross-sample patterns from this author, genre, or platform.",
+    "",
+    "## Workflow",
+    "",
+    "1. Read `references/style-dna.md` for high-confidence rules, ranked patterns, hooks, and pleasure mechanisms.",
+    "2. Read `references/boundary.md` before reusing any recognizable names, relationship shapes, proprietary terms, or scene chains.",
+    "3. Treat rules with occurrence counts as evidence, not commands. Prefer high-confidence rules; manually review single-source rules.",
+    "4. Before final delivery, run the scripts in `scripts/` when a draft file is available, then apply `references/quality-gates.md`.",
+    "",
+    "## Distillation",
+    "",
+    `- Group: \`${data.groupBy}\` = \`${data.groupValue}\``,
+    `- Samples: ${data.sampleSize}`,
+    `- Confidence: ${data.confidence}`,
+    `- High-confidence threshold: ${data.intersectionThreshold} samples`,
+  ].join("\n");
+}
+
+function buildBookStyleReference(source: BookSkillSource): string {
+  const card = source.styleCard || {};
+  const bible = source.styleBible || {};
+  return [
+    `# Style DNA: ${source.title}`,
+    "",
+    "## Core Style",
+    "",
+    bulletList([
+      ...(card.coreStyleTags || []),
+      card.narrativeVoice || bible.narrativePOV || "",
+      card.sentenceRhythm || "",
+      card.paragraphPattern || "",
+      card.dialoguePattern || "",
+    ]),
+    "",
+    "## Pleasure Mechanisms",
+    "",
+    bulletList(card.pleasureMechanisms),
+    "",
+    "## Hook Patterns",
+    "",
+    bulletList(card.hookPatterns),
+    "",
+    "## Writing Rules",
+    "",
+    bulletList([
+      ...(card.styleRules || []),
+      ...(bible.proseRules || []),
+      ...(bible.dialogueRules || []),
+    ]),
+    "",
+    "## Consistency Checklist",
+    "",
+    bulletList(source.consistencyChecklist),
+  ].join("\n");
+}
+
+function buildDistilledStyleReference(data: DistilledSkillData): string {
+  return [
+    `# Style DNA: ${data.groupValue}`,
+    "",
+    "## High-Confidence Rules",
+    "",
+    aggregatedBulletList(data.highConfidenceStyleRules),
+    "",
+    "## Ranked Rules",
+    "",
+    aggregatedBulletList(data.rankedStyleRules.slice(0, 20)),
+    "",
+    "## Single-Source Rules",
+    "",
+    perSourceBulletList(data.singleSourceStyleRules.slice(0, 20)),
+    "",
+    "## Pleasure Mechanisms",
+    "",
+    aggregatedBulletList(data.pleasureMechanisms),
+    "",
+    "## Hook Patterns",
+    "",
+    aggregatedBulletList(data.hookPatterns),
+    "",
+    "## Tone Keywords",
+    "",
+    aggregatedBulletList(data.toneKeywords),
+    "",
+    "## Contributing Samples",
+    "",
+    sourcesTable(data.sources),
+  ].join("\n");
+}
+
+function buildBookBoundaryReference(source: BookSkillSource): string {
+  const card = source.styleCard || {};
+  const bible = source.styleBible || {};
+  const boundary = source.boundary || {};
+  return [
+    `# Boundary: ${source.title}`,
+    "",
+    "## Do Not Reuse",
+    "",
+    bulletList(boundary.doNotReuse),
+    "",
+    "## Must Transform",
+    "",
+    bulletList(boundary.needsTransformation),
+    "",
+    "## Anti-Patterns",
+    "",
+    bulletList([...(card.antiPatterns || []), ...(bible.tabooList || [])]),
+    "",
+    "## Safe Rewrite Moves",
+    "",
+    bulletList(boundary.safeRewriteMoves),
+    "",
+    "## Compliance",
+    "",
+    source.riskNotice?.summary?.trim() ||
+      "Use only structural learning. Do not copy source names, characters, proprietary terms, scene chains, or recognizable expression.",
+  ].join("\n");
+}
+
+function buildDistilledBoundaryReference(data: DistilledSkillData): string {
+  return [
+    `# Boundary: ${data.groupValue}`,
+    "",
+    "## Aggregated Anti-Patterns",
+    "",
+    aggregatedBulletList(data.antiPatterns),
+    "",
+    "## Per-Source Do Not Reuse",
+    "",
+    perSourceBulletList(data.perSourceDoNotReuse),
+    "",
+    "## Per-Source Must Transform",
+    "",
+    perSourceBulletList(data.perSourceNeedsTransformation),
+    "",
+    "## Compliance",
+    "",
+    "This skill is a structural distillation across samples. Do not copy source names, proprietary terms, character identities, or event chains from any contributing book.",
+  ].join("\n");
+}
+
+function buildQualityReference(): string {
+  return [
+    "# Quality Gates",
+    "",
+    "## Before Drafting",
+    "",
+    "- State the core selling point and reader pleasure before choosing fixes.",
+    "- Judge whether a mechanism works before judging whether its presentation feels AI-like or system-like.",
+    "- Preserve valid genre mechanisms, comedy logic, internet-native voice, refusal-as-agency, daily-life contrast, and other style-specific devices.",
+    "",
+    "## Before Final Delivery",
+    "",
+    "- If a draft file exists, run `node scripts/check-ai-patterns.js --check <file>`.",
+    "- If a draft file exists, run `node scripts/check-degeneration.js --check <file>`.",
+    "- Fix blocking findings first: repeated lines, leaked prompt words, obvious system-panel formatting, and unsupported one-size-fits-all deletion advice.",
+    "- Keep mechanism-level fixes specific: novelize, vary frequency, add contextual feedback, or let other characters act instead of deleting the device by default.",
+  ].join("\n");
+}
+
+function buildOpenAiYaml(skillName: string, description: string): string {
+  return [
+    `display_name: ${skillName}`,
+    `short_description: ${escapeYamlString(description).replace(/^"|"$/g, "")}`,
+    `default_prompt: Use $${skillName} to diagnose or generate a structurally original novel draft.`,
+    "",
+  ].join("\n");
+}
+
+const CHECK_AI_PATTERNS_SCRIPT = `#!/usr/bin/env node
+const fs = require("node:fs");
+
+const args = process.argv.slice(2);
+const target = args[0] === "--check" ? args[1] : args[0];
+if (!target) {
+  console.error("Usage: node scripts/check-ai-patterns.js --check <file>");
+  process.exit(2);
+}
+
+const text = fs.readFileSync(target, "utf8");
+const checks = [
+  {
+    name: "system-panel-countdown",
+    pattern: /\\*\\*【[^】]*(剩余时间|倒计时|任务|系统)[^】]*】\\*\\*/g,
+    message: "System-panel formatting found. Keep the mechanism only if it works; novelize the presentation.",
+  },
+  {
+    name: "formulaic-not-but",
+    pattern: /(不是[^。！？\\n]{1,40}而是|没有[^。！？\\n]{1,40}只有)/g,
+    message: "Formulaic contrast sentence found. Rewrite if it sounds generic or explanatory.",
+  },
+  {
+    name: "generic-ai-polish",
+    pattern: /(命运的齿轮|空气仿佛凝固|一股莫名的情绪|说不清道不明)/g,
+    message: "Generic polish phrase found. Replace with scene-specific action or object detail.",
+  },
+];
+
+let issueCount = 0;
+for (const check of checks) {
+  const matches = [...text.matchAll(check.pattern)];
+  if (!matches.length) continue;
+  issueCount += matches.length;
+  console.log(\`[\${check.name}] \${matches.length} hit(s): \${check.message}\`);
+  for (const match of matches.slice(0, 5)) {
+    const line = text.slice(0, match.index).split(/\\r?\\n/).length;
+    console.log(\`  line \${line}: \${match[0].slice(0, 120)}\`);
+  }
+}
+
+if (issueCount > 0) process.exitCode = 1;
+`;
+
+const CHECK_DEGENERATION_SCRIPT = `#!/usr/bin/env node
+const fs = require("node:fs");
+
+const args = process.argv.slice(2);
+const target = args[0] === "--check" ? args[1] : args[0];
+if (!target) {
+  console.error("Usage: node scripts/check-degeneration.js --check <file>");
+  process.exit(2);
+}
+
+const text = fs.readFileSync(target, "utf8");
+const lines = text
+  .split(/\\r?\\n/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+let blocking = 0;
+for (let i = 1; i < lines.length; i += 1) {
+  if (lines[i] === lines[i - 1] && lines[i].length >= 8) {
+    blocking += 1;
+    console.log(\`[repeated-line] line \${i + 1}: \${lines[i].slice(0, 120)}\`);
+  }
+}
+
+const leaked = text.match(/(作为一个AI|以下是修改建议|prompt|system message|模型输出)/gi) || [];
+if (leaked.length) {
+  blocking += leaked.length;
+  console.log(\`[leaked-meta-language] \${leaked.length} hit(s)\`);
+}
+
+if (blocking > 0) {
+  console.log(\`Blocking degeneration findings: \${blocking}\`);
+  process.exitCode = 1;
+}
+`;
