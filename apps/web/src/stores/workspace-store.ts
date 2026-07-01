@@ -774,6 +774,9 @@ export interface WorkspaceStoreState {
 	quickReviewGenre: string;
 	quickReviewInputKind: QuickReviewInputKind;
 	quickReviewPreviousPrompt: string;
+	quickReviewCoreSellingPoint: string;
+	quickReviewMustKeepMechanisms: string;
+	quickReviewTargetReaderPleasures: string;
 	rubricResult: RubricResult | null;
 	scoreResult: ScoreResult | null;
 	quickReviewResult: QuickReviewResult | null;
@@ -845,6 +848,9 @@ interface WorkspaceStoreActions {
 	setQuickReviewGenre: StoreSetter<string>;
 	setQuickReviewInputKind: StoreSetter<QuickReviewInputKind>;
 	setQuickReviewPreviousPrompt: StoreSetter<string>;
+	setQuickReviewCoreSellingPoint: StoreSetter<string>;
+	setQuickReviewMustKeepMechanisms: StoreSetter<string>;
+	setQuickReviewTargetReaderPleasures: StoreSetter<string>;
 	setRubricResult: StoreSetter<RubricResult | null>;
 	setScoreResult: StoreSetter<ScoreResult | null>;
 	setQuickReviewResult: StoreSetter<QuickReviewResult | null>;
@@ -925,6 +931,9 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	quickReviewGenre: "",
 	quickReviewInputKind: "human-draft",
 	quickReviewPreviousPrompt: "",
+	quickReviewCoreSellingPoint: "",
+	quickReviewMustKeepMechanisms: "",
+	quickReviewTargetReaderPleasures: "",
 	rubricResult: null,
 	scoreResult: null,
 	quickReviewResult: null,
@@ -997,6 +1006,9 @@ const persistableWorkspaceKeys = [
 	"quickReviewGenre",
 	"quickReviewInputKind",
 	"quickReviewPreviousPrompt",
+	"quickReviewCoreSellingPoint",
+	"quickReviewMustKeepMechanisms",
+	"quickReviewTargetReaderPleasures",
 	"providerConfigHistory",
 	"rubricResult",
 	"scoreResult",
@@ -1166,6 +1178,9 @@ export function mergeWorkspaceState(
 					...normalizedProvider,
 				}
 			: currentState.provider,
+		quickReviewCoreSellingPoint: persisted.quickReviewCoreSellingPoint || "",
+		quickReviewMustKeepMechanisms: persisted.quickReviewMustKeepMechanisms || "",
+		quickReviewTargetReaderPleasures: persisted.quickReviewTargetReaderPleasures || "",
 		bookFile: null,
 	};
 }
@@ -1226,6 +1241,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setQuickReviewGenre: makeSetter("quickReviewGenre"),
 				setQuickReviewInputKind: makeSetter("quickReviewInputKind"),
 				setQuickReviewPreviousPrompt: makeSetter("quickReviewPreviousPrompt"),
+				setQuickReviewCoreSellingPoint: makeSetter("quickReviewCoreSellingPoint"),
+				setQuickReviewMustKeepMechanisms: makeSetter("quickReviewMustKeepMechanisms"),
+				setQuickReviewTargetReaderPleasures: makeSetter("quickReviewTargetReaderPleasures"),
 				setRubricResult: makeSetter("rubricResult"),
 				setScoreResult: makeSetter("scoreResult"),
 				setQuickReviewResult: makeSetter("quickReviewResult"),

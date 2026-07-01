@@ -33,6 +33,10 @@ export function toSafeFilename(value: string) {
 
 export function downloadText(filename: string, content: string, contentType: string) {
 	const blob = new Blob([content], { type: contentType });
+	downloadBlob(filename, blob);
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement("a");
 	link.href = url;

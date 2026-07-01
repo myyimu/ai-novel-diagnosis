@@ -61,6 +61,36 @@ export class QuickReviewDto {
 
   @ApiPropertyOptional({
     description:
+      "The core appeal the author wants protected, such as anti-power fantasy, comedy, daily-life contrast, or suspense device.",
+    example: "隐世强者拒绝权力，用不争制造反差爽感。",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coreSellingPoint?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Mechanisms that should not be removed before the model judges whether they work.",
+    example: "倒计时、拒绝权势、乡土日常反差。",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  mustKeepMechanisms?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Target reader pleasures or expected laughs/payoffs used to avoid one-size-fits-all diagnosis.",
+    example: "读者想看别人误判林野、京城权力系统被他的拒绝带偏。",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  targetReaderPleasures?: string;
+
+  @ApiPropertyOptional({
+    description:
       "Provider config. If omitted, the API uses the configured shared model path.",
     type: ProviderConfigDto,
   })

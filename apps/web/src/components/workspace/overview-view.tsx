@@ -46,6 +46,9 @@ interface OverviewViewProps {
 	quickReviewGenre: string;
 	quickReviewInputKind: QuickReviewInputKind;
 	quickReviewPreviousPrompt: string;
+	quickReviewCoreSellingPoint: string;
+	quickReviewMustKeepMechanisms: string;
+	quickReviewTargetReaderPleasures: string;
 	revisionSessions: RevisionSession[];
 	methodologyCards: ProjectMethodologyCard[];
 	chapterText: string;
@@ -83,6 +86,9 @@ interface OverviewViewProps {
 	onQuickReviewGenreChange: (value: string) => void;
 	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
 	onQuickReviewPreviousPromptChange: (value: string) => void;
+	onQuickReviewCoreSellingPointChange: (value: string) => void;
+	onQuickReviewMustKeepMechanismsChange: (value: string) => void;
+	onQuickReviewTargetReaderPleasuresChange: (value: string) => void;
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
@@ -262,6 +268,9 @@ export function OverviewView({
 	quickReviewGenre,
 	quickReviewInputKind,
 	quickReviewPreviousPrompt,
+	quickReviewCoreSellingPoint,
+	quickReviewMustKeepMechanisms,
+	quickReviewTargetReaderPleasures,
 	revisionSessions,
 	methodologyCards,
 	chapterText,
@@ -287,6 +296,9 @@ export function OverviewView({
 	onQuickReviewGenreChange,
 	onQuickReviewInputKindChange,
 	onQuickReviewPreviousPromptChange,
+	onQuickReviewCoreSellingPointChange,
+	onQuickReviewMustKeepMechanismsChange,
+	onQuickReviewTargetReaderPleasuresChange,
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
@@ -350,12 +362,18 @@ export function OverviewView({
 				quickReviewGenre={quickReviewGenre}
 				quickReviewInputKind={quickReviewInputKind}
 				quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+				quickReviewCoreSellingPoint={quickReviewCoreSellingPoint}
+				quickReviewMustKeepMechanisms={quickReviewMustKeepMechanisms}
+				quickReviewTargetReaderPleasures={quickReviewTargetReaderPleasures}
 				revisionSessions={revisionSessions}
 				methodologyCards={methodologyCards}
 				onChapterTextChange={onChapterTextChange}
 				onQuickReviewGenreChange={onQuickReviewGenreChange}
 				onQuickReviewInputKindChange={onQuickReviewInputKindChange}
 				onQuickReviewPreviousPromptChange={onQuickReviewPreviousPromptChange}
+				onQuickReviewCoreSellingPointChange={onQuickReviewCoreSellingPointChange}
+				onQuickReviewMustKeepMechanismsChange={onQuickReviewMustKeepMechanismsChange}
+				onQuickReviewTargetReaderPleasuresChange={onQuickReviewTargetReaderPleasuresChange}
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}

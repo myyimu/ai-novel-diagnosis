@@ -54,7 +54,10 @@ export type BookExportFormat =
 	| "style-bible"
 	| "outline"
 	| "prompt-pack"
-	| "do-not-copy";
+	| "do-not-copy"
+	| "skill-md"
+	| "skill-package"
+	| "skill-zip";
 
 export type BookExportMode = "notes" | "originalized";
 
@@ -255,6 +258,22 @@ function ExportCenter({
 					id: "sillytavern-world-info",
 					label: "SillyTavern 世界信息",
 					description: "给 SillyTavern 的 World Info 格式使用。",
+				},
+				{
+					id: "skill-md",
+					label: "单文件 Skill",
+					description: "导出一个 SKILL.md，适合手动整理进 Codex/Claude Code。",
+				},
+				{
+					id: "skill-package",
+					label: "目录级 Skill 包",
+					description: "导出 SKILL.md、references、scripts 和 metadata 文件树。",
+				},
+				{
+					id: "skill-zip",
+					label: "Skill ZIP",
+					description: "直接下载可解压的 skill 目录，适合放进 Codex/Claude Code。",
+					recommended: true,
 				},
 			],
 		},

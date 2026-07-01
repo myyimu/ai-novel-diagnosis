@@ -324,6 +324,9 @@ export function requestQuickReview({
 	quickReviewGenre,
 	quickReviewInputKind,
 	quickReviewPreviousPrompt,
+	quickReviewCoreSellingPoint,
+	quickReviewMustKeepMechanisms,
+	quickReviewTargetReaderPleasures,
 }: {
 	provider: ProviderForm;
 	chapterText: string;
@@ -331,6 +334,9 @@ export function requestQuickReview({
 	quickReviewGenre: string;
 	quickReviewInputKind?: QuickReviewInputKind;
 	quickReviewPreviousPrompt?: string;
+	quickReviewCoreSellingPoint?: string;
+	quickReviewMustKeepMechanisms?: string;
+	quickReviewTargetReaderPleasures?: string;
 }) {
 	const compactedChapterText = compactChapterText(chapterText);
 
@@ -341,6 +347,9 @@ export function requestQuickReview({
 		genre: quickReviewGenre || undefined,
 		inputKind: quickReviewInputKind || undefined,
 		previousPrompt: quickReviewPreviousPrompt?.trim() || undefined,
+		coreSellingPoint: quickReviewCoreSellingPoint?.trim() || undefined,
+		mustKeepMechanisms: quickReviewMustKeepMechanisms?.trim() || undefined,
+		targetReaderPleasures: quickReviewTargetReaderPleasures?.trim() || undefined,
 	});
 }
 

@@ -39,6 +39,9 @@ export function buildQuickReviewCacheKey({
 	quickReviewGenre,
 	quickReviewInputKind,
 	quickReviewPreviousPrompt,
+	quickReviewCoreSellingPoint,
+	quickReviewMustKeepMechanisms,
+	quickReviewTargetReaderPleasures,
 	chapterTitle,
 	chapterText,
 }: {
@@ -46,6 +49,9 @@ export function buildQuickReviewCacheKey({
 	quickReviewGenre: string;
 	quickReviewInputKind?: QuickReviewInputKind;
 	quickReviewPreviousPrompt?: string;
+	quickReviewCoreSellingPoint?: string;
+	quickReviewMustKeepMechanisms?: string;
+	quickReviewTargetReaderPleasures?: string;
 	chapterTitle: string;
 	chapterText: string;
 }) {
@@ -54,6 +60,9 @@ export function buildQuickReviewCacheKey({
 		quickReviewGenre || "auto",
 		quickReviewInputKind || "human-draft",
 		hashString((quickReviewPreviousPrompt || "").trim()),
+		hashString((quickReviewCoreSellingPoint || "").trim()),
+		hashString((quickReviewMustKeepMechanisms || "").trim()),
+		hashString((quickReviewTargetReaderPleasures || "").trim()),
 		chapterTitle.trim(),
 		hashString(chapterText.trim()),
 	].join("|");

@@ -23,12 +23,18 @@ export function QuickExperiencePanel({
 	quickReviewGenre,
 	quickReviewInputKind,
 	quickReviewPreviousPrompt,
+	quickReviewCoreSellingPoint = "",
+	quickReviewMustKeepMechanisms = "",
+	quickReviewTargetReaderPleasures = "",
 	revisionSessions,
 	methodologyCards: projectMethodologyCards,
 	onChapterTextChange,
 	onQuickReviewGenreChange,
 	onQuickReviewInputKindChange,
 	onQuickReviewPreviousPromptChange,
+	onQuickReviewCoreSellingPointChange = noop,
+	onQuickReviewMustKeepMechanismsChange = noop,
+	onQuickReviewTargetReaderPleasuresChange = noop,
 	onRun,
 	onRerun,
 	hasCachedResult,
@@ -48,12 +54,18 @@ export function QuickExperiencePanel({
 	quickReviewGenre: string;
 	quickReviewInputKind: QuickReviewInputKind;
 	quickReviewPreviousPrompt: string;
+	quickReviewCoreSellingPoint?: string;
+	quickReviewMustKeepMechanisms?: string;
+	quickReviewTargetReaderPleasures?: string;
 	revisionSessions: RevisionSession[];
 	methodologyCards: ProjectMethodologyCard[];
 	onChapterTextChange: (value: string) => void;
 	onQuickReviewGenreChange: (value: string) => void;
 	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
 	onQuickReviewPreviousPromptChange: (value: string) => void;
+	onQuickReviewCoreSellingPointChange?: (value: string) => void;
+	onQuickReviewMustKeepMechanismsChange?: (value: string) => void;
+	onQuickReviewTargetReaderPleasuresChange?: (value: string) => void;
 	onRun: () => void;
 	onRerun: () => void;
 	hasCachedResult: boolean;
@@ -161,7 +173,7 @@ export function QuickExperiencePanel({
 					</div>
 					<details className="mt-4 rounded-md border border-border bg-background p-3">
 						<summary className="cursor-pointer list-none text-sm font-medium">
-							可选：指定题材、稿件来源和上一条 Prompt
+							可选：指定题材、卖点保护和上一条 Prompt
 							<span className="ml-2 text-xs font-normal text-muted-foreground">
 								不懂就保持自动判断
 							</span>
@@ -220,6 +232,48 @@ export function QuickExperiencePanel({
 									题材和来源只帮助模型少走弯路；上一条 Prompt
 									会参与诊断和下一轮改稿指令。
 								</p>
+							</div>
+						</div>
+						<div className="mt-3 grid gap-3 lg:grid-cols-3">
+							<div className="space-y-2">
+								<Label htmlFor="quick-review-core-selling-point">核心卖点</Label>
+								<textarea
+									id="quick-review-core-selling-point"
+									value={quickReviewCoreSellingPoint}
+									onChange={(event) =>
+										onQuickReviewCoreSellingPointChange(event.target.value)
+									}
+									className="min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									placeholder="例如：强者不争权，用拒绝权力制造反差爽感。"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="quick-review-must-keep-mechanisms">
+									必须保留机制
+								</Label>
+								<textarea
+									id="quick-review-must-keep-mechanisms"
+									value={quickReviewMustKeepMechanisms}
+									onChange={(event) =>
+										onQuickReviewMustKeepMechanismsChange(event.target.value)
+									}
+									className="min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									placeholder="例如：倒计时、论坛体、热梗、日常弱冲突、主角拒绝。"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="quick-review-target-reader-pleasures">
+									目标读者爽点
+								</Label>
+								<textarea
+									id="quick-review-target-reader-pleasures"
+									value={quickReviewTargetReaderPleasures}
+									onChange={(event) =>
+										onQuickReviewTargetReaderPleasuresChange(event.target.value)
+									}
+									className="min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									placeholder="例如：看别人误判主角、看热梗接住笑点、看日常反差。"
+								/>
 							</div>
 						</div>
 					</details>
@@ -639,6 +693,8 @@ export function QuickExperiencePanel({
 		</section>
 	);
 }
+
+function noop() {}
 
 function buildSharpDiagnosis(result: QuickReviewResult | null) {
 	if (!result) {

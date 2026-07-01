@@ -71,6 +71,9 @@ export interface ChapterCritiqueViewProps {
 	quickReviewGenre: string;
 	quickReviewInputKind: QuickReviewInputKind;
 	quickReviewPreviousPrompt: string;
+	quickReviewCoreSellingPoint: string;
+	quickReviewMustKeepMechanisms: string;
+	quickReviewTargetReaderPleasures: string;
 	revisionSessions: RevisionSession[];
 	methodologyCards: ProjectMethodologyCard[];
 	importReferenceFile: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -79,6 +82,9 @@ export interface ChapterCritiqueViewProps {
 	onQuickReviewGenreChange: (value: string) => void;
 	onQuickReviewInputKindChange: (value: QuickReviewInputKind) => void;
 	onQuickReviewPreviousPromptChange: (value: string) => void;
+	onQuickReviewCoreSellingPointChange: (value: string) => void;
+	onQuickReviewMustKeepMechanismsChange: (value: string) => void;
+	onQuickReviewTargetReaderPleasuresChange: (value: string) => void;
 	onRunQuickExperience: () => void;
 	onRerunQuickExperience: () => void;
 	hasQuickReviewCache: boolean;
@@ -276,6 +282,9 @@ export function ChapterCritiqueView({
 	quickReviewGenre,
 	quickReviewInputKind,
 	quickReviewPreviousPrompt,
+	quickReviewCoreSellingPoint,
+	quickReviewMustKeepMechanisms,
+	quickReviewTargetReaderPleasures,
 	revisionSessions,
 	methodologyCards,
 	importReferenceFile,
@@ -284,6 +293,9 @@ export function ChapterCritiqueView({
 	onQuickReviewGenreChange,
 	onQuickReviewInputKindChange,
 	onQuickReviewPreviousPromptChange,
+	onQuickReviewCoreSellingPointChange,
+	onQuickReviewMustKeepMechanismsChange,
+	onQuickReviewTargetReaderPleasuresChange,
 	onRunQuickExperience,
 	onRerunQuickExperience,
 	hasQuickReviewCache,
@@ -545,12 +557,18 @@ export function ChapterCritiqueView({
 				quickReviewGenre={quickReviewGenre}
 				quickReviewInputKind={quickReviewInputKind}
 				quickReviewPreviousPrompt={quickReviewPreviousPrompt}
+				quickReviewCoreSellingPoint={quickReviewCoreSellingPoint}
+				quickReviewMustKeepMechanisms={quickReviewMustKeepMechanisms}
+				quickReviewTargetReaderPleasures={quickReviewTargetReaderPleasures}
 				revisionSessions={revisionSessions}
 				methodologyCards={methodologyCards}
 				onChapterTextChange={(value) => onChapterDraftChange({ chapterText: value })}
 				onQuickReviewGenreChange={onQuickReviewGenreChange}
 				onQuickReviewInputKindChange={onQuickReviewInputKindChange}
 				onQuickReviewPreviousPromptChange={onQuickReviewPreviousPromptChange}
+				onQuickReviewCoreSellingPointChange={onQuickReviewCoreSellingPointChange}
+				onQuickReviewMustKeepMechanismsChange={onQuickReviewMustKeepMechanismsChange}
+				onQuickReviewTargetReaderPleasuresChange={onQuickReviewTargetReaderPleasuresChange}
 				onRun={onRunQuickExperience}
 				onRerun={onRerunQuickExperience}
 				hasCachedResult={hasQuickReviewCache}

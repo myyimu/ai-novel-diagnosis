@@ -81,6 +81,7 @@ import {
 	formatFileSize,
 	basenameWithoutExtension,
 	toSafeFilename,
+	downloadBlob,
 	downloadText,
 	mergeById,
 	mergeMethodologyCards,
@@ -295,6 +296,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewInputKind,
 		quickReviewPreviousPrompt,
 		setQuickReviewPreviousPrompt,
+		quickReviewCoreSellingPoint,
+		setQuickReviewCoreSellingPoint,
+		quickReviewMustKeepMechanisms,
+		setQuickReviewMustKeepMechanisms,
+		quickReviewTargetReaderPleasures,
+		setQuickReviewTargetReaderPleasures,
 		rubricResult,
 		setRubricResult,
 		scoreResult,
@@ -834,6 +841,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			quickReviewGenre,
 			quickReviewInputKind,
 			quickReviewPreviousPrompt,
+			quickReviewCoreSellingPoint,
+			quickReviewMustKeepMechanisms,
+			quickReviewTargetReaderPleasures,
 			chapterTitle,
 			chapterText,
 		});
@@ -1129,6 +1139,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewGenre(example.genre);
 		setQuickReviewInputKind(example.inputKind);
 		setQuickReviewPreviousPrompt(example.previousPrompt);
+		setQuickReviewCoreSellingPoint("");
+		setQuickReviewMustKeepMechanisms("");
+		setQuickReviewTargetReaderPleasures("");
 		setPreviousQuickReviewResult(null);
 		setQuickReviewResult(null);
 		setScoreResult(null);
@@ -1521,6 +1534,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				quickReviewGenre,
 				quickReviewInputKind,
 				quickReviewPreviousPrompt,
+				quickReviewCoreSellingPoint,
+				quickReviewMustKeepMechanisms,
+				quickReviewTargetReaderPleasures,
 			});
 			setQuickReviewResult(result);
 			rememberQuickReview(cacheKey, result);
@@ -1962,17 +1978,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				const payload = (await response.json()) as ApiEnvelope<unknown>;
 				throw new Error(payload.message || `Export failed: ${response.status}`);
 			}
-			const content = await response.text();
+			const blob = await response.blob();
 			const disposition = response.headers.get("content-disposition") || "";
 			const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
 			const filename = filenameMatch
 				? decodeURIComponent(filenameMatch[1])
 				: `book-analysis-${format}.txt`;
-			downloadText(
-				filename,
-				content,
-				response.headers.get("content-type") || "text/plain;charset=utf-8",
-			);
+			downloadBlob(filename, blob);
 			setStatus(`导出完成：${filename}`);
 		} catch (error) {
 			setStatus((error as Error).message);
@@ -2159,6 +2171,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewInputKind,
 		quickReviewPreviousPrompt,
 		setQuickReviewPreviousPrompt,
+		quickReviewCoreSellingPoint,
+		setQuickReviewCoreSellingPoint,
+		quickReviewMustKeepMechanisms,
+		setQuickReviewMustKeepMechanisms,
+		quickReviewTargetReaderPleasures,
+		setQuickReviewTargetReaderPleasures,
 		quickReviewResult,
 		previousQuickReviewResult,
 		quickReviewElapsedSeconds,
