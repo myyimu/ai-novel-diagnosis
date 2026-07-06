@@ -2223,6 +2223,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		researchSourceCount,
 		researchReadiness,
 		researchSources,
+		persistedResearchLibrary,
 		beginnerLearningDigest,
 
 		/* handlers */

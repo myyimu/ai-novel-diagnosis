@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import {
@@ -22,7 +22,11 @@ import { MethodologyLibraryView } from "@/components/workspace/methodology-libra
 import { OverviewView } from "@/components/workspace/overview-view";
 import { RevisionHistoryView } from "@/components/workspace/revision-history-view";
 import { StarterView } from "@/components/workspace/starter-view";
+import { Sidebar } from "@/components/workspace/Sidebar";
+import { ViewHeader } from "@/components/workspace/ViewHeader";
+import { WorkspaceLayout } from "@/components/workspace/WorkspaceLayout";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { ThreeColumnWorkspaceShell } from "@/components/workspace/ThreeColumnWorkspaceShell";
 import { providerPresetOptions, providerPresets } from "@/lib/provider-presets";
 import { useWorkspaceHandlers, type LoadingState } from "@/hooks/use-workspace-handlers";
 import {
@@ -497,8 +501,149 @@ function BookJobPanel({
 
 /* ──────────── main component ──────────── */
 
-export function NovelCritiqueConsole({ view = "overview" }: { view?: WorkspaceView }) {
+export type LayoutMode = "classic" | "three-column";
+
+// 环境变量作为默认值，可被用户设置覆盖
+const DEFAULT_LAYOUT_MODE: LayoutMode =
+	process.env.NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT === "true" ? "three-column" : "classic";
+
+export function NovelCritiqueConsole({
+	view = "overview",
+	layoutMode = DEFAULT_LAYOUT_MODE,
+}: {
+	view?: WorkspaceView;
+	layoutMode?: LayoutMode;
+}) {
 	const h = useWorkspaceHandlers(view);
+
+	// 为三栏布局构造 handlers
+	const workspaceHandlers = {
+		/* provider state */
+		providerKind: h.provider.kind,
+		providerLabel: h.providerLabel,
+		providerModel: h.provider.model,
+		loading: h.loading,
+
+		/* quick review state */
+		quickLoading: h.loading === "quick",
+		quickElapsedSeconds: h.quickReviewElapsedSeconds,
+		quickReviewResult: h.quickReviewResult,
+		quickReviewError: h.quickReviewError,
+		previousQuickReviewResult: h.previousQuickReviewResult,
+		quickReviewGenre: h.quickReviewGenre,
+		quickReviewInputKind: h.quickReviewInputKind,
+		quickReviewPreviousPrompt: h.quickReviewPreviousPrompt,
+		quickReviewCoreSellingPoint: h.quickReviewCoreSellingPoint,
+		quickReviewMustKeepMechanisms: h.quickReviewMustKeepMechanisms,
+		quickReviewTargetReaderPleasures: h.quickReviewTargetReaderPleasures,
+
+		/* chapter state */
+		chapterText: h.chapterText,
+		chapterTitle: h.chapterTitle,
+
+		/* project state */
+		revisionSessions: h.projectRevisionSessions,
+		methodologyCards: h.projectMethodologyCards,
+
+		/* book state */
+		bookTitle: h.bookTitle,
+		bookGenre: h.bookGenre,
+		bookText: h.bookText,
+		bookFile: h.bookFile,
+		bookUpload: h.bookUpload,
+		bookJob: h.bookJob,
+		bookAnalysisResult: h.bookAnalysisResult,
+
+		/* cache */
+		hasQuickReviewCache: Boolean(h.quickReviewCacheHit),
+
+		/* handlers */
+		handleChapterTextChange: h.handleChapterTextChange,
+		onQuickReviewGenreChange: h.setQuickReviewGenre,
+		onQuickReviewInputKindChange: h.setQuickReviewInputKind,
+		onQuickReviewPreviousPromptChange: h.setQuickReviewPreviousPrompt,
+		onQuickReviewCoreSellingPointChange: h.setQuickReviewCoreSellingPoint,
+		onQuickReviewMustKeepMechanismsChange: h.setQuickReviewMustKeepMechanisms,
+		onQuickReviewTargetReaderPleasuresChange: h.setQuickReviewTargetReaderPleasures,
+		onRunQuickExperience: h.runQuickExperience,
+		onRerunQuickExperience: () => h.runQuickExperience(true),
+
+		/* examples */
+		diagnosisExamples: h.diagnosisExampleOptions,
+		onUseExampleChapter: h.useExampleChapter,
+
+		/* navigation */
+		onOpenModel: () => h.openView("provider"),
+		onOpenCritique: () => h.openView("chapter"),
+		onOpenBook: () => h.openView("book"),
+
+		/* DiagnosisTab - rubric & scoring */
+		rubricResult: h.rubricResult,
+		scoreResult: h.scoreResult,
+		onBuildRubric: h.buildRubric,
+		onScoreChapter: h.scoreChapter,
+		hasRubricCache: Boolean(h.rubricCacheHit),
+		hasScoreCache: Boolean(h.scoreCacheHit),
+		onRebuildRubric: () => h.buildRubric(true),
+		onRescoreChapter: () => h.scoreChapter(true),
+		referenceText: h.referenceText,
+		onReferenceTextChange: h.handleReferenceTextChange,
+		onImportReferenceFile: h.importReferenceFile,
+		platformLabel: h.platformLabel,
+		readingModeLabel: h.readingModeLabel,
+		competitionLevelLabel: h.optionLabel(competitionLevelOptions, h.competitionLevel),
+		pushStageLabel: h.optionLabel(pushStageOptions, h.pushStage),
+		competitionNotes: h.competitionNotes,
+		chapterCompletion: h.chapterCompletion,
+		nextChapterAction: h.nextChapterAction,
+		onOpenPlatformStrategy: () => h.openView("chapter"),
+		onOpenChapterDraft: () => h.openView("chapter"),
+
+		/* ResultsTab - project status */
+		bookStatus: h.bookJob?.status ?? (h.bookUpload ? "已预览" : "未启动"),
+		bookCompletion: h.bookCompletion,
+		onOpenMethodology: () => h.openView("methodology"),
+		onOpenHistory: () => h.openView("revisions"),
+		onOpenDashboard: () => h.openView("dashboard"),
+		onExportProject: h.exportProjectMarkdown,
+		onSaveRevisionNote: h.saveRevisionNote,
+
+		/* AnalysisTab - book analysis */
+		researchReadiness: h.researchReadiness,
+		graphNodeCount: h.graphNodeCount,
+		graphEdgeCount: h.graphEdgeCount,
+		foreshadowingCount: h.foreshadowingCount,
+		evidenceScoreCount: h.evidenceScoreCount,
+		comparableBookCount: h.comparableBookCount,
+		persistedResearchLibrary: h.persistedResearchLibrary,
+		onOpenBookAnalysis: () => h.openView("book"),
+		onOpenLibrary: () => h.openView("library"),
+		onOpenExport: () => h.openView("exports"),
+
+		/* Right panel extensions */
+		providerPreset: h.provider.preset,
+		isBackendFreeProvider: h.isBackendFreeProvider,
+		historyTasks: h.bookHistory,
+			beginnerLearningDigest: h.beginnerLearningDigest,
+		onTestConnection: h.testProvider,
+		onOpenFullSettings: () => h.openView("provider"),
+		onOpenHistoryView: () => h.openView("history"),
+	};
+
+	if (layoutMode === "three-column") {
+		return (
+			<ThreeColumnWorkspaceShell
+				activeView={h.activeView}
+				activeMeta={h.activeMeta}
+				navItems={h.navItems}
+				advancedNavItems={h.advancedNavItems}
+				status={h.status}
+				loading={h.loading !== null}
+				onOpenView={h.openView}
+				workspaceHandlers={workspaceHandlers}
+			/>
+		);
+	}
 
 	return (
 		<WorkspaceShell

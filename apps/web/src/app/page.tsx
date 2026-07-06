@@ -1,6 +1,11 @@
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
+"use client";
+
+import { NovelCritiqueConsole, type LayoutMode } from "@/components/novel-critique-console";
+import { WorkspaceHeader } from "@/components/workspace-header";
+import { useLayoutMode } from "@/components/layout-toggle";
 
 export default function HomePage() {
+	const [layoutMode] = useLayoutMode();
 	const siteUrl =
 		process.env.NEXT_PUBLIC_SITE_URL ??
 		(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://127.0.0.1:3000");
@@ -43,7 +48,8 @@ export default function HomePage() {
 				type="application/ld+json"
 				dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
 			/>
-			<NovelCritiqueConsole view="overview" />
+			<WorkspaceHeader />
+			<NovelCritiqueConsole view="overview" layoutMode={layoutMode} />
 		</main>
 	);
 }
