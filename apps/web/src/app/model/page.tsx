@@ -1,3 +1,5 @@
+"use client";
+
 import { NovelCritiqueConsole } from "@/components/novel-critique-console";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { useLayoutMode } from "@/components/layout-toggle";

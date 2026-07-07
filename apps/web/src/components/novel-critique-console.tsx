@@ -22,9 +22,6 @@ import { MethodologyLibraryView } from "@/components/workspace/methodology-libra
 import { OverviewView } from "@/components/workspace/overview-view";
 import { RevisionHistoryView } from "@/components/workspace/revision-history-view";
 import { StarterView } from "@/components/workspace/starter-view";
-import { Sidebar } from "@/components/workspace/Sidebar";
-import { ViewHeader } from "@/components/workspace/ViewHeader";
-import { WorkspaceLayout } from "@/components/workspace/WorkspaceLayout";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { ThreeColumnWorkspaceShell } from "@/components/workspace/ThreeColumnWorkspaceShell";
 import { providerPresetOptions, providerPresets } from "@/lib/provider-presets";
@@ -624,7 +621,7 @@ export function NovelCritiqueConsole({
 		providerPreset: h.provider.preset,
 		isBackendFreeProvider: h.isBackendFreeProvider,
 		historyTasks: h.bookHistory,
-			beginnerLearningDigest: h.beginnerLearningDigest,
+		beginnerLearningDigest: h.beginnerLearningDigest,
 		onTestConnection: h.testProvider,
 		onOpenFullSettings: () => h.openView("provider"),
 		onOpenHistoryView: () => h.openView("history"),
