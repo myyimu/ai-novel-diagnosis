@@ -1,11 +1,9 @@
 "use client";
 
-import { LayoutToggle, useLayoutMode } from "@/components/layout-toggle";
+import { LayoutToggle } from "@/components/layout-toggle";
 import { LayoutGrid } from "lucide-react";
 
 export function WorkspaceHeader() {
-	const [layoutMode, setLayoutMode] = useLayoutMode();
-
 	return (
 		<header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 			<div className="flex items-center justify-between px-4 py-2">
@@ -13,7 +11,7 @@ export function WorkspaceHeader() {
 					<LayoutGrid className="w-5 h-5 text-primary" />
 					<h1 className="text-sm font-semibold">AI网文诊断台</h1>
 				</div>
-				<LayoutToggle currentMode={layoutMode} onModeChange={setLayoutMode} />
+				<LayoutToggle />
 			</div>
 		</header>
 	);
