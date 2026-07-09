@@ -204,7 +204,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 拆书导览 -> 关系故事线 -> 图谱复核 -> 导出阅读报告/写作资产
 ```
 
-当前页面入口已经收敛：`/` 是第一章诊断台，`/dashboard` 是诊断看板，`/methodology` 是方法论库，`/revisions` 是复诊历史，`/critique` 是深度质检，`/book` 是拆书图谱，`/library` 是样本研究，`/history` 是历史任务，`/export` 是导出资产，`/model` 是 AI 设置。`/workspace`、`/starter` 保留为兼容路由，会回到首页。
+当前页面入口按四个工作区组织：`/diagnose` 是诊断工作区，包含 `/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`；`/project` 是项目工作区，包含 `/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`；`/research` 是研究工作区，包含 `/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`；`/settings` 是设置工作区，包含 `/settings/provider`、`/settings/dashboard`、`/settings/history`。`/` 会进入快速诊断；`/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等旧入口仍保留用于兼容。
 
 ## 主要能力
 
@@ -250,6 +250,7 @@ AI 生成稿诊断与 Prompt 迭代：
 - 单仓多项目：One CLI
 - 前端：Next.js
 - 后端接口：NestJS
+- 桌面外壳：Electron
 - 数据库：PostgreSQL，未配置时回退到 PGlite
 - 包管理器：pnpm
 - 模型接入：公共共享入口、自备 Key、OpenAI-compatible 接口
@@ -357,7 +358,8 @@ API: http://127.0.0.1:3001/api/v1
 
 ## 工作区结构
 
-- `apps/web`: Next.js 控制台，主路径为诊断台、深度质检、拆书图谱、样本研究、历史任务、导出资产和 AI 设置。
+- `apps/web`: Next.js 控制台，按诊断、项目、研究、设置四个工作区组织页面。
+- `apps/desktop`: Electron 桌面外壳，开发模式加载本地 Web，打包模式拉起内置 API / Next sidecar。
 - `services/api`: NestJS API，负责文本清洗、章节切分、异步任务、整书拆解和导出。
 - `packages/ai-core`: 共享类型、评分指标和分析契约。
 
@@ -365,7 +367,7 @@ API: http://127.0.0.1:3001/api/v1
 
 默认不配置 `DATABASE_URL` 时，API 会使用 `.local/pglite` 作为本地开发数据库。
 
-上传 TXT 和整书拆解中间产物默认存放在 `.local/analysis`。这是本地开发明文存储，目录已被 `.gitignore` 忽略，不应提交上传文本、模型输出、本地数据库或 API Key。
+上传 TXT、标准化文本和上传快照默认存放在 `.local/analysis`；整书拆解的章节 map 中间产物默认存放在 `.local/artifacts`。这些目录已被 `.gitignore` 忽略，不应提交上传文本、模型输出、本地数据库或 API Key。
 
 如果处理真实作者稿件或商业稿件，可以设置 `ANALYSIS_STORAGE_KEY` 启用本地隐私模式。启用后，上传原文、标准化文本和上传快照会以 AES-256-GCM 写成 `.enc` 文件；API 会在读取时透明解密。请妥善保存这个密钥，丢失后已加密的本地上传无法恢复。
 
@@ -408,7 +410,7 @@ API: http://localhost:3001/api/v1
 健康检查: http://localhost:3001/health
 ```
 
-当前 compose 只启动实际使用的 `postgres`、`api`、`web`。Redis / MinIO 暂未接入代码，不再默认启动。
+当前 compose 只启动实际使用的 `postgres`、`api`、`web`。
 
 上传文本和整书拆解中间结果默认保存在：
 

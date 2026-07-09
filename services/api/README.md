@@ -1,12 +1,13 @@
 # API Service
 
-`services/api` 是 AI 小说第一步的 NestJS 后端。
+`services/api` 是 AI网文诊断台的 NestJS 后端。
 
 它负责模型调用、第一章改稿急诊、成熟样本质检、整书异步拆解、关系图谱资产、研究库和导出。前端通过 `/api/v1` 访问这些接口；本地开发默认监听 `http://127.0.0.1:3001/api/v1`。
 
 ## 主要模块
 
 - `analysis`: 小说分析主模块，包含第一章急诊、参考画像、Rubric、评分、整书拆解、图谱资产和导出。
+- `workspace`: 项目、复诊资产、方法论卡片和项目导出。
 - `research-library`: 从已完成整书任务生成进阶研究资产，支持多书对比和证据问答。
 - `health`: 健康检查。
 - `auth` / `user` / `common`: 模板保留模块，当前不是产品主路径。
@@ -30,6 +31,7 @@
 ### 模型供应商
 
 - `POST /api/v1/analysis/provider/test`
+- `POST /api/v1/analysis/provider/models`
 - `GET /api/v1/analysis/provider/presets`
 
 支持 mock、共享 OpenAI-compatible 线路、自备 Key、DeepSeek、豆包/火山方舟、通义千问、Ollama 和自定义 OpenAI-compatible 接口。
@@ -37,14 +39,17 @@
 ### 整书拆解与导出
 
 - `POST /api/v1/analysis/book/uploads`
+- `POST /api/v1/analysis/book/jobs`
 - `GET /api/v1/analysis/book/uploads/:uploadId`
 - `GET /api/v1/analysis/book/uploads`
 - `POST /api/v1/analysis/book/uploads/:uploadId/jobs`
 - `POST /api/v1/analysis/book/jobs/:jobId/resume`
 - `GET /api/v1/analysis/book/jobs/:jobId`
+- `DELETE /api/v1/analysis/book/jobs/:jobId`
 - `GET /api/v1/analysis/book/jobs/:jobId/search`
 - `GET /api/v1/analysis/book/jobs`
 - `GET /api/v1/analysis/book/jobs/:jobId/export`
+- `POST /api/v1/analysis/book/skills/distill`
 
 整书任务采用异步 Map-Reduce。每章 map 结果会持久化，任务失败时已完成章节不会丢失。Reduce 结果会支撑角色卡、世界书、关系图谱、时间线和导出包。
 
@@ -53,17 +58,32 @@
 - `GET /api/v1/analysis/research/library`
 - `POST /api/v1/analysis/research/compare`
 - `POST /api/v1/analysis/research/ask`
+- `POST /api/v1/analysis/research/distill`
 
 研究库基于已完成整书任务，服务多书横向对比、证据链和创作决策问答。
+
+### 项目工作区
+
+- `GET /api/v1/analysis/workspace/assets`
+- `POST /api/v1/analysis/workspace/projects`
+- `POST /api/v1/analysis/workspace/revision-assets`
+- `GET /api/v1/analysis/workspace/projects/:projectId/export`
+
+项目工作区接口负责持久化当前项目、复诊记录、方法论卡片和 Markdown 导出包。
 
 ## 本地数据
 
 未配置 `DATABASE_URL` 时，开发环境使用 `.local/pglite`。
 
-上传文本、章节切分、任务中间结果和导出产物保存在：
+上传文本、标准化文本和上传快照保存在：
 
 ```text
 .local/analysis
+```
+
+整书任务章节 map 中间产物保存在：
+
+```text
 .local/artifacts
 ```
 
@@ -128,7 +148,7 @@ pnpm --filter api db:migrate
 
 ## 数据库迁移
 
-真实 PostgreSQL 使用 `drizzle/migrations` 中的迁移文件，不再依赖临时 `db:push` 作为部署手段。
+真实 PostgreSQL 使用 `drizzle/migrations` 中的迁移文件作为部署手段。
 
 ```bash
 DATABASE_URL=postgres://user:pass@host:5432/db pnpm --filter api db:migrate

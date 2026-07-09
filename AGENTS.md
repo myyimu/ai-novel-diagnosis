@@ -5,9 +5,19 @@
 
 ## 工作区
 
-- 根目录：`C:\Users\Legion\Documents\disassemble\ai-novel-first-step`
+- 根目录：`E:\ai-novel-diagnosis`
 - AI 提供方：`codex`
-- 模板分组数：3
+- 模板分组数：4
+
+## custom
+
+适用项目：
+- `apps/desktop`
+
+### 内置指引
+- 当前模板 `custom` 没有内置 AI 最佳实践片段。
+- 先阅读该项目的 README、package.json、脚本和样式/运行时入口，再开始修改。
+- 优先保持现有技术栈和目录约定，不要臆造新的工程层级。
 
 ## nestjs-api
 

@@ -1,464 +1,484 @@
 import {
-	BarChart3,
-	BookOpenCheck,
+	BookOpen,
 	Download,
 	FileText,
+	GanttChart,
 	History,
-	LayoutDashboard,
 	Layers3,
 	ListRestart,
 	Network,
-	Settings,
+	Settings as SettingsIcon,
 	Sparkles,
+	Stethoscope,
+	BarChart3,
 } from "lucide-react";
-import type { WorkspaceNavItem } from "@/components/workspace/workspace-shell";
-import { parseOptionalNumber } from "@/lib/workspace-analysis-client";
-import type { WorkspaceView } from "@/lib/workspace-routes";
+import type { LucideIcon } from "lucide-react";
 import type {
-	BookAnalysisJob,
-	BookAnalysisResult,
-	BookUploadPreview,
-	QuickReviewResult,
-	ScoreResult,
-} from "@/stores/workspace-store";
+	WorkspaceType,
+	DiagnoseView,
+	ProjectView,
+	ResearchView,
+	SettingsView,
+	WorkspaceView,
+} from "@/lib/workspace-routes";
 
-export const workspaceViewItems: Array<WorkspaceNavItem<WorkspaceView>> = [
+export interface WorkspaceNavItem<TView extends string = string> {
+	id: TView;
+	label: string;
+	icon: LucideIcon;
+	title: string;
+	description: string;
+}
+
+// 诊断工作区导航项
+export const diagnoseNavItems: WorkspaceNavItem<DiagnoseView>[] = [
 	{
-		id: "overview",
-		label: "诊断台",
-		icon: LayoutDashboard,
-		title: "AI网文诊断台",
-		description: "别急着重写，先找出小说为什么没人追，再拿下一版改稿方案。",
+		id: "quick",
+		label: "快速诊断",
+		icon: Stethoscope,
+		title: "快速诊断",
+		description: "快速诊断章节问题，获取改稿建议",
 	},
 	{
-		id: "dashboard",
-		label: "诊断看板",
+		id: "deep",
+		label: "深度质检",
+		icon: FileText,
+		title: "深度质检",
+		description: "基于评分标准的详细质量检查",
+	},
+	{
+		id: "score",
+		label: "评分报告",
 		icon: BarChart3,
-		title: "诊断 Dashboard",
-		description: "查看质量趋势、Prompt 有效率、常见问题和方法论沉淀。",
+		title: "评分报告",
+		description: "查看章节评分和改进建议",
+	},
+	{
+		id: "evidence",
+		label: "证据链",
+		icon: ListRestart,
+		title: "证据链",
+		description: "查看诊断依据和证据",
+	},
+];
+
+// 项目工作区导航项
+export const projectNavItems: WorkspaceNavItem<ProjectView>[] = [
+	{
+		id: "current",
+		label: "当前项目",
+		icon: GanttChart,
+		title: "当前项目",
+		description: "查看和切换当前工作项目",
+	},
+	{
+		id: "revisions",
+		label: "复诊记录",
+		icon: History,
+		title: "复诊记录",
+		description: "查看历史诊断和改稿记录",
 	},
 	{
 		id: "methodology",
 		label: "方法论库",
 		icon: Layers3,
-		title: "项目方法论库",
-		description: "把反复出现的问题沉淀成自查规则、改稿约束和可复用 Prompt 模板。",
+		title: "方法论库",
+		description: "沉淀的诊断规则和改稿模板",
 	},
 	{
-		id: "revisions",
-		label: "复诊记录",
-		icon: ListRestart,
-		title: "项目复诊记录",
-		description: "回看当前项目每一次复诊、相邻版本变化和当时生成的下一轮 Prompt。",
+		id: "export",
+		label: "导出资产",
+		icon: Download,
+		title: "导出资产",
+		description: "导出项目资产和诊断报告",
 	},
-	{
-		id: "chapter",
-		label: "深度质检",
-		icon: FileText,
-		title: "深度章节质检",
-		description: "急诊跑通后，再用成熟样本、评分标准和证据链确认这一章该怎么改。",
-	},
+];
+
+// 研究工作区导航项
+export const researchNavItems: WorkspaceNavItem<ResearchView>[] = [
 	{
 		id: "book",
 		label: "拆书图谱",
 		icon: Network,
-		title: "AI拆书图谱",
-		description: "进阶使用：上传 TXT，拆角色、关系、时间线和可导出的写作资产。",
+		title: "拆书图谱",
+		description: "整书角色、关系和时间线分析",
 	},
 	{
-		id: "library",
-		label: "样本研究",
-		icon: BookOpenCheck,
-		title: "样本研究",
-		description: "进阶使用：把已拆解样本变成可追溯的题材、卖点和开头判断。",
+		id: "compare",
+		label: "样本对比",
+		icon: BookOpen,
+		title: "样本对比",
+		description: "对比多个已拆解样本",
+	},
+	{
+		id: "patterns",
+		label: "套路库",
+		icon: Sparkles,
+		title: "套路库",
+		description: "从样本提炼的开头套路",
+	},
+	{
+		id: "materials",
+		label: "研究资料",
+		icon: FileText,
+		title: "研究资料",
+		description: "研究库资料管理",
+	},
+];
+
+// 设置工作区导航项
+export const settingsNavItems: WorkspaceNavItem<SettingsView>[] = [
+	{
+		id: "provider",
+		label: "AI设置",
+		icon: SettingsIcon,
+		title: "AI设置",
+		description: "配置AI模型服务",
+	},
+	{
+		id: "dashboard",
+		label: "诊断看板",
+		icon: BarChart3,
+		title: "诊断看板",
+		description: "数据统计和质量趋势",
 	},
 	{
 		id: "history",
 		label: "历史任务",
 		icon: History,
 		title: "历史任务",
-		description: "重新打开以前的上传记录和整书拆解结果，服务重启后也能查看已完成报告。",
-	},
-	{
-		id: "exports",
-		label: "导出资产",
-		icon: Download,
-		title: "导出资产",
-		description: "选择学习笔记或原创化素材包，再下载报告、角色卡、世界书和避险清单。",
-	},
-	{
-		id: "provider",
-		label: "AI 设置",
-		icon: Settings,
-		title: "AI 设置",
-		description:
-			"选择用于分析小说的模型服务。可用共享站，也可以切换到自己的模型账号或本地模型。",
-	},
-	{
-		id: "starter",
-		label: "爆款套路库",
-		icon: Sparkles,
-		title: "爆款开头套路库",
-		description: "进阶使用：从样本里提炼开头套路和可复用约束，不作为第一次使用入口。",
+		description: "查看历史整书拆解任务",
 	},
 ];
 
-const primaryWorkspaceViews = new Set<WorkspaceView>([
-	"overview",
-	"revisions",
-	"methodology",
-	"provider",
-]);
-
-const advancedWorkspaceViews = new Set<WorkspaceView>([
-	"chapter",
-	"dashboard",
-	"book",
-	"library",
-	"history",
-	"exports",
-]);
-
-export function getWorkspaceNavItems() {
-	return workspaceViewItems.filter((item) => primaryWorkspaceViews.has(item.id));
+// 根据工作区获取导航项
+export function getNavItemsByWorkspace(workspace: WorkspaceType): WorkspaceNavItem[] {
+	switch (workspace) {
+		case "diagnose":
+			return diagnoseNavItems;
+		case "project":
+			return projectNavItems;
+		case "research":
+			return researchNavItems;
+		case "settings":
+			return settingsNavItems;
+		default:
+			return [];
+	}
 }
 
-export function getAdvancedWorkspaceNavItems() {
-	return workspaceViewItems.filter((item) => advancedWorkspaceViews.has(item.id));
+// 获取工作区元信息
+export function getWorkspaceMeta(workspace: WorkspaceType) {
+	const metas: Record<WorkspaceType, { label: string; description: string }> = {
+		diagnose: {
+			label: "诊断",
+			description: "先诊断问题，再决定怎么改",
+		},
+		project: {
+			label: "项目",
+			description: "管理诊断项目和方法论",
+		},
+		research: {
+			label: "研究",
+			description: "拆解样本，提炼套路",
+		},
+		settings: {
+			label: "设置",
+			description: "配置和数据看板",
+		},
+	};
+	return metas[workspace];
 }
 
-export function getWorkspaceViewMeta(view: WorkspaceView) {
-	return workspaceViewItems.find((item) => item.id === view) ?? workspaceViewItems[0];
+// 旧视图元信息（保持兼容性）
+export interface WorkspaceViewMeta {
+	id: string;
+	label: string;
+	title: string;
+	description: string;
+	icon: LucideIcon;
 }
 
-export interface ChapterProjectStep {
+const viewMetaMap: Record<string, WorkspaceViewMeta> = {
+	overview: {
+		id: "overview",
+		label: "快速诊断",
+		title: "快速诊断",
+		description: "快速诊断章节问题",
+		icon: Stethoscope,
+	},
+	chapter: {
+		id: "chapter",
+		label: "深度质检",
+		title: "深度质检",
+		description: "基于评分标准的详细质量检查",
+		icon: FileText,
+	},
+	book: {
+		id: "book",
+		label: "拆书图谱",
+		title: "拆书图谱",
+		description: "整书角色、关系和时间线分析",
+		icon: Network,
+	},
+	library: {
+		id: "library",
+		label: "样本对比",
+		title: "样本对比",
+		description: "对比多个已拆解样本",
+		icon: BookOpen,
+	},
+	starter: {
+		id: "starter",
+		label: "套路库",
+		title: "套路库",
+		description: "从样本提炼的开头套路",
+		icon: Sparkles,
+	},
+	revisions: {
+		id: "revisions",
+		label: "复诊记录",
+		title: "复诊记录",
+		description: "查看历史诊断和改稿记录",
+		icon: History,
+	},
+	methodology: {
+		id: "methodology",
+		label: "方法论库",
+		title: "方法论库",
+		description: "沉淀的诊断规则和改稿模板",
+		icon: Layers3,
+	},
+	exports: {
+		id: "exports",
+		label: "导出资产",
+		title: "导出资产",
+		description: "导出项目资产和诊断报告",
+		icon: Download,
+	},
+	provider: {
+		id: "provider",
+		label: "AI设置",
+		title: "AI设置",
+		description: "配置AI模型服务",
+		icon: SettingsIcon,
+	},
+	dashboard: {
+		id: "dashboard",
+		label: "诊断看板",
+		title: "诊断看板",
+		description: "数据统计和质量趋势",
+		icon: BarChart3,
+	},
+	history: {
+		id: "history",
+		label: "历史任务",
+		title: "历史任务",
+		description: "查看历史整书拆解任务",
+		icon: History,
+	},
+	materials: {
+		id: "materials",
+		label: "研究资料",
+		title: "研究资料",
+		description: "研究库资料管理",
+		icon: FileText,
+	},
+};
+
+export function getWorkspaceViewMeta(view: string): WorkspaceNavItem<WorkspaceView> {
+	const meta = viewMetaMap[view as keyof typeof viewMetaMap] || viewMetaMap.overview;
+	return meta as WorkspaceNavItem<WorkspaceView>;
+}
+
+// 获取工作区导航项（旧API，保持兼容性）
+export function getWorkspaceNavItems(): WorkspaceNavItem<WorkspaceView>[] {
+	return diagnoseNavItems as unknown as WorkspaceNavItem<WorkspaceView>[];
+}
+
+// 获取高级导航项（旧API，保持兼容性）
+export function getAdvancedWorkspaceNavItems(): WorkspaceNavItem<WorkspaceView>[] {
+	return [
+		...projectNavItems,
+		...researchNavItems,
+		...settingsNavItems,
+	] as unknown as WorkspaceNavItem<WorkspaceView>[];
+}
+
+// 性能快照说明
+export function getPerformanceSnapshotNote(options: { isShortFormReading?: boolean; isLongSerialization?: boolean }) {
+	const { isShortFormReading, isLongSerialization } = options;
+	if (isShortFormReading) {
+		return "短篇付费阅读：重点看前3分钟和付费转化率";
+	}
+	if (isLongSerialization) {
+		return "长篇连载：重点看追读率和留存曲线";
+	}
+	return "标准章节：重点看读完率和下一章点击率";
+}
+
+// 章节工作区摘要
+export interface OverviewStep {
 	label: string;
 	done: boolean;
 	detail: string;
 }
 
-export interface OverviewNextAction {
-	title: string;
-	description: string;
-	actionLabel: string;
-	view: WorkspaceView;
-	secondaryLabel?: string;
-	secondaryView?: WorkspaceView;
-}
-
-export function getPerformanceSnapshotNote({
-	isShortFormReading,
-	isLongSerialization,
-}: {
-	isShortFormReading: boolean;
-	isLongSerialization: boolean;
-}) {
-	if (isShortFormReading) {
-		return "短篇付费重点看点击后的全文读完、平均阅读进度和付费解锁，不使用追更、下一章点击、前3章留存。";
-	}
-
-	if (isLongSerialization) {
-		return "长篇追更重点看首章完读、加书架/收藏、章末下一章点击、前3章留存和追更；阅读60s只作低权重参考。";
-	}
-
-	return "移动端连载重点看点击后前30/60秒留住、触底、加书架、下一章点击和前3章留存。";
-}
-
-export function buildChapterWorkspaceSummary({
-	platformLabel,
-	audienceLabel,
-	readingModeLabel,
-	referenceText,
-	referenceFileName,
-	chapterText,
-	quickReviewResult,
-	referenceProfileApplied,
-	category,
-	theme,
-	rubricResult,
-	scoreResult,
-	performanceValues,
-	performanceSnapshotNote,
-}: {
+export function buildChapterWorkspaceSummary(options: {
 	platformLabel: string;
 	audienceLabel: string;
 	readingModeLabel: string;
 	referenceText: string;
 	referenceFileName: string;
 	chapterText: string;
-	quickReviewResult: QuickReviewResult | null;
+	quickReviewResult: unknown;
 	referenceProfileApplied: boolean;
 	category: string;
 	theme: string;
-	rubricResult: { rubric: { metrics: unknown[] } } | null;
-	scoreResult: ScoreResult | null;
-	performanceValues: string[];
+	rubricResult: unknown;
+	scoreResult: unknown;
+	performanceValues: (string | number)[];
 	performanceSnapshotNote: string;
 }) {
-	const hasChapterDraft = Boolean(chapterText.trim());
-	const hasReferenceText = Boolean(referenceText.trim());
-	const hasPerformanceSnapshot = performanceValues.some(
-		(item) => parseOptionalNumber(item) !== undefined,
-	);
-	const chapterProjectSteps: ChapterProjectStep[] = [
-		{
-			label: "平台和策略画像",
-			done: Boolean(platformLabel && audienceLabel && readingModeLabel),
-			detail: `${platformLabel} · ${audienceLabel} · ${readingModeLabel}`,
-		},
-		{
-			label: "成熟章节导入",
-			done: hasReferenceText,
-			detail: hasReferenceText
-				? referenceFileName || `${referenceText.trim().length} 字参考文本`
-				: "可稍后导入，用来生成更细的评分标准。",
-		},
-		{
-			label: "快速点评",
-			done: Boolean(quickReviewResult),
-			detail: quickReviewResult
-				? `${quickReviewResult.quickScore}/10 · ${quickReviewResult.mainProblem}`
-				: hasChapterDraft
-					? "已有章节正文，可以先跑一次快速点评。"
-					: "先粘贴自己的章节正文，最快看到反馈。",
-		},
-		{
-			label: "市场定位识别",
-			done: Boolean(category.trim() && theme.trim()),
-			detail: referenceProfileApplied
-				? "AI 识别结果已写入，可继续校正。"
-				: "可手动填写；建议点击 AI 识别获得更可靠的定位。",
-		},
-		{
-			label: "评分标准",
-			done: Boolean(rubricResult),
-			detail: rubricResult
-				? `${rubricResult.rubric.metrics.length} 个评分指标`
-				: "尚未生成评分标准。",
-		},
-		{
-			label: "章节评分",
-			done: Boolean(scoreResult),
-			detail: scoreResult
-				? `${scoreResult.totalScore}/10 · ${scoreResult.weakestPoint}`
-				: "尚未开始评分。",
-		},
-		{
-			label: "数据快照",
-			done: hasPerformanceSnapshot,
-			detail: hasPerformanceSnapshot ? performanceSnapshotNote : "未提供数据表现指标。",
-		},
-	];
-	const chapterCompletion = Math.round(
-		(chapterProjectSteps.filter((step) => step.done).length / chapterProjectSteps.length) * 100,
-	);
-	const nextChapterAction = !rubricResult
-		? "生成评分标准"
-		: !scoreResult
-			? "开始章节评分"
-			: "查看评分报告";
+	const hasReference = Boolean(options.referenceText.trim() || options.referenceFileName);
+	const hasChapter = Boolean(options.chapterText.trim());
+	const hasQuickReview = Boolean(options.quickReviewResult);
+	const hasRubric = Boolean(options.rubricResult);
+	const hasScore = Boolean(options.scoreResult);
+	const hasValidPerformance = options.performanceValues.some((v) => Number(v) > 0);
+
+	const steps: OverviewStep[] = [];
+	if (hasReference) steps.push({ label: "参考章节", done: true, detail: "已导入" });
+	else steps.push({ label: "参考章节", done: false, detail: "未导入" });
+
+	if (hasChapter) steps.push({ label: "待诊正文", done: true, detail: "已粘贴" });
+	else steps.push({ label: "待诊正文", done: false, detail: "未粘贴" });
+
+	if (hasQuickReview) steps.push({ label: "快速点评", done: true, detail: "已完成" });
+	else steps.push({ label: "快速点评", done: false, detail: "未运行" });
+
+	if (hasRubric) steps.push({ label: "评分标准", done: true, detail: "已生成" });
+	else steps.push({ label: "评分标准", done: false, detail: "未生成" });
+
+	if (hasScore) steps.push({ label: "章节评分", done: true, detail: "已完成" });
+	else steps.push({ label: "章节评分", done: false, detail: "未评分" });
+
+	if (hasValidPerformance) steps.push({ label: "流量数据", done: true, detail: "已填写" });
+	else steps.push({ label: "流量数据", done: false, detail: "未填写" });
+
+	let completion = 0;
+	if (hasReference) completion += 20;
+	if (hasChapter) completion += 20;
+	if (hasQuickReview) completion += 20;
+	if (hasRubric) completion += 15;
+	if (hasScore) completion += 15;
+	if (hasValidPerformance) completion += 10;
+
+	let nextChapterAction = "开始诊断";
+	if (!hasReference) nextChapterAction = "导入参考章节";
+	else if (!hasChapter) nextChapterAction = "粘贴待诊正文";
+	else if (!hasQuickReview) nextChapterAction = "运行快速点评";
+	else if (!hasRubric) nextChapterAction = "生成评分标准";
+	else if (!hasScore) nextChapterAction = "对章节评分";
+	else if (!hasValidPerformance) nextChapterAction = "填写流量数据";
 
 	return {
-		hasChapterDraft,
-		hasReferenceText,
-		hasPerformanceSnapshot,
-		chapterProjectSteps,
-		chapterCompletion,
+		chapterProjectSteps: steps,
+		chapterCompletion: completion,
 		nextChapterAction,
 	};
 }
 
-export function buildOverviewNextAction({
-	hasChapterDraft,
-	quickReviewResult,
-	hasReferenceText,
-	referenceProfileApplied,
-	rubricResult,
-	scoreResult,
-}: {
-	hasChapterDraft: boolean;
-	quickReviewResult: QuickReviewResult | null;
-	hasReferenceText: boolean;
-	referenceProfileApplied: boolean;
-	rubricResult: unknown | null;
-	scoreResult: ScoreResult | null;
-}): OverviewNextAction {
-	if (!hasChapterDraft) {
-		return {
-			title: "先把第一章贴进急诊室",
-			description:
-				"不用先填样本、平台和复杂参数。先贴正文，系统只回答：这章为什么没人追，下一版先改哪里。",
-			actionLabel: "开始急诊",
-			view: "overview",
-			secondaryLabel: "选择模型",
-			secondaryView: "provider",
-		};
-	}
-
-	if (!quickReviewResult) {
-		return {
-			title: "先生成改稿急诊",
-			description:
-				"诊断只需要一段正文，会给出最大流失点、正文证据、三条改法和可复制的改稿 Prompt。",
-			actionLabel: "回到急诊室",
-			view: "overview",
-			secondaryLabel: "选择模型",
-			secondaryView: "provider",
-		};
-	}
-
-	if (!hasReferenceText) {
-		return {
-			title: "复制 Prompt，改完回来复诊",
-			description:
-				"第一轮价值已经出现。先按 Prompt 改一版，再把新版贴回急诊室，看最大流失点有没有真的被解决。",
-			actionLabel: "查看急诊结果",
-			view: "overview",
-			secondaryLabel: "需要证据链",
-			secondaryView: "chapter",
-		};
-	}
-
-	if (!referenceProfileApplied) {
-		return {
-			title: "先校准市场定位",
-			description:
-				"当前还没有完成市场定位校准。先确认分类、主题、标签和读者期待，后面的评分标准才不会偏。",
-			actionLabel: "去 AI 识别定位",
-			view: "chapter",
-			secondaryLabel: "AI 设置",
-			secondaryView: "provider",
-		};
-	}
-
-	if (!rubricResult) {
-		return {
-			title: "生成本章评分标准",
-			description:
-				"市场定位已经可用，下一步把成熟章节拆成可复用的评分标准，再用同一套标准质检你的章节。",
-			actionLabel: "去生成评分标准",
-			view: "chapter",
-			secondaryLabel: "调整策略画像",
-			secondaryView: "chapter",
-		};
-	}
-
-	if (!scoreResult) {
-		return {
-			title: "开始质检你的章节",
-			description:
-				"评分标准已生成。现在可以按目标平台、市场定位、平台策略和数据快照给你的章节打分。",
-			actionLabel: "去开始评分",
-			view: "chapter",
-			secondaryLabel: "查看评分标准",
-			secondaryView: "chapter",
-		};
-	}
-
-	return {
-		title: "先改最大短板",
-		description: scoreResult.nextRevisionMove,
-		actionLabel: "查看评分报告",
-		view: "chapter",
-		secondaryLabel: "回到急诊室",
-		secondaryView: "overview",
-	};
-}
-
-export function buildBookWorkspaceSummary({
-	bookJob,
-	bookUpload,
-}: {
-	bookJob: BookAnalysisJob | null;
-	bookUpload: BookUploadPreview | null;
+// 拆书工作区摘要
+export function buildBookWorkspaceSummary(options: {
+	bookJob: { status?: string } | null;
+	bookUpload: { chapterCount?: number } | null;
 }) {
-	return {
-		bookStatusText: bookJob
-			? `${bookJob.status} · ${bookJob.progress.message}`
-			: bookUpload
-				? `已预览 ${bookUpload.chapterCount} 个章节片段`
-				: "未启动整书拆解",
-		bookCompletion: bookJob?.status === "succeeded" ? 100 : bookUpload ? 35 : 0,
-	};
+	const { bookJob, bookUpload } = options;
+	let bookStatusText = "未开始";
+	let bookCompletion = 0;
+
+	if (bookUpload) {
+		bookStatusText = `章节预览完成：${bookUpload.chapterCount} 个章节片段`;
+		bookCompletion = 30;
+	}
+
+	if (bookJob?.status === "queued") {
+		bookStatusText = "任务已排队，等待处理";
+		bookCompletion = 40;
+	} else if (bookJob?.status === "running") {
+		bookStatusText = "正在拆解整书...";
+		bookCompletion = 60;
+	} else if (bookJob?.status === "succeeded") {
+		bookStatusText = "整书拆解完成";
+		bookCompletion = 100;
+	} else if (bookJob?.status === "failed") {
+		bookStatusText = "拆解失败，请重试";
+		bookCompletion = 50;
+	}
+
+	return { bookStatusText, bookCompletion };
 }
 
-export function buildResearchWorkspaceSummary({
-	referenceText,
-	chapterText,
-	chapterTitle,
-	referenceFileName,
-	bookUpload,
-	bookAnalysisResult,
-	scoreResult,
-	graphNodeCount,
-	graphEdgeCount,
-	evidenceScoreCount,
-	comparableBookCount,
-}: {
+// 研究工作区摘要
+export interface ResearchSource {
+	name: string;
+	status: string;
+	detail: string;
+}
+
+export function buildResearchWorkspaceSummary(options: {
 	referenceText: string;
 	chapterText: string;
 	chapterTitle: string;
 	referenceFileName: string;
-	bookUpload: BookUploadPreview | null;
-	bookAnalysisResult: BookAnalysisResult | null;
-	scoreResult: ScoreResult | null;
+	bookUpload: unknown;
+	bookAnalysisResult: unknown;
+	scoreResult: unknown;
 	graphNodeCount: number;
 	graphEdgeCount: number;
 	evidenceScoreCount: number;
 	comparableBookCount: number;
 }) {
-	const researchSourceCount = [
-		referenceText.trim(),
-		chapterText.trim(),
-		bookUpload,
-		bookAnalysisResult,
-		scoreResult,
-	].filter(Boolean).length;
-	const researchReadiness = Math.round(
-		((researchSourceCount > 0 ? 1 : 0) +
-			(graphNodeCount > 0 ? 1 : 0) +
-			(scoreResult ? 1 : 0) +
-			(comparableBookCount >= 2 ? 1 : 0)) *
-			25,
-	);
-	const researchSources = [
-		{
-			name: "成熟章节样本",
-			status: referenceText.trim() ? "已接入" : "缺失",
-			detail: referenceFileName || `${referenceText.trim().length} 字参考章节`,
-		},
-		{
-			name: "我的目标章节",
-			status: chapterText.trim() ? "已接入" : "缺失",
-			detail: `${chapterTitle} · ${chapterText.trim().length} 字`,
-		},
-		{
-			name: "整书资料",
-			status: bookUpload || bookAnalysisResult ? "已接入" : "待上传",
-			detail: bookUpload
-				? `${bookUpload.title} · ${bookUpload.chapterCount} 个章节片段`
-				: bookAnalysisResult
-					? `${bookAnalysisResult.book.title} · 已拆解`
-					: "用于抽取人物、事件、伏笔和世界规则。",
-		},
-		{
-			name: "可解释评分报告",
-			status: scoreResult ? "已生成" : "待评分",
-			detail: scoreResult
-				? `${scoreResult.totalScore}/10 · ${evidenceScoreCount} 条证据`
-				: "需要先生成评分标准并完成章节评分。",
-		},
-		{
-			name: "多书样本池",
-			status: comparableBookCount >= 2 ? "可对比" : "样本不足",
-			detail: `${comparableBookCount} 本已拆解样本；横向对比建议至少 2 本，最好 5-10 本。`,
-		},
-	];
+	const hasReference = Boolean(options.referenceText.trim());
+	const hasChapter = Boolean(options.chapterText.trim());
+	const hasBookUpload = Boolean(options.bookUpload);
+	const hasBookResult = Boolean(options.bookAnalysisResult);
+	const hasScore = Boolean(options.scoreResult);
+
+	let researchSourceCount = 0;
+	const researchSources: ResearchSource[] = [];
+
+	if (hasReference) {
+		researchSourceCount++;
+		researchSources.push({ name: "参考章节", status: "ready", detail: "已导入" });
+	}
+	if (hasChapter) {
+		researchSourceCount++;
+		researchSources.push({ name: "待诊正文", status: "ready", detail: "已粘贴" });
+	}
+	if (hasBookUpload || hasBookResult) {
+		researchSourceCount++;
+		researchSources.push({ name: "整书样本", status: "ready", detail: "已拆解" });
+	}
+	if (hasScore && options.evidenceScoreCount > 0) {
+		researchSourceCount++;
+		researchSources.push({ name: "评分证据", status: "ready", detail: `${options.evidenceScoreCount} 条` });
+	}
+
+	// researchReadiness is a number (0-100) based on source count
+	let researchReadiness = 0;
+	if (researchSourceCount >= 3) {
+		researchReadiness = 100;
+	} else if (researchSourceCount >= 2) {
+		researchReadiness = 60;
+	} else if (researchSourceCount >= 1) {
+		researchReadiness = 30;
+	}
 
 	return {
 		researchSourceCount,
 		researchReadiness,
 		researchSources,
-		graphEdgeCount,
 	};
 }

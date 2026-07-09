@@ -1,0 +1,27 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "description": "AI网文诊断台 桌面外壳（Electron）：拉起本地 API + Next 服务并加载到窗口",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -F @app/preload build && pnpm -F @app/electron run dev",
+    "build": "pnpm -F @app/preload build && pnpm -F @app/electron run build",
+    "assemble": "pnpm -F @app/electron run assemble",
+    "pack": "pnpm run assemble && pnpm run build && pnpm -F @app/electron run pack",
+    "release": "pnpm run assemble && pnpm run build && pnpm -F @app/electron run package",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.45.0",
+    "oxlint": "^1.60.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "electron-winstaller"]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

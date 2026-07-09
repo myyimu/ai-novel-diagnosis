@@ -6,7 +6,6 @@ import {
 	CheckCircle2,
 	ChevronDown,
 	Loader2,
-	ScanText,
 	ShieldAlert,
 	TriangleAlert,
 } from "lucide-react";
@@ -159,18 +158,6 @@ export function WorkspaceShell<TView extends string>({
 		<div className="min-h-screen bg-background lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
 			<aside className="sticky top-0 z-20 border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:h-screen lg:border-b-0 lg:border-r">
 				<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:h-full lg:px-5 lg:py-6">
-					<div className="flex items-center gap-3">
-						<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-							<ScanText className="size-5" />
-						</div>
-						<div className="min-w-0">
-							<p className="truncate text-sm font-semibold">AI网文诊断台</p>
-							<p className="truncate text-xs text-muted-foreground">
-								本地小说诊断与 AI 拆书
-							</p>
-						</div>
-					</div>
-
 					<nav
 						aria-label="主导航"
 						className="-mx-1 flex gap-1 overflow-x-auto pb-1 text-sm lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0"

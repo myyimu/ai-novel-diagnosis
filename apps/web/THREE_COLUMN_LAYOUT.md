@@ -1,67 +1,45 @@
-# 三栏布局功能
+# 三栏布局
 
-新的三栏布局（参考 NovelForge 设计）已集成到应用中。
+三栏布局是 Web 控制台的可选布局模式，用于在诊断和研究场景中同时展示输入、结果和上下文面板。
 
 ## 启用方式
 
-设置环境变量 `NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT=true` 即可启用新的三栏布局。
+设置环境变量：
 
-### 本地开发
-
-在 `.env.local` 文件中添加：
-```
+```text
 NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT=true
 ```
 
-### 生产环境
-
-在部署时设置环境变量：
-```bash
-NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT=true
-```
+未设置时使用经典布局。
 
 ## 布局结构
 
-```
+```text
 +------------------+--------------------------+------------------+
-| 左侧导航栏        | 主内容区（标签页）         | 右侧面板          |
-| (180-400px)      | (flex-1, tabbed)         | (280-500px)      |
-| 可调整大小       |                          | 可调整大小        |
-| 可折叠          |                          | 可折叠           |
+| 左侧导航/上下文   | 主内容区                 | 右侧辅助面板      |
+| 可调整/可折叠     | 当前视图主体             | 历史/资料/项目状态 |
 +------------------+--------------------------+------------------+
 ```
 
-### 左侧导航栏
-- 主要导航项：总览、诊断仪表盘、章节诊断、全书分析、研究库
-- 高级功能：AI 提供商、任务历史、导出
+三栏主体组件位于：
 
-### 主内容区标签页
-- **输入**：章节文本输入、快速诊断、书籍上传、AI 设置
-- **诊断**：快速诊断、评分系统（待完善）
-- **结果**：诊断仪表盘、方法卡片库、修订历史（待完善）
-- **分析**：全书分析、研究库、导出（待完善）
+- `src/components/workspace/ThreeColumnWorkspaceShell.tsx`
+- `src/components/workspace/workspace-shell.tsx`
+- `src/components/novel-critique-console.tsx`
 
-### 右侧面板
-- **诊断历史**：显示项目相关的诊断记录
-- **参考资料**：显示方法卡片和参考章节
-- **项目范围**：显示项目信息和切换
+## 路由关系
 
-## 测试页面
+当前产品导航按四个工作区组织，三栏布局不再维护一套独立导航模型：
 
-访问 `/test-layout` 路由可以预览新布局（包含基础演示数据）。
+- 诊断：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`
+- 项目：`/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`
+- 研究：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`
+- 设置：`/settings/provider`、`/settings/dashboard`、`/settings/history`
 
-## 当前状态
+旧视图名到新路由的映射由 `src/lib/workspace-routes.ts` 维护。
 
-- ✅ 三栏布局框架完成
-- ✅ 左侧导航功能完整
-- ✅ 右侧面板显示实时数据
-- ✅ 输入标签页集成快速诊断功能
-- ⏳ 其他标签页内容待迁移
+## 维护原则
 
-## 下一步计划
-
-1. 将章节诊断功能迁移到诊断标签页
-2. 将仪表盘功能迁移到结果标签页
-3. 将全书分析功能迁移到分析标签页
-4. 添加键盘快捷键支持
-5. 优化响应式设计
+- 三栏布局是呈现方式，不是新的业务信息架构。
+- 新功能应先确定归属工作区，再决定是否适合三栏展示。
+- 修改旧视图名、工作区路由或导航项时，同步更新 README 和 `workspace-routes.ts`。

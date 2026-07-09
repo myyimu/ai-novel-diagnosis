@@ -6,7 +6,6 @@ import {
 	CheckCircle2,
 	ChevronDown,
 	Loader2,
-	ScanText,
 	ShieldAlert,
 	TriangleAlert,
 } from "lucide-react";
@@ -164,16 +163,6 @@ function SidebarNav<TView extends string>({
 
 	return (
 		<div className="flex h-full flex-col">
-			<div className="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-					<ScanText className="size-5" />
-				</div>
-				<div className="min-w-0">
-					<p className="truncate text-sm font-semibold">AI网文诊断台</p>
-					<p className="truncate text-xs text-muted-foreground">本地小说诊断与 AI 拆书</p>
-				</div>
-			</div>
-
 			<div className="flex-1 overflow-auto px-3 py-2 space-y-1">
 				<nav aria-label="主导航" className="space-y-1 text-sm">
 					{navItems.map(renderNavButton)}

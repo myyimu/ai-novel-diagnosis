@@ -69,7 +69,7 @@ import {
 	updateCachedBookAnalysisByJobId,
 	upsertCacheEntry,
 } from "@/lib/workspace-cache";
-import { type WorkspaceView, workspaceViewRoutes } from "@/lib/workspace-routes";
+import { type WorkspaceView, resolveWorkspaceRoute } from "@/lib/workspace-routes";
 import {
 	buildBeginnerLearningDigest,
 	buildComparisonSamples,
@@ -500,7 +500,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	/* ──────────── handler functions (batch 1) ──────────── */
 
 	function openView(view: WorkspaceView) {
-		router.push(workspaceViewRoutes[view]);
+		const route = resolveWorkspaceRoute(view);
+		if (route) {
+			router.push(route);
+		}
 	}
 
 	function openBookUtility(panel: "history" | "exports") {

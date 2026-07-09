@@ -86,9 +86,10 @@ async function bootstrap() {
   // Enable graceful shutdown hooks (triggers onModuleDestroy, onApplicationShutdown, etc.)
   app.enableShutdownHooks();
 
-  // Start the server
-  await app.listen(port);
-  logger.log(`Application is running on: http://localhost:${port}`);
+  // Start the server — bind loopback so the desktop sidecar never exposes the
+  // API on the LAN. (Web requests reach the API via the Next proxy, same host.)
+  await app.listen(port, "127.0.0.1");
+  logger.log(`Application is running on: http://127.0.0.1:${port}`);
 }
 
 bootstrap().catch((err) => {

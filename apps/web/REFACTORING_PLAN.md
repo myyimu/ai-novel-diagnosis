@@ -1,133 +1,25 @@
-# AI 小说诊断台 - 前端页面重构计划
+# 前端重构记录
 
-## 问题分析
+这份文档保留当前前端重构结论。早期基于单页侧栏、NovelForge 参考和分阶段迁移的计划已经完成或失效，不再作为待办清单。
 
-当前项目（ai-novel-diagnosis）的前端页面存在以下问题：
-1. 所有功能都在单个页面上通过侧边栏导航切换视图
-2. 页面内容过于密集，层次不清晰
-3. 没有使用标签页（Tabs）来组织相关功能
-4. 没有多栏布局来同时显示相关内容
-5. 工作区域（WorkSpace）缺少灵活的拖拽和调整功能
+## 当前结论
 
-## 参考项目的优点
+- 页面按四个工作区组织：诊断、项目、研究、设置。
+- 业务路由优先放在 `/diagnose/*`、`/project/*`、`/research/*`、`/settings/*` 下。
+- `/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等旧路径保留为兼容入口。
+- 经典布局是默认布局；设置 `NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT=true` 可启用三栏布局。
+- 三栏布局是展示模式，不再承担独立的信息架构。
 
-NovelForge-main 的前端架构提供了优秀的设计参考：
-1. 三栏布局：左侧卡片导航树、中间主内容区、右侧助手面板
-2. 主内容区使用标签页（Tabs）组织不同功能
-3. 右侧面板根据当前内容动态显示不同标签页
-4. 面板宽度可通过拖拽条调整
-5. 左侧侧边栏可完全收起和展开
-6. 左侧侧边栏内部有两个可调整高度的区域
+## 关键文件
 
-## 重构目标
+- `src/lib/workspace-routes.ts`: 新旧视图和路由映射。
+- `src/stores/workspace-nav-store.ts`: 四工作区导航状态。
+- `src/components/workspace/WorkspaceNav.tsx`: 工作区切换 UI。
+- `src/components/novel-critique-console.tsx`: 经典/三栏布局切换入口。
+- `src/components/workspace/ThreeColumnWorkspaceShell.tsx`: 三栏布局主体。
 
-1. 将单个页面的平铺视图改为多栏布局
-2. 引入标签页（Tabs）来组织相关功能
-3. 提供灵活的面板拖拽和调整功能
-4. 优化信息层次，减少单页面信息量
-5. 保持现有功能完整性
+## 后续维护
 
-## 重构策略
-
-### 1. 保留并改进 WorkspaceShell 组件
-
-- 保持左侧侧边栏的导航功能
-- 添加侧边栏收起/展开功能
-- 添加侧边栏宽度拖拽调整功能
-
-### 2. 将主内容区分为三个区域
-
-- **左侧侧边栏**：导航（现有功能）
-- **中间主内容区**：使用标签页显示当前视图内容
-- **右侧辅助面板**：根据当前视图显示相关的辅助信息
-
-### 3. 为每个视图设计合适的标签页结构
-
-根据不同视图，动态调整主内容区标签页和右侧辅助面板的内容：
-
-#### a. Overview 视图
-- 主内容区标签页：
-  - 快速诊断
-  - 章节编辑
-- 右侧辅助面板：
-  - 诊断助手
-  - 历史记录
-
-#### b. Chapter Critique 视图
-- 主内容区标签页：
-  - 章节编辑
-  - 诊断结果
-- 右侧辅助面板：
-  - 评分标准
-  - 参考章节
-
-#### c. Book 视图
-- 主内容区标签页：
-  - 上传预览
-  - 任务状态
-  - 结果展示
-- 右侧辅助面板：
-  - 章节列表
-  - 关系图谱
-
-#### d. 其他视图
-- 类似地，根据功能需求设计标签页结构
-
-### 4. 实现新的布局组件
-
-- 创建 `WorkspaceLayout` 组件，管理三栏布局
-- 创建 `TabsContainer` 组件，管理主内容区标签页
-- 创建 `ResizablePanel` 组件，实现可拖拽调整的面板
-- 创建 `SidebarToggle` 组件，实现侧边栏收起/展开功能
-
-## 文件变更清单
-
-### 新增文件
-
-1. `components/workspace/WorkspaceLayout.tsx` - 新的三栏布局组件
-2. `components/workspace/TabsContainer.tsx` - 标签页容器组件
-3. `components/workspace/ResizablePanel.tsx` - 可调整大小的面板组件
-4. `components/workspace/SidebarToggle.tsx` - 侧边栏切换按钮组件
-5. `components/workspace/RightPanel.tsx` - 右侧辅助面板组件
-
-### 修改文件
-
-1. `components/workspace/workspace-shell.tsx` - 改进现有侧边栏，添加调整和切换功能
-2. `components/novel-critique-console.tsx` - 重构主控制台，使用新的布局组件
-3. 各视图组件 - 调整以适应新的标签页结构
-
-## 实现步骤
-
-1. **步骤一**：创建新的布局基础组件
-2. **步骤二**：重构 WorkspaceShell，添加拖拽和切换功能
-3. **步骤三**：创建 WorkspaceLayout 组件，集成所有布局组件
-4. **步骤四**：重构 NovelCritiqueConsole，使用新布局
-5. **步骤五**：调整各视图组件，适应标签页结构
-6. **步骤六**：测试和优化
-
-## 技术细节
-
-### 使用的库
-
-- 继续使用 React 19
-- 继续使用 Tailwind CSS
-- 继续使用 shadcn/ui 组件库
-- 对于拖拽功能，可以使用 React 的状态管理和鼠标事件处理
-
-### 状态管理
-
-- 继续使用现有的 Zustand 状态管理
-- 添加布局相关的状态（如：侧边栏展开状态、各面板宽度、当前标签页等）
-
-### 响应式设计
-
-- 在移动端保持简化的单列布局
-- 在桌面端提供完整的三栏布局
-- 根据屏幕大小动态调整面板的默认宽度
-
-## 风险与注意事项
-
-1. 确保现有功能完整性不受影响
-2. 保持与后端 API 的兼容性
-3. 注意性能问题，避免不必要的重渲染
-4. 提供良好的降级方案，确保在拖拽功能不可用时仍可正常使用
+- 新增页面时优先补齐 `workspace-routes.ts` 和对应 `app/<workspace>/<view>/page.tsx`。
+- 旧一级入口只做兼容，不继续扩展新业务。
+- 文档中的页面结构以实际 `src/app` 路由和 `workspace-routes.ts` 为准。

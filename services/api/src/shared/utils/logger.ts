@@ -1,7 +1,11 @@
-import pino from "pino";
+import { mkdirSync } from "fs";
 import { join } from "path";
+import pino from "pino";
 
-const logsDir = join(process.cwd(), "logs");
+// LOGS_DIR override lets the desktop sidecar redirect logs into a writable
+// userData dir; falls back to <cwd>/logs (original behavior) when unset.
+const logsDir = process.env.LOGS_DIR?.trim() || join(process.cwd(), "logs");
+mkdirSync(logsDir, { recursive: true });
 
 const transport = pino.transport({
   targets: [

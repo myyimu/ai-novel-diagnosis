@@ -19,37 +19,25 @@ AI网文诊断台是本地部署的 AI 小说第一章改稿急诊工具。
 ## Workspace
 
 - `apps/web`: Next.js 控制台，负责改稿急诊、复诊对比、深度质检、AI 设置、整书拆解、图谱复核、历史任务管理和导出工具。
+- `apps/desktop`: Electron 桌面外壳，开发模式加载本地 Web，打包模式拉起内置 API / Next sidecar。
 - `services/api`: NestJS API，负责模型调用、改稿急诊、参考画像、Rubric、评分、整书异步任务、研究库和导出。
 - `packages/ai-core`: Web 和 API 共享的分析类型、评分结果结构和模型契约。
-- `docker-compose.yml`: 本地部署入口，启动 PostgreSQL、API、Web；Redis 和 MinIO 是后续扩展方向，不在默认 compose 中启动。
+- `docker-compose.yml`: 本地部署入口，启动 PostgreSQL、API、Web。
 - `one.manifest.json`: One CLI workspace 的项目、容器和运行入口定义。
 
 ## Frontend Information Architecture
 
-控制台按用户成熟度分层。当前左侧导航保留七类任务：
+控制台按工作流组织为四个工作区：
 
-- 第一章改稿急诊室：默认入口，承接“粘贴第一章 -> 改稿急诊 -> 改稿 Prompt -> 复诊”。
-- 深度章节质检：进阶入口。导入成熟样本，AI 识别市场定位，生成 Rubric，再评分自己的章节。
-- 拆书图谱：进阶学习入口。上传 TXT，预览章节切分，启动 Map-Reduce 整书拆解，先生成拆书导览、理解版思维导图、关系故事线和故事阶段时间轴，再进入角色、世界书、完整图谱和写作资产。
-- 样本研究：进阶研究入口。把已完成拆解的样本变成可追溯的题材、卖点、图谱资产和对比判断。
-- 历史任务：恢复入口。服务重启后也能重新打开上传记录和整书拆解结果。
-- 导出资产：输出入口。下载报告、结构化数据、角色卡、世界书、图谱资产和避险清单。
-- AI 设置：工具入口。共享模型、本地 mock、自备 OpenAI-compatible 供应商配置和连通性测试。
-
-独立入口取舍：
-
-- 关系图谱工作台仍属于 `/book` 的核心结果视图，不单独拆成新路由。
-- 爆款套路库不作为左侧入口，合并进“样本研究”和“拆书图谱”的学习路径。
+- 诊断工作区 `/diagnose`：`/diagnose/quick` 承接“粘贴第一章 -> 改稿急诊 -> 改稿 Prompt -> 复诊”；`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence` 承接深度质检、评分报告和证据链。
+- 项目工作区 `/project`：`/project/current`、`/project/revisions`、`/project/methodology`、`/project/export` 管理当前项目、复诊记录、方法论卡片和导出资产。
+- 研究工作区 `/research`：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials` 承接整书拆解、样本对比、套路沉淀和研究资料。
+- 设置工作区 `/settings`：`/settings/provider`、`/settings/dashboard`、`/settings/history` 管理模型供应商、诊断看板和历史任务。
 
 兼容路由策略：
 
-- `/`：第一章改稿急诊室。
-- `/critique`：深度章节质检。
-- `/book`：整书拆解和结果管理。
-- `/library`：样本研究。
-- `/history`：历史任务。
-- `/export`：导出资产。
-- `/model`：AI 设置。
+- `/`：进入快速诊断。
+- `/critique`、`/book`、`/library`、`/history`、`/export`、`/model`：保留旧入口，用于兼容外部链接和旧导航调用。
 - `/workspace`、`/starter`：重定向回 `/`。
 
 复杂参数遵循渐进暴露原则：首屏只要求章节正文；平台画像、样本 Rubric、数据快照和研究库能力后置。
@@ -97,7 +85,7 @@ TXT 上传
 -> 拆书导览/关系故事线/图谱/时间线/世界书展示和导出
 ```
 
-整书任务会持久化中间结果：每完成一个章节 map，系统会把该章拆解 JSON 写入 `.local/analysis/jobs/{jobId}/maps/`，并在 job 记录里更新 `partialResult`。如果模型 token 额度不足、网络失败或 reduce 失败，上传记录、章节切分预览、已完成章节 map 和失败状态仍会保留。
+整书任务会持久化中间结果：每完成一个章节 map，系统会把该章拆解 JSON 写入 `.local/artifacts/{jobId}/map-{chapterId}.json`，并在 job 记录里更新 `partialResult`。如果模型 token 额度不足、网络失败或 reduce 失败，上传记录、章节切分预览、已完成章节 map 和失败状态仍会保留。
 
 ### 4. Relationship Graph Workbench
 
@@ -181,30 +169,38 @@ TXT 上传
 - `POST /api/v1/analysis/preview`: 不调用真实模型，返回结构化评分预览。
 - `POST /api/v1/analysis/quick-review`: 改稿急诊。
 - `POST /api/v1/analysis/provider/test`: 测试 mock 或 OpenAI-compatible Provider。
+- `POST /api/v1/analysis/provider/models`: 拉取供应商模型列表。
 - `GET /api/v1/analysis/provider/presets`: 返回模型供应商预设。
 - `POST /api/v1/analysis/reference/profile`: 从成熟章节识别市场定位。
 - `POST /api/v1/analysis/rubric`: 从成熟章节生成原则和 Rubric。
 - `POST /api/v1/analysis/score`: 用 Rubric 质检用户章节。
+- `POST /api/v1/analysis/book`: 兼容的一次性整书分析入口。
 - `POST /api/v1/analysis/book/preprocess`: 直接对文本做清洗和章节切分预览。
+- `POST /api/v1/analysis/book/jobs`: 从请求正文创建整书异步任务。
 - `POST /api/v1/analysis/book/uploads`: 上传 TXT 并生成持久化章节预览。
 - `GET /api/v1/analysis/book/uploads/:uploadId`: 读取上传预览。
 - `GET /api/v1/analysis/book/uploads`: 读取上传历史。
 - `POST /api/v1/analysis/book/uploads/:uploadId/jobs`: 从上传文本创建整书异步任务。
 - `POST /api/v1/analysis/book/jobs/:jobId/resume`: 从已完成章节继续整书任务。
 - `GET /api/v1/analysis/book/jobs/:jobId`: 查询整书异步任务状态。
+- `DELETE /api/v1/analysis/book/jobs/:jobId`: 删除已结束的整书异步任务。
 - `GET /api/v1/analysis/book/jobs/:jobId/search`: 搜索整书拆解证据锚点。
 - `GET /api/v1/analysis/book/jobs`: 读取任务历史。
 - `GET /api/v1/analysis/book/jobs/:jobId/export`: 导出拆书阅读报告、完整 Markdown、JSON、Tavern 角色卡、World Book、SillyTavern World Info、续写包、风格圣经、卷纲、提示词包、Do Not Copy 清单，支持 `mode=notes|originalized`。
+- `POST /api/v1/analysis/book/skills/distill`: 从拆书结果提炼技能/方法论资产。
+- `GET /api/v1/analysis/workspace/assets`: 读取项目工作区资产。
+- `POST /api/v1/analysis/workspace/projects`: 创建项目。
+- `POST /api/v1/analysis/workspace/revision-assets`: 保存复诊和方法论资产。
+- `GET /api/v1/analysis/workspace/projects/:projectId/export`: 导出项目资产包。
 - `GET /api/v1/analysis/research/library`: 读取持久化研究库资产。
 - `POST /api/v1/analysis/research/compare`: 多书横向对比。
 - `POST /api/v1/analysis/research/ask`: 基于研究库证据回答问题。
+- `POST /api/v1/analysis/research/distill`: 从研究库提炼可复用模式。
 
 ## Storage Plan
 
 - PGlite/PostgreSQL: 上传记录、章节预览、任务状态、评分表、报告和研究库资产。
-- Local FS: 原始上传文件、清洗后文本、章节 map 中间结果和导出报告。MVP 默认使用 `.local/analysis` 与 `.local/artifacts`。
-- Redis: 后续承接分布式异步任务队列和短期任务状态，当前未接入运行时代码。
-- MinIO/object storage: 后续替换本地文件系统，当前未接入运行时代码。
+- Local FS: 原始上传文件、清洗后文本、章节 map 中间结果和导出报告。默认上传目录为 `.local/analysis`，章节 map artifact 目录为 `.local/artifacts`。
 
 ## Model Provider
 

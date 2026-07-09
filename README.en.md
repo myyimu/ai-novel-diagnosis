@@ -161,7 +161,7 @@ When you already have a complete TXT file or multiple samples, move into full-bo
 Upload a full TXT -> preview chapter split -> run Map-Reduce analysis -> review the relationship graph -> export character/world/continuation assets
 ```
 
-The current page structure is intentionally compressed: `/` is the chapter triage room, `/critique` is advanced chapter critique, `/model` is AI settings, and `/book` is full-book analysis plus result management. `/workspace`, `/starter`, `/history`, `/export`, and `/library` remain compatibility routes and redirect back to the home or full-book workflow.
+The current UI is organized into four workspaces: `/diagnose` for chapter diagnosis, with `/diagnose/quick`, `/diagnose/deep`, `/diagnose/score`, and `/diagnose/evidence`; `/project` for current projects, retests, methodology cards, and export; `/research` for full-book analysis, sample comparison, pattern study, and research materials; and `/settings` for model providers, dashboards, and history. `/` opens quick diagnosis. Older routes such as `/critique`, `/book`, `/library`, `/history`, `/export`, and `/model` remain as compatibility entry points.
 
 ## Core Capabilities
 
@@ -194,6 +194,7 @@ Relationship graph workbench:
 - Monorepo: One CLI
 - Web: Next.js
 - API: NestJS
+- Desktop shell: Electron
 - DB: PostgreSQL / PGlite fallback
 - Package manager: pnpm
 - Model provider: BYOK, OpenAI-compatible
@@ -309,6 +310,7 @@ API: http://localhost:3001/api/v1
 ## Workspace
 
 - `apps/web`: Next.js console for chapter triage, advanced critique, AI settings, and full-book analysis.
+- `apps/desktop`: Electron desktop shell. In development it loads the local Web app; packaged builds start bundled API and Next sidecars.
 - `services/api`: NestJS API for text cleaning, chapter splitting, async jobs, full-book analysis, and exports.
 - `packages/ai-core`: Shared types, scoring metrics, and analysis contracts.
 
@@ -335,21 +337,21 @@ API: http://localhost:3001/api/v1
 Health: http://localhost:3001/health
 ```
 
-The compose stack starts only the services currently used by the code: `postgres`, `api`, and `web`. Redis and MinIO are not started by default because no runtime client uses them yet.
+The compose stack starts only the services currently used by the code: `postgres`, `api`, and `web`.
 
-Uploaded text and intermediate full-book analysis artifacts are stored under:
+Uploaded text, normalized text, and upload snapshots are stored under:
 
 ```text
 .local/analysis
 ```
 
-By default, local upload storage is plaintext for easier development and debugging. For real manuscripts or commercial drafts, set `ANALYSIS_STORAGE_KEY` to enable local privacy mode. When the key is set, uploaded raw text, normalized text, and upload snapshots are stored as AES-256-GCM `.enc` files and decrypted transparently by the API. Keep this key safe; encrypted local uploads cannot be recovered if the key is lost.
-
-Chapter map results are saved under:
+Chapter-map artifacts from full-book jobs are stored under:
 
 ```text
-.local/analysis/jobs/{jobId}/maps/
+.local/artifacts/{jobId}/map-{chapterId}.json
 ```
+
+By default, local upload storage is plaintext for easier development and debugging. For real manuscripts or commercial drafts, set `ANALYSIS_STORAGE_KEY` to enable local privacy mode. When the key is set, uploaded raw text, normalized text, and upload snapshots are stored as AES-256-GCM `.enc` files and decrypted transparently by the API. Keep this key safe; encrypted local uploads cannot be recovered if the key is lost.
 
 `.local` is ignored by Git. Do not commit uploaded novels, model outputs, local databases, or API keys.
 
@@ -379,7 +381,7 @@ pnpm run doctor
 - This is an Alpha / MVP project. AI analysis and scoring are not guaranteed to be correct.
 - Partial results are persisted, and failed/interrupted full-book jobs have a basic resume path. More granular partial export and persisted graph-review corrections are still being iterated.
 - Relationship graphs support local manual corrections and correction-aware JSON export, but correction records are not yet stored as a separate database entity.
-- For real PostgreSQL deployments, run `pnpm --filter api db:push` or generate migrations when schema changes.
+- For real PostgreSQL deployments, use committed Drizzle migrations. Generate a new migration after schema changes, then run `pnpm --filter api db:migrate`.
 - There is no account system yet. The project is currently best suited for local single-user deployment.
 - The tool only provides analysis, learning, critique, and export features. Users are responsible for confirming they have the necessary rights or legal basis for uploaded texts and exported assets.
 
