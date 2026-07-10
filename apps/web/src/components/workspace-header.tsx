@@ -1,6 +1,5 @@
 "use client";
 
-import { LayoutToggle } from "@/components/layout-toggle";
 import { WorkspaceNav } from "@/components/workspace/WorkspaceNav";
 import { LayoutGrid } from "lucide-react";
 
@@ -13,7 +12,6 @@ export function WorkspaceHeader() {
 						<LayoutGrid className="w-5 h-5 text-primary" />
 						<h1 className="text-sm font-semibold">AI网文诊断台</h1>
 					</div>
-					<LayoutToggle />
 				</div>
 			</header>
 			<WorkspaceNav />

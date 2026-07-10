@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { app, dialog } from "electron";
+import { app } from "electron";
 import { provide } from "@inversifyjs/binding-decorators";
 import { inject, injectable } from "inversify";
 import ElectronLogger from "../vendor/ElectronLogger";
@@ -12,6 +12,8 @@ import { buildApiEnv, buildWebEnv } from "./env";
 interface ManagedChild {
   proc: ChildProcess | null;
   name: string;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
 }
 
 // 负责打包模式下两个本地子进程的生命周期：
@@ -40,20 +42,28 @@ export default class SidecarSupervisor {
       const jwtSecret = this.ensureJwtSecret();
 
       this.logger.info("starting API sidecar on 127.0.0.1:3001");
-      this.api = this.spawnChild("api", nodeExe(), [apiEntry()], apiDir(), buildApiEnv({ userData, jwtSecret }));
-      await this.waitForHttp(API_HEALTH_URL, 60_000, "API"); // 首次启动 PGlite 建表较慢
+      this.api = this.spawnChild(
+        "api",
+        nodeExe(),
+        [apiEntry()],
+        apiDir(),
+        buildApiEnv({ userData, jwtSecret }),
+      );
+      await this.waitForHttp(API_HEALTH_URL, 60_000, "API", this.api); // 首次启动 PGlite 建表较慢
 
       this.logger.info("starting Next sidecar on 127.0.0.1:3000");
-      this.web = this.spawnChild("web", nodeExe(), [webEntry()], webDir(), buildWebEnv());
-      await this.waitForHttp(APP_URL, 30_000, "Next");
+      const webRoot = webDir();
+      this.web = this.spawnChild(
+        "web",
+        nodeExe(),
+        [webEntry()],
+        webRoot,
+        buildWebEnv({ webRoot }),
+      );
+      await this.waitForHttp(APP_URL, 30_000, "Next", this.web);
     } catch (err) {
       this.logger.error("sidecar startup failed", err);
-      void dialog.showMessageBox({
-        type: "error",
-        title: "启动失败",
-        message: "本地服务启动失败",
-        detail: String(err instanceof Error ? err.message : err),
-      });
+      this.stop();
       throw err;
     }
   }
@@ -80,17 +90,34 @@ export default class SidecarSupervisor {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
-    proc.stdout?.on("data", (d: Buffer) => this.logger.info(`[${name}] ${d.toString().trimEnd()}`));
-    proc.stderr?.on("data", (d: Buffer) => this.logger.error(`[${name}] ${d.toString().trimEnd()}`));
+    proc.stdout?.on("data", (d: Buffer) =>
+      this.logger.info(`[${name}] ${d.toString().trimEnd()}`),
+    );
+    proc.stderr?.on("data", (d: Buffer) =>
+      this.logger.error(`[${name}] ${d.toString().trimEnd()}`),
+    );
+    const child: ManagedChild = { proc, name, exitCode: null, signal: null };
     proc.on("exit", (code, signal) => {
+      child.exitCode = code;
+      child.signal = signal;
       this.logger.warn(`${name} exited code=${code} signal=${signal}`);
     });
-    return { proc, name };
+    return child;
   }
 
-  private async waitForHttp(url: string, timeoutMs: number, label: string): Promise<void> {
+  private async waitForHttp(
+    url: string,
+    timeoutMs: number,
+    label: string,
+    child: ManagedChild,
+  ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
+      if (child.exitCode !== null || child.signal !== null) {
+        throw new Error(
+          `${label} 子进程已退出 code=${child.exitCode} signal=${child.signal}`,
+        );
+      }
       try {
         const res = await fetch(url, { method: "GET" });
         // 200 或 404 都说明服务已起来（有的根路径返回 404）

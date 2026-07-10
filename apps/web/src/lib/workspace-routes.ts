@@ -67,9 +67,215 @@ export const settingsRoutes: Record<SettingsView, string> = {
 	history: "/settings/history",
 };
 
+// 设置工作区兼容路由（input 和 ai-settings 重定向到 provider）
+export const settingsRoutesCompat: Record<string, string> = {
+	"settings/input": "/settings/provider",
+	"settings/ai-settings": "/settings/provider",
+};
+
+export type WorkspaceRouteView = DiagnoseView | ProjectView | ResearchView | SettingsView;
+
+export interface WorkspaceRouteMeta {
+	workspace: WorkspaceType;
+	view: WorkspaceRouteView;
+	path: string;
+	legacyView: WorkspaceView;
+	defaultMainTab: "input" | "diagnosis" | "results" | "analysis";
+	defaultRightPanelTab:
+		| "history"
+		| "reference"
+		| "project"
+		| "ai-settings"
+		| "history-tasks"
+		| "help";
+}
+
+export const workspaceRouteMeta: WorkspaceRouteMeta[] = [
+	{
+		workspace: "diagnose",
+		view: "quick",
+		path: diagnoseRoutes.quick,
+		legacyView: "overview",
+		defaultMainTab: "input",
+		defaultRightPanelTab: "history",
+	},
+	{
+		workspace: "diagnose",
+		view: "deep",
+		path: diagnoseRoutes.deep,
+		legacyView: "chapter",
+		defaultMainTab: "diagnosis",
+		defaultRightPanelTab: "reference",
+	},
+	{
+		workspace: "diagnose",
+		view: "score",
+		path: diagnoseRoutes.score,
+		legacyView: "chapter",
+		defaultMainTab: "diagnosis",
+		defaultRightPanelTab: "reference",
+	},
+	{
+		workspace: "diagnose",
+		view: "evidence",
+		path: diagnoseRoutes.evidence,
+		legacyView: "chapter",
+		defaultMainTab: "diagnosis",
+		defaultRightPanelTab: "reference",
+	},
+	{
+		workspace: "project",
+		view: "current",
+		path: projectRoutes.current,
+		legacyView: "overview",
+		defaultMainTab: "results",
+		defaultRightPanelTab: "project",
+	},
+	{
+		workspace: "project",
+		view: "revisions",
+		path: projectRoutes.revisions,
+		legacyView: "revisions",
+		defaultMainTab: "results",
+		defaultRightPanelTab: "history",
+	},
+	{
+		workspace: "project",
+		view: "methodology",
+		path: projectRoutes.methodology,
+		legacyView: "methodology",
+		defaultMainTab: "results",
+		defaultRightPanelTab: "project",
+	},
+	{
+		workspace: "project",
+		view: "export",
+		path: projectRoutes.export,
+		legacyView: "exports",
+		defaultMainTab: "results",
+		defaultRightPanelTab: "project",
+	},
+	{
+		workspace: "research",
+		view: "book",
+		path: researchRoutes.book,
+		legacyView: "book",
+		defaultMainTab: "analysis",
+		defaultRightPanelTab: "history-tasks",
+	},
+	{
+		workspace: "research",
+		view: "compare",
+		path: researchRoutes.compare,
+		legacyView: "library",
+		defaultMainTab: "analysis",
+		defaultRightPanelTab: "reference",
+	},
+	{
+		workspace: "research",
+		view: "patterns",
+		path: researchRoutes.patterns,
+		legacyView: "starter",
+		defaultMainTab: "analysis",
+		defaultRightPanelTab: "help",
+	},
+	{
+		workspace: "research",
+		view: "materials",
+		path: researchRoutes.materials,
+		legacyView: "materials",
+		defaultMainTab: "analysis",
+		defaultRightPanelTab: "reference",
+	},
+	{
+		workspace: "settings",
+		view: "provider",
+		path: settingsRoutes.provider,
+		legacyView: "provider",
+		defaultMainTab: "input",
+		defaultRightPanelTab: "ai-settings",
+	},
+	{
+		workspace: "settings",
+		view: "dashboard",
+		path: settingsRoutes.dashboard,
+		legacyView: "dashboard",
+		defaultMainTab: "results",
+		defaultRightPanelTab: "project",
+	},
+	{
+		workspace: "settings",
+		view: "history",
+		path: settingsRoutes.history,
+		legacyView: "history",
+		defaultMainTab: "analysis",
+		defaultRightPanelTab: "history-tasks",
+	},
+];
+
+export interface WorkspaceTopNavMeta {
+	workspace: WorkspaceType;
+	label: string;
+	path: string;
+	title: string;
+	description: string;
+}
+
 // 获取工作区首页路由
 export function getWorkspaceHomeRoute(workspace: WorkspaceType): string {
 	return workspaceRoutes[workspace];
+}
+
+export function getWorkspaceTopNavMeta(workspace: WorkspaceType): WorkspaceTopNavMeta {
+	const meta =
+		workspaceRouteMeta.find(
+			(route) => route.workspace === workspace && route.path === workspaceRoutes[workspace],
+		) ?? workspaceRouteMeta.find((route) => route.workspace === workspace);
+
+	if (!meta) {
+		return {
+			workspace,
+			label: workspace,
+			path: workspaceRoutes[workspace],
+			title: workspace,
+			description: "",
+		};
+	}
+
+	return {
+		workspace,
+		label:
+			workspace === "diagnose"
+				? "诊断"
+				: workspace === "project"
+					? "项目"
+					: workspace === "research"
+						? "研究"
+						: "设置",
+		path: workspaceRoutes[workspace],
+		title:
+			workspace === "diagnose"
+				? "诊断"
+				: workspace === "project"
+					? "项目"
+					: workspace === "research"
+						? "研究"
+						: "设置",
+		description:
+			workspace === "diagnose"
+				? "先诊断问题，再决定怎么改"
+				: workspace === "project"
+					? "管理诊断项目和方法论"
+					: workspace === "research"
+						? "拆解样本，提炼套路"
+						: "配置和数据看板",
+	};
+}
+
+export function getWorkspaceTopNavMetaList(): WorkspaceTopNavMeta[] {
+	return ["diagnose", "project", "research", "settings"].map((workspace) =>
+		getWorkspaceTopNavMeta(workspace as WorkspaceType),
+	);
 }
 
 // 根据路径解析当前工作区
@@ -79,6 +285,17 @@ export function parseWorkspaceFromPath(path: string): WorkspaceType | null {
 	if (path.startsWith("/research")) return "research";
 	if (path.startsWith("/settings")) return "settings";
 	return null;
+}
+
+export function getWorkspaceRouteMetaByPath(path: string): WorkspaceRouteMeta | undefined {
+	const normalized = path.split("?")[0]?.replace(/\/$/, "") || "/";
+	return workspaceRouteMeta.find((route) => route.path === normalized);
+}
+
+export function getWorkspaceRouteMetaByLegacyView(
+	view: WorkspaceView,
+): WorkspaceRouteMeta | undefined {
+	return workspaceRouteMeta.find((route) => route.legacyView === view);
 }
 
 // 旧视图路由映射（保持兼容性）
@@ -106,6 +323,7 @@ const workspaceRouteResolvers: ReadonlyArray<Record<string, string>> = [
 	projectRoutes,
 	researchRoutes,
 	settingsRoutes,
+	settingsRoutesCompat,
 	workspaceRoutes,
 ];
 

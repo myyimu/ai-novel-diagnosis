@@ -13,10 +13,12 @@ import { appName, workspace } from "../utils";
 @provide()
 export default class ElectronLogger {
   logger: Logger;
+  logPath: string;
 
   constructor() {
     const datetime = dayjs().format("YYYY-MM-DD");
     const logPath = path.resolve(workspace, `logs/${datetime}-${appName}.log`);
+    this.logPath = logPath;
     mkdirSync(path.dirname(logPath), { recursive: true });
 
     logger.transports.file.level = "info";

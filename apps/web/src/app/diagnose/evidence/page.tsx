@@ -1,16 +1,5 @@
-"use client";
-
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
-import { WorkspaceHeader } from "@/components/workspace-header";
-import { useLayoutMode } from "@/components/layout-toggle";
+import { DeepDiagnosisPage } from "@/components/workspace/deep/DeepDiagnosisPage";
 
 export default function EvidenceChainPage() {
-	const [layoutMode] = useLayoutMode();
-
-	return (
-		<main className="min-h-screen bg-background text-foreground">
-			<WorkspaceHeader />
-			<NovelCritiqueConsole view="chapter" layoutMode={layoutMode} />
-		</main>
-	);
+	return <DeepDiagnosisPage entryView="evidence" />;
 }

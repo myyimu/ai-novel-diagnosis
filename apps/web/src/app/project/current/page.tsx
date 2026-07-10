@@ -1,16 +1,13 @@
 "use client";
 
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
 import { WorkspaceHeader } from "@/components/workspace-header";
-import { useLayoutMode } from "@/components/layout-toggle";
+import { ProjectCurrentPage } from "@/components/workspace/project/ProjectCurrentPage";
 
 export default function CurrentProjectPage() {
-	const [layoutMode] = useLayoutMode();
-
 	return (
 		<main className="min-h-screen bg-background text-foreground">
 			<WorkspaceHeader />
-			<NovelCritiqueConsole view="overview" layoutMode={layoutMode} />
+			<ProjectCurrentPage />
 		</main>
 	);
 }

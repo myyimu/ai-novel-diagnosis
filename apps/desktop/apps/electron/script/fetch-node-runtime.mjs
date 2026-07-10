@@ -1,5 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -21,7 +28,9 @@ const OUTER_ROOT = findOuterRoot(__dirname);
 
 function readNodeVersion() {
   try {
-    const v = readFileSync(join(OUTER_ROOT, ".nvmrc"), "utf8").trim().replace(/^v/, "");
+    const v = readFileSync(join(OUTER_ROOT, ".nvmrc"), "utf8")
+      .trim()
+      .replace(/^v/, "");
     return v || FALLBACK_NODE_VERSION;
   } catch {
     return FALLBACK_NODE_VERSION;
@@ -39,7 +48,9 @@ export async function fetchNodeRuntime(targetExe) {
   mkdirSync(dirname(targetExe), { recursive: true });
   const version = readNodeVersion();
   // 国内可设 NODE_DIST_MIRROR=https://npmmirror.com/mirrors/node 加速
-  const mirror = (process.env.NODE_DIST_MIRROR || "https://nodejs.org/dist").replace(/\/$/, "");
+  const mirror = (
+    process.env.NODE_DIST_MIRROR || "https://nodejs.org/dist"
+  ).replace(/\/$/, "");
   const url = `${mirror}/v${version}/node-v${version}-win-x64.zip`;
   const cacheDir = join(__dirname, "..", ".cache", "node-runtime");
   const zipPath = join(cacheDir, `node-v${version}-win-x64.zip`);

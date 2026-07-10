@@ -13,20 +13,30 @@ import SidecarSupervisor from "./services/sidecar-supervisor";
 @provide()
 export default class ElectronApp {
   constructor(
-    @inject(MainWindow)        private readonly mainWindow: MainWindow,
+    @inject(MainWindow) private readonly mainWindow: MainWindow,
     @inject(SidecarSupervisor) private readonly supervisor: SidecarSupervisor,
-    @inject(ElectronLogger)    private readonly logger: ElectronLogger,
+    @inject(ElectronLogger) private readonly logger: ElectronLogger,
   ) {}
 
   async init(): Promise<void> {
-    await this.supervisor.start();
-
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) this.mainWindow.init();
     });
 
-    this.mainWindow.init();
-    this.logger.info("app ready");
+    this.mainWindow.showStartup();
+
+    try {
+      await this.supervisor.start();
+      this.mainWindow.loadApp();
+      this.logger.info("app ready");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error("app startup failed", err);
+      this.mainWindow.showStartupError(
+        `本地服务未能启动：${message}`,
+        this.logger.logPath,
+      );
+    }
   }
 
   // 第二实例启动时把焦点还给已有窗口

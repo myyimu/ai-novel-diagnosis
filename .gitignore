@@ -27,3 +27,9 @@ logs
 .idea/
 .vscode/
 *.iml
+
+# local agent/tool state
+.claude/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

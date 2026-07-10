@@ -32,6 +32,27 @@ export default class MainWindow extends Window {
     this.url = APP_URL;
   }
 
+  showStartup(): void {
+    this.loadStatusPage(
+      "正在启动本地服务",
+      "正在启动 API 与 Web 服务，请稍候。",
+    );
+  }
+
+  showStartupError(message: string, logPath: string): void {
+    this.loadStatusPage("启动失败", message, logPath);
+  }
+
+  loadApp(): void {
+    this.url = APP_URL;
+    if (!this.window) {
+      this.init();
+      return;
+    }
+    void this.window.loadURL(APP_URL);
+    this.window.show();
+  }
+
   init(): void {
     if (this.window) {
       this.window.show();
@@ -42,5 +63,108 @@ export default class MainWindow extends Window {
       if (!this.window) return;
       this.store.set("mainBounds", this.window.getBounds());
     });
+  }
+
+  private loadStatusPage(
+    title: string,
+    message: string,
+    logPath?: string,
+  ): void {
+    this.url = this.statusPageUrl(title, message, logPath);
+    if (!this.window) {
+      this.window = this.create();
+      this.window.show();
+      this.window.on("close", () => {
+        if (!this.window) return;
+        this.store.set("mainBounds", this.window.getBounds());
+      });
+      return;
+    }
+    void this.window.loadURL(this.url);
+    this.window.show();
+  }
+
+  private statusPageUrl(
+    title: string,
+    message: string,
+    logPath?: string,
+  ): string {
+    const escapedTitle = this.escapeHtml(title);
+    const escapedMessage = this.escapeHtml(message);
+    const escapedLogPath = logPath ? this.escapeHtml(logPath) : "";
+    const logBlock = escapedLogPath
+      ? `<p class="label">日志文件</p><pre>${escapedLogPath}</pre>`
+      : "";
+    const html = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapedTitle}</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #101114;
+      color: #f4f0e8;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(640px, calc(100vw - 48px));
+      padding: 28px;
+      border: 1px solid rgba(244, 240, 232, 0.16);
+      background: #181a1f;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      font-weight: 650;
+    }
+    p {
+      margin: 0;
+      color: #c8c0b4;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    .label {
+      margin-top: 22px;
+      color: #f4f0e8;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    pre {
+      margin: 8px 0 0;
+      padding: 12px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #d7e9ff;
+      background: #0b0c0f;
+      border: 1px solid rgba(244, 240, 232, 0.12);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>${escapedTitle}</h1>
+    <p>${escapedMessage}</p>
+    ${logBlock}
+  </main>
+</body>
+</html>`;
+    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 }

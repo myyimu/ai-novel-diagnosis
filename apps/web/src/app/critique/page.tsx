@@ -1,16 +1,5 @@
-"use client";
-
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
-import { WorkspaceHeader } from "@/components/workspace-header";
-import { useLayoutMode } from "@/components/layout-toggle";
+import { redirect } from "next/navigation";
 
 export default function CritiquePage() {
-	const [layoutMode] = useLayoutMode();
-
-	return (
-		<main className="min-h-screen bg-background text-foreground">
-			<WorkspaceHeader />
-			<NovelCritiqueConsole view="chapter" layoutMode={layoutMode} />
-		</main>
-	);
+	redirect("/diagnose/deep");
 }

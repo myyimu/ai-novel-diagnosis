@@ -354,7 +354,7 @@ API: http://127.0.0.1:3001/api/v1
 
 这三个入口都会先做环境检查，再启动服务。本项目在 `.nvmrc` 和 `package.json#engines` 中声明了 Node.js 基线版本。如果本机缺少 Node.js 或版本过旧，脚本会优先尝试使用项目要求的版本；如果缺少 `pnpm`，会先尝试 `corepack`，再回退到 `npm install -g`。
 
-通常安装后不需要重开终端，除非脚本明确提示当前 shell 仍然找不到 `node` 或 `pnpm`。更完整的双语启动说明见 [scripts/START-LOCAL-GUIDE.md](./scripts/START-LOCAL-GUIDE.md)。
+通常安装后不需要重开终端，除非脚本明确提示当前 shell 仍然找不到 `node` 或 `pnpm`。更完整的跨平台服务启动说明见 [scripts/START-LOCAL-GUIDE.md](./scripts/START-LOCAL-GUIDE.md)。
 
 ## 工作区结构
 

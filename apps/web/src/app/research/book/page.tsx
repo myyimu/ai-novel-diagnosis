@@ -1,16 +1,7 @@
 "use client";
 
-import { NovelCritiqueConsole } from "@/components/novel-critique-console";
-import { WorkspaceHeader } from "@/components/workspace-header";
-import { useLayoutMode } from "@/components/layout-toggle";
+import { ResearchBookPage } from "@/components/workspace/research/ResearchBookPage";
 
 export default function BookAnalysisPage() {
-	const [layoutMode] = useLayoutMode();
-
-	return (
-		<main className="min-h-screen bg-background text-foreground">
-			<WorkspaceHeader />
-			<NovelCritiqueConsole view="book" layoutMode={layoutMode} />
-		</main>
-	);
+	return <ResearchBookPage />;
 }

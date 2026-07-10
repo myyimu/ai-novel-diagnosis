@@ -306,7 +306,10 @@ export function getAdvancedWorkspaceNavItems(): WorkspaceNavItem<WorkspaceView>[
 }
 
 // 性能快照说明
-export function getPerformanceSnapshotNote(options: { isShortFormReading?: boolean; isLongSerialization?: boolean }) {
+export function getPerformanceSnapshotNote(options: {
+	isShortFormReading?: boolean;
+	isLongSerialization?: boolean;
+}) {
 	const { isShortFormReading, isLongSerialization } = options;
 	if (isShortFormReading) {
 		return "短篇付费阅读：重点看前3分钟和付费转化率";
@@ -463,7 +466,11 @@ export function buildResearchWorkspaceSummary(options: {
 	}
 	if (hasScore && options.evidenceScoreCount > 0) {
 		researchSourceCount++;
-		researchSources.push({ name: "评分证据", status: "ready", detail: `${options.evidenceScoreCount} 条` });
+		researchSources.push({
+			name: "评分证据",
+			status: "ready",
+			detail: `${options.evidenceScoreCount} 条`,
+		});
 	}
 
 	// researchReadiness is a number (0-100) based on source count

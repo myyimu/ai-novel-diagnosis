@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Upload, Settings, Target } from "lucide-react";
+import { FileText, Target } from "lucide-react";
 import { QuickExperiencePanel } from "@/components/workspace/quick-experience-panel";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
 
@@ -64,6 +64,9 @@ interface WorkspaceHandlers {
 	onOpenModel: () => void;
 	onOpenCritique: () => void;
 	onOpenBook: () => void;
+	onOpenEvidenceIssue?: (issueIndex: number) => void;
+	onOpenRevisionSession?: (sessionIndex: number) => void;
+	onOpenMethodologyCard?: (cardIndex: number) => void;
 }
 
 interface InputTabProps {
@@ -125,6 +128,9 @@ export function InputTab({ handlers }: InputTabProps) {
 				onOpenModel={handlers.onOpenModel}
 				onOpenCritique={handlers.onOpenCritique}
 				onOpenBook={handlers.onOpenBook}
+				onOpenEvidenceIssue={handlers.onOpenEvidenceIssue}
+				onOpenRevisionSession={handlers.onOpenRevisionSession}
+				onOpenMethodologyCard={handlers.onOpenMethodologyCard}
 			/>
 		);
 	}, [handlers]);
@@ -133,11 +139,11 @@ export function InputTab({ handlers }: InputTabProps) {
 		<div className="space-y-4">
 			<div className="flex items-center gap-2">
 				<FileText className="w-5 h-5" />
-				<h2 className="text-lg font-semibold">输入</h2>
+				<h2 className="text-lg font-semibold">章节诊断</h2>
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-2">
-				<Card className="md:col-span-2">
+			<div className="grid gap-4">
+				<Card>
 					<CardHeader>
 						<CardTitle className="text-sm flex items-center gap-2">
 							<Target className="w-4 h-4" />
@@ -148,53 +154,6 @@ export function InputTab({ handlers }: InputTabProps) {
 						</CardDescription>
 					</CardHeader>
 					<CardContent>{quickExperiencePanel}</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-sm flex items-center gap-2">
-							<Upload className="w-4 h-4" />
-							书籍上传
-						</CardTitle>
-						<CardDescription>上传完整书籍进行全书分析</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<p className="text-sm text-muted-foreground">
-							{handlers?.bookText || handlers?.bookFile ? (
-								<span>
-									{handlers.bookTitle || "未命名书籍"} -{" "}
-									{handlers.bookText?.length || 0} 字
-								</span>
-							) : (
-								"书籍上传功能将在完整实施后可用"
-							)}
-						</p>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-sm flex items-center gap-2">
-							<Settings className="w-4 h-4" />
-							AI 提供商设置
-						</CardTitle>
-						<CardDescription>配置 AI 模型和 API</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<p className="text-sm text-muted-foreground">
-							{handlers ? (
-								<span>
-									当前: {handlers.providerLabel} (
-									{handlers.providerKind === "mock"
-										? "本地演示"
-										: handlers.providerModel || "预设模型"}
-									)
-								</span>
-							) : (
-								"AI 设置功能将在完整实施后可用"
-							)}
-						</p>
-					</CardContent>
 				</Card>
 			</div>
 		</div>

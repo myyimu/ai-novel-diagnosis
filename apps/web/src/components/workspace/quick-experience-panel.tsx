@@ -43,6 +43,9 @@ export function QuickExperiencePanel({
 	onOpenModel,
 	onOpenCritique,
 	onOpenBook,
+	onOpenEvidenceIssue,
+	onOpenRevisionSession,
+	onOpenMethodologyCard,
 }: {
 	chapterText: string;
 	providerLabel: string;
@@ -74,6 +77,9 @@ export function QuickExperiencePanel({
 	onOpenModel: () => void;
 	onOpenCritique: () => void;
 	onOpenBook: () => void;
+	onOpenEvidenceIssue?: (issueIndex: number) => void;
+	onOpenRevisionSession?: (sessionIndex: number) => void;
+	onOpenMethodologyCard?: (cardIndex: number) => void;
 }) {
 	const MIN_CHAR_COUNT = 50;
 	const trimmedLength = chapterText.trim().length;
@@ -440,10 +446,12 @@ export function QuickExperiencePanel({
 						<div className="rounded-md border border-border bg-background p-4">
 							<p className="text-sm font-medium">关键问题证据链</p>
 							<div className="mt-3 space-y-3">
-								{issues.slice(0, 3).map((issue) => (
-									<div
+								{issues.slice(0, 3).map((issue, index) => (
+									<button
 										key={issue.id || issue.title}
-										className="rounded-md border border-border bg-card p-3"
+										type="button"
+										className="rounded-md border border-border bg-card p-3 text-left transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+										onClick={() => onOpenEvidenceIssue?.(index)}
 									>
 										<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 											<p className="text-sm font-semibold">{issue.title}</p>
@@ -488,7 +496,7 @@ export function QuickExperiencePanel({
 											<span className="font-medium">下一步动作：</span>
 											{issue.fixAction}
 										</p>
-									</div>
+									</button>
 								))}
 							</div>
 						</div>
@@ -592,13 +600,17 @@ export function QuickExperiencePanel({
 							</div>
 							{revisionTrend ? (
 								<div className="mt-3 grid gap-3 md:grid-cols-3">
-									<div className="rounded-md border border-border bg-card p-3">
+									<button
+										type="button"
+										className="rounded-md border border-border bg-card p-3 text-left transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+										onClick={() => onOpenRevisionSession?.(0)}
+									>
 										<p className="text-xs text-muted-foreground">最近诊断</p>
 										<p className="mt-2 text-sm font-semibold">
 											{revisionTrend.latest.quickScore}/10 ·{" "}
 											{formatGateLabel(revisionTrend.latest.gateDecision)}
 										</p>
-									</div>
+									</button>
 									<div className="rounded-md border border-border bg-card p-3">
 										<p className="text-xs text-muted-foreground">分数变化</p>
 										<p className="mt-2 text-sm font-semibold">
@@ -619,10 +631,12 @@ export function QuickExperiencePanel({
 							) : null}
 							{latestProjectCards.length ? (
 								<div className="mt-3 grid gap-3 md:grid-cols-2">
-									{latestProjectCards.map((card) => (
-										<div
+									{latestProjectCards.map((card, index) => (
+										<button
 											key={card.projectCardId}
-											className="rounded-md border border-border bg-card p-3"
+											type="button"
+											className="rounded-md border border-border bg-card p-3 text-left transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+											onClick={() => onOpenMethodologyCard?.(index)}
 										>
 											<div className="flex items-start justify-between gap-3">
 												<p className="text-sm font-semibold">
@@ -635,7 +649,7 @@ export function QuickExperiencePanel({
 											<p className="mt-2 text-xs leading-5 text-muted-foreground">
 												{card.reusableRule}
 											</p>
-										</div>
+										</button>
 									))}
 								</div>
 							) : null}
@@ -766,7 +780,7 @@ function formatIssueCategory(category: string) {
 	return map[category] || "其他";
 }
 
-function formatGateLabel(gate: string | undefined) {
+export function formatGateLabel(gate: string | undefined) {
 	const map: Record<string, string> = {
 		continue: "继续",
 		revise: "修改",

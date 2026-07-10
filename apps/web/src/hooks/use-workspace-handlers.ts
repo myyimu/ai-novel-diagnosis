@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { type BookExportFormat, type BookExportMode } from "@/components/workspace/export-view";
 import { apiUrl, type ApiEnvelope } from "@/lib/api-client";
@@ -46,6 +46,7 @@ import {
 	buildChapterWorkspaceSummary,
 	buildResearchWorkspaceSummary,
 	getAdvancedWorkspaceNavItems,
+	getNavItemsByWorkspace,
 	getPerformanceSnapshotNote,
 	getWorkspaceNavItems,
 	getWorkspaceViewMeta,
@@ -69,7 +70,12 @@ import {
 	updateCachedBookAnalysisByJobId,
 	upsertCacheEntry,
 } from "@/lib/workspace-cache";
-import { type WorkspaceView, resolveWorkspaceRoute } from "@/lib/workspace-routes";
+import {
+	type WorkspaceView,
+	getWorkspaceRouteMetaByLegacyView,
+	getWorkspaceRouteMetaByPath,
+	resolveWorkspaceRoute,
+} from "@/lib/workspace-routes";
 import {
 	buildBeginnerLearningDigest,
 	buildComparisonSamples,
@@ -233,6 +239,7 @@ async function readTextFileWithAutoEncoding(file: File) {
 
 export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const router = useRouter();
+	const pathname = usePathname();
 	const {
 		provider,
 		setProvider,
@@ -506,6 +513,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}
 	}
 
+	function openWorkspaceView(view: string) {
+		const route = resolveWorkspaceRoute(view);
+		if (route) {
+			router.push(route);
+		}
+	}
+
 	function openBookUtility(panel: "history" | "exports") {
 		setBookUtilityPanel((current) => (current === panel ? null : panel));
 	}
@@ -653,6 +667,17 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const navItems = getWorkspaceNavItems();
 	const advancedNavItems = getAdvancedWorkspaceNavItems();
 	const activeMeta = getWorkspaceViewMeta(activeView);
+	const workspaceRouteMeta =
+		getWorkspaceRouteMetaByPath(pathname) ?? getWorkspaceRouteMetaByLegacyView(activeView);
+	const workspaceNavItems = workspaceRouteMeta
+		? getNavItemsByWorkspace(workspaceRouteMeta.workspace)
+		: navItems;
+	const workspaceAdvancedNavItems = workspaceRouteMeta ? [] : advancedNavItems;
+	const workspaceActiveView = workspaceRouteMeta?.view ?? activeView;
+	const workspaceActiveMeta =
+		workspaceNavItems.find((item) => item.id === workspaceActiveView) ?? activeMeta;
+	const workspaceDefaultMainTab = workspaceRouteMeta?.defaultMainTab;
+	const workspaceDefaultRightPanelTab = workspaceRouteMeta?.defaultRightPanelTab;
 
 	/* ──────────── computed values ──────────── */
 
@@ -2082,8 +2107,15 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		activeMeta,
 		navItems,
 		advancedNavItems,
+		workspaceActiveView,
+		workspaceActiveMeta,
+		workspaceNavItems,
+		workspaceAdvancedNavItems,
+		workspaceDefaultMainTab,
+		workspaceDefaultRightPanelTab,
 		status,
 		loading,
+		openWorkspaceView,
 
 		/* project */
 		projects,
@@ -2201,6 +2233,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		bookText,
 		setBookText,
 		bookFile,
+		setBookFile,
 		bookUpload,
 		bookJob,
 		bookAnalysisResult,
