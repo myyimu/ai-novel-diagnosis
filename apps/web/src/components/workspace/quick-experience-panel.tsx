@@ -124,10 +124,10 @@ export function QuickExperiencePanel({
 				<div className="max-w-3xl">
 					<div className="flex items-center gap-2">
 						<Target className="size-5 text-primary" />
-						<h2 className="text-xl font-semibold">30 秒小说诊断</h2>
+						<h2 className="text-xl font-semibold">快速诊断一章</h2>
 					</div>
 					<p className="mt-2 text-sm leading-6 text-muted-foreground">
-						先别让 AI 重写。粘贴第一章，先看为什么没人追、证据在哪、下一版先改什么。
+						粘贴一章正文，先看正文批注、问题分析和下一步修改方案。
 					</p>
 				</div>
 				<div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
@@ -179,7 +179,7 @@ export function QuickExperiencePanel({
 					</div>
 					<details className="mt-4 rounded-md border border-border bg-background p-3">
 						<summary className="cursor-pointer list-none text-sm font-medium">
-							可选：指定题材、卖点保护和上一条 Prompt
+							可选：指定题材、卖点保护和上一条修改指令
 							<span className="ml-2 text-xs font-normal text-muted-foreground">
 								不懂就保持自动判断
 							</span>
@@ -220,11 +220,11 @@ export function QuickExperiencePanel({
 									<option value="ai-draft">AI 生成稿</option>
 									<option value="idea">脑洞/设定</option>
 									<option value="outline">大纲</option>
-									<option value="prompt">Prompt 草稿</option>
+									<option value="prompt">修改指令草稿</option>
 								</select>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor="quick-review-previous-prompt">上一条 Prompt</Label>
+								<Label htmlFor="quick-review-previous-prompt">上一条修改指令</Label>
 								<textarea
 									id="quick-review-previous-prompt"
 									value={quickReviewPreviousPrompt}
@@ -232,11 +232,10 @@ export function QuickExperiencePanel({
 										onQuickReviewPreviousPromptChange(event.target.value)
 									}
 									className="min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									placeholder="如果正文来自 AI，把上一条写作 Prompt 粘贴到这里。系统会判断问题出在正文还是 Prompt。"
+									placeholder="如果正文来自 AI，把上一条写作修改指令粘贴到这里。系统会判断问题出在正文还是指令。"
 								/>
 								<p className="text-xs leading-5 text-muted-foreground">
-									题材和来源只帮助模型少走弯路；上一条 Prompt
-									会参与诊断和下一轮改稿指令。
+									题材和来源只帮助模型少走弯路；上一条修改指令会参与诊断和下一轮修改方案。
 								</p>
 							</div>
 						</div>
@@ -291,7 +290,7 @@ export function QuickExperiencePanel({
 						disabled={loading || isChapterTooShort}
 					>
 						{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-						生成改稿方案
+						生成修改方案
 					</Button>
 					{hasCachedResult ? (
 						<Button
@@ -371,7 +370,7 @@ export function QuickExperiencePanel({
 				<div className="mt-5 space-y-4 rounded-md border border-success-border bg-success-surface p-5">
 					<div className="flex items-center gap-2">
 						<CheckCircle2 className="size-5 text-success-foreground" />
-						<h3 className="text-base font-semibold">改稿急诊结果：{quickScore}</h3>
+						<h3 className="text-base font-semibold">问题分析：{quickScore}</h3>
 						<span className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
 							{quickReviewResult.genre || "类型待确认"} ·{" "}
 							{confidence === null ? "置信度待确认" : `置信度 ${confidence}%`}
@@ -384,7 +383,7 @@ export function QuickExperiencePanel({
 					</p>
 					<div className="rounded-md border border-border bg-background p-4">
 						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<p className="text-sm font-medium">总判断</p>
+							<p className="text-sm font-medium">问题分析</p>
 							<span
 								className={`rounded-md border px-2 py-1 text-xs ${gate.className}`}
 							>
@@ -396,7 +395,7 @@ export function QuickExperiencePanel({
 						</p>
 						<p className="mt-1 text-xs leading-5 text-muted-foreground">
 							{quickReviewResult.gateReason ||
-								"这是当前稿件的改稿优先级建议，不代表平台流量预测。"}
+								"这是当前稿件的修改优先级建议，不代表平台流量预测。"}
 						</p>
 						{evidenceSummary ? (
 							<div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -435,16 +434,16 @@ export function QuickExperiencePanel({
 						<p className="text-sm font-medium text-warning-foreground">最大追读问题</p>
 						<p className="mt-1 text-sm leading-6">
 							{quickReviewResult.mainProblem ||
-								"模型没有返回明确问题，请重试或进入完整点评。"}
+								"模型没有返回明确问题，请重试或进入完整诊断。"}
 						</p>
 					</div>
 					<div className="rounded-md border border-primary/30 bg-primary/10 p-4">
-						<p className="text-sm font-medium">产品诊断</p>
+						<p className="text-sm font-medium">诊断判断</p>
 						<p className="mt-2 text-base font-semibold leading-6">{sharpDiagnosis}</p>
 					</div>
 					{issues.length ? (
 						<div className="rounded-md border border-border bg-background p-4">
-							<p className="text-sm font-medium">关键问题证据链</p>
+							<p className="text-sm font-medium">正文批注与证据链</p>
 							<div className="mt-3 space-y-3">
 								{issues.slice(0, 3).map((issue, index) => (
 									<button
@@ -502,7 +501,7 @@ export function QuickExperiencePanel({
 						</div>
 					) : null}
 					<div>
-						<p className="text-sm font-medium">立刻改这三处</p>
+						<p className="text-sm font-medium">修改方案</p>
 						<ol className="mt-1 list-inside list-decimal space-y-1 text-sm leading-6 text-muted-foreground">
 							{actionableFixes.length ? (
 								actionableFixes.map((fix, index) => <li key={index}>{fix}</li>)
@@ -513,7 +512,7 @@ export function QuickExperiencePanel({
 					</div>
 					<div className="rounded-md border border-border bg-background p-4">
 						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<p className="text-sm font-medium">可复制给写作 AI 的改稿 Prompt</p>
+							<p className="text-sm font-medium">可复制给写作 AI 的修改指令</p>
 							<Button
 								type="button"
 								size="sm"
@@ -555,7 +554,7 @@ export function QuickExperiencePanel({
 					) : null}
 					{reviewComparison ? (
 						<div className="rounded-md border border-border bg-background p-4">
-							<p className="text-sm font-medium">改稿后复诊对比</p>
+							<p className="text-sm font-medium">修改效果对比</p>
 							<div className="mt-3 grid gap-3 md:grid-cols-3">
 								<div className="rounded-md border border-border bg-card p-3">
 									<p className="text-xs text-muted-foreground">急诊分</p>
@@ -592,9 +591,9 @@ export function QuickExperiencePanel({
 					{revisionTrend || latestProjectCards.length ? (
 						<div className="rounded-md border border-border bg-background p-4">
 							<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-								<p className="text-sm font-medium">项目迭代资产</p>
+								<p className="text-sm font-medium">书籍迭代资产</p>
 								<span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-									{revisionSessions.length} 次复诊 ·{" "}
+									{revisionSessions.length} 次修改效果 ·{" "}
 									{projectMethodologyCards.length} 张方法论卡
 								</span>
 							</div>
@@ -693,14 +692,14 @@ export function QuickExperiencePanel({
 							<div className="mt-4 flex flex-wrap gap-2">
 								<Button onClick={onOpenCritique}>打开深度质检</Button>
 								<Button variant="outline" onClick={onOpenBook}>
-									样本/整书进阶
+									样本/整本导入
 								</Button>
 							</div>
 						</div>
 					</details>
 					<p className="text-xs leading-5 text-muted-foreground">
 						{quickReviewResult.readyReason ||
-							"如果结果不完整，建议重试一次或进入完整评分。"}
+							"如果结果不完整，建议重试一次或进入完整诊断。"}
 					</p>
 				</div>
 			) : null}
@@ -772,7 +771,7 @@ function formatIssueCategory(category: string) {
 		pacing: "节奏",
 		setting_load: "设定负担",
 		prose_ai_flavor: "AI 腔",
-		prompt_constraint: "Prompt 约束",
+		prompt_constraint: "修改指令约束",
 		market_promise: "市场承诺",
 		other: "其他",
 	};
@@ -852,7 +851,7 @@ function buildReviewComparison(
 			? "改法有效，可以进入高级质检找证据链。"
 			: delta >= 0
 				? "方向可能有效，但还要继续补强目标、代价或章末钩子。"
-				: "这版改稿可能削弱了追读动机，建议回到最大流失点重新改。";
+				: "这版修改可能削弱了追读动机，建议回到最大流失点重新改。";
 
 	return {
 		previousScore,
@@ -895,7 +894,7 @@ const quickReviewProgressSteps = [
 	{ startsAt: 0, label: "读取章节开头和结尾" },
 	{ startsAt: 4, label: "判断题材与主线冲突" },
 	{ startsAt: 8, label: "提取卖点和最大问题" },
-	{ startsAt: 12, label: "整理改稿建议" },
+	{ startsAt: 12, label: "整理修改方案" },
 	{ startsAt: 20, label: "等待模型返回" },
 ];
 

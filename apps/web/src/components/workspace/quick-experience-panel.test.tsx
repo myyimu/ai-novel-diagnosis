@@ -17,15 +17,15 @@ const diagnosisExamples = [
 	},
 	{
 		id: "urban-prompt-too-vague",
-		label: "都市 AI 初稿：Prompt 约束太泛",
-		description: "把 Prompt 改成强冲突约束",
+		label: "都市 AI 初稿：修改指令约束太泛",
+		description: "把修改指令改成强冲突约束",
 		genre: "urban",
 		inputKind: "ai-draft" as const,
 		chapterTitle: "第一章 下山",
 		chapterText: "林越背着旧布包走出车站。",
 		previousPrompt: "请写一个都市下山高手开局。",
 		topIssueCategory: "prompt_constraint",
-		nextAction: "把 Prompt 改成强冲突约束",
+		nextAction: "把修改指令改成强冲突约束",
 	},
 ];
 
@@ -58,13 +58,13 @@ describe("QuickExperiencePanel", () => {
 			/>,
 		);
 
-		expect(html).toContain("30 秒小说诊断");
+		expect(html).toContain("快速诊断一章");
 		expect(html).toContain("当前 AI: 免费共享算力");
-		expect(html).toContain("生成改稿方案");
+		expect(html).toContain("生成修改方案");
 		expect(html).toContain("玄幻 AI 初稿：开局承诺不清");
-		expect(html).toContain("都市 AI 初稿：Prompt 约束太泛");
+		expect(html).toContain("都市 AI 初稿：修改指令约束太泛");
 		expect(html).toContain("当前 16 字，还差 34 字");
-		expect(html).toContain("可选：指定题材、卖点保护和上一条 Prompt");
+		expect(html).toContain("可选：指定题材、卖点保护和上一条修改指令");
 		expect(html).toContain("核心卖点");
 		expect(html).toContain("必须保留机制");
 		expect(html).toContain("目标读者爽点");
@@ -195,16 +195,16 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("82%");
 		expect(html).toContain("最高优先级");
 		expect(html).toContain("高优先级");
-		expect(html).toContain("关键问题证据链");
+		expect(html).toContain("正文批注与证据链");
 		expect(html).toContain("第1段：");
 		expect(html).toContain("置信度 86%");
 		expect(html).toContain("读者会觉得主角还没被逼到必须反击。");
 		expect(html).toContain("把试炼资格和家族代价绑定到这场公开否定。");
 		expect(html).toContain("补一句失败代价");
-		expect(html).toContain("可复制给写作 AI 的改稿 Prompt");
+		expect(html).toContain("可复制给写作 AI 的修改指令");
 		expect(html).toContain("请帮我改写这一章");
-		expect(html).toContain("改稿后复诊对比");
-		expect(html).toContain("项目迭代资产");
+		expect(html).toContain("修改效果对比");
+		expect(html).toContain("书籍迭代资产");
 		expect(html).toContain("钩子必须绑定代价");
 		expect(html).toContain("5.2");
 		expect(html).toContain("6.5");
@@ -212,7 +212,7 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("推荐发布平台");
 		expect(html).toContain("番茄小说");
 		expect(html).toContain("打开深度质检");
-		expect(html).toContain("样本/整书进阶");
+		expect(html).toContain("样本/整本导入");
 	});
 
 	it("falls back when the model returns an incomplete result", () => {

@@ -19,6 +19,7 @@ export function SettingsWorkspace() {
 		providerConfigHistory,
 		filteredProviderModelOptions,
 		providerModelsLoading,
+		providerTestResult,
 		applyProviderPreset,
 		setProviderModelSearch,
 		setProvider,
@@ -176,6 +177,7 @@ export function SettingsWorkspace() {
 				}))}
 				filteredProviderModelOptions={filteredProviderModelOptions}
 				providerModelsLoading={providerModelsLoading}
+				providerTestResult={providerTestResult}
 				onChangeProviderPreset={handleChangeProviderPreset}
 				onChangeProviderModel={handleChangeProviderModel}
 				onChangeProviderApiKey={handleChangeProviderApiKey}

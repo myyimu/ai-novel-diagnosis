@@ -44,7 +44,7 @@ export const jwtConfig = registerAs("jwt", () => {
 });
 
 export const serverConfig = registerAs("server", () => ({
-  port: parseInt(process.env.PORT || "3000", 10),
+  port: parseInt(process.env.PORT || "3001", 10),
 }));
 
 export const databaseConfig = registerAs("database", () => ({

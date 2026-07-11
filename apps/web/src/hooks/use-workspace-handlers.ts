@@ -67,6 +67,7 @@ import {
 	createQuickReviewCacheEntry,
 	createRubricCacheEntry,
 	createScoreCacheEntry,
+	hashString,
 	updateCachedBookAnalysisByJobId,
 	upsertCacheEntry,
 } from "@/lib/workspace-cache";
@@ -138,6 +139,16 @@ export type LoadingState =
 	| "ask"
 	| "export"
 	| null;
+
+export interface ProviderTestResultView {
+	status: "success" | "error";
+	providerName: string;
+	modelName: string;
+	durationMs: number;
+	checkedAt: string;
+	message: string;
+	raw?: Record<string, unknown>;
+}
 
 const TEXT_FILE_DECODER_CANDIDATES = [
 	"utf-8",
@@ -373,6 +384,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const [newProjectName, setNewProjectName] = useState("");
 	const [providerModelsLoading, setProviderModelsLoading] = useState(false);
 	const [providerModelSearch, setProviderModelSearch] = useState("");
+	const [providerTestResult, setProviderTestResult] = useState<ProviderTestResultView | null>(
+		null,
+	);
 	const [loadedProviderModels, setLoadedProviderModels] = useState<{
 		key: string;
 		models: string[];
@@ -533,7 +547,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setActiveProjectId(projectId);
 		setPreviousQuickReviewResult(null);
 		setQuickReviewResult(null);
-		setStatus(`已切换到项目：${project?.name || "未命名项目"}`);
+		setStatus(`已切换到书籍：${project?.name || "未命名书籍"}`);
 	}
 
 	function applyWorkspaceAssets(assets: WorkspaceAssetsPayload) {
@@ -568,7 +582,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	function createProject() {
 		const name = newProjectName.trim();
 		if (!name) {
-			setStatus("请先填写项目名称。");
+			setStatus("请先填写书籍名称。");
 			return;
 		}
 
@@ -584,9 +598,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setNewProjectName("");
 		setPreviousQuickReviewResult(null);
 		setQuickReviewResult(null);
-		setStatus(`已创建并切换到项目：${project.name}`);
+		setStatus(`已创建并切换到书籍：${project.name}`);
 		void upsertWorkspaceProject(project).catch(() => {
-			setStatus("项目已在本地创建；后端暂时未同步成功。");
+			setStatus("书籍已在本地创建；后端暂时未同步成功。");
 		});
 	}
 
@@ -608,19 +622,19 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
 			),
 		);
-		setStatus("复诊备注已保存。");
+		setStatus("修改效果备注已保存。");
 		void updateRevisionSessionNote({
 			sessionId,
 			note: note.trim(),
 			updatedAt: now,
 		}).catch(() => {
-			setStatus("复诊备注已本地保存；后端暂时未同步成功。");
+			setStatus("修改效果备注已本地保存；后端暂时未同步成功。");
 		});
 	}
 
 	async function exportProjectMarkdown() {
 		if (!projectRevisionSessions.length && !projectMethodologyCards.length) {
-			setStatus("当前项目还没有可导出的复诊记录或方法论卡。");
+			setStatus("当前书籍还没有可导出的修改效果记录或方法论卡。");
 			return;
 		}
 
@@ -643,7 +657,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					content,
 					response.headers.get("content-type") || "text/markdown;charset=utf-8",
 				);
-				setStatus(`项目导出完成：${filename}`);
+				setStatus(`书籍资产导出完成：${filename}`);
 				return;
 			}
 		} catch {
@@ -659,7 +673,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			.toISOString()
 			.slice(0, 10)}.md`;
 		downloadText(filename, content, "text/markdown;charset=utf-8");
-		setStatus(`项目导出完成：${filename}`);
+		setStatus(`书籍资产导出完成：${filename}`);
 	}
 
 	/* ──────────── nav items ──────────── */
@@ -1000,8 +1014,19 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		})
 			.then(applyWorkspaceAssets)
 			.catch(() => {
-				setStatus("复诊结果已本地保存；后端暂时未同步成功。");
+				setStatus("修改效果已本地保存；后端暂时未同步成功。");
 			});
+	}
+
+	function openQuickReviewChapter() {
+		const projectId = encodeURIComponent(activeProjectId || defaultWorkspaceProject.id);
+		const chapterSeed = [
+			activeProjectId || defaultWorkspaceProject.id,
+			chapterTitle.trim() || "第一章",
+			chapterText.trim(),
+		].join("|");
+		const chapterId = encodeURIComponent(`chapter-${hashString(chapterSeed)}`);
+		router.push(`/project/current?id=${projectId}&chapter=${chapterId}`);
 	}
 
 	function rememberRubric(key: string, result: RubricResult) {
@@ -1045,6 +1070,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	async function testProvider() {
 		setLoading("provider");
 		setStatus("正在测试模型服务...");
+		setProviderTestResult(null);
 		const timeoutMs = 120000;
 		const timeoutSignal = new Promise<never>((_, reject) => {
 			const timer = setTimeout(() => {
@@ -1066,9 +1092,26 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					: provider.model || String(result.model || "未指定模型");
 			const duration = Date.now() - startedAt;
 			rememberSuccessfulProviderConfig(providerPayload);
+			setProviderTestResult({
+				status: "success",
+				providerName,
+				modelName,
+				durationMs: duration,
+				checkedAt: new Date().toISOString(),
+				message: String(result.message || result.status || "模型服务连接成功。"),
+				raw: result,
+			});
 			setStatus(`模型服务可用：${providerName} · ${modelName}（${duration}ms）`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "模型测试失败，请稍后重试。";
+			setProviderTestResult({
+				status: "error",
+				providerName: providerPresets[provider.preset].label,
+				modelName: provider.kind === "mock" ? "本地演示" : provider.model || "未指定模型",
+				durationMs: 0,
+				checkedAt: new Date().toISOString(),
+				message,
+			});
 			setStatus(`模型测试失败：${message}`);
 		} finally {
 			setLoading(null);
@@ -1192,7 +1235,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setBookUpload(null);
 		setBookAnalysisResult(null);
 		setBookJob(null);
-		setStatus("已填入示例整书文本。示例只用于演示，请在正式拆解前替换为自己的 TXT。");
+		setStatus("已填入示例整本正文。示例只用于演示，请在正式导入前替换为自己的 TXT。");
 	}
 
 	function applyInferredPlatformStrategy(
@@ -1388,7 +1431,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				setRubricResult(cached.result);
 				setScoreResult(null);
 				resetScoreProgress();
-				setStatus("已使用缓存的评分标准；如需让 AI 重新拆解，请点“重新分析”。");
+				setStatus("已使用缓存的评分标准；如需让 AI 重新分析，请点“重新分析”。");
 				return;
 			}
 		}
@@ -1399,7 +1442,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const rubricReferenceText = compactReferenceText(referenceText);
 		setStatus(
 			rubricReferenceText.length === referenceText.trim().length
-				? "正在拆解参考章节并生成评分标准..."
+				? "正在分析参考章节并生成评分标准..."
 				: `参考章节超过单次分析长度，已抽取 ${rubricReferenceText.length} 字的开头和结尾生成评分标准...`,
 		);
 		try {
@@ -1506,7 +1549,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	async function runQuickExperience(force = false) {
 		if (chapterText.trim().length < 50) {
-			setStatus("请先粘贴至少 50 字章节正文，再运行快速点评。");
+			setStatus("请先粘贴至少 50 字章节正文，再运行快速诊断。");
 			return;
 		}
 
@@ -1519,7 +1562,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				}
 				setQuickReviewResult(cached.result);
 				setQuickReviewError(null);
-				setStatus("已使用缓存的快速点评；如需让 AI 重新点评，请点“重新分析”。");
+				setStatus("已使用缓存的问题分析；如需让 AI 重新分析，请点“重新分析”。");
+				openQuickReviewChapter();
 				return;
 			}
 		}
@@ -1536,6 +1580,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
 			setStatus(`已载入示例诊断报告：${matchedExample.label}。`);
+			openQuickReviewChapter();
 			return;
 		}
 
@@ -1554,7 +1599,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			);
 		}, 10_000);
 		try {
-			setStatus("正在生成快速点评...");
+			setStatus("正在生成问题分析...");
 			const result = await requestQuickReview({
 				provider: providerPayload,
 				chapterText,
@@ -1569,7 +1614,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			setQuickReviewResult(result);
 			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
-			setStatus(`快速点评完成：${result.quickScore}/10`);
+			setStatus(`问题分析完成：${result.quickScore}/10`);
+			openQuickReviewChapter();
 		} catch (error) {
 			const message = toQuickReviewErrorMessage(error);
 			setStatus(message);
@@ -1592,7 +1638,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				}
 				setStatus(
 					cached.job.status === "succeeded"
-						? "已使用缓存的整书拆解结果；如需让 AI 重新拆解，请点“重新拆解”。"
+						? "已使用缓存的整本分析结果；如需让 AI 重新分析，请点“重新分析”。"
 						: "已恢复这本书的历史任务，继续同步最新状态。",
 				);
 				if (cached.job.status === "queued" || cached.job.status === "running") {
@@ -1609,7 +1655,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setLoading("book");
 		setBookAnalysisResult(null);
 		setBookJob(null);
-		setStatus("正在准备上传文本并创建整书异步拆解任务...");
+		setStatus("正在准备上传文本并创建整本异步分析任务...");
 		try {
 			const upload = bookUpload ?? (await uploadBookForPreview(false));
 			if (!upload) {
@@ -1633,14 +1679,14 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	async function resumeBookAnalysis() {
 		if (!bookJob?.id) {
-			setStatus("请先打开一个可继续的整书任务。");
+			setStatus("请先打开一个可继续的整本任务。");
 			return;
 		}
 
 		const targetJobId = bookJob.id;
 		setLoading("book");
 		setBookAnalysisResult(null);
-		setStatus("正在从已完成章节继续整书拆解...");
+		setStatus("正在从已完成章节继续整本分析...");
 		const cacheKey = buildBookAnalysisCacheKey();
 		try {
 			const resumedJob = await resumeBookAnalysisJob(targetJobId, providerPayload);
@@ -1750,7 +1796,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 						updateBookAnalysisCacheByJobId(jobId, completedJob);
 						if (!options?.silent) {
 							setStatus(
-								`整书拆解完成：${latestJob.result.characters.length} 张角色卡，已分析 ${latestJob.result.mapReduce?.mapCount ?? 0} 个章节片段`,
+								`整本分析完成：${latestJob.result.characters.length} 张角色卡，已分析 ${latestJob.result.mapReduce?.mapCount ?? 0} 个章节片段`,
 							);
 						}
 					}
@@ -1780,7 +1826,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			}
 
 			if (latestSnapshot && !options?.silent) {
-				setStatus("整书拆解仍在后台运行，刷新页面后也会自动恢复任务状态。");
+				setStatus("整本分析仍在后台运行，刷新页面后也会自动恢复任务状态。");
 			}
 			return latestSnapshot;
 		} finally {
@@ -1794,7 +1840,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const hasBookFile = Boolean(bookFile);
 		const hasBookText = Boolean(bookText.trim());
 		if (!hasBookFile && !hasBookText) {
-			setStatus("请先上传 TXT 文件，或在文本框粘贴整书内容。");
+			setStatus("请先上传 TXT 文件，或在文本框粘贴整本正文。");
 			return null;
 		}
 		if (bookFile && bookFile.size === 0) {
@@ -1941,7 +1987,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}
 
 		setLoading("ask");
-		setStatus("正在基于已拆解资料回答问题...");
+		setStatus("正在基于已分析资料回答问题...");
 		try {
 			const result = await requestResearchQa({
 				provider: providerPayload,
@@ -2035,7 +2081,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		if (file.size > LARGE_BOOK_INLINE_BYTES) {
 			setBookText("");
 			setStatus(
-				`已选择大文件 ${file.name}（${formatFileSize(file.size)}）。为避免浏览器卡顿，不再展开全文，后续会直接上传并拆解。`,
+				`已选择大文件 ${file.name}（${formatFileSize(file.size)}）。为避免浏览器卡顿，不再展开全文，后续会直接上传并分析章节。`,
 			);
 			return;
 		}
@@ -2142,6 +2188,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		providerModelSearch,
 		setProviderModelSearch,
 		providerModelsLoading,
+		providerTestResult,
 		selectedModelOption,
 		isBackendFreeProvider,
 		providerLabel,

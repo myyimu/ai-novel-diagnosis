@@ -1,7 +1,7 @@
 {
   "schemaVersion": "novel-diagnosis-fixture/v1",
   "id": "urban-prompt-too-vague",
-  "title": "都市 AI 初稿：Prompt 约束太泛",
+  "title": "都市 AI 初稿：修改指令约束太泛",
   "genre": "urban",
   "inputKind": "ai-draft",
   "chapterTitle": "第一章 下山",
@@ -13,7 +13,7 @@
     "scoreRange": [5.0, 6.2],
     "mustContainEvidence": ["礼貌地让他稍等"],
     "actionKeywords": ["误判", "压迫", "反转"],
-    "nextAction": "把 Prompt 改成强冲突约束，让第一章必须出现误判、压迫和当场反转"
+    "nextAction": "把修改指令改成强冲突约束，让第一章必须出现误判、压迫和当场反转"
   },
   "result": {
     "title": "第一章 下山",
@@ -21,11 +21,11 @@
     "inputKind": "ai-draft",
     "positioning": "都市下山高手婚约开局",
     "sellingPoints": ["高手下山", "豪门婚约", "隐藏能力"],
-    "mainProblem": "上一条 Prompt 只给了元素，没有约束冲突强度，导致正文礼貌、平、没有爽点。",
+    "mainProblem": "上一条修改指令只给了元素，没有约束冲突强度，导致正文礼貌、平、没有爽点。",
     "actionableFixes": [
       "让前台或助理当场误判主角身份，制造压迫。",
       "让苏家正遇到危机，主角用一个小动作证明能力。",
-      "Prompt 中明确要求第一章出现当场反转，而不是只说风格爽一点。"
+      "修改指令中明确要求第一章出现当场反转，而不是只说风格爽一点。"
     ],
     "recommendedPlatforms": [
       {
@@ -36,18 +36,18 @@
       }
     ],
     "readyForFullReview": true,
-    "readyReason": "类型方向可用，先修 Prompt 约束和第一章冲突。",
+    "readyReason": "类型方向可用，先修修改指令约束和第一章冲突。",
     "quickScore": 5.7,
     "confidence": 0.79,
     "gateDecision": "revise",
-    "gateReason": "不是脑洞不能用，而是 Prompt 没有把爽点执行标准说清。",
+    "gateReason": "不是脑洞不能用，而是修改指令没有把爽点执行标准说清。",
     "oneLineDiagnosis": "这不是都市爽文开局，更像一段礼貌的设定交代。",
     "issues": [
       {
         "id": "issue-prompt-constraint-1",
         "severity": "high",
         "category": "prompt_constraint",
-        "title": "Prompt 只列元素，没有规定冲突和反转",
+        "title": "修改指令只列元素，没有规定冲突和反转",
         "description": "下山、婚约、集团千金都是有效元素，但模型按普通叙事写成了礼貌接待。",
         "evidence": [
           {
@@ -62,7 +62,7 @@
           }
         ],
         "readerImpact": "读者期待的是被轻视后的当场证明，当前没有压迫，也没有反转爽感。",
-        "fixAction": "把下一轮 Prompt 改成必须出现误判、压迫、能力证明和关系变化。",
+        "fixAction": "把下一轮修改指令改成必须出现误判、压迫、能力证明和关系变化。",
         "promptConstraint": "第一章必须让主角被误判并在同一场景完成一次小反转。",
         "blocksNextStep": true
       },
@@ -109,7 +109,7 @@
       "improvedPromptPrinciples": ["把爽点写成可检查事件", "要求同一场景内完成压迫和反转"]
     },
     "nextPrompt": {
-      "title": "强化都市下山开局 Prompt",
+      "title": "强化都市下山开局修改指令",
       "prompt": "请重写第一章。保留林越下山履行婚约、苏晚晴是集团千金。第一场戏必须发生在集团大厅：前台和助理误判林越是骗子并当众驱赶；苏家会议室同时出现一个会影响融资的突发危机；林越用一个低调但可验证的医术/眼力动作解决危机，让苏晚晴第一次改变态度。禁止只写礼貌等待，禁止用旁白说他很强。",
       "linkedIssueIds": ["issue-prompt-constraint-1", "issue-payoff-1"],
       "whyThisWorks": ["把模糊爽点变成可检查事件", "让能力改变局面", "让婚约关系产生推进"]
@@ -120,9 +120,9 @@
         "sourceIssueId": "issue-prompt-constraint-1",
         "type": "prompt_rule",
         "title": "不要只给元素，要给爽点执行标准",
-        "triggerProblem": "Prompt 只写了题材元素和风格要求。",
+        "triggerProblem": "修改指令只写了题材元素和风格要求。",
         "reusableRule": "给 AI 写第一章时，必须把爽点拆成误判、压迫、行动、反转和关系变化。",
-        "selfCheckQuestion": "这条 Prompt 能否检查第一场戏有没有完成反转？",
+        "selfCheckQuestion": "这条修改指令能否检查第一场戏有没有完成反转？",
         "promptTemplate": "第一场戏必须出现误判、压迫、主角行动、当场反转和关系变化。"
       }
     ]

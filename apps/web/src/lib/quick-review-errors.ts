@@ -47,5 +47,5 @@ export function toQuickReviewErrorMessage(error: unknown): string {
 		return "模型返回内容不完整，请重试一次。";
 	}
 
-	return message || "快速点评失败，请稍后重试。";
+	return message || "快速诊断失败，请稍后重试。";
 }

@@ -17,7 +17,7 @@ interface QuickDiagnosisStatusProps {
 
 function sanitizeQuickErrorMessage(error: string) {
 	const normalized = error.trim();
-	if (!normalized) return "快速点评失败，请稍后重试。";
+	if (!normalized) return "快速诊断失败，请稍后重试。";
 
 	const hasHtml = /<\s*\/?\s*(html|body|script|style|iframe|svg|img|div|span|meta|link)\b/i.test(
 		normalized,
@@ -48,7 +48,7 @@ export function QuickDiagnosisStatus({
 				<CardContent className="flex items-center gap-3 p-4">
 					<Loader2 className="size-4 animate-spin text-primary" />
 					<div className="min-w-0">
-						<p className="text-sm font-medium text-foreground">正在生成改稿方案</p>
+						<p className="text-sm font-medium text-foreground">正在生成问题分析</p>
 						<p className="text-xs leading-5 text-muted-foreground">
 							按钮已禁用，结果返回后会自动显示。
 						</p>

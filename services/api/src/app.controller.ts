@@ -17,19 +17,19 @@ export class AppController {
         data: {
           type: "object",
           properties: {
-            name: { type: "string", example: "NestJS Template API" },
+            name: { type: "string", example: "AI网文诊断台 API" },
             version: { type: "string", example: "0.1.0" },
             description: {
               type: "string",
               example:
-                "A NestJS REST API template with authentication and validation",
+                "Local API for AI web-novel diagnosis, full-book import, and workspace assets",
             },
             endpoints: {
               type: "object",
               properties: {
                 auth: { type: "string", example: "/api/v1/auth" },
                 common: { type: "string", example: "/api/v1/common" },
-                health: { type: "string", example: "/api/v1" },
+                health: { type: "string", example: "/health" },
               },
             },
           },
@@ -41,14 +41,14 @@ export class AppController {
   @Get()
   getRoot() {
     return {
-      name: "NestJS Template API",
+      name: "AI网文诊断台 API",
       version: "0.1.0",
       description:
-        "A NestJS REST API template with authentication and validation",
+        "Local API for AI web-novel diagnosis, full-book import, and workspace assets",
       endpoints: {
         auth: "/api/v1/auth",
         common: "/api/v1/common",
-        health: "/api/v1",
+        health: "/health",
       },
     };
   }

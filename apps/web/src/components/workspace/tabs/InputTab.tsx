@@ -81,9 +81,9 @@ export function InputTab({ handlers }: InputTabProps) {
 					<CardHeader>
 						<CardTitle className="text-sm flex items-center gap-2">
 							<Target className="w-4 h-4" />
-							快速诊断
+							快速诊断一章
 						</CardTitle>
-						<CardDescription>对章节内容进行快速质量评估</CardDescription>
+						<CardDescription>输入一章，生成问题分析和修改方案</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<p className="text-sm text-muted-foreground">请从主页加载完整功能</p>
@@ -147,10 +147,10 @@ export function InputTab({ handlers }: InputTabProps) {
 					<CardHeader>
 						<CardTitle className="text-sm flex items-center gap-2">
 							<Target className="w-4 h-4" />
-							快速诊断
+							快速诊断一章
 						</CardTitle>
 						<CardDescription>
-							粘贴章节文本，获取问题诊断、正文证据和改稿建议
+							粘贴章节文本，获取正文批注、问题分析和修改方案
 						</CardDescription>
 					</CardHeader>
 					<CardContent>{quickExperiencePanel}</CardContent>

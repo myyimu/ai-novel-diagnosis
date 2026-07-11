@@ -344,7 +344,10 @@ pnpm run dev:core:raw
 ```text
 Web: http://127.0.0.1:3000
 API: http://127.0.0.1:3001/api/v1
+Health: http://127.0.0.1:3001/health
 ```
+
+打开页面请访问 Web 地址。`http://127.0.0.1:3001` 是后端 API 服务根路径，浏览器直接打开可能会看到 `Cannot GET /`，这不代表启动失败；检查后端是否正常请访问 `http://127.0.0.1:3001/health`，查看 API 信息请访问 `http://127.0.0.1:3001/api/v1`。
 
 ### Windows 启动说明
 

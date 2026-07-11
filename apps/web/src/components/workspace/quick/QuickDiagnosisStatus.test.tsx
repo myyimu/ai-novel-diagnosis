@@ -9,7 +9,7 @@ describe("QuickDiagnosisStatus", () => {
 			<QuickDiagnosisStatus loading error={null} onRetry={vi.fn()} onOpenModel={vi.fn()} />,
 		);
 
-		expect(html).toContain("正在生成改稿方案");
+		expect(html).toContain("正在生成问题分析");
 		expect(html).toContain("按钮已禁用");
 	});
 

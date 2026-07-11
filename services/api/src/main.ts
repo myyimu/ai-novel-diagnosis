@@ -11,7 +11,7 @@ async function bootstrap() {
   });
 
   const logger = new Logger("Bootstrap");
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
 
   app.use(json({ limit: "10mb" }));
   app.use(urlencoded({ extended: true, limit: "10mb" }));

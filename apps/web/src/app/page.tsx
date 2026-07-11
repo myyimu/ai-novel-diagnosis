@@ -7,7 +7,7 @@ export default function HomePage() {
 	const router = useRouter();
 
 	useEffect(() => {
-		router.replace("/diagnose/quick");
+		router.replace("/project/current");
 	}, [router]);
 
 	return null;

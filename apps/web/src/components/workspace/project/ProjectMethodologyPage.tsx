@@ -21,14 +21,14 @@ export function ProjectMethodologyPage() {
 		() => [
 			{
 				id: "current",
-				label: "当前项目",
-				description: "查看项目概览和资产",
+				label: "当前书籍",
+				description: "查看小说概览和资产",
 				meta: "",
 			},
 			{
 				id: "revisions",
-				label: "改稿方案",
-				description: "查看和管理改稿记录",
+				label: "修改效果",
+				description: "查看和管理修改效果记录",
 				meta: "",
 			},
 			{
@@ -40,7 +40,7 @@ export function ProjectMethodologyPage() {
 			{
 				id: "export",
 				label: "导出",
-				description: "导出项目数据",
+				description: "导出书籍资产",
 				meta: "",
 			},
 		],
@@ -51,7 +51,7 @@ export function ProjectMethodologyPage() {
 		() => [
 			{
 				title: "方法论统计",
-				description: "当前项目的方法论卡统计",
+				description: "当前书籍的方法论卡统计",
 				fields: [
 					{
 						label: "方法论卡数",
@@ -81,7 +81,7 @@ export function ProjectMethodologyPage() {
 					},
 					{
 						label: "布局模式",
-						value: "项目工作区",
+						value: "书籍工作区",
 						hint: "仅显示方法论库，不混入诊断表单",
 					},
 				],
@@ -107,14 +107,14 @@ export function ProjectMethodologyPage() {
 	return (
 		<WorkspaceTaskFrame
 			title="方法论库"
-			description="从诊断结果提炼的改稿方法论卡片"
+			description="从诊断结果提炼的修改方法论卡片"
 			status={`${projectMethodologyCards.length} 条方法论`}
 			taskNav={{
 				items: taskNavItems,
 				activeId: "methodology",
 				onChange: handleNavChange,
-				title: "项目导航",
-				description: "选择要管理的项目内容",
+				title: "书籍导航",
+				description: "选择要管理的书籍内容",
 			}}
 			inspector={{
 				title: "方法论上下文",
@@ -134,7 +134,7 @@ export function ProjectMethodologyPage() {
 							<Lightbulb className="w-12 h-12 text-muted-foreground mb-4" />
 							<h3 className="text-lg font-semibold mb-2">暂无方法论卡</h3>
 							<p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-								完成快速诊断后，系统会自动提炼方法论卡保存到当前项目
+								完成快速诊断后，系统会自动提炼方法论卡保存到当前书籍
 							</p>
 							<Button onClick={handleBackToDiagnosis}>
 								<ArrowLeft className="w-4 h-4 mr-2" />
@@ -176,7 +176,7 @@ export function ProjectMethodologyPage() {
 									) : null}
 									{card.reusableRule ? (
 										<div>
-											<h4 className="text-sm font-semibold mb-2">改稿规则</h4>
+											<h4 className="text-sm font-semibold mb-2">修改规则</h4>
 											<p className="text-sm text-muted-foreground whitespace-pre-wrap">
 												{card.reusableRule}
 											</p>
@@ -213,10 +213,10 @@ export function ProjectMethodologyPage() {
 						<CardTitle className="text-sm">方法论库说明</CardTitle>
 					</CardHeader>
 					<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-						<p>• 方法论卡从诊断结果中自动提炼改稿套路</p>
+						<p>• 方法论卡从诊断结果中自动提炼修改套路</p>
 						<p>• 每张卡片包含具体的修改方法和支持证据</p>
 						<p>• 可以按类型分类浏览不同的方法论</p>
-						<p>• 帮助积累改稿经验，提升写作技巧</p>
+						<p>• 帮助积累修改经验，提升写作技巧</p>
 					</CardContent>
 				</Card>
 			</div>

@@ -37,7 +37,7 @@ export const diagnoseNavItems: WorkspaceNavItem<DiagnoseView>[] = [
 		label: "快速诊断",
 		icon: Stethoscope,
 		title: "快速诊断",
-		description: "快速诊断章节问题，获取改稿建议",
+		description: "输入一章，进入章节诊断页",
 	},
 	{
 		id: "deep",
@@ -62,35 +62,35 @@ export const diagnoseNavItems: WorkspaceNavItem<DiagnoseView>[] = [
 	},
 ];
 
-// 项目工作区导航项
+// 书籍工作区导航项
 export const projectNavItems: WorkspaceNavItem<ProjectView>[] = [
 	{
 		id: "current",
-		label: "当前项目",
+		label: "我的书籍",
 		icon: GanttChart,
-		title: "当前项目",
-		description: "查看和切换当前工作项目",
+		title: "我的书籍",
+		description: "管理小说目录、章节诊断和修改效果",
 	},
 	{
 		id: "revisions",
-		label: "复诊记录",
+		label: "修改效果",
 		icon: History,
-		title: "复诊记录",
-		description: "查看历史诊断和改稿记录",
+		title: "修改效果",
+		description: "查看历史诊断和修改记录",
 	},
 	{
 		id: "methodology",
 		label: "方法论库",
 		icon: Layers3,
 		title: "方法论库",
-		description: "沉淀的诊断规则和改稿模板",
+		description: "沉淀的诊断规则和修改方法",
 	},
 	{
 		id: "export",
-		label: "导出资产",
+		label: "导出",
 		icon: Download,
-		title: "导出资产",
-		description: "导出项目资产和诊断报告",
+		title: "导出书籍资产",
+		description: "导出书籍资产和诊断报告",
 	},
 ];
 
@@ -98,17 +98,17 @@ export const projectNavItems: WorkspaceNavItem<ProjectView>[] = [
 export const researchNavItems: WorkspaceNavItem<ResearchView>[] = [
 	{
 		id: "book",
-		label: "拆书图谱",
+		label: "整本导入",
 		icon: Network,
-		title: "拆书图谱",
-		description: "整书角色、关系和时间线分析",
+		title: "整本导入",
+		description: "上传 TXT，检查章节拆分",
 	},
 	{
 		id: "compare",
 		label: "样本对比",
 		icon: BookOpen,
 		title: "样本对比",
-		description: "对比多个已拆解样本",
+		description: "对比多个已导入样本",
 	},
 	{
 		id: "patterns",
@@ -147,7 +147,7 @@ export const settingsNavItems: WorkspaceNavItem<SettingsView>[] = [
 		label: "历史任务",
 		icon: History,
 		title: "历史任务",
-		description: "查看历史整书拆解任务",
+		description: "查看历史整本导入任务",
 	},
 ];
 
@@ -175,12 +175,12 @@ export function getWorkspaceMeta(workspace: WorkspaceType) {
 			description: "先诊断问题，再决定怎么改",
 		},
 		project: {
-			label: "项目",
-			description: "管理诊断项目和方法论",
+			label: "书籍",
+			description: "管理小说目录、修改效果和方法论",
 		},
 		research: {
 			label: "研究",
-			description: "拆解样本，提炼套路",
+			description: "导入整本样本，提炼套路",
 		},
 		settings: {
 			label: "设置",
@@ -216,16 +216,16 @@ const viewMetaMap: Record<string, WorkspaceViewMeta> = {
 	},
 	book: {
 		id: "book",
-		label: "拆书图谱",
-		title: "拆书图谱",
-		description: "整书角色、关系和时间线分析",
+		label: "整本导入",
+		title: "整本导入",
+		description: "上传 TXT，检查章节拆分",
 		icon: Network,
 	},
 	library: {
 		id: "library",
 		label: "样本对比",
 		title: "样本对比",
-		description: "对比多个已拆解样本",
+		description: "对比多个已导入样本",
 		icon: BookOpen,
 	},
 	starter: {
@@ -237,23 +237,23 @@ const viewMetaMap: Record<string, WorkspaceViewMeta> = {
 	},
 	revisions: {
 		id: "revisions",
-		label: "复诊记录",
-		title: "复诊记录",
-		description: "查看历史诊断和改稿记录",
+		label: "修改效果",
+		title: "修改效果",
+		description: "查看历史诊断和修改记录",
 		icon: History,
 	},
 	methodology: {
 		id: "methodology",
 		label: "方法论库",
 		title: "方法论库",
-		description: "沉淀的诊断规则和改稿模板",
+		description: "沉淀的诊断规则和修改方法",
 		icon: Layers3,
 	},
 	exports: {
 		id: "exports",
-		label: "导出资产",
-		title: "导出资产",
-		description: "导出项目资产和诊断报告",
+		label: "导出",
+		title: "导出书籍资产",
+		description: "导出书籍资产和诊断报告",
 		icon: Download,
 	},
 	provider: {
@@ -274,7 +274,7 @@ const viewMetaMap: Record<string, WorkspaceViewMeta> = {
 		id: "history",
 		label: "历史任务",
 		title: "历史任务",
-		description: "查看历史整书拆解任务",
+		description: "查看历史整本导入任务",
 		icon: History,
 	},
 	materials: {
@@ -357,8 +357,8 @@ export function buildChapterWorkspaceSummary(options: {
 	if (hasChapter) steps.push({ label: "待诊正文", done: true, detail: "已粘贴" });
 	else steps.push({ label: "待诊正文", done: false, detail: "未粘贴" });
 
-	if (hasQuickReview) steps.push({ label: "快速点评", done: true, detail: "已完成" });
-	else steps.push({ label: "快速点评", done: false, detail: "未运行" });
+	if (hasQuickReview) steps.push({ label: "问题分析", done: true, detail: "已完成" });
+	else steps.push({ label: "问题分析", done: false, detail: "未运行" });
 
 	if (hasRubric) steps.push({ label: "评分标准", done: true, detail: "已生成" });
 	else steps.push({ label: "评分标准", done: false, detail: "未生成" });
@@ -380,7 +380,7 @@ export function buildChapterWorkspaceSummary(options: {
 	let nextChapterAction = "开始诊断";
 	if (!hasReference) nextChapterAction = "导入参考章节";
 	else if (!hasChapter) nextChapterAction = "粘贴待诊正文";
-	else if (!hasQuickReview) nextChapterAction = "运行快速点评";
+	else if (!hasQuickReview) nextChapterAction = "生成问题分析";
 	else if (!hasRubric) nextChapterAction = "生成评分标准";
 	else if (!hasScore) nextChapterAction = "对章节评分";
 	else if (!hasValidPerformance) nextChapterAction = "填写流量数据";
@@ -410,13 +410,13 @@ export function buildBookWorkspaceSummary(options: {
 		bookStatusText = "任务已排队，等待处理";
 		bookCompletion = 40;
 	} else if (bookJob?.status === "running") {
-		bookStatusText = "正在拆解整书...";
+		bookStatusText = "正在分析章节...";
 		bookCompletion = 60;
 	} else if (bookJob?.status === "succeeded") {
-		bookStatusText = "整书拆解完成";
+		bookStatusText = "整本分析完成";
 		bookCompletion = 100;
 	} else if (bookJob?.status === "failed") {
-		bookStatusText = "拆解失败，请重试";
+		bookStatusText = "分析失败，请重试";
 		bookCompletion = 50;
 	}
 
@@ -462,7 +462,7 @@ export function buildResearchWorkspaceSummary(options: {
 	}
 	if (hasBookUpload || hasBookResult) {
 		researchSourceCount++;
-		researchSources.push({ name: "整书样本", status: "ready", detail: "已拆解" });
+		researchSources.push({ name: "整本样本", status: "ready", detail: "已分析" });
 	}
 	if (hasScore && options.evidenceScoreCount > 0) {
 		researchSourceCount++;

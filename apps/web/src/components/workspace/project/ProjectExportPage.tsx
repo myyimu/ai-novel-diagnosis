@@ -28,14 +28,14 @@ export function ProjectExportPage() {
 		() => [
 			{
 				id: "current",
-				label: "当前项目",
-				description: "查看项目概览和资产",
+				label: "当前书籍",
+				description: "查看小说概览和资产",
 				meta: "",
 			},
 			{
 				id: "revisions",
-				label: "改稿方案",
-				description: "查看和管理改稿记录",
+				label: "修改效果",
+				description: "查看和管理修改效果记录",
 				meta: "",
 			},
 			{
@@ -47,7 +47,7 @@ export function ProjectExportPage() {
 			{
 				id: "export",
 				label: "导出",
-				description: "导出项目数据",
+				description: "导出书籍资产",
 				meta: "当前",
 			},
 		],
@@ -58,10 +58,10 @@ export function ProjectExportPage() {
 		() => [
 			{
 				title: "导出内容",
-				description: "将要导出的项目资产",
+				description: "将要导出的书籍资产",
 				fields: [
 					{
-						label: "改稿方案",
+						label: "修改效果",
 						value: `${projectRevisionSessions.length} 条`,
 						tone: projectRevisionSessions.length > 0 ? "secondary" : "outline",
 					},
@@ -83,7 +83,7 @@ export function ProjectExportPage() {
 					},
 					{
 						label: "包含内容",
-						value: "项目信息 + 改稿方案 + 方法论卡",
+						value: "书籍信息 + 修改效果 + 方法论卡",
 						hint: "按时间顺序组织所有内容",
 					},
 				],
@@ -99,7 +99,7 @@ export function ProjectExportPage() {
 					},
 					{
 						label: "布局模式",
-						value: "项目工作区",
+						value: "书籍工作区",
 						hint: "独立的导出页面",
 					},
 				],
@@ -120,7 +120,7 @@ export function ProjectExportPage() {
 
 	const handleExport = async () => {
 		if (projectRevisionSessions.length === 0 && projectMethodologyCards.length === 0) {
-			toast.error("当前项目没有可导出的内容");
+			toast.error("当前书籍没有可导出的内容");
 			return;
 		}
 
@@ -128,7 +128,7 @@ export function ProjectExportPage() {
 		try {
 			exportProjectMarkdown();
 			toast.success("导出成功", {
-				description: "项目数据已导出为 Markdown 文件",
+				description: "书籍资产已导出为 Markdown 文件",
 			});
 		} catch (error) {
 			toast.error("导出失败", {
@@ -143,15 +143,15 @@ export function ProjectExportPage() {
 
 	return (
 		<WorkspaceTaskFrame
-			title="项目导出"
-			description="导出项目的改稿方案和方法论为 Markdown 文件"
+			title="书籍资产导出"
+			description="导出书籍资产的修改效果和方法论为 Markdown 文件"
 			status={canExport ? "可导出" : "无内容"}
 			taskNav={{
 				items: taskNavItems,
 				activeId: "export",
 				onChange: handleNavChange,
-				title: "项目导航",
-				description: "选择要管理的项目内容",
+				title: "书籍导航",
+				description: "选择要管理的书籍内容",
 			}}
 			inspector={{
 				title: "导出上下文",
@@ -169,10 +169,10 @@ export function ProjectExportPage() {
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<Download className="w-5 h-5" />
-							导出项目数据
+							导出书籍资产
 						</CardTitle>
 						<CardDescription>
-							将项目的改稿方案和方法论卡导出为 Markdown 文件
+							将书籍的修改效果和方法论卡导出为 Markdown 文件
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
@@ -181,7 +181,7 @@ export function ProjectExportPage() {
 								<FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
 								<h3 className="text-lg font-semibold mb-2">暂无可导出内容</h3>
 								<p className="text-sm text-muted-foreground mb-4">
-									当前项目还没有改稿方案或方法论卡，请先完成快速诊断
+									当前书籍还没有修改效果或方法论卡，请先完成快速诊断
 								</p>
 								<Button
 									variant="outline"
@@ -196,9 +196,9 @@ export function ProjectExportPage() {
 									<div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
 										<FileText className="w-5 h-5 text-primary mt-0.5" />
 										<div className="flex-1">
-											<h4 className="font-semibold mb-1">改稿方案</h4>
+											<h4 className="font-semibold mb-1">修改效果</h4>
 											<p className="text-sm text-muted-foreground">
-												{projectRevisionSessions.length} 条改稿记录
+												{projectRevisionSessions.length} 条修改效果记录
 											</p>
 										</div>
 										<Badge variant="secondary">
@@ -228,7 +228,7 @@ export function ProjectExportPage() {
 										</div>
 										<div className="flex items-center gap-2 text-sm">
 											<CheckCircle2 className="w-4 h-4 text-success" />
-											<span>包含完整的项目信息、改稿方案和方法论</span>
+											<span>包含完整的书籍信息、修改效果和方法论</span>
 										</div>
 										<div className="flex items-center gap-2 text-sm">
 											<CheckCircle2 className="w-4 h-4 text-success" />
@@ -240,7 +240,7 @@ export function ProjectExportPage() {
 								<div className="flex items-center justify-between pt-4 border-t">
 									<div>
 										<p className="text-sm font-medium">
-											{activeProject?.name || "默认项目"}
+											{activeProject?.name || "默认书籍"}
 										</p>
 										<p className="text-xs text-muted-foreground">
 											导出为 .md 文件
@@ -252,7 +252,7 @@ export function ProjectExportPage() {
 										) : (
 											<>
 												<Download className="w-4 h-4 mr-2" />
-												导出项目
+												导出书籍资产
 											</>
 										)}
 									</Button>
@@ -267,9 +267,9 @@ export function ProjectExportPage() {
 						<CardTitle className="text-sm">导出说明</CardTitle>
 					</CardHeader>
 					<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-						<p>• 导出的 Markdown 文件包含完整的项目信息</p>
-						<p>• 改稿方案按时间顺序排列，包含所有修改建议</p>
-						<p>• 方法论卡包含提炼的改稿套路和支持证据</p>
+						<p>• 导出的 Markdown 文件包含完整的书籍信息</p>
+						<p>• 修改效果按时间顺序排列，包含所有修改建议</p>
+						<p>• 方法论卡包含提炼的修改套路和支持证据</p>
 						<p>• 导出的文件可用于备份、分享或进一步编辑</p>
 					</CardContent>
 				</Card>

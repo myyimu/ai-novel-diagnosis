@@ -46,7 +46,7 @@ describe("QuickDiagnosisCompose", () => {
 		const html = renderToStaticMarkup(<QuickDiagnosisCompose handlers={baseHandlers} />);
 
 		expect(html).toContain("快速诊断");
-		expect(html).toContain("30 秒小说诊断");
+		expect(html).toContain("快速诊断一章");
 		expect(html).toContain("至少 50 字");
 		expect(html).toContain("自动判断");
 		expect(html).toContain("本地演示");

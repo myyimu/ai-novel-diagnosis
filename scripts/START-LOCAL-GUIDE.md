@@ -314,6 +314,8 @@ pnpm run dev:api:raw
 pnpm run dev:core:raw
 ```
 
+启动后打开页面请访问 Web 地址：`http://127.0.0.1:3000`。`http://127.0.0.1:3001` 是 API 根路径，浏览器直接打开可能会显示 `Cannot GET /`；检查 API 是否正常请访问 `http://127.0.0.1:3001/health`，查看 API 信息请访问 `http://127.0.0.1:3001/api/v1`。
+
 质量检查：
 
 ```bash

@@ -21,14 +21,14 @@ export function ProjectRevisionsPage() {
 		() => [
 			{
 				id: "current",
-				label: "当前项目",
-				description: "查看项目概览和资产",
+				label: "当前书籍",
+				description: "查看小说概览和资产",
 				meta: "",
 			},
 			{
 				id: "revisions",
-				label: "改稿方案",
-				description: `查看和管理 ${projectRevisionSessions.length} 条改稿记录`,
+				label: "修改效果",
+				description: `查看和管理 ${projectRevisionSessions.length} 条修改效果记录`,
 				meta: "当前",
 			},
 			{
@@ -40,7 +40,7 @@ export function ProjectRevisionsPage() {
 			{
 				id: "export",
 				label: "导出",
-				description: "导出项目数据",
+				description: "导出书籍资产",
 				meta: "",
 			},
 		],
@@ -50,11 +50,11 @@ export function ProjectRevisionsPage() {
 	const inspectorSections: ContextInspectorSection[] = useMemo(
 		() => [
 			{
-				title: "改稿统计",
-				description: "当前项目的改稿记录统计",
+				title: "修改效果统计",
+				description: "当前书籍的修改效果记录统计",
 				fields: [
 					{
-						label: "改稿记录数",
+						label: "修改效果记录数",
 						value: `${projectRevisionSessions.length} 条`,
 						tone: projectRevisionSessions.length > 0 ? "secondary" : "outline",
 					},
@@ -72,7 +72,7 @@ export function ProjectRevisionsPage() {
 			},
 			{
 				title: "页面信息",
-				description: "改稿方案页面信息",
+				description: "修改效果页面信息",
 				fields: [
 					{
 						label: "当前路径",
@@ -81,8 +81,8 @@ export function ProjectRevisionsPage() {
 					},
 					{
 						label: "布局模式",
-						value: "项目工作区",
-						hint: "仅显示改稿方案，不混入诊断表单",
+						value: "书籍工作区",
+						hint: "仅显示修改效果，不混入诊断表单",
 					},
 				],
 			},
@@ -106,23 +106,23 @@ export function ProjectRevisionsPage() {
 
 	return (
 		<WorkspaceTaskFrame
-			title="改稿方案"
-			description="查看和管理从快速诊断生成的改稿记录"
+			title="修改效果"
+			description="查看和管理从快速诊断生成的修改效果记录"
 			status={`${projectRevisionSessions.length} 条记录`}
 			taskNav={{
 				items: taskNavItems,
 				activeId: "revisions",
 				onChange: handleNavChange,
-				title: "项目导航",
-				description: "选择要管理的项目内容",
+				title: "书籍导航",
+				description: "选择要管理的书籍内容",
 			}}
 			inspector={{
-				title: "改稿上下文",
-				description: "当前改稿方案的统计和信息",
+				title: "修改效果上下文",
+				description: "当前修改效果的统计和信息",
 				sections: inspectorSections,
 				emptyState: (
 					<div className="space-y-2">
-						<p className="text-sm text-muted-foreground">暂无改稿记录。</p>
+						<p className="text-sm text-muted-foreground">暂无修改效果记录。</p>
 					</div>
 				),
 			}}
@@ -132,9 +132,9 @@ export function ProjectRevisionsPage() {
 					<Card>
 						<CardContent className="flex flex-col items-center justify-center py-12">
 							<FileText className="w-12 h-12 text-muted-foreground mb-4" />
-							<h3 className="text-lg font-semibold mb-2">暂无改稿记录</h3>
+							<h3 className="text-lg font-semibold mb-2">暂无修改效果记录</h3>
 							<p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-								完成快速诊断后，改稿方案会自动保存到当前项目
+								完成快速诊断后，修改效果记录会自动保存到当前书籍
 							</p>
 							<Button onClick={handleBackToDiagnosis}>
 								<ArrowLeft className="w-4 h-4 mr-2" />
@@ -163,9 +163,9 @@ export function ProjectRevisionsPage() {
 								</CardHeader>
 								<CardContent className="space-y-3">
 									<div>
-										<h4 className="text-sm font-semibold mb-2">改稿提示</h4>
+										<h4 className="text-sm font-semibold mb-2">修改指令</h4>
 										<p className="text-sm text-muted-foreground line-clamp-3">
-											{session.nextPrompt || "暂无改稿提示"}
+											{session.nextPrompt || "暂无修改指令"}
 										</p>
 									</div>
 									{session.revisionNote ? (
@@ -196,11 +196,11 @@ export function ProjectRevisionsPage() {
 
 				<Card className="border-muted/50 bg-muted/30">
 					<CardHeader>
-						<CardTitle className="text-sm">改稿方案说明</CardTitle>
+						<CardTitle className="text-sm">修改效果说明</CardTitle>
 					</CardHeader>
 					<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-						<p>• 每次快速诊断后会生成一条改稿方案</p>
-						<p>• 改稿方案包含修改建议和改稿提示</p>
+						<p>• 每次快速诊断后会生成一条修改效果记录</p>
+						<p>• 修改效果记录包含修改建议和修改指令</p>
 						<p>• 可以查看完整的诊断结果和修改动作</p>
 						<p>• 支持添加备注以便后续参考</p>
 					</CardContent>

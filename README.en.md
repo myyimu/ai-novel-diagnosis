@@ -305,7 +305,10 @@ Default local URLs:
 ```text
 Web: http://localhost:3000
 API: http://localhost:3001/api/v1
+Health: http://localhost:3001/health
 ```
+
+Open the Web URL for the app UI. `http://localhost:3001` is the API server root, so opening it directly may show `Cannot GET /`; that does not mean startup failed. Use `http://localhost:3001/health` for the API health check and `http://localhost:3001/api/v1` for API information.
 
 ## Workspace
 

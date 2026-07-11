@@ -19,7 +19,7 @@ export type WorkspaceView =
 // 诊断工作区子页面
 export type DiagnoseView = "quick" | "deep" | "score" | "evidence";
 
-// 项目工作区子页面
+// 书籍工作区子页面
 export type ProjectView = "current" | "revisions" | "methodology" | "export";
 
 // 研究工作区子页面
@@ -44,7 +44,7 @@ export const diagnoseRoutes: Record<DiagnoseView, string> = {
 	evidence: "/diagnose/evidence",
 };
 
-// 项目工作区子页面路由
+// 书籍工作区子页面路由
 export const projectRoutes: Record<ProjectView, string> = {
 	current: "/project/current",
 	revisions: "/project/revisions",
@@ -246,28 +246,28 @@ export function getWorkspaceTopNavMeta(workspace: WorkspaceType): WorkspaceTopNa
 		workspace,
 		label:
 			workspace === "diagnose"
-				? "诊断"
+				? "快速诊断"
 				: workspace === "project"
-					? "项目"
+					? "我的书籍"
 					: workspace === "research"
-						? "研究"
+						? "整本导入"
 						: "设置",
 		path: workspaceRoutes[workspace],
 		title:
 			workspace === "diagnose"
-				? "诊断"
+				? "快速诊断"
 				: workspace === "project"
-					? "项目"
+					? "我的书籍"
 					: workspace === "research"
-						? "研究"
+						? "整本导入"
 						: "设置",
 		description:
 			workspace === "diagnose"
-				? "先诊断问题，再决定怎么改"
+				? "输入一章，进入章节诊断页"
 				: workspace === "project"
-					? "管理诊断项目和方法论"
+					? "管理小说目录、章节诊断和修改效果"
 					: workspace === "research"
-						? "拆解样本，提炼套路"
+						? "上传 TXT，检查章节拆分"
 						: "配置和数据看板",
 	};
 }

@@ -12,8 +12,14 @@ const HOP_BY_HOP_HEADERS = new Set([
 	"upgrade",
 ]);
 
-const PROXY_REQUEST_TIMEOUT_MS = 20_000;
-const UPSTREAM_REQUEST_TIMEOUT_MS = 30_000;
+const PROVIDER_TEST_TIMEOUT_MS = 20_000;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const MODEL_UPSTREAM_TIMEOUT_MS = readPositiveIntegerEnv(
+	process.env.API_MODEL_PROXY_TIMEOUT_MS,
+	600_000,
+);
+
+export const maxDuration = 600;
 
 type RouteContext = {
 	params: Promise<{
@@ -24,6 +30,15 @@ type RouteContext = {
 type ProxyRequestInit = RequestInit & {
 	duplex?: "half";
 };
+
+function readPositiveIntegerEnv(value: string | undefined, fallback: number) {
+	if (!value) {
+		return fallback;
+	}
+
+	const parsed = Number(value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function getApiBaseUrl() {
 	return (process.env.API_INTERNAL_BASE_URL ?? "http://localhost:3001/api/v1").replace(
@@ -68,13 +83,47 @@ function isProviderTestPath(path: string[]) {
 	);
 }
 
+function isModelBackedAnalysisPath(path: string[]) {
+	if (path[0] !== "analysis") {
+		return false;
+	}
+
+	if (path[1] === "provider") {
+		return false;
+	}
+
+	return ["quick-review", "reference", "rubric", "score", "research", "book"].includes(path[1]);
+}
+
+function resolveProxyTimeoutMs(path: string[]) {
+	if (isProviderTestPath(path)) {
+		return PROVIDER_TEST_TIMEOUT_MS;
+	}
+
+	if (isModelBackedAnalysisPath(path)) {
+		return MODEL_UPSTREAM_TIMEOUT_MS;
+	}
+
+	return DEFAULT_UPSTREAM_TIMEOUT_MS;
+}
+
+function resolveProxyTimeoutMessage(path: string[]) {
+	if (isProviderTestPath(path)) {
+		return "Provider test timed out, please check API service reachability or retry later";
+	}
+
+	if (isModelBackedAnalysisPath(path)) {
+		return "模型请求仍在处理或排队，请稍后重试。";
+	}
+
+	return "Request timed out, please retry later";
+}
+
 async function proxy(request: NextRequest, context: RouteContext) {
 	const { path } = await context.params;
 	const upstreamUrl = new URL(`${getApiBaseUrl()}/${path.map(encodeURIComponent).join("/")}`);
 	upstreamUrl.search = request.nextUrl.search;
-	const timeoutMs = isProviderTestPath(path)
-		? PROXY_REQUEST_TIMEOUT_MS
-		: UPSTREAM_REQUEST_TIMEOUT_MS;
+	const timeoutMs = resolveProxyTimeoutMs(path);
 
 	const hasBody = request.method !== "GET" && request.method !== "HEAD";
 	const init: ProxyRequestInit = {
@@ -102,9 +151,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
 		});
 	} catch (error) {
 		if (isAbortError(error)) {
-			const timeoutMessage = isProviderTestPath(path)
-				? "Provider test timed out, please check API service reachability or retry later"
-				: "Request timed out, please retry later";
+			const timeoutMessage = resolveProxyTimeoutMessage(path);
 			return new Response(buildProxyTimeoutError(timeoutMessage), {
 				status: 504,
 				headers: {

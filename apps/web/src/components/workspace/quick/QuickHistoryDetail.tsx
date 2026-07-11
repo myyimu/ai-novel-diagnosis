@@ -25,7 +25,7 @@ export function QuickHistoryDetail({ session }: QuickHistoryDetailProps) {
 				<p className="leading-6">{session.mainProblem}</p>
 				{session.nextPrompt ? (
 					<div className="rounded-md border border-border bg-background p-3">
-						<p className="text-xs font-medium text-muted-foreground">下一轮 Prompt</p>
+						<p className="text-xs font-medium text-muted-foreground">下一轮修改指令</p>
 						<p className="mt-1 whitespace-pre-wrap leading-6">{session.nextPrompt}</p>
 					</div>
 				) : null}

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KeyRound, Loader2, ShieldAlert, Settings } from "lucide-react";
+import type { ProviderTestResultView } from "@/hooks/use-workspace-handlers";
+import { CheckCircle2, KeyRound, Loader2, ShieldAlert, Settings, XCircle } from "lucide-react";
 
 interface ProviderSettingsProps {
 	provider: {
@@ -32,6 +33,7 @@ interface ProviderSettingsProps {
 	}>;
 	filteredProviderModelOptions: string[];
 	providerModelsLoading: boolean;
+	providerTestResult: ProviderTestResultView | null;
 
 	onChangeProviderPreset: (preset: string) => void;
 	onChangeProviderModel: (model: string) => void;
@@ -82,6 +84,15 @@ function FieldHelp({ text }: { text: string }) {
 	);
 }
 
+function TestResultFact({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-md border border-current/20 bg-background/70 px-3 py-2">
+			<span className="block text-[11px] opacity-70">{label}</span>
+			<strong className="mt-0.5 block truncate text-xs">{value}</strong>
+		</div>
+	);
+}
+
 export function ProviderSettings({
 	provider,
 	providerLabel,
@@ -91,6 +102,7 @@ export function ProviderSettings({
 	providerConfigHistory,
 	filteredProviderModelOptions,
 	providerModelsLoading,
+	providerTestResult,
 	onChangeProviderPreset,
 	onChangeProviderModel,
 	onChangeProviderApiKey,
@@ -136,6 +148,67 @@ export function ProviderSettings({
 							测试连接
 						</Button>
 					</div>
+
+					{providerTestResult ? (
+						<div
+							className={`rounded-md border p-4 text-sm leading-6 ${
+								providerTestResult.status === "success"
+									? "border-success-border bg-success-surface text-success-foreground"
+									: "border-warning-border bg-warning-surface text-warning-foreground"
+							}`}
+						>
+							<div className="flex items-start gap-3">
+								{providerTestResult.status === "success" ? (
+									<CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+								) : (
+									<XCircle className="mt-0.5 size-5 shrink-0" />
+								)}
+								<div className="min-w-0 flex-1">
+									<p className="font-semibold">
+										{providerTestResult.status === "success"
+											? "模型测试通过"
+											: "模型测试失败"}
+									</p>
+									<p className="mt-1 break-words">{providerTestResult.message}</p>
+									<div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+										<TestResultFact
+											label="服务"
+											value={providerTestResult.providerName}
+										/>
+										<TestResultFact
+											label="模型"
+											value={providerTestResult.modelName}
+										/>
+										<TestResultFact
+											label="耗时"
+											value={
+												providerTestResult.durationMs
+													? `${providerTestResult.durationMs}ms`
+													: "-"
+											}
+										/>
+										<TestResultFact
+											label="测试时间"
+											value={new Date(
+												providerTestResult.checkedAt,
+											).toLocaleString()}
+										/>
+									</div>
+									{providerTestResult.raw &&
+									Object.keys(providerTestResult.raw).length ? (
+										<details className="mt-3">
+											<summary className="cursor-pointer text-xs font-medium">
+												查看原始返回
+											</summary>
+											<pre className="mt-2 max-h-40 overflow-auto rounded-md border border-current/20 bg-background/70 p-3 text-xs text-foreground">
+												{JSON.stringify(providerTestResult.raw, null, 2)}
+											</pre>
+										</details>
+									) : null}
+								</div>
+							</div>
+						</div>
+					) : null}
 
 					{selectedProviderPreset.notice ? (
 						<div className="rounded-md border border-warning-border bg-warning-surface p-4 text-sm leading-6 text-warning-foreground">
