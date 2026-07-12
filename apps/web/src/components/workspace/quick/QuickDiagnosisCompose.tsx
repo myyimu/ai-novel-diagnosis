@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +68,7 @@ const focusOptions = [
 ];
 
 export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) {
+	const router = useRouter();
 	const [activeFocus, setActiveFocus] = useState(focusOptions[0]);
 	const [customFocus, setCustomFocus] = useState("");
 
@@ -131,7 +133,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 			}
 			topActions={
 				<>
-					<RedesignTopButton variant="ghost" onClick={() => handlers.openView("chapter")}>
+					<RedesignTopButton variant="ghost" onClick={() => router.push("/help")}>
 						查看使用说明
 					</RedesignTopButton>
 					<RedesignTopButton onClick={loadFirstExample}>载入示例</RedesignTopButton>
