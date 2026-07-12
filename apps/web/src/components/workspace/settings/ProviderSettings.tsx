@@ -8,7 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProviderTestResultView } from "@/hooks/use-workspace-handlers";
 import { providerPresetOptions } from "@/lib/provider-presets";
-import { CheckCircle2, KeyRound, Loader2, ShieldAlert, Settings, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+	CheckCircle2,
+	ChevronDown,
+	KeyRound,
+	Loader2,
+	ShieldAlert,
+	Settings,
+	XCircle,
+} from "lucide-react";
 
 interface ProviderSettingsProps {
 	provider: {
@@ -50,6 +59,29 @@ interface ProviderSettingsProps {
 	onOpenModel?: () => void;
 }
 
+const formControlClass =
+	"min-h-[42px] rounded-[10px] border-[#d8dbe0] bg-white text-sm text-[#1f2329] outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10 focus-visible:ring-[#ff5a1f]/10 focus-visible:ring-offset-0 disabled:bg-[#f4f5f7]";
+
+const selectControlClass = cn(
+	formControlClass,
+	"w-full appearance-none px-3 pr-9 accent-[#ff5a1f]",
+);
+
+const primaryButtonClass =
+	"min-h-[38px] rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-3.5 font-bold text-white shadow-[0_6px_16px_rgba(255,90,31,.18)] hover:border-[#e84b13] hover:bg-[#e84b13] focus-visible:ring-[#ff5a1f]/20 focus-visible:ring-offset-0";
+
+const secondaryButtonClass =
+	"min-h-[36px] rounded-[9px] border-[#d8dbe0] bg-white px-3 font-bold text-[#1f2329] hover:border-[#bec3cb] hover:bg-[#fafafa] focus-visible:ring-[#ff5a1f]/20 focus-visible:ring-offset-0";
+
+function baseUrlOptionClass(active: boolean) {
+	return cn(
+		"h-8 rounded-full px-3 text-xs font-bold focus-visible:ring-[#ff5a1f]/20 focus-visible:ring-offset-0",
+		active
+			? "border-[#ff5a1f] bg-[#ff5a1f] text-white shadow-[0_5px_12px_rgba(255,90,31,.16)] hover:border-[#e84b13] hover:bg-[#e84b13]"
+			: "border-[#d8dbe0] bg-white text-[#454b55] hover:border-[#ff8b5f] hover:bg-[#fff2ec] hover:text-[#d94710]",
+	);
+}
+
 function FieldHelp({ text }: { text: string }) {
 	const [open, setOpen] = useState(false);
 
@@ -57,7 +89,7 @@ function FieldHelp({ text }: { text: string }) {
 		<span className="relative ml-1 inline-flex align-middle">
 			<button
 				type="button"
-				className="inline-flex size-4 items-center justify-center rounded-full border border-border bg-background text-[10px] leading-none text-muted-foreground transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+				className="inline-flex size-4 items-center justify-center rounded-full border border-[#d8dbe0] bg-white text-[10px] leading-none text-[#69707d] transition hover:border-[#ff8b5f] hover:text-[#d94710] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ff5a1f]/10"
 				aria-label="查看说明"
 				aria-expanded={open}
 				onClick={(event) => {
@@ -125,14 +157,19 @@ export function ProviderSettings({
 				<CardHeader>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
-							<KeyRound className="size-5 text-primary" />
+							<KeyRound className="size-5 text-[#ff5a1f]" />
 							<div>
 								<CardTitle>AI 模型服务设置</CardTitle>
 								<CardDescription>配置模型服务以用于诊断和分析</CardDescription>
 							</div>
 						</div>
 						{onOpenModel && (
-							<Button variant="outline" size="sm" onClick={onOpenModel}>
+							<Button
+								variant="outline"
+								size="sm"
+								className={secondaryButtonClass}
+								onClick={onOpenModel}
+							>
 								<Settings className="w-4 h-4 mr-2" />
 								在任务页配置
 							</Button>
@@ -148,7 +185,11 @@ export function ProviderSettings({
 								{provider.model && ` · ${provider.model}`}
 							</p>
 						</div>
-						<Button onClick={onTestProvider} disabled={isLoading}>
+						<Button
+							className={primaryButtonClass}
+							onClick={onTestProvider}
+							disabled={isLoading}
+						>
 							{isLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 							测试连接
 						</Button>
@@ -227,18 +268,21 @@ export function ProviderSettings({
 					<div className="space-y-4">
 						<div className="space-y-2">
 							<Label htmlFor="provider-preset">模型服务</Label>
-							<select
-								id="provider-preset"
-								className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-								value={provider.preset}
-								onChange={(event) => onChangeProviderPreset(event.target.value)}
-							>
-								{providerPresetOptions.map(({ id, preset }) => (
-									<option key={id} value={id}>
-										{preset.label}
-									</option>
-								))}
-							</select>
+							<div className="relative">
+								<select
+									id="provider-preset"
+									className={selectControlClass}
+									value={provider.preset}
+									onChange={(event) => onChangeProviderPreset(event.target.value)}
+								>
+									{providerPresetOptions.map(({ id, preset }) => (
+										<option key={id} value={id}>
+											{preset.label}
+										</option>
+									))}
+								</select>
+								<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#69707d]" />
+							</div>
 						</div>
 
 						{provider.kind === "mock" ? (
@@ -259,6 +303,7 @@ export function ProviderSettings({
 									</div>
 									<Input
 										id="provider-base-url"
+										className={formControlClass}
 										value={provider.baseUrl}
 										onChange={(event) =>
 											onChangeProviderBaseUrl(event.target.value)
@@ -276,13 +321,11 @@ export function ProviderSettings({
 												<Button
 													key={option.url}
 													type="button"
-													variant={
-														provider.baseUrl === option.url
-															? "default"
-															: "outline"
-													}
+													variant="outline"
 													size="sm"
-													className="h-8 rounded-full px-3 text-xs"
+													className={baseUrlOptionClass(
+														provider.baseUrl === option.url,
+													)}
 													onClick={() =>
 														onChangeProviderBaseUrl(option.url)
 													}
@@ -302,6 +345,7 @@ export function ProviderSettings({
 									<div className="flex gap-2">
 										<Input
 											id="provider-model"
+											className={formControlClass}
 											list="provider-model-options"
 											value={provider.model}
 											onChange={(event) =>
@@ -318,6 +362,7 @@ export function ProviderSettings({
 											<Button
 												type="button"
 												variant="outline"
+												className={secondaryButtonClass}
 												onClick={onLoadProviderModelOptions}
 												disabled={providerModelsLoading}
 											>
@@ -348,6 +393,7 @@ export function ProviderSettings({
 									) : (
 										<Input
 											id="provider-api-key"
+											className={formControlClass}
 											type="password"
 											value={provider.apiKey}
 											onChange={(event) =>
@@ -369,6 +415,7 @@ export function ProviderSettings({
 							type="button"
 							variant="outline"
 							size="sm"
+							className={secondaryButtonClass}
 							onClick={onResetProviderSettings}
 						>
 							恢复默认
@@ -391,6 +438,7 @@ export function ProviderSettings({
 								type="button"
 								variant="outline"
 								size="sm"
+								className={secondaryButtonClass}
 								onClick={onClearProviderConfigHistory}
 							>
 								清空
@@ -415,6 +463,7 @@ export function ProviderSettings({
 											type="button"
 											variant="outline"
 											size="sm"
+											className={secondaryButtonClass}
 											onClick={() => onApplyProviderConfigHistory(item.id)}
 										>
 											应用
@@ -423,6 +472,7 @@ export function ProviderSettings({
 											type="button"
 											variant="outline"
 											size="sm"
+											className={secondaryButtonClass}
 											onClick={() => onDeleteProviderConfigHistory(item.id)}
 										>
 											删除
