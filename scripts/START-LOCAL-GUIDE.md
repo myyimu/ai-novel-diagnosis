@@ -10,6 +10,7 @@ Last updated: 2026-07-10
 | --- | --- | --- |
 | Windows 普通试用 | `scripts/start-local.cmd` | 不想手动配环境的用户 |
 | Windows 桌面 exe | 发布产物里的安装包 | 想像普通桌面软件一样使用的用户 |
+| macOS 普通试用 | `scripts/start-local-mac.command` | 不想手动配环境的用户 |
 | macOS / Linux 本地开发 | `pnpm run dev` 或 `pnpm run dev:raw` | 开发者 |
 | Docker / Linux 服务器演示 | `docker compose up --build` | 已安装 Docker 的部署或演示环境 |
 | 单独调试 Web / API / Core | `pnpm run dev:*` 或 `pnpm run dev:*:raw` | 需要定位单个服务问题的开发者 |
@@ -139,9 +140,57 @@ pnpm --filter desktop release
 
 如果打包时遇到 `winCodeSign`、`darwin`、`symbolic link` 相关错误，优先开启 Windows「开发者模式」或使用管理员终端重新执行打包命令。
 
-## macOS：本地启动
+## macOS：一键脚本启动
 
-macOS 没有使用 Windows 的 `.cmd` / `.ps1` 启动器。请使用终端从仓库根目录启动。
+最简单入口，适合双击：
+
+```bash
+scripts/start-local-mac.command
+```
+
+从终端启动：
+
+```bash
+scripts/start-local-mac.sh
+scripts/start-local-mac.sh --auto-install
+pnpm run start:local:mac
+```
+
+常用参数：
+
+```bash
+pnpm run start:local:mac -- --no-browser
+pnpm run start:local:mac -- --reuse
+pnpm run start:local:mac -- --web-port 3100 --api-port 3101
+pnpm run start:local:mac -- --port-search-limit 30
+```
+
+参数说明：
+
+- `--no-browser`: 只启动服务，不自动打开浏览器。
+- `--reuse`: 复用健康的本项目 API/Web 服务。
+- `--web-port`: Web 优先端口，默认 `3000`。
+- `--api-port`: API 优先端口，默认 `3001`。
+- `--port-search-limit`: 首选端口之后继续尝试的范围，默认 `20`。
+- `--auto-install`: 缺依赖时直接执行 `pnpm install`，不再询问。
+- `--reset-pglite`: 重置本地 PGlite 运行目录后重新启动。
+
+脚本会做这些事：
+
+1. 检查 Node.js 版本；低于 `20.11.0` 会阻断，`21+` 会提示超出声明范围但继续启动。
+2. 优先通过 Corepack 激活 `pnpm@10.14.0`。
+3. 缺依赖时提示执行 `pnpm install`，或在 `--auto-install` 下自动安装。
+4. 搜索可用 API / Web 端口。
+5. 在同一个 Terminal 窗口后台启动 API 和 Web。
+6. 自动设置 `NEXT_PUBLIC_API_BASE_URL`、`API_INTERNAL_BASE_URL`、`PGLITE_DATA_DIR`。
+7. 将运行日志写入 `.local/run-logs`。
+8. 默认打开 Web 页面。
+
+停止方式：在启动脚本所在 Terminal 窗口按 `Ctrl+C`。
+
+## macOS：开发命令
+
+如果你只想用开发命令，也可以从仓库根目录启动。
 
 安装环境和依赖：
 

@@ -25,12 +25,24 @@ Windows 用户可以直接双击：
 scripts/start-local.cmd
 ```
 
+macOS 用户可以直接双击：
+
+```text
+scripts/start-local-mac.command
+```
+
 脚本会检查 Node.js / pnpm、安装缺失依赖、启动 API 和 Web，并自动打开页面。进入页面后，先不用配置复杂参数，直接粘贴第一章运行“改稿急诊”。
 
-终端用户也可以在仓库根目录运行：
+Windows 终端用户也可以在仓库根目录运行：
 
 ```powershell
 pnpm run start:local
+```
+
+macOS 终端用户可以运行：
+
+```bash
+pnpm run start:local:mac
 ```
 
 默认地址：
@@ -322,6 +334,18 @@ PGLITE_DATA_DIR=.local/pglite-runtime
 ```
 
 关闭打开的 API / Web PowerShell 窗口即可停止服务。
+
+macOS 本地一键启动脚本：
+
+```bash
+scripts/start-local-mac.command
+scripts/start-local-mac.sh --auto-install
+pnpm run start:local:mac -- --no-browser
+pnpm run start:local:mac -- --reuse
+pnpm run start:local:mac -- --web-port 3100 --api-port 3101
+```
+
+`scripts/start-local-mac.command` 适合双击；`scripts/start-local-mac.sh` 适合终端。脚本会在当前 Terminal 窗口后台启动 API 和 Web，自动设置 API 地址、PGlite 目录，并把日志写入 `.local/run-logs`。在该窗口按 `Ctrl+C` 可停止本脚本启动的服务。
 
 单独启动某个项目，One CLI 版本：
 

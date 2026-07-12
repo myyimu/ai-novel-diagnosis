@@ -25,12 +25,24 @@ On Windows, double-click:
 scripts/start-local.cmd
 ```
 
+On macOS, double-click:
+
+```text
+scripts/start-local-mac.command
+```
+
 The script checks Node.js / pnpm, installs missing dependencies, starts the API and Web app, and opens the page automatically. After the page opens, skip advanced configuration at first. Paste your first chapter and run chapter triage.
 
-If you are already in a terminal at the repository root, run:
+If you are already in a terminal at the repository root on Windows, run:
 
 ```powershell
 pnpm run start:local
+```
+
+On macOS, run:
+
+```bash
+pnpm run start:local:mac
 ```
 
 Default URLs:
@@ -266,6 +278,18 @@ If you are already in a terminal at the workspace root, use the equivalent npm s
 ```powershell
 pnpm run start:local
 ```
+
+macOS one-click local startup:
+
+```bash
+scripts/start-local-mac.command
+scripts/start-local-mac.sh --auto-install
+pnpm run start:local:mac -- --no-browser
+pnpm run start:local:mac -- --reuse
+pnpm run start:local:mac -- --web-port 3100 --api-port 3101
+```
+
+Use `scripts/start-local-mac.command` for double-click startup and `scripts/start-local-mac.sh` from Terminal. The script starts API and Web in the same Terminal window, sets the local API URL and PGlite directory, writes logs to `.local/run-logs`, and stops services started by this launcher when you press `Ctrl+C`.
 
 Common startup commands:
 
