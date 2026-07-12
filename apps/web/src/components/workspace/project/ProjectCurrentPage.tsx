@@ -704,55 +704,62 @@ function ProjectChapterWorkspace({
 								))}
 							</nav>
 
-							<section className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2 shadow-[0_4px_16px_rgba(28,34,42,.05)]">
-								<div className="flex min-w-[220px] flex-[1_1_220px] flex-wrap items-center gap-2">
-									{["诊断", "改稿", "复诊", "完成"].map((label, index) => (
-										<div key={label} className="flex items-center gap-2">
-											{index ? (
-												<span className="h-px w-5 bg-[#d8dbe0]" />
-											) : null}
-											<span
-												className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
-													index < workflow.stage
-														? "border-[#c9e7d9] bg-[#eaf8f2] text-[#14764f]"
-														: index === workflow.stage
-															? "border-[#ffd1bd] bg-[#fff2ec] text-[#c94413]"
-															: "border-[#e6e8eb] bg-[#fbfcfd] text-[#69707d]"
-												}`}
+							<section className="mb-3 grid gap-2.5 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(28,34,42,.05)]">
+								<div className="flex min-w-0 items-center justify-between gap-3 border-b border-[#edf0f3] pb-2">
+									<div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+										{["诊断", "改稿", "复诊", "完成"].map((label, index) => (
+											<div
+												key={label}
+												className="flex shrink-0 items-center gap-1.5"
 											>
-												<i className="grid size-[18px] place-items-center rounded-full bg-white text-[9px] not-italic">
-													{index < workflow.stage ? "✓" : index + 1}
-												</i>
-												{label}
-											</span>
-										</div>
-									))}
+												{index ? (
+													<span className="h-px w-4 bg-[#d8dbe0]" />
+												) : null}
+												<span
+													className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
+														index < workflow.stage
+															? "border-[#c9e7d9] bg-[#eaf8f2] text-[#14764f]"
+															: index === workflow.stage
+																? "border-[#ffd1bd] bg-[#fff2ec] text-[#c94413]"
+																: "border-[#e6e8eb] bg-[#fbfcfd] text-[#69707d]"
+													}`}
+												>
+													<i className="grid size-[18px] place-items-center rounded-full bg-white text-[9px] not-italic">
+														{index < workflow.stage ? "✓" : index + 1}
+													</i>
+													{label}
+												</span>
+											</div>
+										))}
+									</div>
+									<strong className="shrink-0 rounded-full bg-[#f5f6f8] px-2.5 py-1 text-[10px] text-[#454b55]">
+										{workflow.title}
+									</strong>
 								</div>
-								<div className="min-w-[160px] flex-[1_1_180px]">
-									<strong className="block text-[10px]">{workflow.title}</strong>
-									<span className="mt-0.5 block text-[9px] leading-4 text-[#69707d]">
+								<div className="grid items-center gap-3 [grid-template-columns:minmax(0,1fr)_minmax(246px,auto)] max-[1180px]:grid-cols-1">
+									<span className="block min-w-0 text-[10px] leading-4 text-[#69707d]">
 										{workflow.description}
 									</span>
-								</div>
-								<div className="flex flex-[1_1_260px] flex-wrap items-center justify-end gap-2">
-									<Button
-										onClick={handlePrimaryChapterAction}
-										className="min-h-9 rounded-[9px] bg-[#ff5a1f] px-4 font-bold text-white hover:bg-[#e84b13]"
-									>
-										{workflow.action}
-									</Button>
-									<Button
-										variant="outline"
-										className="min-h-9 rounded-[9px] border-[#d8dbe0] px-4"
-									>
-										编辑正文
-									</Button>
-									<Button
-										variant="outline"
-										className="min-h-9 rounded-[9px] border-[#d8dbe0] px-4"
-									>
-										替换正文
-									</Button>
+									<div className="grid grid-cols-3 gap-2 max-[620px]:grid-cols-1">
+										<Button
+											onClick={handlePrimaryChapterAction}
+											className="h-8 rounded-[9px] bg-[#ff5a1f] px-3 text-xs font-bold text-white hover:bg-[#e84b13]"
+										>
+											{workflow.action}
+										</Button>
+										<Button
+											variant="outline"
+											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
+										>
+											编辑正文
+										</Button>
+										<Button
+											variant="outline"
+											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
+										>
+											替换正文
+										</Button>
+									</div>
 								</div>
 							</section>
 
