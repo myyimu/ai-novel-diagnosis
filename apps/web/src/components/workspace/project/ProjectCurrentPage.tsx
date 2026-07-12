@@ -617,9 +617,9 @@ function ProjectChapterWorkspace({
 						</div>
 					</div>
 
-					<div className="min-h-0 flex-1 overflow-auto px-[34px] py-[26px] pb-[70px] max-[1180px]:px-[22px] max-lg:px-3">
+					<div className="min-h-0 flex-1 overflow-auto px-[28px] py-[14px] pb-[44px] max-[1180px]:px-[18px] max-lg:px-3">
 						<div className="mx-auto w-[min(1040px,100%)]">
-							<nav className="sticky top-0 z-10 mb-4 flex items-center gap-1 overflow-x-auto rounded-[11px] border border-[#e8ebef] bg-white/95 p-1.5 shadow-[0_8px_24px_rgba(20,25,35,.05)] backdrop-blur">
+							<nav className="sticky top-0 z-10 mb-2 flex items-center gap-1 overflow-x-auto rounded-[11px] border border-[#e8ebef] bg-white/95 p-1 shadow-[0_6px_18px_rgba(20,25,35,.045)] backdrop-blur">
 								{[
 									{ id: "annotation", label: "正文批注", count: issues.length },
 									{ id: "diagnosis", label: "诊断总览", count: result ? 1 : 0 },
@@ -630,7 +630,7 @@ function ProjectChapterWorkspace({
 										key={tab.id}
 										type="button"
 										onClick={() => setChapterTab(tab.id as ChapterTab)}
-										className={`min-h-9 rounded-[9px] px-3 text-xs font-bold ${
+										className={`min-h-8 rounded-[9px] px-3 text-xs font-bold ${
 											chapterTab === tab.id
 												? "bg-[#fff2ec] text-[#c94413] shadow-[inset_0_0_0_1px_rgba(255,90,31,.12)]"
 												: "text-[#69707d] hover:bg-[#f5f6f8]"
@@ -644,15 +644,15 @@ function ProjectChapterWorkspace({
 								))}
 							</nav>
 
-							<section className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(28,34,42,.055)]">
+							<section className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2 shadow-[0_4px_16px_rgba(28,34,42,.05)]">
 								<div className="flex min-w-[220px] flex-[1_1_220px] flex-wrap items-center gap-2">
 									{["诊断", "改稿", "复诊", "完成"].map((label, index) => (
 										<div key={label} className="flex items-center gap-2">
 											{index ? (
-												<span className="h-px w-7 bg-[#d8dbe0]" />
+												<span className="h-px w-5 bg-[#d8dbe0]" />
 											) : null}
 											<span
-												className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${
+												className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
 													index < workflow.stage
 														? "border-[#c9e7d9] bg-[#eaf8f2] text-[#14764f]"
 														: index === workflow.stage
@@ -670,26 +670,26 @@ function ProjectChapterWorkspace({
 								</div>
 								<div className="min-w-[160px] flex-[1_1_180px]">
 									<strong className="block text-[10px]">{workflow.title}</strong>
-									<span className="mt-0.5 block text-[8px] leading-4 text-[#69707d]">
+									<span className="mt-0.5 block text-[9px] leading-4 text-[#69707d]">
 										{workflow.description}
 									</span>
 								</div>
 								<div className="flex flex-[1_1_260px] flex-wrap items-center justify-end gap-2">
 									<Button
 										onClick={handlePrimaryChapterAction}
-										className="rounded-[9px] bg-[#ff5a1f] font-bold text-white hover:bg-[#e84b13]"
+										className="min-h-9 rounded-[9px] bg-[#ff5a1f] px-4 font-bold text-white hover:bg-[#e84b13]"
 									>
 										{workflow.action}
 									</Button>
 									<Button
 										variant="outline"
-										className="rounded-[9px] border-[#d8dbe0]"
+										className="min-h-9 rounded-[9px] border-[#d8dbe0] px-4"
 									>
 										编辑正文
 									</Button>
 									<Button
 										variant="outline"
-										className="rounded-[9px] border-[#d8dbe0]"
+										className="min-h-9 rounded-[9px] border-[#d8dbe0] px-4"
 									>
 										替换正文
 									</Button>
@@ -697,10 +697,10 @@ function ProjectChapterWorkspace({
 							</section>
 
 							{chapterTab === "annotation" ? (
-								<article className="mx-auto min-h-[calc(100vh-170px)] w-[min(830px,100%)] rounded-[18px] border border-[#e0e4e8] bg-white px-[58px] py-10 pb-20 shadow-[0_12px_32px_rgba(24,30,38,.075)] max-[1180px]:px-10 max-[620px]:px-6">
-									<header className="mb-[22px] flex items-start justify-between gap-4 border-b border-[#e6e8eb] pb-[18px]">
+								<article className="mx-auto min-h-[calc(100vh-138px)] w-[min(860px,100%)] rounded-[16px] border border-[#e0e4e8] bg-white px-[50px] py-8 pb-14 shadow-[0_10px_28px_rgba(24,30,38,.065)] max-[1180px]:px-9 max-[620px]:px-5">
+									<header className="mb-5 flex items-start justify-between gap-4 border-b border-[#e6e8eb] pb-4">
 										<div>
-											<h1 className="text-2xl font-bold leading-snug tracking-normal">
+											<h1 className="text-[22px] font-bold leading-snug tracking-normal">
 												{chapterTitle}
 											</h1>
 											<div className="mt-2 flex flex-wrap gap-3 text-[9px] text-[#6f7782]">
@@ -723,7 +723,7 @@ function ProjectChapterWorkspace({
 											{statusLabel}
 										</span>
 									</header>
-									<div className="font-serif text-[17px] leading-[2.02] text-[#313741]">
+									<div className="font-serif text-[16px] leading-[1.92] text-[#313741]">
 										{annotatedParagraphs.length
 											? annotatedParagraphs.map((item, index) => (
 													<AnnotatedParagraph
@@ -772,11 +772,11 @@ function ProjectChapterWorkspace({
 						commentsOpen ? "max-lg:translate-x-0" : "max-lg:translate-x-[103%]"
 					}`}
 				>
-					<div className="flex h-[52px] items-center justify-between border-b border-[#e6e8eb] px-3">
+					<div className="flex h-12 items-center justify-between border-b border-[#e6e8eb] px-3">
 						<strong className="text-xs">诊断意见</strong>
 						<span className="text-[10px] text-[#69707d]">{issues.length}</span>
 					</div>
-					<div className="flex flex-wrap gap-1 border-b border-[#e6e8eb] bg-[#fafbfc] p-2.5">
+					<div className="flex flex-wrap gap-1 border-b border-[#e6e8eb] bg-[#fafbfc] p-2">
 						{[
 							{ id: "all", label: "全部" },
 							{ id: "must", label: "必须先改" },
@@ -798,12 +798,12 @@ function ProjectChapterWorkspace({
 							</button>
 						))}
 					</div>
-					<div className="min-h-0 flex-1 overflow-auto p-3">
-						<div className="mb-3 rounded-xl border border-[#f3dacd] bg-gradient-to-br from-[#fffaf7] to-white p-3">
+					<div className="min-h-0 flex-1 overflow-auto p-2.5 pb-4">
+						<div className="mb-2.5 rounded-[12px] border border-[#f3dacd] bg-gradient-to-br from-[#fffaf7] to-white p-2.5">
 							<div className="flex items-start justify-between gap-2">
 								<div>
 									<h3 className="m-0 text-[13px] font-bold">本章状态</h3>
-									<p className="mt-1 text-[10px] leading-5 text-[#69707d]">
+									<p className="mt-1 line-clamp-3 text-[10px] leading-[18px] text-[#69707d]">
 										{result?.mainProblem || "诊断结果已经保存到章节工作区。"}
 									</p>
 								</div>
@@ -835,7 +835,7 @@ function ProjectChapterWorkspace({
 											role="button"
 											tabIndex={0}
 											data-issue-card={issue.id}
-											className={`relative w-full rounded-[13px] border bg-white py-3 pl-4 pr-3 text-left transition before:absolute before:bottom-3 before:left-0 before:top-3 before:w-[3px] before:rounded-r ${
+											className={`relative w-full rounded-[12px] border bg-white py-2.5 pl-4 pr-3 text-left transition before:absolute before:bottom-3 before:left-0 before:top-3 before:w-[3px] before:rounded-r ${
 												issue.id === activeIssueId
 													? "border-[#ffb493] shadow-[0_8px_20px_rgba(255,90,31,.09)]"
 													: "border-[#e6e8eb] hover:border-[#ffb493] hover:shadow-[0_8px_20px_rgba(255,90,31,.09)]"
@@ -855,16 +855,16 @@ function ProjectChapterWorkspace({
 											<h3 className="mb-1 mt-2 text-xs font-bold leading-snug">
 												{issue.title}
 											</h3>
-											<p className="line-clamp-3 text-[10px] leading-5 text-[#606873]">
+											<p className="line-clamp-2 text-[10px] leading-[18px] text-[#606873]">
 												{issue.description || issue.readerImpact}
 											</p>
 											{issue.evidence?.[0]?.quote ? (
-												<div className="mt-2 rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
+												<div className="mt-2 line-clamp-2 rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
 													证据：{issue.evidence[0].quote}
 												</div>
 											) : null}
 											{issue.fixAction ? (
-												<div className="mt-2 rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
+												<div className="mt-2 line-clamp-2 rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
 													{issue.fixAction}
 												</div>
 											) : null}
@@ -927,8 +927,8 @@ function ProjectChapterWorkspace({
 							)}
 						</div>
 					</div>
-					<div className="border-t border-[#e6e8eb] bg-white p-3">
-						<div className="mb-2 rounded-lg border border-[#d8e2f6] bg-[#edf4ff] px-2.5 py-2 text-[9px] leading-4 text-[#405a85]">
+					<div className="border-t border-[#e6e8eb] bg-white p-2.5">
+						<div className="mb-2 rounded-lg border border-[#d8e2f6] bg-[#edf4ff] px-2.5 py-1.5 text-[9px] leading-4 text-[#405a85]">
 							接受意见后，系统先生成修改预览；只有你确认的修改才会保存为新版本。
 						</div>
 						<div className="mb-2 text-[9px] text-[#6f7782]">
@@ -1410,7 +1410,7 @@ function AnnotatedParagraph({
 	const { paragraph, markers } = annotation;
 
 	if (!markers.length) {
-		return <p className="mb-[1.05em] text-left last:mb-0">{paragraph}</p>;
+		return <p className="mb-[0.72em] text-left last:mb-0">{paragraph}</p>;
 	}
 
 	const inlineMarkers = markers
@@ -1448,7 +1448,7 @@ function AnnotatedParagraph({
 	nodes.push(paragraph.slice(cursor));
 
 	return (
-		<p className="mb-[1.05em] text-left last:mb-0">
+		<p className="mb-[0.72em] text-left last:mb-0">
 			{nodes}
 			<span className="ml-1.5 inline-flex flex-wrap items-center gap-1 align-[2px]">
 				{markers.map((marker) => {
