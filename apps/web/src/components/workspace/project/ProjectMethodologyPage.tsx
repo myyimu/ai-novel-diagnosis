@@ -1,225 +1,215 @@
 "use client";
 
-import { useMemo } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, BookMarked, Clock, HelpCircle, Lightbulb, Sparkles } from "lucide-react";
 
-import { WorkspaceTaskFrame } from "@/components/workspace/WorkspaceTaskFrame";
-import type { ContextInspectorSection } from "@/components/workspace/ContextInspector";
-import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
-import type { TaskNavItem } from "@/components/workspace/TaskNav";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Clock, ArrowLeft } from "lucide-react";
+import {
+	RedesignTopButton,
+	RedesignWorkspaceShell,
+} from "@/components/workspace/RedesignWorkspaceShell";
+import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
+import { ProjectAssetTabs } from "./ProjectAssetTabs";
 
 export function ProjectMethodologyPage() {
 	const router = useRouter();
+	const { activeProject, projectRevisionSessions, projectMethodologyCards, providerLabel } =
+		useWorkspaceHandlers("overview");
 
-	const { projectMethodologyCards } = useWorkspaceHandlers("overview");
-
-	const taskNavItems: TaskNavItem[] = useMemo(
-		() => [
-			{
-				id: "current",
-				label: "当前书籍",
-				description: "查看小说概览和资产",
-				meta: "",
-			},
-			{
-				id: "revisions",
-				label: "修改效果",
-				description: "查看和管理修改效果记录",
-				meta: "",
-			},
-			{
-				id: "methodology",
-				label: "方法论库",
-				description: `查看和管理 ${projectMethodologyCards.length} 条方法论卡`,
-				meta: "当前",
-			},
-			{
-				id: "export",
-				label: "导出",
-				description: "导出书籍资产",
-				meta: "",
-			},
-		],
-		[projectMethodologyCards.length],
-	);
-
-	const inspectorSections: ContextInspectorSection[] = useMemo(
-		() => [
-			{
-				title: "方法论统计",
-				description: "当前书籍的方法论卡统计",
-				fields: [
-					{
-						label: "方法论卡数",
-						value: `${projectMethodologyCards.length} 条`,
-						tone: projectMethodologyCards.length > 0 ? "secondary" : "outline",
-					},
-					{
-						label: "最近添加",
-						value:
-							projectMethodologyCards.length > 0
-								? new Date(
-										projectMethodologyCards[projectMethodologyCards.length - 1]
-											.lastSeenAt,
-									).toLocaleString()
-								: "无",
-					},
-				],
-			},
-			{
-				title: "页面信息",
-				description: "方法论库页面信息",
-				fields: [
-					{
-						label: "当前路径",
-						value: "/project/methodology",
-						tone: "outline",
-					},
-					{
-						label: "布局模式",
-						value: "书籍工作区",
-						hint: "仅显示方法论库，不混入诊断表单",
-					},
-				],
-			},
-		],
-		[projectMethodologyCards],
-	);
-
-	const handleNavChange = (id: string) => {
-		if (id === "current") {
-			router.push("/project/current");
-		} else if (id === "revisions") {
-			router.push("/project/revisions");
-		} else if (id === "export") {
-			router.push("/project/export");
-		}
-	};
-
-	const handleBackToDiagnosis = () => {
-		router.push("/diagnose/quick");
-	};
+	const latestUpdate = projectMethodologyCards.length
+		? new Date(
+				projectMethodologyCards[projectMethodologyCards.length - 1].lastSeenAt,
+			).toLocaleString()
+		: "暂无";
 
 	return (
-		<WorkspaceTaskFrame
-			title="方法论库"
-			description="从诊断结果提炼的修改方法论卡片"
-			status={`${projectMethodologyCards.length} 条方法论`}
-			taskNav={{
-				items: taskNavItems,
-				activeId: "methodology",
-				onChange: handleNavChange,
-				title: "书籍导航",
-				description: "选择要管理的书籍内容",
-			}}
-			inspector={{
-				title: "方法论上下文",
-				description: "当前方法论库的统计和信息",
-				sections: inspectorSections,
-				emptyState: (
-					<div className="space-y-2">
-						<p className="text-sm text-muted-foreground">暂无方法论卡。</p>
-					</div>
-				),
-			}}
+		<RedesignWorkspaceShell
+			active="history"
+			providerLabel={providerLabel}
+			crumb={
+				<>
+					我的书籍 / <b className="text-[#1f2329]">方法论库</b>
+				</>
+			}
+			topActions={
+				<>
+					<RedesignTopButton onClick={() => router.push("/project/current")}>
+						返回书籍
+					</RedesignTopButton>
+					<RedesignTopButton
+						variant="primary"
+						onClick={() => router.push("/diagnose/quick")}
+					>
+						快速诊断一章
+					</RedesignTopButton>
+				</>
+			}
 		>
-			<div className="space-y-4">
-				{projectMethodologyCards.length === 0 ? (
-					<Card>
-						<CardContent className="flex flex-col items-center justify-center py-12">
-							<Lightbulb className="w-12 h-12 text-muted-foreground mb-4" />
-							<h3 className="text-lg font-semibold mb-2">暂无方法论卡</h3>
-							<p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-								完成快速诊断后，系统会自动提炼方法论卡保存到当前书籍
+			<main className="mx-auto w-[min(1080px,calc(100%_-_48px))] py-[34px] pb-[70px] max-[820px]:w-[calc(100%_-_24px)] max-[820px]:py-[22px]">
+				<section className="mb-[22px] flex items-start justify-between gap-6 max-[720px]:block">
+					<div>
+						<h1 className="mb-1.5 text-[28px] font-bold leading-tight tracking-normal">
+							方法论库
+						</h1>
+						<p className="max-w-[720px] text-sm leading-6 text-[#69707d]">
+							把诊断意见提炼成可复用的改稿套路，沉淀为这本书自己的写作规则和自查问题。
+						</p>
+					</div>
+					<div className="rounded-full border border-[#ffd6c4] bg-[#fff2ec] px-3 py-1 text-xs font-bold text-[#c94413] max-[720px]:mt-4 max-[720px]:inline-flex">
+						{projectMethodologyCards.length} 张卡片
+					</div>
+				</section>
+
+				<section className="mb-4 grid gap-3 md:grid-cols-4">
+					<SummaryCard label="当前书籍" value={activeProject?.name || "默认书籍"} />
+					<SummaryCard label="方法论卡" value={`${projectMethodologyCards.length} 张`} />
+					<SummaryCard label="修改记录" value={`${projectRevisionSessions.length} 条`} />
+					<SummaryCard label="最近添加" value={latestUpdate} />
+				</section>
+
+				<ProjectAssetTabs
+					active="methodology"
+					revisionCount={projectRevisionSessions.length}
+					methodologyCount={projectMethodologyCards.length}
+				/>
+
+				<section className="mt-4">
+					{projectMethodologyCards.length === 0 ? (
+						<div className="rounded-[16px] border border-dashed border-[#d8dbe0] bg-white px-6 py-14 text-center shadow-[0_8px_24px_rgba(22,27,34,.055)]">
+							<div className="mx-auto grid size-12 place-items-center rounded-[14px] bg-[#fff2ec] text-[#ff5a1f]">
+								<Lightbulb className="size-6" />
+							</div>
+							<h2 className="mt-4 text-lg font-bold">暂无方法论卡</h2>
+							<p className="mx-auto mt-2 max-w-[460px] text-sm leading-6 text-[#69707d]">
+								完成快速诊断后，系统会从问题、证据和修改建议里提炼可复用的改稿规则。
 							</p>
-							<Button onClick={handleBackToDiagnosis}>
-								<ArrowLeft className="w-4 h-4 mr-2" />
+							<Button
+								onClick={() => router.push("/diagnose/quick")}
+								className="mt-6 min-h-10 rounded-[9px] bg-[#ff5a1f] px-4 font-bold text-white hover:bg-[#e84b13]"
+							>
+								<ArrowLeft className="mr-2 size-4" />
 								返回快速诊断
 							</Button>
-						</CardContent>
-					</Card>
-				) : (
-					<div className="space-y-4">
-						{projectMethodologyCards.map((card) => (
-							<Card key={card.projectCardId}>
-								<CardHeader>
-									<div className="flex items-start justify-between">
-										<div>
-											<CardTitle className="text-base flex items-center gap-2">
-												<Lightbulb className="w-4 h-4" />
-												{card.title || "未命名方法论"}
-											</CardTitle>
-											<CardDescription className="flex items-center gap-2 mt-1">
-												<Clock className="w-3 h-3" />
-												{new Date(card.lastSeenAt).toLocaleString()}
-											</CardDescription>
+						</div>
+					) : (
+						<div className="grid gap-3 md:grid-cols-2">
+							{projectMethodologyCards.map((card) => (
+								<article
+									key={card.projectCardId}
+									className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_6px_20px_rgba(22,27,34,.055)]"
+								>
+									<div className="flex items-start justify-between gap-4">
+										<div className="min-w-0">
+											<div className="flex items-center gap-2">
+												<span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[#fff2ec] text-[#ff5a1f]">
+													<BookMarked className="size-4" />
+												</span>
+												<h2 className="truncate text-base font-bold">
+													{card.title || "未命名方法论"}
+												</h2>
+											</div>
+											<div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#69707d]">
+												<span className="inline-flex items-center gap-1">
+													<Clock className="size-3.5" />
+													{new Date(card.lastSeenAt).toLocaleString()}
+												</span>
+												<span>来源：诊断提炼</span>
+											</div>
 										</div>
-										{card.type && (
-											<Badge variant="secondary" className="text-xs">
+										{card.type ? (
+											<span className="shrink-0 rounded-full bg-[#eef7f2] px-2.5 py-1 text-[11px] font-bold text-[#176e50]">
 												{card.type}
-											</Badge>
-										)}
+											</span>
+										) : null}
 									</div>
-								</CardHeader>
-								<CardContent className="space-y-3">
-									{card.triggerProblem ? (
-										<div>
-											<h4 className="text-sm font-semibold mb-2">触发问题</h4>
-											<p className="text-sm text-muted-foreground">
-												{card.triggerProblem}
-											</p>
-										</div>
-									) : null}
-									{card.reusableRule ? (
-										<div>
-											<h4 className="text-sm font-semibold mb-2">修改规则</h4>
-											<p className="text-sm text-muted-foreground whitespace-pre-wrap">
-												{card.reusableRule}
-											</p>
-										</div>
-									) : null}
-									{card.selfCheckQuestion ? (
-										<div>
-											<h4 className="text-sm font-semibold mb-2">自查问题</h4>
-											<p className="text-sm text-muted-foreground">
-												{card.selfCheckQuestion}
-											</p>
-										</div>
-									) : null}
-									<div className="flex items-center justify-between pt-2 border-t">
-										<p className="text-xs text-muted-foreground">
-											来源于诊断结果提炼
+
+									<div className="mt-4 grid gap-2">
+										{card.triggerProblem ? (
+											<InfoBlock
+												icon={
+													<Sparkles className="size-4 text-[#ff5a1f]" />
+												}
+												title="触发问题"
+												body={card.triggerProblem}
+											/>
+										) : null}
+										{card.reusableRule ? (
+											<InfoBlock
+												icon={
+													<Lightbulb className="size-4 text-[#ff5a1f]" />
+												}
+												title="修改规则"
+												body={card.reusableRule}
+												expanded
+											/>
+										) : null}
+										{card.selfCheckQuestion ? (
+											<InfoBlock
+												icon={
+													<HelpCircle className="size-4 text-[#ff5a1f]" />
+												}
+												title="自查问题"
+												body={card.selfCheckQuestion}
+											/>
+										) : null}
+									</div>
+
+									<div className="mt-4 flex items-center justify-between gap-3 border-t border-[#eceef1] pt-3 max-[640px]:block">
+										<p className="text-xs text-[#69707d]">
+											用于后续章节复查同类问题，避免同一类写法反复返工。
 										</p>
 										<Button
 											variant="outline"
-											size="sm"
+											className="min-h-9 rounded-[9px] border-[#d8dbe0] max-[640px]:mt-3"
 											onClick={() => router.push("/diagnose/quick")}
 										>
 											查看诊断
 										</Button>
 									</div>
-								</CardContent>
-							</Card>
-						))}
-					</div>
-				)}
+								</article>
+							))}
+						</div>
+					)}
+				</section>
+			</main>
+		</RedesignWorkspaceShell>
+	);
+}
 
-				<Card className="border-muted/50 bg-muted/30">
-					<CardHeader>
-						<CardTitle className="text-sm">方法论库说明</CardTitle>
-					</CardHeader>
-					<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-						<p>• 方法论卡从诊断结果中自动提炼修改套路</p>
-						<p>• 每张卡片包含具体的修改方法和支持证据</p>
-						<p>• 可以按类型分类浏览不同的方法论</p>
-						<p>• 帮助积累修改经验，提升写作技巧</p>
-					</CardContent>
-				</Card>
-			</div>
-		</WorkspaceTaskFrame>
+function SummaryCard({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+			<span className="text-[11px] text-[#69707d]">{label}</span>
+			<strong className="mt-1 block truncate text-sm">{value}</strong>
+		</div>
+	);
+}
+
+function InfoBlock({
+	icon,
+	title,
+	body,
+	expanded = false,
+}: {
+	icon: ReactNode;
+	title: string;
+	body: string;
+	expanded?: boolean;
+}) {
+	return (
+		<div className="rounded-[11px] border border-[#eceef1] bg-[#fafbfc] p-3">
+			<h3 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold">
+				{icon}
+				{title}
+			</h3>
+			<p
+				className={`whitespace-pre-wrap text-sm leading-6 text-[#505762] ${
+					expanded ? "line-clamp-5" : "line-clamp-3"
+				}`}
+			>
+				{body}
+			</p>
+		</div>
 	);
 }
