@@ -63,8 +63,8 @@ const navGroups: Array<{
 			},
 			{
 				key: "settings",
-				label: "设置",
-				description: "模型、隐私和连接状态",
+				label: "AI 设置",
+				description: "模型、密钥和连接状态",
 				href: "/settings/provider",
 				icon: <Settings className="size-[18px]" />,
 			},

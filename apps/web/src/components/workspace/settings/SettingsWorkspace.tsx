@@ -19,6 +19,7 @@ export function SettingsWorkspace() {
 		loading,
 		selectedProviderPreset,
 		providerConfigHistory,
+		providerBaseUrlOptions,
 		filteredProviderModelOptions,
 		providerModelsLoading,
 		providerTestResult,
@@ -39,6 +40,10 @@ export function SettingsWorkspace() {
 	const handleChangeProviderModel = (model: string) => {
 		setProviderModelSearch(model);
 		setProvider((current) => ({ ...current, model }));
+	};
+
+	const handleChangeProviderBaseUrl = (baseUrl: string) => {
+		setProvider((current) => ({ ...current, baseUrl }));
 	};
 
 	const handleChangeProviderApiKey = (apiKey: string) => {
@@ -67,7 +72,7 @@ export function SettingsWorkspace() {
 			providerLabel={providerLabel}
 			crumb={
 				<>
-					工作区 / <b className="text-[#1f2329]">设置</b>
+					工作区 / <b className="text-[#1f2329]">AI 设置</b>
 				</>
 			}
 			topActions={
@@ -88,10 +93,10 @@ export function SettingsWorkspace() {
 				<section className="mb-[22px] flex items-start justify-between gap-6 max-[720px]:block">
 					<div>
 						<h1 className="mb-1.5 text-[28px] font-bold leading-tight tracking-normal">
-							AI 设置
+							AI 模型服务设置
 						</h1>
 						<p className="max-w-[720px] text-sm leading-6 text-[#69707d]">
-							配置模型、Base URL 和密钥；诊断前先确认模型可用。API Key
+							配置模型服务、Base URL、Model 和密钥；诊断前先确认模型可用。API Key
 							只保存在当前浏览器。
 						</p>
 					</div>
@@ -100,10 +105,17 @@ export function SettingsWorkspace() {
 					</div>
 				</section>
 
-				<section className="mb-4 grid gap-3 md:grid-cols-3">
+				<section className="mb-4 grid gap-3 md:grid-cols-4">
 					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 						<span className="text-[11px] text-[#69707d]">当前服务</span>
 						<strong className="mt-1 block truncate text-sm">{providerLabel}</strong>
+					</div>
+					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+						<span className="text-[11px] text-[#69707d]">Base URL</span>
+						<strong className="mt-1 block truncate text-sm">
+							{providerData.baseUrl ||
+								(isBackendFreeProvider ? "由服务端配置" : "未设置")}
+						</strong>
 					</div>
 					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 						<span className="text-[11px] text-[#69707d]">模型</span>
@@ -123,6 +135,7 @@ export function SettingsWorkspace() {
 					isBackendFreeProvider={isBackendFreeProvider}
 					isLoading={loading === "provider"}
 					selectedProviderPreset={selectedProviderPreset}
+					providerBaseUrlOptions={providerBaseUrlOptions}
 					providerConfigHistory={providerConfigHistory.map((item) => ({
 						id: item.id,
 						title: item.title,
@@ -133,6 +146,7 @@ export function SettingsWorkspace() {
 					providerModelsLoading={providerModelsLoading}
 					providerTestResult={providerTestResult}
 					onChangeProviderPreset={handleChangeProviderPreset}
+					onChangeProviderBaseUrl={handleChangeProviderBaseUrl}
 					onChangeProviderModel={handleChangeProviderModel}
 					onChangeProviderApiKey={handleChangeProviderApiKey}
 					onResetProviderSettings={handleResetProviderSettings}

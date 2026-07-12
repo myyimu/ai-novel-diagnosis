@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ProviderTestResultView } from "@/hooks/use-workspace-handlers";
+import { providerPresetOptions } from "@/lib/provider-presets";
 import { CheckCircle2, KeyRound, Loader2, ShieldAlert, Settings, XCircle } from "lucide-react";
 
 interface ProviderSettingsProps {
@@ -25,6 +26,7 @@ interface ProviderSettingsProps {
 		needsApiKey: boolean;
 		notice?: string;
 	};
+	providerBaseUrlOptions: Array<{ label: string; url: string }>;
 	providerConfigHistory: Array<{
 		id: string;
 		title: string;
@@ -36,6 +38,7 @@ interface ProviderSettingsProps {
 	providerTestResult: ProviderTestResultView | null;
 
 	onChangeProviderPreset: (preset: string) => void;
+	onChangeProviderBaseUrl: (baseUrl: string) => void;
 	onChangeProviderModel: (model: string) => void;
 	onChangeProviderApiKey: (apiKey: string) => void;
 	onResetProviderSettings: () => void;
@@ -99,11 +102,13 @@ export function ProviderSettings({
 	isBackendFreeProvider,
 	isLoading,
 	selectedProviderPreset,
+	providerBaseUrlOptions,
 	providerConfigHistory,
 	filteredProviderModelOptions,
 	providerModelsLoading,
 	providerTestResult,
 	onChangeProviderPreset,
+	onChangeProviderBaseUrl,
 	onChangeProviderModel,
 	onChangeProviderApiKey,
 	onResetProviderSettings,
@@ -116,7 +121,7 @@ export function ProviderSettings({
 }: ProviderSettingsProps) {
 	return (
 		<div className="space-y-6">
-			<Card>
+			<Card className="rounded-[14px] border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 				<CardHeader>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
@@ -228,12 +233,11 @@ export function ProviderSettings({
 								value={provider.preset}
 								onChange={(event) => onChangeProviderPreset(event.target.value)}
 							>
-								<option value="mock">本地演示</option>
-								<option value="shared-gpu">共享算力</option>
-								<option value="openai">OpenAI</option>
-								<option value="qwen">通义千问</option>
-								<option value="deepseek">DeepSeek</option>
-								<option value="custom">自定义</option>
+								{providerPresetOptions.map(({ id, preset }) => (
+									<option key={id} value={id}>
+										{preset.label}
+									</option>
+								))}
 							</select>
 						</div>
 
@@ -248,6 +252,48 @@ export function ProviderSettings({
 							</div>
 						) : (
 							<>
+								<div className="space-y-2">
+									<div className="flex items-center gap-1">
+										<Label htmlFor="provider-base-url">Base URL（高级）</Label>
+										<FieldHelp text="OpenAI-compatible、自定义中转和本地模型都需要接口地址。共享算力由服务端配置，通常不需要手动填写。" />
+									</div>
+									<Input
+										id="provider-base-url"
+										value={provider.baseUrl}
+										onChange={(event) =>
+											onChangeProviderBaseUrl(event.target.value)
+										}
+										placeholder={
+											isBackendFreeProvider
+												? "由共享站服务端配置决定"
+												: "例如 https://api.openai.com/v1 或 http://localhost:11434/v1"
+										}
+										disabled={provider.preset === "shared-gpu"}
+									/>
+									{providerBaseUrlOptions.length > 0 && !isBackendFreeProvider ? (
+										<div className="flex flex-wrap gap-2">
+											{providerBaseUrlOptions.map((option) => (
+												<Button
+													key={option.url}
+													type="button"
+													variant={
+														provider.baseUrl === option.url
+															? "default"
+															: "outline"
+													}
+													size="sm"
+													className="h-8 rounded-full px-3 text-xs"
+													onClick={() =>
+														onChangeProviderBaseUrl(option.url)
+													}
+												>
+													{option.label}
+												</Button>
+											))}
+										</div>
+									) : null}
+								</div>
+
 								<div className="space-y-2">
 									<div className="flex items-center gap-1">
 										<Label htmlFor="provider-model">模型（Model）</Label>
@@ -332,7 +378,7 @@ export function ProviderSettings({
 			</Card>
 
 			{providerConfigHistory.length > 0 ? (
-				<Card>
+				<Card className="rounded-[14px] border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 					<CardHeader>
 						<div className="flex items-center justify-between">
 							<div>
@@ -389,7 +435,7 @@ export function ProviderSettings({
 				</Card>
 			) : null}
 
-			<Card className="border-muted/50 bg-muted/30">
+			<Card className="rounded-[14px] border-[#e6e8eb] bg-[#fafafa]">
 				<CardHeader>
 					<CardTitle className="text-sm">隐私与安全说明</CardTitle>
 				</CardHeader>
