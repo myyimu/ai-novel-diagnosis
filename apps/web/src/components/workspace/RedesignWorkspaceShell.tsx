@@ -122,16 +122,16 @@ export function RedesignWorkspaceShell({
 									type="button"
 									onClick={() => router.push(item.href)}
 									aria-label={item.label}
-									className={`flex min-h-[42px] w-full items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left transition max-[820px]:justify-center max-[820px]:px-2 max-[820px]:group-hover/sidebar:justify-start max-[820px]:group-hover/sidebar:px-[11px] max-[820px]:group-focus-within/sidebar:justify-start max-[820px]:group-focus-within/sidebar:px-[11px] ${
+									className={`flex min-h-[42px] w-full items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left font-semibold transition-colors max-[820px]:justify-center max-[820px]:px-2 max-[820px]:group-hover/sidebar:justify-start max-[820px]:group-hover/sidebar:px-[11px] max-[820px]:group-focus-within/sidebar:justify-start max-[820px]:group-focus-within/sidebar:px-[11px] ${
 										active === item.key
-											? "bg-[#fff2ec] font-bold text-[#d94710]"
+											? "bg-[#fff2ec] text-[#d94710]"
 											: "text-[#454b55] hover:bg-[#f4f5f7] hover:text-[#1f2329]"
 									}`}
 								>
-									<span className="grid size-[19px] place-items-center">
+									<span className="grid size-[19px] shrink-0 place-items-center">
 										{item.icon}
 									</span>
-									<span className="min-w-0 max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
+									<span className="min-w-0 flex-1 max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
 										<span className="block text-sm leading-tight">
 											{item.label}
 										</span>

@@ -40,9 +40,9 @@ export function Sidebar<TView extends string>({
 				type="button"
 				onClick={() => onOpenView(item.id)}
 				aria-current={isActive ? "page" : undefined}
-				className={`flex min-w-max items-center gap-2 rounded-md px-3 py-2 text-left transition-colors w-full ${
+				className={`flex min-w-max items-center gap-2 rounded-md px-3 py-2 text-left font-medium transition-colors w-full ${
 					isActive
-						? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+						? "bg-sidebar-accent text-sidebar-accent-foreground"
 						: "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
 				}`}
 			>
