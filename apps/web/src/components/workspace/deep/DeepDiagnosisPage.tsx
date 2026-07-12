@@ -1,6 +1,10 @@
 "use client";
 
-import { WorkspaceTaskFrame } from "@/components/workspace/WorkspaceTaskFrame";
+import { useRouter } from "next/navigation";
+import {
+	RedesignTopButton,
+	RedesignWorkspaceShell,
+} from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { DeepDiagnosisStepper } from "./DeepDiagnosisStepper";
 
@@ -10,29 +14,30 @@ interface DeepDiagnosisPageProps {
 
 export function DeepDiagnosisPage({ entryView = "deep" }: DeepDiagnosisPageProps) {
 	const handlers = useWorkspaceHandlers("chapter");
+	const router = useRouter();
 
 	return (
-		<WorkspaceTaskFrame
-			title="深度质检"
-			description="参考资料、评分标准和评分结果按步骤推进，证据链跟随评分结果展示。"
-			status={handlers.providerLabel}
-			taskNav={{
-				items: [
-					{
-						id: "deep-stepper",
-						label: "深度质检",
-						description: "依次完成参考、评分标准、评分结果",
-						meta: "当前",
-					},
-				],
-				activeId: "deep-stepper",
-				onChange: () => {},
-			}}
-			inspector={{
-				title: "步骤详情",
-				description: "点选具体证据后展示详情。",
-				sections: [],
-			}}
+		<RedesignWorkspaceShell
+			active="deep"
+			providerLabel={handlers.providerLabel}
+			crumb={
+				<>
+					诊断 / <b className="text-[#1f2329]">深度质检</b>
+				</>
+			}
+			topActions={
+				<>
+					<RedesignTopButton onClick={() => router.push("/project/current")}>
+						返回工作区
+					</RedesignTopButton>
+					<RedesignTopButton
+						variant="primary"
+						onClick={() => router.push("/settings/provider")}
+					>
+						AI 设置
+					</RedesignTopButton>
+				</>
+			}
 		>
 			<DeepDiagnosisStepper
 				entryView={entryView}
@@ -56,6 +61,6 @@ export function DeepDiagnosisPage({ entryView = "deep" }: DeepDiagnosisPageProps
 				diagnosisExampleOptions={handlers.diagnosisExampleOptions}
 				onUseExampleChapter={handlers.useExampleChapter}
 			/>
-		</WorkspaceTaskFrame>
+		</RedesignWorkspaceShell>
 	);
 }

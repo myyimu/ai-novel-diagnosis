@@ -68,10 +68,11 @@ describe("DeepDiagnosisStepper", () => {
 			/>,
 		);
 
-		expect(html).toContain("深度质检步骤");
+		expect(html).toContain("选参考样本并拆出标准信号");
 		expect(html).toContain("尚未提供参考资料");
 		expect(html).toContain("生成评分标准");
 		expect(html).toContain("开始评分");
+		expect(html).toContain("质检发现");
 		expect(html).not.toContain("右侧证据检查器");
 		expect(html).toContain("示例章节");
 	});

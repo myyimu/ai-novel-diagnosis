@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({
+		push: vi.fn(),
+	}),
+}));
+
 vi.mock("@/hooks/use-workspace-handlers", () => ({
 	useWorkspaceHandlers: () => ({
 		providerLabel: "本地演示",
@@ -35,8 +41,9 @@ describe("DeepDiagnosisPage", () => {
 		const html = renderToStaticMarkup(<DeepDiagnosisPage />);
 
 		expect(html).toContain("深度质检");
-		expect(html).toContain("参考资料、评分标准和评分结果按步骤推进");
-		expect(html).toContain("深度质检步骤");
+		expect(html).toContain("参考样本 → 标准 → 评分");
+		expect(html).toContain("选参考样本并拆出标准信号");
+		expect(html).toContain("质检发现");
 		expect(html).toContain("本地演示");
 		expect(html).not.toContain("步骤检查器");
 	});

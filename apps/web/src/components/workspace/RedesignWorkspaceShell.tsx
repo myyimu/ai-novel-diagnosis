@@ -2,17 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import {
-	BookOpen,
-	CircleDot,
-	Files,
-	History,
-	LibraryBig,
-	RefreshCw,
-	Search,
-	Settings,
-	Sparkles,
-} from "lucide-react";
+import { BookOpen, ListTree, Search, Settings, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -40,72 +30,55 @@ const navGroups: Array<{
 	items: Array<{
 		key: NavKey;
 		label: string;
+		description: string;
 		badge?: string;
 		href: string;
 		icon: ReactNode;
 	}>;
 }> = [
 	{
-		label: "诊断",
+		label: "工作区",
 		items: [
 			{
 				key: "quick",
-				label: "快速诊断",
+				label: "诊断",
+				description: "快速诊断与深度质检",
 				badge: "推荐",
 				href: "/diagnose/quick",
 				icon: <Sparkles className="size-[18px]" />,
 			},
 			{
-				key: "deep",
-				label: "深度质检",
-				href: "/diagnose/chapter",
-				icon: <Search className="size-[18px]" />,
-			},
-			{
-				key: "evidence",
-				label: "证据对照",
-				href: "/diagnose/chapter",
-				icon: <CircleDot className="size-[18px]" />,
-			},
-		],
-	},
-	{
-		label: "项目",
-		items: [
-			{
-				key: "revision",
-				label: "改稿复诊",
-				href: "/project/revisions",
-				icon: <RefreshCw className="size-[18px]" />,
-			},
-			{
 				key: "history",
-				label: "历史记录",
+				label: "我的书籍",
+				description: "章节、改稿和复诊资产",
 				href: "/project/current",
-				icon: <History className="size-[18px]" />,
+				icon: <ListTree className="size-[18px]" />,
 			},
-			{
-				key: "methodology",
-				label: "方法论卡片",
-				href: "/project/methodology",
-				icon: <LibraryBig className="size-[18px]" />,
-			},
-		],
-	},
-	{
-		label: "研究",
-		items: [
 			{
 				key: "book",
-				label: "整书拆解",
+				label: "研究",
+				description: "整书拆解与样本学习",
 				href: "/research/book",
 				icon: <BookOpen className="size-[18px]" />,
 			},
 			{
-				key: "compare",
-				label: "样本对比",
-				href: "/research/compare",
-				icon: <Files className="size-[18px]" />,
+				key: "settings",
+				label: "设置",
+				description: "模型、隐私和连接状态",
+				href: "/settings/provider",
+				icon: <Settings className="size-[18px]" />,
+			},
+		],
+	},
+	{
+		label: "进阶入口",
+		items: [
+			{
+				key: "deep",
+				label: "深度质检",
+				description: "参考样本 → 标准 → 评分",
+				href: "/diagnose/deep",
+				icon: <Search className="size-[18px]" />,
 			},
 		],
 	},
@@ -121,17 +94,17 @@ export function RedesignWorkspaceShell({
 	const router = useRouter();
 
 	return (
-		<div className="grid min-h-screen grid-cols-[236px_minmax(0,1fr)] bg-[#f6f7f9] text-[#1f2329] max-[780px]:block">
-			<aside className="sticky top-0 z-20 flex h-screen flex-col border-r border-[#e6e8eb] bg-white px-4 py-5 max-[780px]:hidden">
+		<div className="grid min-h-screen grid-cols-[236px_minmax(0,1fr)] bg-[#f6f7f9] text-[#1f2329] max-[820px]:grid-cols-[64px_minmax(0,1fr)]">
+			<aside className="group/sidebar sticky top-0 z-20 flex h-screen flex-col overflow-x-hidden border-r border-[#e6e8eb] bg-white px-4 py-5 transition-[width,box-shadow] duration-200 max-[820px]:w-16 max-[820px]:px-2 max-[820px]:hover:w-[236px] max-[820px]:hover:shadow-[12px_0_28px_rgba(22,28,36,.1)] max-[820px]:focus-within:w-[236px] max-[820px]:focus-within:shadow-[12px_0_28px_rgba(22,28,36,.1)]">
 				<button
 					type="button"
 					onClick={() => router.push("/project/current")}
-					className="mb-[18px] flex items-center gap-[11px] border-b border-[#e6e8eb] px-2 pb-[22px] text-left"
+					className="mb-[18px] flex items-center gap-[11px] border-b border-[#e6e8eb] px-2 pb-[22px] text-left max-[820px]:justify-center max-[820px]:px-0 max-[820px]:group-hover/sidebar:justify-start max-[820px]:group-hover/sidebar:px-2 max-[820px]:group-focus-within/sidebar:justify-start max-[820px]:group-focus-within/sidebar:px-2"
 				>
 					<div className="grid size-9 place-items-center rounded-[11px] bg-gradient-to-br from-[#ff7b3f] to-[#ff4f12] font-extrabold text-white shadow-[0_8px_20px_rgba(255,90,31,.23)]">
 						诊
 					</div>
-					<div>
+					<div className="max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
 						<strong className="block text-[15px] leading-tight">AI 网文诊断台</strong>
 						<span className="mt-0.5 block text-xs text-[#69707d]">先诊断，再改稿</span>
 					</div>
@@ -148,7 +121,8 @@ export function RedesignWorkspaceShell({
 									key={item.key}
 									type="button"
 									onClick={() => router.push(item.href)}
-									className={`flex min-h-[42px] w-full items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left transition ${
+									aria-label={item.label}
+									className={`flex min-h-[42px] w-full items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left transition max-[820px]:justify-center max-[820px]:px-2 max-[820px]:group-hover/sidebar:justify-start max-[820px]:group-hover/sidebar:px-[11px] max-[820px]:group-focus-within/sidebar:justify-start max-[820px]:group-focus-within/sidebar:px-[11px] ${
 										active === item.key
 											? "bg-[#fff2ec] font-bold text-[#d94710]"
 											: "text-[#454b55] hover:bg-[#f4f5f7] hover:text-[#1f2329]"
@@ -157,9 +131,16 @@ export function RedesignWorkspaceShell({
 									<span className="grid size-[19px] place-items-center">
 										{item.icon}
 									</span>
-									<span>{item.label}</span>
+									<span className="min-w-0 max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
+										<span className="block text-sm leading-tight">
+											{item.label}
+										</span>
+										<span className="mt-0.5 block text-[10px] font-medium leading-snug text-[#69707d]">
+											{item.description}
+										</span>
+									</span>
 									{item.badge ? (
-										<span className="ml-auto rounded-full bg-[#ffe0d1] px-[7px] py-px text-[11px] text-[#a54b24]">
+										<span className="ml-auto rounded-full bg-[#ffe0d1] px-[7px] py-px text-[11px] text-[#a54b24] max-[820px]:hidden max-[820px]:group-hover/sidebar:inline-flex max-[820px]:group-focus-within/sidebar:inline-flex">
 											{item.badge}
 										</span>
 									) : null}
@@ -170,36 +151,41 @@ export function RedesignWorkspaceShell({
 				))}
 
 				<div className="mt-auto grid gap-2.5">
-					<button
-						type="button"
-						onClick={() => router.push("/settings/provider")}
-						className={`flex min-h-[42px] w-full items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left transition ${
-							active === "settings"
-								? "bg-[#fff2ec] font-bold text-[#d94710]"
-								: "text-[#454b55] hover:bg-[#f4f5f7] hover:text-[#1f2329]"
-						}`}
-					>
-						<Settings className="size-[18px]" />
-						AI 与隐私设置
-					</button>
-					<div className="rounded-xl border border-[#e6e8eb] bg-[#fafafa] p-3">
-						<div className="flex items-center justify-between text-xs text-[#69707d]">
+					<div className="rounded-xl border border-[#e6e8eb] bg-[#fafafa] p-3 max-[820px]:px-2 max-[820px]:text-center max-[820px]:group-hover/sidebar:px-3 max-[820px]:group-hover/sidebar:text-left max-[820px]:group-focus-within/sidebar:px-3 max-[820px]:group-focus-within/sidebar:text-left">
+						<div className="flex items-center justify-between text-xs text-[#69707d] max-[820px]:justify-center max-[820px]:group-hover/sidebar:justify-between max-[820px]:group-focus-within/sidebar:justify-between">
 							<span>
 								<i className="mr-1.5 inline-block size-2 rounded-full bg-[#22a06b] shadow-[0_0_0_3px_rgba(34,160,107,.12)]" />
-								模型已连接
+								<span className="max-[820px]:hidden max-[820px]:group-hover/sidebar:inline max-[820px]:group-focus-within/sidebar:inline">
+									模型已连接
+								</span>
 							</span>
-							<span>本地</span>
+							<span className="max-[820px]:hidden max-[820px]:group-hover/sidebar:inline max-[820px]:group-focus-within/sidebar:inline">
+								本地
+							</span>
 						</div>
-						<div className="mt-1.5 truncate text-[13px] font-bold">{providerLabel}</div>
+						<div className="mt-1.5 truncate text-[13px] font-bold max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
+							{providerLabel}
+						</div>
+						<button
+							type="button"
+							onClick={() => router.push("/settings/provider")}
+							className="mt-2 min-h-8 w-full rounded-lg border border-[#d8dbe0] bg-white text-xs font-bold text-[#1f2329] max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block"
+						>
+							AI 设置
+						</button>
 					</div>
 				</div>
 			</aside>
 
 			<main className="min-w-0">
-				<header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-[#e6e8eb] bg-white/90 px-7 backdrop-blur max-[780px]:px-4">
-					<div className="min-w-0 text-[13px] text-[#69707d]">{crumb}</div>
-					<div className="flex items-center gap-[9px]">{topActions}</div>
-				</header>
+				{topActions ? (
+					<div className="flex items-center justify-between gap-4 px-7 pt-5 max-[820px]:px-4 max-[620px]:items-start max-[620px]:flex-col">
+						<div className="min-w-0 text-[13px] text-[#69707d]">{crumb}</div>
+						<div className="flex flex-wrap items-center justify-end gap-[9px]">
+							{topActions}
+						</div>
+					</div>
+				) : null}
 				{children}
 			</main>
 		</div>
