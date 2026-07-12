@@ -57,7 +57,7 @@
     "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-local.ps1",
     "start:local:mac": "bash ./scripts/start-local-mac.sh",
     "doctor": "node scripts/run-pnpm.cjs run ci && node scripts/run-pnpm.cjs run container:prepare && node scripts/run-pnpm.cjs run one:doctor",
-    "build": "node scripts/run-pnpm.cjs -r --if-present build",
+    "build": "node scripts/run-pnpm.cjs --filter web --filter api --filter @ai-novel-diagnosis/ai-core --if-present build",
     "lint": "node scripts/run-pnpm.cjs -r --if-present lint",
     "format": "node scripts/run-pnpm.cjs -r --if-present format",
     "typecheck": "node scripts/run-pnpm.cjs -r --if-present typecheck",
