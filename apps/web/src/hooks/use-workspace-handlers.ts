@@ -1562,6 +1562,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				}
 				setQuickReviewResult(cached.result);
 				setQuickReviewError(null);
+				rememberQuickReviewIteration(cached.result);
 				setStatus("已使用缓存的问题分析；如需让 AI 重新分析，请点“重新分析”。");
 				openQuickReviewChapter();
 				return;

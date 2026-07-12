@@ -71,6 +71,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 	const [customFocus, setCustomFocus] = useState("");
 
 	const isLoading = handlers.loading === "quick";
+	const hasQuickResult = Boolean(handlers.quickReviewResult);
 	const issues = useMemo(
 		() =>
 			Array.isArray(handlers.quickReviewResult?.issues)
@@ -180,10 +181,12 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 						</div>
 						<div>
 							<strong className="block text-xs">
-								生成诊断后会自动创建书籍和第一章
+								{hasQuickResult
+									? "当前分析已接入书籍工作区"
+									: "诊断完成后会接入当前书籍工作区"}
 							</strong>
 							<span className="mt-0.5 block text-[10px] text-[#69707d]">
-								诊断结果不会停留在临时页面，而会进入章节诊断、改稿和复诊工作区。
+								若当前书籍已存在，会更新章节诊断和改稿资产；不会重复创建一本书。
 							</span>
 						</div>
 					</div>
@@ -414,7 +417,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 							<div className="flex items-center justify-between gap-3.5 pt-[18px] max-[780px]:flex-col max-[780px]:items-stretch">
 								<div className="flex items-center gap-2 text-xs text-[#69707d]">
 									<ShieldCheck className="size-4" />
-									生成后自动保存为“书籍 &gt; 章节”，数据仅保存在当前浏览器。
+									生成后接入“书籍 &gt; 章节”，数据仅保存在当前浏览器。
 								</div>
 								<Button
 									onClick={handlers.runQuickExperience}
@@ -527,8 +530,8 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 			{isLoading ? (
 				<div className="fixed inset-0 z-50 grid place-items-center bg-[#f6f7f9]/90 backdrop-blur-sm">
 					<div className="w-[min(390px,calc(100%_-_30px))] rounded-[14px] border border-[#e6e8eb] bg-white p-[22px] shadow-[0_12px_34px_rgba(22,27,34,.07)]">
-						<h3 className="mb-[11px] text-base font-bold">正在创建书籍上下文</h3>
-						{["保存书籍", "创建第一章", "生成章节诊断", "打开章节工作区"].map(
+						<h3 className="mb-[11px] text-base font-bold">正在接入书籍工作区</h3>
+						{["保存诊断结果", "更新当前章节", "沉淀改稿资产", "打开章节工作区"].map(
 							(step, index) => (
 								<div
 									key={step}
