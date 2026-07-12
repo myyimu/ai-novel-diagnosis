@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 
-import { WorkspaceTaskFrame } from "@/components/workspace/WorkspaceTaskFrame";
-import type { ContextInspectorSection } from "@/components/workspace/ContextInspector";
+import {
+	RedesignTopButton,
+	RedesignWorkspaceShell,
+} from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
-import { ProviderSettings } from "./ProviderSettings";
-import type { TaskNavItem } from "@/components/workspace/TaskNav";
 import type { ProviderPresetId } from "@/stores/workspace-store";
+import { ProviderSettings } from "./ProviderSettings";
 
 export function SettingsWorkspace() {
+	const router = useRouter();
 	const {
 		provider: providerData,
 		providerLabel,
@@ -52,142 +54,95 @@ export function SettingsWorkspace() {
 		}));
 	};
 
-	const taskNavItems: TaskNavItem[] = useMemo(
-		() => [
-			{
-				id: "provider",
-				label: "AI 模型服务",
-				description: "配置模型服务、API Key 和测试连接",
-				meta: "当前",
-			},
-		],
-		[],
-	);
-
-	const inspectorSections: ContextInspectorSection[] = useMemo(
-		() => [
-			{
-				title: "当前配置",
-				description: "AI 模型服务配置状态",
-				fields: [
-					{
-						label: "模型服务",
-						value: providerLabel,
-						tone: "secondary",
-					},
-					{
-						label: "当前模型",
-						value: providerData.model || "未设置",
-						hint: isBackendFreeProvider
-							? "共享算力/本地演示"
-							: providerData.model || "需要配置",
-					},
-					{
-						label: "API Key",
-						value: providerData.apiKey
-							? "已配置"
-							: isBackendFreeProvider
-								? "无需配置"
-								: "未配置",
-						tone:
-							providerData.apiKey || isBackendFreeProvider ? "secondary" : "outline",
-					},
-				],
-			},
-			{
-				title: "配置历史",
-				description: "已保存的配置记录",
-				fields: [
-					{
-						label: "历史记录数",
-						value: `${providerConfigHistory.length} 条`,
-						tone: providerConfigHistory.length > 0 ? "secondary" : "outline",
-					},
-					{
-						label: "最近保存",
-						value:
-							providerConfigHistory.length > 0
-								? new Date(
-										providerConfigHistory[providerConfigHistory.length - 1]
-											.createdAt,
-									).toLocaleString()
-								: "无",
-					},
-				],
-			},
-			{
-				title: "页面信息",
-				description: "设置工作区页面信息",
-				fields: [
-					{
-						label: "当前路径",
-						value: "/settings/provider",
-						tone: "outline",
-					},
-					{
-						label: "布局模式",
-						value: "独立设置页",
-						hint: "不作为右栏常驻 Tab",
-					},
-					{
-						label: "数据存储",
-						value: "浏览器本地存储",
-						hint: "API Key 不会上传到后端",
-					},
-				],
-			},
-		],
-		[providerLabel, providerData, isBackendFreeProvider, providerConfigHistory],
-	);
+	const apiKeyState =
+		providerData.apiKey || isBackendFreeProvider
+			? isBackendFreeProvider
+				? "无需配置"
+				: "已配置"
+			: "未配置";
 
 	return (
-		<WorkspaceTaskFrame
-			title="设置工作区"
-			description="管理 AI 模型服务配置、诊断历史和系统设置"
-			status={providerLabel}
-			taskNav={{
-				items: taskNavItems,
-				activeId: "provider",
-				onChange: () => {},
-				title: "设置导航",
-				description: "选择要管理的设置项目",
-			}}
-			inspector={{
-				title: "设置上下文",
-				description: "当前设置页面的配置状态和信息",
-				sections: inspectorSections,
-				emptyState: (
-					<div className="space-y-2">
-						<p className="text-sm text-muted-foreground">暂无配置信息。</p>
-					</div>
-				),
-			}}
+		<RedesignWorkspaceShell
+			active="settings"
+			providerLabel={providerLabel}
+			crumb={
+				<>
+					工作区 / <b className="text-[#1f2329]">设置</b>
+				</>
+			}
+			topActions={
+				<>
+					<RedesignTopButton onClick={() => router.push("/project/current")}>
+						返回书籍列表
+					</RedesignTopButton>
+					<RedesignTopButton
+						variant="primary"
+						onClick={() => router.push("/diagnose/quick")}
+					>
+						开始诊断
+					</RedesignTopButton>
+				</>
+			}
 		>
-			<ProviderSettings
-				provider={providerData}
-				providerLabel={providerLabel}
-				isBackendFreeProvider={isBackendFreeProvider}
-				isLoading={loading === "provider"}
-				selectedProviderPreset={selectedProviderPreset}
-				providerConfigHistory={providerConfigHistory.map((item) => ({
-					id: item.id,
-					title: item.title,
-					createdAt: item.createdAt,
-					config: item.provider,
-				}))}
-				filteredProviderModelOptions={filteredProviderModelOptions}
-				providerModelsLoading={providerModelsLoading}
-				providerTestResult={providerTestResult}
-				onChangeProviderPreset={handleChangeProviderPreset}
-				onChangeProviderModel={handleChangeProviderModel}
-				onChangeProviderApiKey={handleChangeProviderApiKey}
-				onResetProviderSettings={handleResetProviderSettings}
-				onTestProvider={testProvider}
-				onLoadProviderModelOptions={loadProviderModelOptions}
-				onApplyProviderConfigHistory={applyProviderConfigHistory}
-				onDeleteProviderConfigHistory={deleteProviderConfigHistory}
-				onClearProviderConfigHistory={clearProviderConfigHistory}
-			/>
-		</WorkspaceTaskFrame>
+			<main className="mx-auto w-[min(1080px,calc(100%_-_48px))] py-[34px] pb-[70px] max-[820px]:w-[calc(100%_-_24px)] max-[820px]:py-[22px]">
+				<section className="mb-[22px] flex items-start justify-between gap-6 max-[720px]:block">
+					<div>
+						<h1 className="mb-1.5 text-[28px] font-bold leading-tight tracking-normal">
+							AI 设置
+						</h1>
+						<p className="max-w-[720px] text-sm leading-6 text-[#69707d]">
+							配置模型、Base URL 和密钥；诊断前先确认模型可用。API Key
+							只保存在当前浏览器。
+						</p>
+					</div>
+					<div className="rounded-full border border-[#cfe8dc] bg-[#eaf8f1] px-3 py-1 text-xs font-bold text-[#176e50] max-[720px]:mt-4 max-[720px]:inline-flex">
+						模型已连接
+					</div>
+				</section>
+
+				<section className="mb-4 grid gap-3 md:grid-cols-3">
+					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+						<span className="text-[11px] text-[#69707d]">当前服务</span>
+						<strong className="mt-1 block truncate text-sm">{providerLabel}</strong>
+					</div>
+					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+						<span className="text-[11px] text-[#69707d]">模型</span>
+						<strong className="mt-1 block truncate text-sm">
+							{providerData.model || "由服务端配置"}
+						</strong>
+					</div>
+					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+						<span className="text-[11px] text-[#69707d]">API Key</span>
+						<strong className="mt-1 block truncate text-sm">{apiKeyState}</strong>
+					</div>
+				</section>
+
+				<ProviderSettings
+					provider={providerData}
+					providerLabel={providerLabel}
+					isBackendFreeProvider={isBackendFreeProvider}
+					isLoading={loading === "provider"}
+					selectedProviderPreset={selectedProviderPreset}
+					providerConfigHistory={providerConfigHistory.map((item) => ({
+						id: item.id,
+						title: item.title,
+						createdAt: item.createdAt,
+						config: item.provider,
+					}))}
+					filteredProviderModelOptions={filteredProviderModelOptions}
+					providerModelsLoading={providerModelsLoading}
+					providerTestResult={providerTestResult}
+					onChangeProviderPreset={handleChangeProviderPreset}
+					onChangeProviderModel={handleChangeProviderModel}
+					onChangeProviderApiKey={handleChangeProviderApiKey}
+					onResetProviderSettings={handleResetProviderSettings}
+					onTestProvider={testProvider}
+					onLoadProviderModelOptions={loadProviderModelOptions}
+					onApplyProviderConfigHistory={applyProviderConfigHistory}
+					onDeleteProviderConfigHistory={deleteProviderConfigHistory}
+					onClearProviderConfigHistory={clearProviderConfigHistory}
+				/>
+			</main>
+		</RedesignWorkspaceShell>
 	);
 }
