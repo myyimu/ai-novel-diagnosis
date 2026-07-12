@@ -319,8 +319,37 @@ function ProjectChapterWorkspace({
 			: issues[0]?.id;
 	const annotatedParagraphs = buildAnnotatedParagraphs(chapterText, issues);
 	const workspaceGridRef = useRef<HTMLElement | null>(null);
+	const contentScrollRef = useRef<HTMLDivElement | null>(null);
+	const pendingTextScrollIssueIdRef = useRef<string | null>(null);
 	const [connectorPath, setConnectorPath] = useState<string | null>(null);
 	const activeIssue = issues.find((issue) => issue.id === activeIssueId);
+	const scrollIssueTextIntoView = useCallback((issueId: string) => {
+		const scroller = contentScrollRef.current;
+		const grid = workspaceGridRef.current;
+		if (!scroller || !grid) {
+			return false;
+		}
+
+		const anchor = grid.querySelector<HTMLElement>(
+			`[data-annotation-anchor="${CSS.escape(issueId)}"]`,
+		);
+		if (!anchor) {
+			return false;
+		}
+
+		const scrollerRect = scroller.getBoundingClientRect();
+		const anchorRect = anchor.getBoundingClientRect();
+		const targetTop =
+			scroller.scrollTop +
+			anchorRect.top -
+			scrollerRect.top -
+			Math.min(120, scrollerRect.height * 0.2);
+		scroller.scrollTo({
+			top: Math.max(0, targetTop),
+			behavior: "smooth",
+		});
+		return true;
+	}, []);
 	const updateConnector = useCallback(() => {
 		const grid = workspaceGridRef.current;
 		if (!grid || !activeIssueId || window.innerWidth <= 920) {
@@ -381,6 +410,12 @@ function ProjectChapterWorkspace({
 		if (state === "accepted") {
 			setIssueFilter("all");
 		}
+	}
+
+	function selectIssueFromCard(issueId: string) {
+		pendingTextScrollIssueIdRef.current = issueId;
+		setChapterTab("annotation");
+		setSelectedIssueId(issueId);
 	}
 
 	function openRewritePreview() {
@@ -452,6 +487,28 @@ function ProjectChapterWorkspace({
 			window.removeEventListener("resize", requestConnector);
 		};
 	}, [updateConnector, annotatedParagraphs.length, issues.length]);
+
+	useEffect(() => {
+		const issueId = pendingTextScrollIssueIdRef.current;
+		if (!issueId || chapterTab !== "annotation" || issueId !== activeIssueId) {
+			return;
+		}
+
+		let attempts = 0;
+		let frame = 0;
+		const tryScroll = () => {
+			attempts += 1;
+			if (scrollIssueTextIntoView(issueId) || attempts >= 3) {
+				pendingTextScrollIssueIdRef.current = null;
+				window.requestAnimationFrame(updateConnector);
+				return;
+			}
+			frame = window.requestAnimationFrame(tryScroll);
+		};
+
+		frame = window.requestAnimationFrame(tryScroll);
+		return () => window.cancelAnimationFrame(frame);
+	}, [activeIssueId, chapterTab, scrollIssueTextIntoView, updateConnector]);
 
 	return (
 		<div className="grid h-screen grid-rows-[62px_minmax(0,1fr)] overflow-hidden bg-[#f5f6f8] text-[#20242b]">
@@ -617,7 +674,10 @@ function ProjectChapterWorkspace({
 						</div>
 					</div>
 
-					<div className="min-h-0 flex-1 overflow-auto px-[28px] py-[14px] pb-[44px] max-[1180px]:px-[18px] max-lg:px-3">
+					<div
+						ref={contentScrollRef}
+						className="min-h-0 flex-1 overflow-auto px-[28px] py-[14px] pb-[44px] max-[1180px]:px-[18px] max-lg:px-3"
+					>
 						<div className="mx-auto w-[min(1040px,100%)]">
 							<nav className="sticky top-0 z-10 mb-2 flex items-center gap-1 overflow-x-auto rounded-[11px] border border-[#e8ebef] bg-white/95 p-1 shadow-[0_6px_18px_rgba(20,25,35,.045)] backdrop-blur">
 								{[
@@ -825,11 +885,11 @@ function ProjectChapterWorkspace({
 									return (
 										<article
 											key={issue.id || issue.title}
-											onClick={() => setSelectedIssueId(issue.id)}
+											onClick={() => selectIssueFromCard(issue.id)}
 											onKeyDown={(event) => {
 												if (event.key === "Enter" || event.key === " ") {
 													event.preventDefault();
-													setSelectedIssueId(issue.id);
+													selectIssueFromCard(issue.id);
 												}
 											}}
 											role="button"
