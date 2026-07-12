@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { diagnosisExampleOptions } from "@/lib/diagnosis-examples";
 import { hashString } from "@/lib/workspace-cache";
 import type { QuickReviewResult } from "@/stores/workspace-store";
+import * as textQuoteAnchor from "dom-anchor-text-quote";
 import { BookOpen, Download, FileText, FolderOpen, Lightbulb, Plus } from "lucide-react";
 
 type QuickReviewIssue = NonNullable<QuickReviewResult["issues"]>[number];
@@ -722,16 +723,13 @@ function ProjectChapterWorkspace({
 											{statusLabel}
 										</span>
 									</header>
-									<div className="font-serif text-base leading-[2.12] text-[#313741]">
+									<div className="font-serif text-[17px] leading-[2.02] text-[#313741]">
 										{annotatedParagraphs.length
 											? annotatedParagraphs.map((item, index) => (
 													<AnnotatedParagraph
-														key={`${index}-${item.issue?.id || "plain"}`}
+														key={`${index}-${item.markers.map((marker) => marker.issue.id).join("-") || "plain"}`}
 														annotation={item}
-														active={Boolean(
-															item.issue &&
-															item.issue.id === activeIssueId,
-														)}
+														activeIssueId={activeIssueId}
 														onFocusIssue={setSelectedIssueId}
 													/>
 												))
@@ -1384,67 +1382,96 @@ function ChapterStat({ label, value }: { label: string; value: string }) {
 
 type ParagraphAnnotation = {
 	paragraph: string;
-	issue?: QuickReviewIssue;
-	issueIndex?: number;
-	quote?: string;
+	markers: ParagraphIssueMarker[];
+};
+
+type ParagraphIssueMarker = {
+	issue: QuickReviewIssue;
+	issueIndex: number;
+	start?: number;
+	end?: number;
+};
+
+type ParagraphMatch = {
+	paragraphIndex: number;
+	start?: number;
+	end?: number;
 };
 
 function AnnotatedParagraph({
 	annotation,
-	active,
+	activeIssueId,
 	onFocusIssue,
 }: {
 	annotation: ParagraphAnnotation;
-	active: boolean;
+	activeIssueId?: string;
 	onFocusIssue: (issueId: string) => void;
 }) {
-	const { paragraph, issue, issueIndex, quote } = annotation;
+	const { paragraph, markers } = annotation;
 
-	if (!issue || issueIndex === undefined) {
-		return <p className="mb-[1.25em] text-justify last:mb-0">{paragraph}</p>;
+	if (!markers.length) {
+		return <p className="mb-[1.05em] text-left last:mb-0">{paragraph}</p>;
 	}
 
-	const quoteIndex = quote ? paragraph.indexOf(quote) : -1;
-	const anchorClass = getAnchorClass(issue.severity, active);
-	const anchorNumberClass = `ml-1 inline-grid size-[18px] place-items-center rounded-full bg-[#ff5a1f] align-[2px] font-sans text-[9px] font-black text-white transition ${
-		active ? "scale-110 shadow-[0_0_0_3px_rgba(255,90,31,.18)]" : ""
-	}`;
+	const inlineMarkers = markers
+		.filter((marker) => marker.start !== undefined && marker.end !== undefined)
+		.sort((left, right) => (left.start || 0) - (right.start || 0));
+	const renderedIssueIds = new Set<string>();
+	const nodes: ReactNode[] = [];
+	let cursor = 0;
+
+	inlineMarkers.forEach((marker) => {
+		const start = marker.start ?? -1;
+		const end = marker.end ?? -1;
+		if (start < cursor || end <= start) {
+			return;
+		}
+
+		const markerActive = marker.issue.id === activeIssueId;
+		const anchorClass = getAnchorClass(marker.issue.severity, markerActive);
+		nodes.push(paragraph.slice(cursor, start));
+		nodes.push(
+			<button
+				key={`quote-${marker.issue.id}`}
+				type="button"
+				onClick={() => onFocusIssue(marker.issue.id)}
+				data-annotation-anchor={marker.issue.id}
+				className={anchorClass}
+				title={marker.issue.title}
+			>
+				{paragraph.slice(start, end)}
+			</button>,
+		);
+		cursor = end;
+		renderedIssueIds.add(marker.issue.id);
+	});
+	nodes.push(paragraph.slice(cursor));
 
 	return (
-		<p className="mb-[1.25em] text-justify last:mb-0">
-			{quote && quoteIndex >= 0 ? (
-				<>
-					{paragraph.slice(0, quoteIndex)}
-					<button
-						type="button"
-						onClick={() => onFocusIssue(issue.id)}
-						data-annotation-anchor={issue.id}
-						className={anchorClass}
-						title={issue.title}
-					>
-						{quote}
-					</button>
-					{paragraph.slice(quoteIndex + quote.length)}
-				</>
-			) : (
-				<button
-					type="button"
-					onClick={() => onFocusIssue(issue.id)}
-					data-annotation-anchor={issue.id}
-					className={`${anchorClass} text-left`}
-					title={issue.title}
-				>
-					{paragraph}
-				</button>
-			)}
-			<button
-				type="button"
-				onClick={() => onFocusIssue(issue.id)}
-				className={anchorNumberClass}
-				aria-label={`查看诊断意见 ${issueIndex + 1}`}
-			>
-				{issueIndex + 1}
-			</button>
+		<p className="mb-[1.05em] text-left last:mb-0">
+			{nodes}
+			<span className="ml-1.5 inline-flex flex-wrap items-center gap-1 align-[2px]">
+				{markers.map((marker) => {
+					const markerActive = marker.issue.id === activeIssueId;
+					const anchorNumberClass = `inline-grid size-[18px] place-items-center rounded-full bg-[#ff5a1f] font-sans text-[9px] font-black text-white transition ${
+						markerActive ? "scale-110 shadow-[0_0_0_3px_rgba(255,90,31,.18)]" : ""
+					}`;
+					return (
+						<button
+							key={`number-${marker.issue.id}`}
+							type="button"
+							onClick={() => onFocusIssue(marker.issue.id)}
+							data-annotation-anchor={
+								renderedIssueIds.has(marker.issue.id) ? undefined : marker.issue.id
+							}
+							className={anchorNumberClass}
+							aria-label={`查看诊断意见 ${marker.issueIndex + 1}`}
+						>
+							{marker.issueIndex + 1}
+						</button>
+					);
+				})}
+			</span>
 		</p>
 	);
 }
@@ -1453,50 +1480,145 @@ function buildAnnotatedParagraphs(
 	chapterText: string,
 	issues: QuickReviewIssue[],
 ): ParagraphAnnotation[] {
-	const usedIssueIds = new Set<string>();
-	const paragraphs = chapterText
-		.trim()
-		.split(/\n\s*\n+/)
-		.map((paragraph) => paragraph.trim())
-		.filter(Boolean)
-		.slice(0, 8);
+	const paragraphs = splitChapterParagraphs(chapterText);
+	if (!paragraphs.length) {
+		return [];
+	}
 
-	return paragraphs.map((paragraph) => {
-		const matchedIssueIndex = issues.findIndex((issue) => {
-			if (usedIssueIds.has(issue.id)) {
-				return false;
-			}
+	const annotations: ParagraphAnnotation[] = paragraphs.map((paragraph) => ({
+		paragraph,
+		markers: [],
+	}));
+	const paragraphIndex = buildParagraphIndex(paragraphs);
 
-			return getEvidenceQuotes(issue).some((quote) => paragraph.includes(quote));
-		});
-
-		if (matchedIssueIndex < 0) {
-			return { paragraph };
+	issues.forEach((issue, issueIndex) => {
+		const match = findIssueParagraphMatch(issue, paragraphIndex, issueIndex, issues.length);
+		if (!match) {
+			return;
 		}
-
-		const issue = issues[matchedIssueIndex];
-		if (!issue) {
-			return { paragraph };
-		}
-
-		usedIssueIds.add(issue.id);
-		const quote = getEvidenceQuotes(issue).find((item) => paragraph.includes(item));
-
-		return {
-			paragraph,
+		annotations[match.paragraphIndex]?.markers.push({
 			issue,
-			issueIndex: matchedIssueIndex,
-			quote,
-		};
+			issueIndex,
+			start: match.start,
+			end: match.end,
+		});
 	});
+
+	return annotations;
 }
 
 function splitChapterParagraphs(chapterText: string) {
-	return chapterText
-		.trim()
-		.split(/\n\s*\n+/)
+	const text = chapterText.replace(/\r\n?/g, "\n").trim();
+	if (!text) {
+		return [];
+	}
+
+	const blocks = (/\n\s*\n/.test(text) ? text.split(/\n\s*\n+/) : text.split(/\n+/))
 		.map((paragraph) => paragraph.trim())
 		.filter(Boolean);
+
+	return blocks.flatMap(splitLongParagraph);
+}
+
+function buildParagraphIndex(paragraphs: string[]) {
+	const separator = "\n\n";
+	let cursor = 0;
+	const starts = paragraphs.map((paragraph) => {
+		const start = cursor;
+		cursor += paragraph.length + separator.length;
+		return start;
+	});
+
+	return {
+		fullText: paragraphs.join(separator),
+		paragraphs,
+		starts,
+	};
+}
+
+function splitLongParagraph(paragraph: string) {
+	const normalized = paragraph.replace(/[ \t]{2,}/g, " ").trim();
+	if (normalized.length <= 180) {
+		return [normalized];
+	}
+
+	const sentences = normalized.match(/[^。！？!?；;]+[。！？!?；;」”』】）)]*|[^。！？!?；;]+$/g);
+	if (!sentences?.length) {
+		return [normalized];
+	}
+
+	const chunks: string[] = [];
+	let current = "";
+	sentences.forEach((sentence) => {
+		const next = `${current}${sentence}`.trim();
+		if (current && next.length > 180) {
+			chunks.push(current);
+			current = sentence.trim();
+			return;
+		}
+		current = next;
+	});
+	if (current) {
+		chunks.push(current);
+	}
+
+	return chunks;
+}
+
+function findIssueParagraphMatch(
+	issue: QuickReviewIssue,
+	paragraphIndex: ReturnType<typeof buildParagraphIndex>,
+	issueIndex: number,
+	issueCount: number,
+): ParagraphMatch {
+	const { fullText } = paragraphIndex;
+	const quotes = getEvidenceQuotes(issue);
+	for (const quote of quotes) {
+		if (!quote.trim()) {
+			continue;
+		}
+
+		const position = textQuoteAnchor.toTextPosition(
+			{ textContent: fullText },
+			{ exact: quote.trim() },
+			{ hint: estimateIssueOffset(issueIndex, issueCount, fullText.length) },
+		);
+		if (position) {
+			const mapped = mapTextPositionToParagraph(position, paragraphIndex);
+			if (mapped) {
+				return mapped;
+			}
+		}
+	}
+
+	return {
+		paragraphIndex: Math.min(issueIndex, paragraphIndex.paragraphs.length - 1),
+	};
+}
+
+function mapTextPositionToParagraph(
+	position: { start: number; end: number },
+	paragraphIndex: ReturnType<typeof buildParagraphIndex>,
+): ParagraphMatch | null {
+	for (let index = 0; index < paragraphIndex.paragraphs.length; index += 1) {
+		const paragraph = paragraphIndex.paragraphs[index];
+		const startOffset = paragraphIndex.starts[index] ?? 0;
+		const endOffset = startOffset + paragraph.length;
+		if (position.start >= startOffset && position.start <= endOffset) {
+			const start = Math.max(0, position.start - startOffset);
+			const end = Math.min(paragraph.length, Math.max(position.end - startOffset, start));
+			return {
+				paragraphIndex: index,
+				start: end > start ? start : undefined,
+				end: end > start ? end : undefined,
+			};
+		}
+	}
+	return null;
+}
+
+function estimateIssueOffset(issueIndex: number, issueCount: number, textLength: number) {
+	return Math.round(((issueIndex + 0.5) / Math.max(issueCount, 1)) * textLength);
 }
 
 function getIssuePreviewParagraph(issue: QuickReviewIssue, paragraphs: string[]) {
