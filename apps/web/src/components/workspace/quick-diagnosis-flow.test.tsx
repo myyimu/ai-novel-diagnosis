@@ -60,7 +60,7 @@ describe("quick diagnosis fixture flow", () => {
 			/>,
 		);
 
-		expect(html).toContain("30 秒小说诊断");
+		expect(html).toContain("快速诊断一章");
 		expect(html).toContain(example.label);
 		expect(html).toContain(result.mainProblem);
 		expect(html).toContain(result.oneLineDiagnosis!);
@@ -68,7 +68,7 @@ describe("quick diagnosis fixture flow", () => {
 		expect(html).toContain("平均置信度");
 		expect(html).toContain(result.issues![0]!.title);
 		expect(html).toContain(result.issues![0]!.evidence[0]!.locationHint);
-		expect(html).toContain("可复制给写作 AI 的改稿 Prompt");
+		expect(html).toContain("可复制给写作 AI 的修改指令");
 		expect(html).toContain(result.nextPrompt!.prompt);
 		expect(html).toContain("可沉淀的方法论卡片");
 		expect(html).toContain(result.methodologyCards![0]!.title);

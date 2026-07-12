@@ -83,7 +83,7 @@ describe("OverviewView", () => {
 
 		expect(html).toContain("AI网文诊断台");
 		expect(html).toContain("先找出小说为什么没人追。");
-		expect(html).toContain("30 秒小说诊断");
+		expect(html).toContain("快速诊断一章");
 		expect(html).toContain("诊断闭环");
 		expect(html).toContain("需要理解流程时再展开看。");
 		expect(html).toContain("本地演示");

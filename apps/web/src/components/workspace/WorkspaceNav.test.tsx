@@ -24,7 +24,7 @@ describe("WorkspaceNav", () => {
 		const html = renderToStaticMarkup(<WorkspaceNav />);
 
 		expect((html.match(/border-primary text-primary/g) ?? []).length).toBe(1);
-		expect(html).toContain("项目");
+		expect(html).toContain("我的书籍");
 		expect(push).not.toHaveBeenCalled();
 	});
 });

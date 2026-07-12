@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { QuickDiagnosisCompose } from "./QuickDiagnosisCompose";
 
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({
+		push: vi.fn(),
+	}),
+}));
+
 const baseHandlers = {
 	provider: { kind: "mock" as const, model: "" },
 	providerLabel: "本地演示",
@@ -46,9 +52,9 @@ describe("QuickDiagnosisCompose", () => {
 		const html = renderToStaticMarkup(<QuickDiagnosisCompose handlers={baseHandlers} />);
 
 		expect(html).toContain("快速诊断");
-		expect(html).toContain("快速诊断一章");
-		expect(html).toContain("至少 50 字");
-		expect(html).toContain("自动判断");
+		expect(html).toContain("聚焦一个问题");
+		expect(html).toContain("输入稿件");
+		expect(html).toContain("复制修改指令");
 		expect(html).toContain("本地演示");
 		expect(html).toContain("章节诊断");
 		expect(html).not.toContain("书籍上传");
