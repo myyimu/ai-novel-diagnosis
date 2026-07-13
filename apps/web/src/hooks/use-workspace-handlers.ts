@@ -28,7 +28,6 @@ import {
 	requestRubric,
 	requestScoreChapter,
 	resumeBookAnalysisJob,
-	testProviderConnection,
 	updateRevisionSessionNote,
 	uploadBookPreview,
 	upsertRevisionAssets,
@@ -109,10 +108,12 @@ import {
 	type InferredReferenceProfile,
 } from "@/lib/workspace-utils";
 import {
+	type ProviderTestResultView,
+	useProviderConnection,
+} from "@/hooks/use-provider-connection";
+import {
 	type BookAnalysisResult,
 	type BookAnalysisJob,
-	type ProviderConfigHistoryEntry,
-	type ProviderForm,
 	type ProviderPresetId,
 	type QuickReviewResult,
 	type RubricResult,
@@ -139,16 +140,6 @@ export type LoadingState =
 	| "ask"
 	| "export"
 	| null;
-
-export interface ProviderTestResultView {
-	status: "success" | "error";
-	providerName: string;
-	modelName: string;
-	durationMs: number;
-	checkedAt: string;
-	message: string;
-	raw?: Record<string, unknown>;
-}
 
 const TEXT_FILE_DECODER_CANDIDATES = [
 	"utf-8",
@@ -253,7 +244,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const pathname = usePathname();
 	const {
 		provider,
-		setProvider,
 		providerConfigHistory,
 		setProviderConfigHistory,
 		referenceTitle,
@@ -312,6 +302,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewGenre,
 		quickReviewInputKind,
 		setQuickReviewInputKind,
+		quickReviewChapterPosition,
+		setQuickReviewChapterPosition,
+		quickReviewDiagnosticFocus,
+		setQuickReviewDiagnosticFocus,
 		quickReviewPreviousPrompt,
 		setQuickReviewPreviousPrompt,
 		quickReviewCoreSellingPoint,
@@ -320,6 +314,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewMustKeepMechanisms,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
+		saveQuickReviewMethodology,
+		setSaveQuickReviewMethodology,
 		rubricResult,
 		setRubricResult,
 		scoreResult,
@@ -372,6 +368,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		activeProjectId,
 		setActiveProjectId,
 	} = useWorkspaceStore();
+	const { providerConnection, setProviderWithHistory, testCurrentProvider } =
+		useProviderConnection();
 
 	/* ──────────── local state ──────────── */
 
@@ -384,9 +382,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const [newProjectName, setNewProjectName] = useState("");
 	const [providerModelsLoading, setProviderModelsLoading] = useState(false);
 	const [providerModelSearch, setProviderModelSearch] = useState("");
-	const [providerTestResult, setProviderTestResult] = useState<ProviderTestResultView | null>(
-		null,
-	);
 	const [loadedProviderModels, setLoadedProviderModels] = useState<{
 		key: string;
 		models: string[];
@@ -402,80 +397,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const platformStrategyTouchedRef = useRef(false);
 	const activeBookPollJobIdRef = useRef<string | null>(null);
 	const workspaceAssetsLoadedRef = useRef(false);
-
-	const PROVIDER_CONFIG_HISTORY_MAX_ENTRIES = 10;
-
-	function resolveStoreValue<T>(value: T | ((current: T) => T), current: T): T {
-		return typeof value === "function" ? (value as (current: T) => T)(current) : value;
-	}
-
-	function normalizeProviderConfig(provider: ProviderForm): ProviderForm {
-		return {
-			...provider,
-			baseUrl: (provider.baseUrl || "").trim(),
-			model: (provider.model || "").trim(),
-			apiKey: provider.apiKey || "",
-		};
-	}
-
-	function areProviderFormsEqual(left: ProviderForm, right: ProviderForm) {
-		return (
-			left.preset === right.preset &&
-			left.kind === right.kind &&
-			left.baseUrl === right.baseUrl &&
-			left.apiKey === right.apiKey &&
-			left.model === right.model &&
-			left.temperature === right.temperature &&
-			left.jsonMode === right.jsonMode
-		);
-	}
-
-	function pruneProviderConfigHistory(history: ProviderConfigHistoryEntry[]) {
-		return history
-			.filter((entry) => {
-				const timestamp = Date.parse(entry.createdAt);
-				return Boolean(entry?.id) && Number.isFinite(timestamp);
-			})
-			.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-			.slice(0, PROVIDER_CONFIG_HISTORY_MAX_ENTRIES);
-	}
-
-	function providerHistoryLabel(providerConfig: ProviderForm) {
-		const presetLabel = providerPresets[providerConfig.preset].label;
-		const modelText = providerConfig.model || "未设置模型";
-		const baseUrlText = providerConfig.baseUrl || "未设置 Base URL";
-		return `${presetLabel} · ${modelText} · ${baseUrlText}`;
-	}
-
-	function createProviderHistoryId() {
-		return `provider-config-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-	}
-
-	function setProviderWithHistory(
-		nextProvider: ProviderForm | ((current: ProviderForm) => ProviderForm),
-	) {
-		setProvider((current) => {
-			const nextValue = resolveStoreValue(nextProvider, current);
-			return normalizeProviderConfig(nextValue);
-		});
-	}
-
-	function rememberSuccessfulProviderConfig(providerConfig: ProviderForm) {
-		const normalized = normalizeProviderConfig(providerConfig);
-		const record: ProviderConfigHistoryEntry = {
-			id: createProviderHistoryId(),
-			createdAt: new Date().toISOString(),
-			title: providerHistoryLabel(normalized),
-			provider: normalized,
-		};
-
-		setProviderConfigHistory((history) => {
-			const withoutDuplicate = pruneProviderConfigHistory(history).filter(
-				(entry) => !areProviderFormsEqual(entry.provider, normalized),
-			);
-			return pruneProviderConfigHistory([record, ...withoutDuplicate]);
-		});
-	}
 
 	/* ──────────── progress controllers ──────────── */
 
@@ -601,6 +522,34 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setStatus(`已创建并切换到书籍：${project.name}`);
 		void upsertWorkspaceProject(project).catch(() => {
 			setStatus("书籍已在本地创建；后端暂时未同步成功。");
+		});
+	}
+
+	function syncActiveBookName(name: string) {
+		const trimmedName = name.trim();
+		if (!trimmedName) {
+			return;
+		}
+
+		const now = new Date().toISOString();
+		const projectId = activeProjectId || defaultWorkspaceProject.id;
+		const project: WorkspaceProject = activeProject
+			? { ...activeProject, id: projectId, name: trimmedName, updatedAt: now }
+			: { ...defaultWorkspaceProject, id: projectId, name: trimmedName, updatedAt: now };
+
+		setProjects((current) => {
+			const exists = current.some((item) => item.id === projectId);
+			if (!exists) {
+				return [project, ...current];
+			}
+
+			return current.map((item) =>
+				item.id === projectId ? { ...item, name: trimmedName, updatedAt: now } : item,
+			);
+		});
+		setActiveProjectId(projectId);
+		void upsertWorkspaceProject(project).catch(() => {
+			// 后端同步失败不阻塞本地书籍命名。
 		});
 	}
 
@@ -743,6 +692,19 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	});
 	const providerLabel =
 		provider.kind === "mock" ? "本地演示" : providerPresets[provider.preset].label;
+	const providerTestResult: ProviderTestResultView | null =
+		providerConnection.status === "success" || providerConnection.status === "error"
+			? {
+					status: providerConnection.status,
+					providerName: providerConnection.providerName || providerLabel,
+					modelName:
+						providerConnection.modelName ||
+						(provider.kind === "mock" ? "本地演示" : provider.model || "未指定模型"),
+					durationMs: providerConnection.durationMs,
+					checkedAt: providerConnection.checkedAt || new Date().toISOString(),
+					message: providerConnection.message,
+				}
+			: null;
 	const referenceProfileApplied = referenceProfileProgress.some(
 		(item) => item.id === "apply" && item.status === "completed",
 	);
@@ -882,10 +844,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			provider,
 			quickReviewGenre,
 			quickReviewInputKind,
+			quickReviewChapterPosition,
+			quickReviewDiagnosticFocus,
 			quickReviewPreviousPrompt,
 			quickReviewCoreSellingPoint,
 			quickReviewMustKeepMechanisms,
 			quickReviewTargetReaderPleasures,
+			includeMethodologyCards: saveQuickReviewMethodology,
 			chapterTitle,
 			chapterText,
 		});
@@ -981,14 +946,19 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const project: WorkspaceProject = activeProject
 			? { ...activeProject, updatedAt: now }
 			: { ...defaultWorkspaceProject, updatedAt: now };
-		const mergedCards = mergeProjectMethodologyCards({
-			projectId: activeProjectId,
-			currentCards: methodologyCards,
-			resultCards: result.methodologyCards,
-			result,
-			chapterTitle,
-			now,
-		});
+		const mergedCards = saveQuickReviewMethodology
+			? mergeProjectMethodologyCards({
+					projectId: activeProjectId,
+					currentCards: methodologyCards,
+					resultCards: result.methodologyCards,
+					result,
+					chapterTitle,
+					now,
+				})
+			: {
+					cards: methodologyCards,
+					cardIds: [],
+				};
 		const session = createRevisionSession({
 			projectId: activeProjectId,
 			chapterTitle,
@@ -998,7 +968,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			now,
 		});
 
-		setMethodologyCards(mergedCards.cards);
+		if (saveQuickReviewMethodology) {
+			setMethodologyCards(mergedCards.cards);
+		}
 		setRevisionSessions((current) => upsertRevisionSession(current, session));
 		setProjects((current) =>
 			current.map((project) =>
@@ -1008,9 +980,11 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		void upsertRevisionAssets({
 			project,
 			session,
-			methodologyCards: mergedCards.cards.filter(
-				(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
-			),
+			methodologyCards: saveQuickReviewMethodology
+				? mergedCards.cards.filter(
+						(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
+					)
+				: [],
 		})
 			.then(applyWorkspaceAssets)
 			.catch(() => {
@@ -1070,48 +1044,17 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	async function testProvider() {
 		setLoading("provider");
 		setStatus("正在测试模型服务...");
-		setProviderTestResult(null);
-		const timeoutMs = 120000;
-		const timeoutSignal = new Promise<never>((_, reject) => {
-			const timer = setTimeout(() => {
-				clearTimeout(timer);
-				reject(new Error("模型测试超时（120s），请检查网络或模型服务可用性。"));
-			}, timeoutMs);
-		});
-
 		try {
-			const startedAt = Date.now();
-			const result = await Promise.race([
-				testProviderConnection(providerPayload),
-				timeoutSignal,
-			]);
-			const providerName = providerPresets[provider.preset].label;
-			const modelName =
-				provider.kind === "mock"
-					? "本地演示"
-					: provider.model || String(result.model || "未指定模型");
-			const duration = Date.now() - startedAt;
-			rememberSuccessfulProviderConfig(providerPayload);
-			setProviderTestResult({
-				status: "success",
-				providerName,
-				modelName,
-				durationMs: duration,
-				checkedAt: new Date().toISOString(),
-				message: String(result.message || result.status || "模型服务连接成功。"),
-				raw: result,
-			});
-			setStatus(`模型服务可用：${providerName} · ${modelName}（${duration}ms）`);
+			const result = await testCurrentProvider();
+			if (result.status === "success") {
+				setStatus(
+					`模型服务可用：${result.providerName} · ${result.modelName}（${result.durationMs}ms）`,
+				);
+				return;
+			}
+			setStatus(`模型测试失败：${result.message}`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "模型测试失败，请稍后重试。";
-			setProviderTestResult({
-				status: "error",
-				providerName: providerPresets[provider.preset].label,
-				modelName: provider.kind === "mock" ? "本地演示" : provider.model || "未指定模型",
-				durationMs: 0,
-				checkedAt: new Date().toISOString(),
-				message,
-			});
 			setStatus(`模型测试失败：${message}`);
 		} finally {
 			setLoading(null);
@@ -1209,6 +1152,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setChapterText(example.chapterText);
 		setQuickReviewGenre(example.genre);
 		setQuickReviewInputKind(example.inputKind);
+		setQuickReviewChapterPosition("unknown");
+		setQuickReviewDiagnosticFocus("为什么没人追读");
 		setQuickReviewPreviousPrompt(example.previousPrompt);
 		setQuickReviewCoreSellingPoint("");
 		setQuickReviewMustKeepMechanisms("");
@@ -1231,6 +1176,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	function useExampleBook() {
 		setBookTitle("示例长篇小说");
+		syncActiveBookName("示例长篇小说");
 		setBookText(defaultBookText);
 		setBookUpload(null);
 		setBookAnalysisResult(null);
@@ -1607,15 +1553,22 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				chapterTitle,
 				quickReviewGenre,
 				quickReviewInputKind,
+				quickReviewChapterPosition,
+				quickReviewDiagnosticFocus,
 				quickReviewPreviousPrompt,
 				quickReviewCoreSellingPoint,
 				quickReviewMustKeepMechanisms,
 				quickReviewTargetReaderPleasures,
+				includeMethodologyCards: saveQuickReviewMethodology,
 			});
 			setQuickReviewResult(result);
 			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
-			setStatus(`问题分析完成：${result.quickScore}/10`);
+			setStatus(
+				typeof result.quickScore === "number"
+					? `问题分析完成：${result.quickScore}/10`
+					: "问题分析完成：信息不足，暂不评分。",
+			);
 			openQuickReviewChapter();
 		} catch (error) {
 			const message = toQuickReviewErrorMessage(error);
@@ -1862,6 +1815,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				bookGenre,
 			});
 			setBookUpload(upload);
+			syncActiveBookName(upload.title);
 			setStatus(`章节预览完成：${upload.chapterCount} 个章节片段`);
 			return upload;
 		} catch (error) {
@@ -1883,6 +1837,19 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			const { jobs, uploads } = await listBookHistory(10);
 			setBookHistory(jobs);
 			setUploadHistory(uploads);
+			const shouldRestoreLatestUpload = !bookFile && !bookText.trim() && !bookJob?.id;
+			const currentUpload = bookUpload?.id
+				? uploads.find((upload) => upload.id === bookUpload.id)
+				: undefined;
+			const fallbackUpload = shouldRestoreLatestUpload ? uploads[0] : undefined;
+
+			if (currentUpload) {
+				setBookUpload(currentUpload);
+			} else if (fallbackUpload) {
+				setBookUpload(fallbackUpload);
+			} else if (bookUpload?.id) {
+				setBookUpload(null);
+			}
 			if (!options?.silent) {
 				setStatus(`历史已加载：${jobs.length} 个任务，${uploads.length} 个上传`);
 			}
@@ -2017,6 +1984,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		try {
 			const job = await readBookAnalysisJob(jobId, true);
 			setBookJob(job);
+			syncActiveBookName(job.result?.book.title || job.inputSummary.title);
 			if (job.result) {
 				setBookAnalysisResult(job.result);
 			}
@@ -2074,7 +2042,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}
 
 		setBookFile(file);
-		setBookTitle(file.name.replace(/\.[^.]+$/, ""));
+		const title = file.name.replace(/\.[^.]+$/, "");
+		setBookTitle(title);
+		syncActiveBookName(title);
 		setBookUpload(null);
 		setBookAnalysisResult(null);
 		setBookJob(null);
@@ -2096,6 +2066,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	function handleChapterTextChange(value: string) {
 		chapterDraftTouchedRef.current = true;
 		setChapterText(value);
+	}
+
+	function handleBookTitleChange(value: string) {
+		setBookTitle(value);
+		if (value.trim()) {
+			syncActiveBookName(value);
+		}
 	}
 
 	function handleReferenceTextChange(value: string) {
@@ -2189,6 +2166,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		providerModelSearch,
 		setProviderModelSearch,
 		providerModelsLoading,
+		providerConnection,
 		providerTestResult,
 		selectedModelOption,
 		isBackendFreeProvider,
@@ -2242,6 +2220,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		/* chapter */
 		chapterTitle,
+		setChapterTitle,
 		chapterText,
 		chapterProjectSteps,
 		chapterCompletion,
@@ -2252,6 +2231,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewGenre,
 		quickReviewInputKind,
 		setQuickReviewInputKind,
+		quickReviewChapterPosition,
+		setQuickReviewChapterPosition,
+		quickReviewDiagnosticFocus,
+		setQuickReviewDiagnosticFocus,
 		quickReviewPreviousPrompt,
 		setQuickReviewPreviousPrompt,
 		quickReviewCoreSellingPoint,
@@ -2260,6 +2243,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewMustKeepMechanisms,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
+		saveQuickReviewMethodology,
+		setSaveQuickReviewMethodology,
 		quickReviewResult,
 		previousQuickReviewResult,
 		quickReviewElapsedSeconds,
@@ -2275,7 +2260,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		/* book */
 		bookTitle,
-		setBookTitle,
+		setBookTitle: handleBookTitleChange,
 		bookGenre,
 		setBookGenre,
 		bookText,

@@ -5,12 +5,17 @@ import type {
 	CachedQuickReview,
 	CachedRubricResult,
 	CachedScoreResult,
+	ChapterPosition,
 	ProviderForm,
 	QuickReviewInputKind,
 	QuickReviewResult,
 	RubricResult,
 	ScoreResult,
 } from "@/stores/workspace-store";
+import {
+	QUICK_REVIEW_PROMPT_VERSION,
+	QUICK_REVIEW_SAMPLING_VERSION,
+} from "@ai-novel-diagnosis/ai-core";
 
 export function hashString(value: string): string {
 	let hash = 0;
@@ -38,31 +43,42 @@ export function buildQuickReviewCacheKey({
 	provider,
 	quickReviewGenre,
 	quickReviewInputKind,
+	quickReviewChapterPosition,
+	quickReviewDiagnosticFocus,
 	quickReviewPreviousPrompt,
 	quickReviewCoreSellingPoint,
 	quickReviewMustKeepMechanisms,
 	quickReviewTargetReaderPleasures,
+	includeMethodologyCards,
 	chapterTitle,
 	chapterText,
 }: {
 	provider: ProviderForm;
 	quickReviewGenre: string;
 	quickReviewInputKind?: QuickReviewInputKind;
+	quickReviewChapterPosition?: ChapterPosition;
+	quickReviewDiagnosticFocus?: string;
 	quickReviewPreviousPrompt?: string;
 	quickReviewCoreSellingPoint?: string;
 	quickReviewMustKeepMechanisms?: string;
 	quickReviewTargetReaderPleasures?: string;
+	includeMethodologyCards?: boolean;
 	chapterTitle: string;
 	chapterText: string;
 }) {
 	return [
 		buildProviderCacheFingerprint(provider),
+		QUICK_REVIEW_PROMPT_VERSION,
+		QUICK_REVIEW_SAMPLING_VERSION,
 		quickReviewGenre || "auto",
 		quickReviewInputKind || "human-draft",
+		quickReviewChapterPosition || "unknown",
+		hashString((quickReviewDiagnosticFocus || "").trim()),
 		hashString((quickReviewPreviousPrompt || "").trim()),
 		hashString((quickReviewCoreSellingPoint || "").trim()),
 		hashString((quickReviewMustKeepMechanisms || "").trim()),
 		hashString((quickReviewTargetReaderPleasures || "").trim()),
+		includeMethodologyCards ? "methodology-on" : "methodology-off",
 		chapterTitle.trim(),
 		hashString(chapterText.trim()),
 	].join("|");

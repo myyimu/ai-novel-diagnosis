@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { ClipboardEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,16 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
-import type { QuickReviewResult } from "@/stores/workspace-store";
+import {
+	looksLikeMarkdownText,
+	markdownToPlainText,
+	replaceTextSelection,
+} from "@/lib/pasted-text";
+import type {
+	ChapterPosition,
+	QuickReviewResult,
+	WorkspaceProject,
+} from "@/stores/workspace-store";
 import { CheckCircle2, Clipboard, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
 
 type QuickIssue = NonNullable<QuickReviewResult["issues"]>[number];
@@ -26,15 +35,20 @@ interface QuickDiagnosisHandlers {
 	previousQuickReviewResult: QuickReviewResult | null;
 	quickReviewGenre: string;
 	quickReviewInputKind: import("@/stores/workspace-store").QuickReviewInputKind;
+	quickReviewChapterPosition: ChapterPosition;
+	quickReviewDiagnosticFocus: string;
 	quickReviewPreviousPrompt: string;
 	quickReviewCoreSellingPoint: string;
 	quickReviewMustKeepMechanisms: string;
 	quickReviewTargetReaderPleasures: string;
+	saveQuickReviewMethodology: boolean;
 	chapterText: string;
 	chapterTitle: string;
+	activeProject?: WorkspaceProject;
 	projectRevisionSessions: import("@/stores/workspace-store").RevisionSession[];
 	projectMethodologyCards: import("@/stores/workspace-store").ProjectMethodologyCard[];
 	bookTitle: string;
+	setBookTitle: (value: string) => void;
 	bookGenre: string;
 	bookText: string;
 	bookFile: File | null;
@@ -45,10 +59,14 @@ interface QuickDiagnosisHandlers {
 	setQuickReviewInputKind: (
 		value: import("@/stores/workspace-store").QuickReviewInputKind,
 	) => void;
+	setQuickReviewChapterPosition: (value: ChapterPosition) => void;
+	setQuickReviewDiagnosticFocus: (value: string) => void;
 	setQuickReviewPreviousPrompt: (value: string) => void;
 	setQuickReviewCoreSellingPoint: (value: string) => void;
 	setQuickReviewMustKeepMechanisms: (value: string) => void;
 	setQuickReviewTargetReaderPleasures: (value: string) => void;
+	setSaveQuickReviewMethodology: (value: boolean) => void;
+	setChapterTitle: (value: string) => void;
 	runQuickExperience: () => void;
 	useExampleChapter: (exampleId: string) => void;
 	openView: (view: "provider" | "chapter" | "book") => void;
@@ -69,8 +87,7 @@ const focusOptions = [
 
 export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) {
 	const router = useRouter();
-	const [activeFocus, setActiveFocus] = useState(focusOptions[0]);
-	const [customFocus, setCustomFocus] = useState("");
+	const [bookTitleFocused, setBookTitleFocused] = useState(false);
 
 	const isLoading = handlers.loading === "quick";
 	const hasQuickResult = Boolean(handlers.quickReviewResult);
@@ -90,14 +107,16 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 				: [],
 		[handlers.quickReviewResult],
 	);
-	const focusValue = customFocus.trim() || activeFocus;
-	const chapterTitle = handlers.chapterTitle.trim() || "第一章：失去资格";
-	const bookName = handlers.bookTitle.trim() || "未命名书籍";
+	const focusValue = handlers.quickReviewDiagnosticFocus.trim() || focusOptions[0];
+	const activeFocus = focusOptions.includes(focusValue) ? focusValue : "";
+	const customFocus = activeFocus ? "" : focusValue;
+	const fallbackBookName = handlers.activeProject?.name.trim() || "默认书籍";
+	const bookName = bookTitleFocused ? handlers.bookTitle : handlers.bookTitle || fallbackBookName;
 	const charCount = handlers.chapterText.trim().length;
 	const quickScore =
 		typeof handlers.quickReviewResult?.quickScore === "number"
 			? handlers.quickReviewResult.quickScore.toFixed(1)
-			: "5.8";
+			: "信息不足";
 	const confidence =
 		typeof handlers.quickReviewResult?.confidence === "number"
 			? `${Math.round(handlers.quickReviewResult.confidence * 100)}%`
@@ -105,14 +124,25 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 	const rewritePrompt = buildRewritePrompt(handlers.quickReviewResult);
 
 	const chooseFocus = (focus: string) => {
-		setActiveFocus(focus);
-		setCustomFocus("");
-		handlers.setQuickReviewCoreSellingPoint(focus);
+		handlers.setQuickReviewDiagnosticFocus(focus);
 	};
 
 	const setCustom = (value: string) => {
-		setCustomFocus(value);
-		handlers.setQuickReviewCoreSellingPoint(value || activeFocus);
+		handlers.setQuickReviewDiagnosticFocus(value || activeFocus || focusOptions[0]);
+	};
+
+	const handleBookTitleFocus = () => {
+		setBookTitleFocused(true);
+		if (!handlers.bookTitle.trim()) {
+			handlers.setBookTitle(fallbackBookName);
+		}
+	};
+
+	const handleBookTitleBlur = () => {
+		setBookTitleFocused(false);
+		if (!handlers.bookTitle.trim()) {
+			handlers.setBookTitle("默认书籍");
+		}
 	};
 
 	const loadFirstExample = () => {
@@ -120,6 +150,31 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 		if (first) {
 			handlers.useExampleChapter(first.id);
 		}
+	};
+
+	const handleChapterTextPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+		const pastedText = event.clipboardData.getData("text");
+		if (!looksLikeMarkdownText(pastedText)) {
+			return;
+		}
+
+		const shouldConvert = window.confirm(
+			"检测到你粘贴的内容像 Markdown，是否自动转换为纯正文？",
+		);
+		if (!shouldConvert) {
+			return;
+		}
+
+		event.preventDefault();
+		const target = event.currentTarget;
+		const convertedText = markdownToPlainText(pastedText);
+		const nextText = replaceTextSelection(
+			handlers.chapterText,
+			convertedText,
+			target.selectionStart,
+			target.selectionEnd,
+		);
+		handlers.handleChapterTextChange(nextText);
 	};
 
 	return (
@@ -197,6 +252,27 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 					</RedesignTopButton>
 				</section>
 
+				<section className="mb-4 rounded-[11px] border border-[#e6e8eb] bg-white px-[15px] py-[13px] shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+					<label className="flex cursor-pointer items-start gap-3">
+						<input
+							type="checkbox"
+							checked={handlers.saveQuickReviewMethodology}
+							onChange={(event) =>
+								handlers.setSaveQuickReviewMethodology(event.target.checked)
+							}
+							className="mt-1 size-4 accent-[#ff5a1f]"
+						/>
+						<span className="min-w-0">
+							<strong className="block text-xs text-[#303640]">
+								保存可复用方法论卡
+							</strong>
+							<span className="mt-0.5 block text-[10px] leading-5 text-[#69707d]">
+								默认只保存本章诊断和改稿 Prompt；勾选后才把本次结论写入“方法论库”。
+							</span>
+						</span>
+					</label>
+				</section>
+
 				<section className="grid items-start gap-5 [grid-template-columns:minmax(0,1.55fr)_minmax(330px,.75fr)] max-[1100px]:grid-cols-1">
 					<div className="rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 						<header className="flex items-start justify-between gap-4 border-b border-[#e6e8eb] px-5 py-[18px] pb-3.5">
@@ -221,11 +297,15 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 									</span>
 									<input
 										value={bookName}
-										readOnly
+										onFocus={handleBookTitleFocus}
+										onBlur={handleBookTitleBlur}
+										onChange={(event) =>
+											handlers.setBookTitle(event.target.value)
+										}
 										className="min-h-[42px] w-full rounded-[10px] border border-[#d8dbe0] bg-white px-3 text-sm outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 									/>
 									<small className="text-[#69707d]">
-										可以先使用默认名称，进入小说工作台后再修改。
+										修改后会同步到“我的书籍”的当前书籍名。
 									</small>
 								</label>
 
@@ -247,6 +327,27 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 										<option value="ai-draft">AI 生成初稿</option>
 										<option value="outline">故事大纲</option>
 										<option value="idea">创意 / 脑洞</option>
+									</select>
+								</label>
+
+								<label className="grid gap-[7px]">
+									<span className="text-xs font-bold text-[#4d535d]">
+										章节位置
+									</span>
+									<select
+										value={handlers.quickReviewChapterPosition}
+										onChange={(event) =>
+											handlers.setQuickReviewChapterPosition(
+												event.target.value as ChapterPosition,
+											)
+										}
+										className="min-h-[42px] w-full rounded-[10px] border border-[#d8dbe0] bg-white px-3 text-sm outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
+									>
+										<option value="unknown">暂不确定</option>
+										<option value="first">第一章</option>
+										<option value="early">前期章节</option>
+										<option value="middle">中段章节</option>
+										<option value="final">收束章节</option>
 									</select>
 								</label>
 
@@ -337,8 +438,11 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 										</small>
 									</span>
 									<input
-										value={chapterTitle}
-										readOnly
+										value={handlers.chapterTitle}
+										onChange={(event) =>
+											handlers.setChapterTitle(event.target.value)
+										}
+										placeholder="不填则按诊断结果自动命名章节"
 										className="min-h-[42px] w-full rounded-[10px] border border-[#d8dbe0] bg-white px-3 text-sm outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 									/>
 								</label>
@@ -351,6 +455,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 											onChange={(event) =>
 												handlers.handleChapterTextChange(event.target.value)
 											}
+											onPaste={handleChapterTextPaste}
 											placeholder="粘贴第一章或待诊断片段。建议 1500-6000 字。"
 											className="min-h-80 w-full resize-y rounded-[10px] border border-[#d8dbe0] bg-white px-3.5 py-[13px] text-sm leading-7 outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 										/>
@@ -381,7 +486,22 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 											className="min-h-[110px] w-full resize-y rounded-[10px] border border-[#d8dbe0] bg-white px-3.5 py-[13px] text-sm leading-7 outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 										/>
 									</label>
-									<div className="grid grid-cols-2 gap-3.5 max-[780px]:grid-cols-1">
+									<div className="grid grid-cols-3 gap-3.5 max-[980px]:grid-cols-1">
+										<label className="grid gap-[7px]">
+											<span className="text-xs font-bold text-[#4d535d]">
+												核心卖点
+											</span>
+											<input
+												value={handlers.quickReviewCoreSellingPoint}
+												onChange={(event) =>
+													handlers.setQuickReviewCoreSellingPoint(
+														event.target.value,
+													)
+												}
+												placeholder="例如：拒绝权力的反差爽感"
+												className="min-h-[42px] rounded-[10px] border border-[#d8dbe0] px-3 text-sm outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
+											/>
+										</label>
 										<label className="grid gap-[7px]">
 											<span className="text-xs font-bold text-[#4d535d]">
 												必须保留机制
@@ -532,21 +652,21 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 			{isLoading ? (
 				<div className="fixed inset-0 z-50 grid place-items-center bg-[#f6f7f9]/90 backdrop-blur-sm">
 					<div className="w-[min(390px,calc(100%_-_30px))] rounded-[14px] border border-[#e6e8eb] bg-white p-[22px] shadow-[0_12px_34px_rgba(22,27,34,.07)]">
-						<h3 className="mb-[11px] text-base font-bold">正在接入书籍工作区</h3>
-						{["保存诊断结果", "更新当前章节", "沉淀改稿资产", "打开章节工作区"].map(
-							(step, index) => (
-								<div
-									key={step}
-									className={`py-[7px] text-[11px] ${
-										index <= loadingStep(handlers.quickReviewElapsedSeconds)
-											? "font-bold text-[#2f6feb]"
-											: "text-[#69707d]"
-									}`}
-								>
-									{index + 1}. {step}
-								</div>
-							),
-						)}
+						<h3 className="mb-[11px] text-base font-bold">正在生成问题分析</h3>
+						<div className="flex items-start gap-3 rounded-[11px] border border-[#d8e2f6] bg-[#edf4ff] p-3 text-xs leading-5 text-[#405a85]">
+							<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+							<div>
+								<strong className="block text-[#2f5faa]">
+									等待模型返回结果
+								</strong>
+								<span className="mt-0.5 block">
+									已等待 {handlers.quickReviewElapsedSeconds} 秒。返回后会保存本章诊断，并打开章节工作区。
+								</span>
+							</div>
+						</div>
+						<div className="mt-3 rounded-[10px] border border-[#e6e8eb] bg-[#fbfcfd] px-3 py-2 text-[11px] leading-5 text-[#69707d]">
+							方法论卡{handlers.saveQuickReviewMethodology ? "会" : "不会"}自动保存。
+						</div>
 					</div>
 				</div>
 			) : null}
@@ -581,7 +701,9 @@ function ResultSection({
 						<div className="grid size-24 place-items-center rounded-full bg-[conic-gradient(#ff5a1f_0_58%,#eceef1_58%_100%)] p-2">
 							<div className="grid size-20 place-items-center rounded-full bg-white text-center leading-none">
 								<strong className="block text-[25px]">{quickScore}</strong>
-								<span className="text-[11px] text-[#69707d]">/ 10</span>
+								<span className="text-[11px] text-[#69707d]">
+									{typeof result.quickScore === "number" ? "/ 10" : "暂不评分"}
+								</span>
 							</div>
 						</div>
 						<div>
@@ -627,6 +749,12 @@ function ResultSection({
 									</div>
 								))}
 							</div>
+							{result.analysisScope?.isPartial ? (
+								<div className="mt-3 rounded-[10px] border border-[#f5d9a8] bg-[#fff7e6] px-3 py-2 text-[11px] leading-5 text-[#7f4a0c]">
+									本次只检查了开头和结尾：原文 {result.analysisScope.originalCharacters} 字，
+									采样 {result.analysisScope.sampledCharacters} 字，中段未完整诊断。
+								</div>
+							) : null}
 						</div>
 					</div>
 
@@ -771,7 +899,7 @@ function ResultSection({
 								variant="outline"
 								className="w-full rounded-[9px] border-[#d8dbe0]"
 							>
-								保存到项目
+								保存到书籍
 							</Button>
 							<Button
 								variant="outline"
@@ -825,19 +953,13 @@ function SectionCard({
 	);
 }
 
-function loadingStep(elapsedSeconds: number) {
-	if (elapsedSeconds >= 12) return 3;
-	if (elapsedSeconds >= 8) return 2;
-	if (elapsedSeconds >= 4) return 1;
-	return 0;
-}
-
 function formatGateLabel(gate: string | undefined) {
 	const map: Record<string, string> = {
 		continue: "Continue",
 		revise: "Revise",
 		rebuild: "Rebuild",
 		discard: "Discard",
+		insufficient: "Insufficient",
 	};
 
 	return map[gate || ""] || "Revise";

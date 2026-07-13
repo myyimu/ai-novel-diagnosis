@@ -63,7 +63,7 @@ export class TextPreprocessorService {
     maxChapterChars: number,
   ): ChapterSegment[] {
     const headingPattern =
-      /^\s*((?:第[零〇一二两三四五六七八九十百千万\d]+[章节回卷部集][^\n]{0,60})|(?:Chapter\s+\d+[^\n]{0,60})|(?:\d{1,4}[、.．]\s*[^\n]{1,60}))\s*$/gim;
+      /^\s*(?:#{1,6}\s*)?((?:第\s*[零〇一二两三四五六七八九十百千万\d]+\s*[章节回卷部集][^\n]{0,60})|(?:章节\s*[零〇一二两三四五六七八九十百千万\d]+[^\n]{0,60})|(?:Chapter\s+\d+[^\n]{0,60})|(?:\d{1,4}[、.．]\s*[^\n]{1,60}))\s*$/gim;
     const matches = [...text.matchAll(headingPattern)].filter(
       (match) => match.index !== undefined,
     );

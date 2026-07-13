@@ -98,16 +98,46 @@ const providerPresets: ProviderPresetWithId[] = [
         url: "https://ark.cn-beijing.volces.com/api/v3",
       },
       {
-        label: "火山方舟 Coding",
+        label: "火山方舟 Coding Plan",
         url: "https://ark.cn-beijing.volces.com/api/coding/v3",
       },
       {
-        label: "火山方舟 Plan",
+        label: "火山方舟 Plan 套餐",
         url: "https://ark.cn-beijing.volces.com/api/plan/v3",
       },
     ],
     model: "doubao-seed-1-6",
     modelOptions: ["doubao-seed-1-6"],
+    jsonMode: false,
+    needsApiKey: true,
+  },
+  {
+    id: "zhipu",
+    label: "智谱",
+    kind: "openai-compatible",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    baseUrlOptions: [
+      {
+        label: "智谱标准推理",
+        url: "https://open.bigmodel.cn/api/paas/v4",
+      },
+      {
+        label: "智谱 Coding Plan",
+        url: "https://open.bigmodel.cn/api/coding/paas/v4",
+      },
+    ],
+    model: "glm-5.2",
+    modelOptions: [
+      "glm-5.2",
+      "glm-5-turbo",
+      "glm-4.7",
+      "glm-5.2-air",
+      "glm-4.6",
+      "glm-4.5",
+      "glm-4.5-air",
+      "glm-4.5-x",
+      "glm-4-flash-250414",
+    ],
     jsonMode: false,
     needsApiKey: true,
   },
@@ -218,8 +248,9 @@ const defaultSharedGpuFallback = {
 };
 
 // Shared/public providers often queue for a while during book-scale analysis.
-// Keep the default generous, while still allowing env override per deployment.
-const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
+// Match the web proxy ceiling so the API service does not give up first.
+// Deployments can still override this via PROVIDER_REQUEST_TIMEOUT_MS.
+const DEFAULT_PROVIDER_TIMEOUT_MS = 600_000;
 const MAX_ERROR_BODY_LENGTH = 1_000;
 const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 
@@ -989,7 +1020,7 @@ export class ModelProviderService {
             ? `连接测试在 ${Math.round(
                 timeoutMs / 1000,
               )} 秒内无响应：检查 baseUrl 是否能正常访问，或换一个更快的 provider。`
-            : "Provider request timed out. Retry later, switch to a faster provider, or raise PROVIDER_REQUEST_TIMEOUT_MS.";
+            : "当前模型可能在排队，可稍后重试或切换；如需更长等待时间，可调大 PROVIDER_REQUEST_TIMEOUT_MS。";
         throw new BadRequestException(hint);
       }
       throw error;

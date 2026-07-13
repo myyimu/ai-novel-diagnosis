@@ -6,18 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ProviderTestResultView } from "@/hooks/use-workspace-handlers";
+import type { ProviderTestResultView } from "@/hooks/use-provider-connection";
 import { providerPresetOptions } from "@/lib/provider-presets";
 import { cn } from "@/lib/utils";
-import {
-	CheckCircle2,
-	ChevronDown,
-	KeyRound,
-	Loader2,
-	ShieldAlert,
-	Settings,
-	XCircle,
-} from "lucide-react";
+import { CheckCircle2, ChevronDown, Loader2, ShieldAlert, XCircle } from "lucide-react";
 
 interface ProviderSettingsProps {
 	provider: {
@@ -40,7 +32,7 @@ interface ProviderSettingsProps {
 		id: string;
 		title: string;
 		createdAt: string;
-		config: any;
+		config: unknown;
 	}>;
 	filteredProviderModelOptions: string[];
 	providerModelsLoading: boolean;
@@ -53,10 +45,10 @@ interface ProviderSettingsProps {
 	onResetProviderSettings: () => void;
 	onTestProvider: () => void;
 	onLoadProviderModelOptions: () => void;
+	onConfirmProviderChange: () => void;
 	onApplyProviderConfigHistory: (historyId: string) => void;
 	onDeleteProviderConfigHistory: (historyId: string) => void;
 	onClearProviderConfigHistory: () => void;
-	onOpenModel?: () => void;
 }
 
 const formControlClass =
@@ -73,13 +65,63 @@ const primaryButtonClass =
 const secondaryButtonClass =
 	"min-h-[36px] rounded-[9px] border-[#d8dbe0] bg-white px-3 font-bold text-[#1f2329] hover:border-[#bec3cb] hover:bg-[#fafafa] focus-visible:ring-[#ff5a1f]/20 focus-visible:ring-offset-0";
 
-function baseUrlOptionClass(active: boolean) {
+function isPlanBaseUrlOption(option: { label: string; url: string }) {
+	const text = `${option.label} ${option.url}`.toLowerCase();
+	return text.includes("plan") || text.includes("/coding/");
+}
+
+function baseUrlOptionClass(active: boolean, option: { label: string; url: string }) {
+	const isPlanOption = isPlanBaseUrlOption(option);
+	if (active && isPlanOption) {
+		return "h-8 rounded-full border-[#7c3aed] bg-[#7c3aed] px-3 text-xs font-bold text-white shadow-[0_5px_12px_rgba(124,58,237,.16)] hover:border-[#6d28d9] hover:bg-[#6d28d9] focus-visible:ring-[#7c3aed]/20 focus-visible:ring-offset-0";
+	}
+	if (isPlanOption) {
+		return "h-8 rounded-full border-[#ddd6fe] bg-[#f5f3ff] px-3 text-xs font-bold text-[#5b21b6] hover:border-[#a78bfa] hover:bg-[#ede9fe] focus-visible:ring-[#7c3aed]/20 focus-visible:ring-offset-0";
+	}
+
 	return cn(
 		"h-8 rounded-full px-3 text-xs font-bold focus-visible:ring-[#ff5a1f]/20 focus-visible:ring-offset-0",
 		active
-			? "border-[#ff5a1f] bg-[#ff5a1f] text-white shadow-[0_5px_12px_rgba(255,90,31,.16)] hover:border-[#e84b13] hover:bg-[#e84b13]"
-			: "border-[#d8dbe0] bg-white text-[#454b55] hover:border-[#ff8b5f] hover:bg-[#fff2ec] hover:text-[#d94710]",
+			? "border-[#176e50] bg-[#176e50] text-white shadow-[0_5px_12px_rgba(23,110,80,.16)] hover:border-[#145f45] hover:bg-[#145f45]"
+			: "border-[#cfe8dc] bg-[#f3fbf7] text-[#176e50] hover:border-[#8fd4b3] hover:bg-[#eaf8f1]",
 	);
+}
+
+function getProviderPrivacyHint(provider: ProviderSettingsProps["provider"]) {
+	if (provider.preset === "shared-gpu") {
+		return {
+			text: "多人共享密钥，隐私不隔离",
+			className: "border-[#ffd6a8] bg-[#fff7e6] text-[#9a4a00]",
+		};
+	}
+	if (provider.preset === "ollama") {
+		return {
+			text: "离线本地，无 API 费用",
+			className: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
+		};
+	}
+	if (provider.preset === "mock") {
+		return {
+			text: "本地演示，不调用真实模型",
+			className: "border-[#d8dbe0] bg-[#f4f5f7] text-[#69707d]",
+		};
+	}
+	if (provider.baseUrl.includes("/coding/") || provider.baseUrl.includes("/plan/")) {
+		return {
+			text: "订阅套餐专用，不走普通 API 计费",
+			className: "border-[#ddd6fe] bg-[#f5f3ff] text-[#5b21b6]",
+		};
+	}
+	if (provider.preset === "custom" || provider.preset === "new-api") {
+		return {
+			text: "自定义服务，请自行确认密钥和数据边界",
+			className: "border-[#d8dbe0] bg-white text-[#4b5563]",
+		};
+	}
+	return {
+		text: "个人密钥，数据独立",
+		className: "border-[#cfe8dc] bg-[#eaf8f1] text-[#176e50]",
+	};
 }
 
 function FieldHelp({ text }: { text: string }) {
@@ -146,38 +188,18 @@ export function ProviderSettings({
 	onResetProviderSettings,
 	onTestProvider,
 	onLoadProviderModelOptions,
+	onConfirmProviderChange,
 	onApplyProviderConfigHistory,
 	onDeleteProviderConfigHistory,
 	onClearProviderConfigHistory,
-	onOpenModel,
 }: ProviderSettingsProps) {
+	const providerPrivacyHint = getProviderPrivacyHint(provider);
+
 	return (
 		<div className="space-y-6">
 			<Card className="rounded-[14px] border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
-				<CardHeader>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<KeyRound className="size-5 text-[#ff5a1f]" />
-							<div>
-								<CardTitle>AI 模型服务设置</CardTitle>
-								<CardDescription>配置模型服务以用于诊断和分析</CardDescription>
-							</div>
-						</div>
-						{onOpenModel && (
-							<Button
-								variant="outline"
-								size="sm"
-								className={secondaryButtonClass}
-								onClick={onOpenModel}
-							>
-								<Settings className="w-4 h-4 mr-2" />
-								在任务页配置
-							</Button>
-						)}
-					</div>
-				</CardHeader>
-				<CardContent className="space-y-6">
-					<div className="flex items-center justify-between gap-3">
+				<CardContent className="space-y-6 pt-6">
+					<div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#e6e8eb] bg-[#fbfcfd] px-4 py-3 max-[640px]:block">
 						<div>
 							<h3 className="text-sm font-semibold">连接状态</h3>
 							<p className="text-xs text-muted-foreground">
@@ -186,7 +208,7 @@ export function ProviderSettings({
 							</p>
 						</div>
 						<Button
-							className={primaryButtonClass}
+							className={cn(primaryButtonClass, "max-[640px]:mt-3")}
 							onClick={onTestProvider}
 							disabled={isLoading}
 						>
@@ -266,7 +288,7 @@ export function ProviderSettings({
 					) : null}
 
 					<div className="space-y-4">
-						<div className="space-y-2">
+						<div className="space-y-2 rounded-[12px] border border-[#ffd6c4] bg-[#fffaf7] p-4">
 							<Label htmlFor="provider-preset">模型服务</Label>
 							<div className="relative">
 								<select
@@ -282,6 +304,11 @@ export function ProviderSettings({
 									))}
 								</select>
 								<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#69707d]" />
+							</div>
+							<div
+								className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${providerPrivacyHint.className}`}
+							>
+								{providerPrivacyHint.text}
 							</div>
 						</div>
 
@@ -325,6 +352,7 @@ export function ProviderSettings({
 													size="sm"
 													className={baseUrlOptionClass(
 														provider.baseUrl === option.url,
+														option,
 													)}
 													onClick={() =>
 														onChangeProviderBaseUrl(option.url)
@@ -411,15 +439,29 @@ export function ProviderSettings({
 							</>
 						)}
 
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							className={secondaryButtonClass}
-							onClick={onResetProviderSettings}
-						>
-							恢复默认
-						</Button>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className={secondaryButtonClass}
+								onClick={onResetProviderSettings}
+							>
+								恢复默认
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								className={primaryButtonClass}
+								onClick={onConfirmProviderChange}
+								disabled={isLoading}
+							>
+								{isLoading ? (
+									<Loader2 className="mr-2 size-4 animate-spin" />
+								) : null}
+								确认并测试连接
+							</Button>
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -431,8 +473,11 @@ export function ProviderSettings({
 							<div>
 								<CardTitle className="text-base">AI 设置历史</CardTitle>
 								<CardDescription className="text-xs">
-									只保存测试成功的最近 10 条配置
+									只保存当前浏览器里测试成功的最近 10 条配置
 								</CardDescription>
+								<p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+									切换浏览器、localhost / 127.0.0.1 或端口后不会自动同步。
+								</p>
 							</div>
 							<Button
 								type="button"
@@ -491,7 +536,8 @@ export function ProviderSettings({
 				</CardHeader>
 				<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
 					<p>• 所有设置保存在浏览器本地，不会上传到后端</p>
-					<p>• API Key 以密码形式存储，不会在日志或截图中明文显示</p>
+					<p>• AI 设置历史只在当前浏览器和当前地址可见，切换浏览器、域名或端口不会同步</p>
+					<p>• API Key 仅随当前会话请求发送，界面默认以密码框隐藏显示</p>
 					<p>• 测试连接仅验证模型服务可用性，不发送敏感内容</p>
 					<p>• 切换到其他页面后设置会自动保存</p>
 				</CardContent>

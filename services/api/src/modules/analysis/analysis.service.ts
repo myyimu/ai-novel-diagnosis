@@ -5,18 +5,18 @@ import type {
   DiagnosisIssueSeverity,
   GateDecision,
   MethodologyCard,
+  ChapterPosition,
   QuickReviewResult,
   QuickReviewInputKind,
-  RecommendedPlatform,
-  RecommendedPlatformId,
   RubricMetric,
 } from "@ai-novel-diagnosis/ai-core";
 import {
   buildChapterScorePrompt,
-  buildChapterTriagePrompt,
+  buildQuickReviewPrompt,
   createPreviewReport,
   DEFAULT_RUBRIC_METRICS,
   formatStoryCraftPromptBrief,
+  QUICK_REVIEW_SAMPLING_VERSION,
 } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
@@ -301,14 +301,23 @@ const labelMaps = {
   },
 };
 
-const recommendedPlatformLabels: Record<RecommendedPlatformId, string> = {
-  qidian: "起点中文网",
-  fanqie: "番茄小说",
-  jinjiang: "晋江文学城",
-  qimao: "七猫小说",
-  "wechat-short": "微信短篇/小程序文",
-  other: "其他平台",
-};
+const quickReviewSamplingLimit = 7000;
+const quickReviewHeadSampleLength = 5200;
+const quickReviewTailSampleLength = 1600;
+const quickReviewSuggestedLength = 300;
+const quickReviewConfidenceBase = 0.45;
+const quickReviewConfidenceLengthBonus = 0.15;
+const quickReviewConfidenceEvidenceBonus = 0.2;
+const quickReviewConfidenceGenreBonus = 0.05;
+const quickReviewConfidenceChapterPositionBonus = 0.05;
+const quickReviewConfidenceContextBonus = 0.05;
+const quickReviewConfidencePartialPenalty = 0.1;
+const quickReviewConfidenceMissingQuotePenalty = 0.15;
+
+interface QuickReviewTextSample {
+  text: string;
+  analysisScope: NonNullable<QuickReviewResult["analysisScope"]>;
+}
 
 @Injectable()
 export class AnalysisService {
@@ -338,18 +347,14 @@ export class AnalysisService {
 
   async quickReview(input: QuickReviewDto) {
     const provider = this.resolveQuickReviewProvider(input.provider);
+    const textSample = this.buildQuickReviewTextSample(input);
     if (provider.kind === "mock") {
-      return this.mockQuickReview(input);
+      return this.mockQuickReview(input, textSample);
     }
 
-    const textSample =
-      input.chapterText.trim().length <= 7000
-        ? input.chapterText.trim()
-        : `${input.chapterText.trim().slice(0, 5200)}\n\n……中间内容省略……\n\n${input.chapterText.trim().slice(-1600)}`;
-
-    const prompt = this.buildQuickReviewPrompt(input, textSample);
+    const prompt = this.buildQuickReviewPrompt(input, textSample.text);
     const content = await this.modelProviders.chat(provider, prompt.messages, {
-      maxOutputTokens: 2200,
+      maxOutputTokens: 1800,
       jsonSchema: {
         name: "quick_review_result",
         schema: quickReviewJsonSchema,
@@ -364,136 +369,29 @@ export class AnalysisService {
         "章节急诊",
       ),
       input,
+      textSample,
     );
   }
 
   private buildQuickReviewPrompt(input: QuickReviewDto, textSample: string) {
-    const prompt = buildChapterTriagePrompt({
-      title: input.title || "未命名章节",
-      text: textSample,
-      rubricId: "quick-review",
+    return buildQuickReviewPrompt({
+      title: input.title,
+      genre: input.genre,
+      inputKind: this.normalizeQuickReviewInputKind(input.inputKind),
+      chapterPosition: this.normalizeChapterPosition(input.chapterPosition),
+      diagnosticFocus: input.diagnosticFocus,
+      previousPrompt: input.previousPrompt,
+      coreSellingPoint: input.coreSellingPoint,
+      mustKeepMechanisms: input.mustKeepMechanisms,
+      targetReaderPleasures: input.targetReaderPleasures,
+      sampledText: textSample,
     });
-
-    return {
-      ...prompt,
-      messages: [
-        {
-          ...prompt.messages[0],
-          content: `${prompt.messages[0].content}
-你只返回合法 JSON，不使用 Markdown，不解释过程。`,
-        },
-        {
-          ...prompt.messages[1],
-          content: `${prompt.messages[1].content}
-
-类型提示：${input.genre || "请自行判断"}
-输入来源：${this.normalizeQuickReviewInputKind(input.inputKind)}
-上一条 Prompt：${input.previousPrompt?.trim() || "未提供"}
-用户声明的核心卖点：${input.coreSellingPoint?.trim() || "未提供"}
-必须保留的机制/装置：${input.mustKeepMechanisms?.trim() || "未提供"}
-目标读者爽点/笑点/期待：${input.targetReaderPleasures?.trim() || "未提供"}
-
-${formatStoryCraftPromptBrief()}
-
-诊断前先执行“一刀切误判防护层”：
-1. 当你发现重复、违和、系统化、缺少代价、缺少冲突、热梗不自然、日常太轻、主角不行动等风险时，必须先判断它是文本缺陷，还是目标读者会买账的风格化机制、题材惯例、喜剧机制、叙事装置或作者声线。
-2. 对倒计时、系统面板、弹幕/论坛体、聊天记录、档案/审讯记录、规则条款、网络热梗、沙雕重复句式、反套路废话、日常弱冲突、主角拒绝权力/拒绝行动等内容，先判断机制是否成立，再判断呈现是否像 AI、系统提示或堆梗。
-3. 如果机制成立，不要建议删除机制；改法应是小说化呈现、降频、换句式、补上下文反馈、让他人产生动作、安排回收或增强角色专属细节。
-4. 如果机制不成立，说明它为什么没有服务核心卖点或目标读者期待，再建议删除、替换或重构。
-5. revisionPlan.keep 和 strengths 必须保护仍然有效的特殊卖点；actionableFixes 和 nextPrompt 不能误删用户声明必须保留的机制。
-
-严格返回这个 JSON 结构：
-{
-  "title": "章节标题（如正文有标题则用正文的）",
-  "genre": "xuanhuan | urban | romance | suspense | infinite-flow | other",
-  "inputKind": "human-draft | ai-draft | idea | outline | prompt",
-  "positioning": "一句话定位这章在市场上的位置",
-  "sellingPoints": ["本章 2-3 个主要卖点"],
-  "mainProblem": "本章最大的一个问题，不超过 50 字",
-  "actionableFixes": ["3 条可执行的改稿建议，每条不超过 40 字"],
-  "recommendedPlatforms": [
-    {
-      "id": "fanqie",
-      "label": "番茄小说",
-      "fit": "优先发布",
-      "reason": "一句话说明为什么适合这个平台"
-    }
-  ],
-  "readyForFullReview": true或false,
-  "readyReason": "是否适合做完整评分的一句话理由",
-  "quickScore": 6.5,
-  "confidence": 0.8,
-  "gateDecision": "continue | revise | rebuild | discard",
-  "gateReason": "为什么当前建议继续、修改、重构或废稿",
-  "oneLineDiagnosis": "一句话说明这稿最该先解决什么",
-  "issues": [
-    {
-      "id": "issue-1",
-      "severity": "critical | high | medium | low",
-      "category": "opening | hook | character_goal | conflict_pressure | payoff | pacing | setting_load | prose_ai_flavor | prompt_constraint | market_promise | other",
-      "title": "问题标题",
-      "description": "问题说明，若涉及特殊机制，必须说明它是缺陷、可用机制但呈现有问题，还是目标读者爽点",
-      "evidence": [{"quote": "原文短证据", "locationHint": "开头/中段/结尾/第N段", "confidence": 0.8}],
-      "readerImpact": "读者会如何流失或降低期待",
-      "fixAction": "下一步具体改法",
-      "promptConstraint": "下一轮改稿 Prompt 必须加入的约束",
-      "blocksNextStep": true
-    }
-  ],
-  "strengths": [{"title": "可保留优点", "evidence": "可选证据", "keepAction": "下一版如何保留"}],
-  "revisionPlan": {
-    "priorityIssueIds": ["issue-1"],
-    "keep": ["必须保留的内容"],
-    "change": ["必须修改的内容"],
-    "avoid": ["下一版不要做什么"],
-    "checkpoints": ["复诊时检查什么"]
-  },
-  "promptDiagnosis": {
-    "originalPrompt": "如果用户提供则原样摘要，否则空字符串",
-    "missingConstraints": ["上一条 Prompt 缺了什么约束"],
-    "vagueInstructions": ["哪些指令太泛"],
-    "improvedPromptPrinciples": ["下一条 Prompt 应该遵守的原则"]
-  },
-  "nextPrompt": {
-    "title": "下一轮改稿 Prompt",
-    "prompt": "可直接复制给写作 AI 的改稿 Prompt",
-    "linkedIssueIds": ["issue-1"],
-    "whyThisWorks": ["这条 Prompt 如何对应解决问题"]
-  },
-  "methodologyCards": [
-    {
-      "id": "method-1",
-      "sourceIssueId": "issue-1",
-      "type": "opening_rule | prompt_rule | pacing_rule | hook_rule | payoff_rule | anti_pattern",
-      "title": "可复用方法论标题",
-      "triggerProblem": "什么问题触发这条规则",
-      "reusableRule": "下次可复用的规则",
-      "selfCheckQuestion": "作者自查问题",
-      "promptTemplate": "可复用 Prompt 模板"
-    }
-  ]
-}
-
-要求：
-1. genre 只能选 xuanhuan、urban、romance、suspense、infinite-flow、other 之一。
-2. quickScore 是 0-10 分，代表网文追读吸引力的快速估分。
-3. actionableFixes 必须是具体可执行的改法，不要空洞建议。
-4. recommendedPlatforms 返回 1-3 个中文网文平台，优先从 qidian、fanqie、jinjiang、qimao、wechat-short 中选择。
-5. fit 只能写“优先发布”“可作为第二选择”或“更适合短篇测试”之一。
-6. confidence 是 0 到 1 的数字，文本太短时降低。
-7. issues 返回 1-3 条，必须有原文证据；没有证据时降低 confidence。
-8. gateDecision 只表示当前稿件改稿优先级，不预测平台流量。
-9. 如果提供上一条 Prompt，promptDiagnosis 必须指出 Prompt 缺口；未提供则返回空数组。
-10. nextPrompt 必须能直接复制给写作 AI，用于改这一版稿，不要另起炉灶。
-11. 对用户声明的核心卖点、必须保留机制和目标读者爽点，必须先做“保留价值”判断，再给出改法；不能把特殊机制一刀切归因为 AI 痕迹或结构缺陷。`,
-        },
-      ],
-    };
   }
 
   private normalizeQuickReviewResult(
     result: unknown,
     input: QuickReviewDto,
+    textSample: QuickReviewTextSample,
   ): QuickReviewResult {
     const source =
       result && typeof result === "object"
@@ -501,65 +399,90 @@ ${formatStoryCraftPromptBrief()}
         : {};
     const requestedGenre = this.normalizeQuickReviewGenre(input.genre);
     const genre =
-      this.normalizeQuickReviewGenre(source.genre) || requestedGenre || "other";
+      this.normalizeQuickReviewGenre(source.inferredGenre) ||
+      this.normalizeQuickReviewGenre(source.genre) ||
+      requestedGenre ||
+      "other";
     const inputKind = this.normalizeQuickReviewInputKind(
       source.inputKind || input.inputKind,
     );
+    const chapterPosition = this.normalizeChapterPosition(
+      source.chapterPosition || input.chapterPosition,
+    );
     const mainProblem =
-      asText(source.mainProblem) ||
+      this.resolveQuickReviewMainProblem(source) ||
       "模型没有返回明确问题，请重试或进入完整点评。";
     const actionableFixes = asTextList(source.actionableFixes).slice(0, 4);
-    const issues = this.normalizeDiagnosisIssues(source.issues, {
+    const rawIssues = this.normalizeDiagnosisIssues(source.issues, {
       mainProblem,
       actionableFixes,
       confidence: clampNumber(source.confidence, 0, 1, 0.5),
-      text: input.chapterText,
+      text: textSample.text,
     });
-    const gateDecision = this.normalizeGateDecision(
-      source.gateDecision,
-      issues,
+    const evidenceVerification = this.verifyDiagnosisEvidence(
+      rawIssues,
+      textSample.text,
     );
+    const issues = evidenceVerification.issues;
+    const resolvedActionableFixes =
+      actionableFixes.length > 0
+        ? actionableFixes
+        : issues.slice(0, 3).map((issue) => issue.fixAction);
+    const gateDecision = this.resolveQuickReviewGateDecision(issues);
+    const quickScore = this.calculateQuickReviewScore(gateDecision, issues);
+    const confidence = this.calculateQuickReviewConfidence({
+      input,
+      genre,
+      issues,
+      analysisScope: textSample.analysisScope,
+      removedEvidenceCount: evidenceVerification.removedEvidenceCount,
+    });
     const nextPrompt = this.normalizeNextPrompt(source.nextPrompt, {
-      positioning: asText(source.positioning),
+      positioning: this.resolveReaderPromise(source),
       sellingPoints: asTextList(source.sellingPoints),
       mainProblem,
-      actionableFixes,
+      actionableFixes: resolvedActionableFixes,
       issues,
       previousPrompt: input.previousPrompt,
     });
-    const methodologyCards = this.normalizeMethodologyCards(
-      source.methodologyCards,
-      issues,
-      nextPrompt.prompt,
-    );
+    const methodologyCards = input.includeMethodologyCards
+      ? this.normalizeMethodologyCards(
+          source.methodologyCards,
+          issues,
+          nextPrompt.prompt,
+        )
+      : [];
 
     return {
-      title: asText(source.title) || input.title || "未命名章节",
+      schemaVersion: "quick-review.v3",
+      title:
+        asText(source.inferredTitle) ||
+        asText(source.title) ||
+        input.title ||
+        "未命名章节",
       genre,
       inputKind,
+      chapterPosition,
       positioning:
-        asText(source.positioning) ||
+        this.resolveReaderPromise(source) ||
         "模型没有返回明确定位，请重试或进入完整点评。",
       sellingPoints: asTextList(source.sellingPoints).slice(0, 4),
       mainProblem,
-      actionableFixes,
-      recommendedPlatforms: this.normalizeRecommendedPlatforms(
-        source.recommendedPlatforms,
-        genre,
+      actionableFixes: resolvedActionableFixes,
+      recommendedPlatforms: [],
+      readyForFullReview: this.isReadyForFullReview(
+        inputKind,
         input.chapterText.trim().length,
+        gateDecision,
       ),
-      readyForFullReview:
-        typeof source.readyForFullReview === "boolean"
-          ? source.readyForFullReview
-          : input.chapterText.trim().length >= 300,
       readyReason:
-        asText(source.readyReason) ||
-        "如果结果不完整，建议重试一次或进入完整评分。",
-      quickScore: clampNumber(source.quickScore, 0, 10, 0),
-      confidence: clampNumber(source.confidence, 0, 1, 0.5),
+        gateDecision === "insufficient"
+          ? "当前输入缺少可核验证据，建议补充更完整内容后重试。"
+          : "快速诊断已完成；如需完整评分，请进入深度质检。",
+      quickScore,
+      confidence,
       gateDecision,
-      gateReason:
-        asText(source.gateReason) || this.buildGateReason(gateDecision, issues),
+      gateReason: this.buildGateReason(gateDecision, issues),
       oneLineDiagnosis:
         asText(source.oneLineDiagnosis) || `这稿最该先解决：${mainProblem}`,
       issues,
@@ -571,6 +494,7 @@ ${formatStoryCraftPromptBrief()}
       ),
       nextPrompt,
       methodologyCards,
+      analysisScope: textSample.analysisScope,
     };
   }
 
@@ -585,6 +509,47 @@ ${formatStoryCraftPromptBrief()}
     }
 
     return "human-draft";
+  }
+
+  private normalizeChapterPosition(value: unknown): ChapterPosition {
+    const position = asText(value).toLowerCase();
+    if (["first", "early", "middle", "final", "unknown"].includes(position)) {
+      return position as ChapterPosition;
+    }
+
+    return "unknown";
+  }
+
+  private buildQuickReviewTextSample(input: QuickReviewDto): QuickReviewTextSample {
+    const trimmed = input.chapterText.trim();
+    const chapterPosition = this.normalizeChapterPosition(input.chapterPosition);
+    const assumptions =
+      chapterPosition === "unknown" ? ["章节位置未知，未强制使用第一章标准。"] : [];
+
+    if (trimmed.length <= quickReviewSamplingLimit) {
+      return {
+        text: trimmed,
+        analysisScope: {
+          originalCharacters: trimmed.length,
+          sampledCharacters: trimmed.length,
+          isPartial: false,
+          samplingStrategy: "full",
+          assumptions,
+        },
+      };
+    }
+
+    const text = `${trimmed.slice(0, quickReviewHeadSampleLength)}\n\n……中间内容省略……\n\n${trimmed.slice(-quickReviewTailSampleLength)}`;
+    return {
+      text,
+      analysisScope: {
+        originalCharacters: trimmed.length,
+        sampledCharacters: text.length,
+        isPartial: true,
+        samplingStrategy: QUICK_REVIEW_SAMPLING_VERSION,
+        assumptions: [...assumptions, "正文过长，本次只检查开头和结尾，中段未完整诊断。"],
+      },
+    };
   }
 
   private normalizeQuickReviewGenre(value: unknown) {
@@ -602,6 +567,67 @@ ${formatStoryCraftPromptBrief()}
       return genre;
     }
     if (genre === "xuanhua" || genre === "fantasy") return "xuanhuan";
+    return "";
+  }
+
+  private resolveReaderPromise(source: Record<string, unknown>) {
+    const readerPromise =
+      source.readerPromise && typeof source.readerPromise === "object"
+        ? (source.readerPromise as Record<string, unknown>)
+        : {};
+
+    return asText(readerPromise.summary) || asText(source.positioning);
+  }
+
+  private resolveQuickReviewMainProblem(source: Record<string, unknown>) {
+    const directCandidates = [
+      source.mainProblem,
+      source.main_problem,
+      source.biggestProblem,
+      source.biggest_problem,
+      source.primaryProblem,
+      source.primary_problem,
+      source.weakestPoint,
+      source.weakest_point,
+      source.oneLineDiagnosis,
+      source.one_line_diagnosis,
+      source.diagnosis,
+      source.summary,
+    ];
+
+    for (const candidate of directCandidates) {
+      const text = asText(candidate);
+      if (text) {
+        return text;
+      }
+    }
+
+    if (Array.isArray(source.issues)) {
+      for (const issue of source.issues) {
+        if (typeof issue === "string") {
+          const text = issue.trim();
+          if (text) {
+            return text;
+          }
+          continue;
+        }
+
+        if (!issue || typeof issue !== "object") {
+          continue;
+        }
+
+        const issueSource = issue as Record<string, unknown>;
+        const text =
+          asText(issueSource.title) ||
+          asText(issueSource.description) ||
+          asText(issueSource.readerImpact) ||
+          asText(issueSource.fixAction);
+        if (text) {
+          return text;
+        }
+      }
+    }
+
     return "";
   }
 
@@ -659,6 +685,26 @@ ${formatStoryCraftPromptBrief()}
     value: unknown,
     index: number,
   ): DiagnosisIssue | null {
+    if (typeof value === "string") {
+      const title = value.trim();
+      if (!title) {
+        return null;
+      }
+
+      return {
+        id: `issue-${index + 1}`,
+        severity: "medium",
+        category: "other",
+        title,
+        description: title,
+        evidence: [],
+        readerImpact: "读者可能无法形成明确期待，继续阅读动力会下降。",
+        fixAction: "先围绕这个问题做局部改写，不要整章重写。",
+        promptConstraint: "下一轮 Prompt 必须明确要求解决这个问题。",
+        blocksNextStep: false,
+      };
+    }
+
     if (!value || typeof value !== "object") {
       return null;
     }
@@ -749,22 +795,119 @@ ${formatStoryCraftPromptBrief()}
     return text.trim().replace(/\s+/g, " ").slice(0, 120);
   }
 
-  private normalizeGateDecision(
-    value: unknown,
-    issues: DiagnosisIssue[],
-  ): GateDecision {
-    const gate = asText(value).toLowerCase();
-    if (["continue", "revise", "rebuild", "discard"].includes(gate)) {
-      return gate as GateDecision;
+  private verifyDiagnosisEvidence(issues: DiagnosisIssue[], sampledText: string) {
+    let removedEvidenceCount = 0;
+    const normalizedSample = this.normalizeEvidenceText(sampledText);
+    const verifiedIssues = issues.map((issue) => {
+      const evidence = issue.evidence.filter((item) => {
+        const quote = this.normalizeEvidenceText(item.quote);
+        const isValid = Boolean(quote && normalizedSample.includes(quote));
+        if (!isValid) {
+          removedEvidenceCount += 1;
+        }
+        return isValid;
+      });
+
+      return { ...issue, evidence };
+    });
+
+    return {
+      issues: verifiedIssues,
+      removedEvidenceCount,
+    };
+  }
+
+  private normalizeEvidenceText(value: string) {
+    return value.replace(/\s+/g, "");
+  }
+
+  private resolveQuickReviewGateDecision(issues: DiagnosisIssue[]): GateDecision {
+    if (issues.every((issue) => issue.evidence.length === 0)) {
+      return "insufficient";
     }
 
-    if (issues.some((issue) => issue.severity === "critical")) {
+    if (
+      issues.some(
+        (issue) => issue.severity === "critical" && issue.blocksNextStep,
+      )
+    ) {
       return "rebuild";
     }
     if (issues.some((issue) => issue.severity === "high")) {
       return "revise";
     }
+    if (issues.filter((issue) => issue.severity === "medium").length >= 2) {
+      return "revise";
+    }
     return "continue";
+  }
+
+  private calculateQuickReviewScore(
+    gateDecision: GateDecision,
+    issues: DiagnosisIssue[],
+  ): number | null {
+    if (gateDecision === "insufficient") {
+      return null;
+    }
+
+    const penaltyBySeverity: Record<DiagnosisIssueSeverity, number> = {
+      critical: 3,
+      high: 2,
+      medium: 1,
+      low: 0.5,
+    };
+    const penalty = issues.reduce(
+      (total, issue) => total + penaltyBySeverity[issue.severity],
+      0,
+    );
+
+    return Number(clampNumber(10 - penalty, 0, 10, 0).toFixed(1));
+  }
+
+  private calculateQuickReviewConfidence({
+    input,
+    genre,
+    issues,
+    analysisScope,
+    removedEvidenceCount,
+  }: {
+    input: QuickReviewDto;
+    genre: string;
+    issues: DiagnosisIssue[];
+    analysisScope: NonNullable<QuickReviewResult["analysisScope"]>;
+    removedEvidenceCount: number;
+  }) {
+    const hasEvidenceForEveryIssue =
+      issues.length > 0 && issues.every((issue) => issue.evidence.length > 0);
+    const confidence =
+      quickReviewConfidenceBase +
+      (input.chapterText.trim().length >= quickReviewSuggestedLength
+        ? quickReviewConfidenceLengthBonus
+        : 0) +
+      (hasEvidenceForEveryIssue ? quickReviewConfidenceEvidenceBonus : 0) +
+      (input.genre?.trim() || genre !== "other" ? quickReviewConfidenceGenreBonus : 0) +
+      (this.normalizeChapterPosition(input.chapterPosition) !== "unknown"
+        ? quickReviewConfidenceChapterPositionBonus
+        : 0) +
+      (input.coreSellingPoint?.trim() || input.targetReaderPleasures?.trim()
+        ? quickReviewConfidenceContextBonus
+        : 0) -
+      (analysisScope.isPartial ? quickReviewConfidencePartialPenalty : 0) -
+      removedEvidenceCount * quickReviewConfidenceMissingQuotePenalty;
+
+    return clampNumber(confidence, 0, 1, 0.45);
+  }
+
+  private isReadyForFullReview(
+    inputKind: QuickReviewInputKind,
+    textLength: number,
+    gateDecision: GateDecision,
+  ) {
+    return (
+      ["human-draft", "ai-draft"].includes(inputKind) &&
+      textLength >= quickReviewSuggestedLength &&
+      gateDecision !== "insufficient"
+    );
   }
 
   private buildGateReason(gate: GateDecision, issues: DiagnosisIssue[]) {
@@ -774,6 +917,7 @@ ${formatStoryCraftPromptBrief()}
       revise: `当前稿件有潜力，但需要先解决“${topIssue}”。`,
       rebuild: `当前稿件的关键承诺或结构需要重构，优先处理“${topIssue}”。`,
       discard: "当前版本投入产出偏低，建议换角度重写或保留经验后另开一版。",
+      insufficient: "当前输入缺少可核验的证据片段，暂不建议按分数或 Gate 做投入判断。",
     };
     return reasonMap[gate];
   }
@@ -835,6 +979,14 @@ ${formatStoryCraftPromptBrief()}
     value: unknown,
     previousPrompt?: string,
   ): QuickReviewResult["promptDiagnosis"] {
+    if (!previousPrompt?.trim()) {
+      return {
+        missingConstraints: [],
+        vagueInstructions: [],
+        improvedPromptPrinciples: [],
+      };
+    }
+
     const source =
       value && typeof value === "object"
         ? (value as Record<string, unknown>)
@@ -1017,207 +1169,7 @@ ${formatStoryCraftPromptBrief()}
     };
   }
 
-  private normalizeRecommendedPlatforms(
-    value: unknown,
-    genre: string,
-    textLength: number,
-  ): RecommendedPlatform[] {
-    const recommended = Array.isArray(value)
-      ? value
-          .map((item) => this.normalizeRecommendedPlatform(item))
-          .filter((item): item is RecommendedPlatform => item !== null)
-          .slice(0, 3)
-      : [];
-
-    if (recommended.length > 0) {
-      return recommended;
-    }
-
-    return this.buildFallbackRecommendedPlatforms(genre, textLength);
-  }
-
-  private normalizeRecommendedPlatform(
-    value: unknown,
-  ): RecommendedPlatform | null {
-    if (!value || typeof value !== "object") {
-      return null;
-    }
-
-    const source = value as Record<string, unknown>;
-    const id = this.normalizeRecommendedPlatformId(source.id);
-    if (!id) {
-      return null;
-    }
-
-    return {
-      id,
-      label: asText(source.label) || recommendedPlatformLabels[id],
-      fit: this.normalizeRecommendedFit(source.fit),
-      reason:
-        asText(source.reason) || "题材和节奏与该平台当前常见消费方式更匹配。",
-    };
-  }
-
-  private normalizeRecommendedPlatformId(
-    value: unknown,
-  ): RecommendedPlatformId | null {
-    const platformId = asText(value).toLowerCase() as RecommendedPlatformId;
-    if (
-      [
-        "qidian",
-        "fanqie",
-        "jinjiang",
-        "qimao",
-        "wechat-short",
-        "other",
-      ].includes(platformId)
-    ) {
-      return platformId;
-    }
-
-    return null;
-  }
-
-  private normalizeRecommendedFit(value: unknown) {
-    const fit = asText(value);
-    if (
-      fit === "优先发布" ||
-      fit === "可作为第二选择" ||
-      fit === "更适合短篇测试"
-    ) {
-      return fit;
-    }
-
-    return "可作为第二选择";
-  }
-
-  private buildFallbackRecommendedPlatforms(
-    genre: string,
-    textLength: number,
-  ): RecommendedPlatform[] {
-    const isShortFormCandidate = textLength > 0 && textLength <= 1800;
-
-    const byGenre: Record<string, RecommendedPlatform[]> = {
-      xuanhuan: [
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "优先发布",
-          reason: "玄幻爽点和直给冲突更容易在快节奏分发环境里测出反馈。",
-        },
-        {
-          id: "qidian",
-          label: recommendedPlatformLabels.qidian,
-          fit: "可作为第二选择",
-          reason: "如果后续能把成长线和设定厚度继续做深，长篇连载空间更大。",
-        },
-        {
-          id: "qimao",
-          label: recommendedPlatformLabels.qimao,
-          fit: "可作为第二选择",
-          reason: "强冲突和高爽点题材在大众向免费阅读里也有机会。",
-        },
-      ],
-      urban: [
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "优先发布",
-          reason: "都市题材适合先用低理解成本和强冲突测试点击与留存。",
-        },
-        {
-          id: "qimao",
-          label: recommendedPlatformLabels.qimao,
-          fit: "可作为第二选择",
-          reason: "如果打脸、反转和爽点释放够密，商业向适配度会比较好。",
-        },
-        {
-          id: "qidian",
-          label: recommendedPlatformLabels.qidian,
-          fit: "可作为第二选择",
-          reason: "当职业线、成长线更完整时，连载价值会更稳定。",
-        },
-      ],
-      romance: [
-        {
-          id: "jinjiang",
-          label: recommendedPlatformLabels.jinjiang,
-          fit: "优先发布",
-          reason: "关系推进、情绪张力和人物选择型内容更容易找到核心读者。",
-        },
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "可作为第二选择",
-          reason: "如果冲突直给、开局钩子强，也适合先测大众化反馈。",
-        },
-        {
-          id: "wechat-short",
-          label: recommendedPlatformLabels["wechat-short"],
-          fit: isShortFormCandidate ? "更适合短篇测试" : "可作为第二选择",
-          reason: "情绪反转明确、付费卡点清楚时，短篇分发也有转化空间。",
-        },
-      ],
-      suspense: [
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "优先发布",
-          reason: "悬念和反转密度高的章节适合先看分发环境里的读完反馈。",
-        },
-        {
-          id: "wechat-short",
-          label: recommendedPlatformLabels["wechat-short"],
-          fit: isShortFormCandidate ? "更适合短篇测试" : "可作为第二选择",
-          reason: "如果章节以强钩子和连续反转驱动，短篇测试会更直接。",
-        },
-        {
-          id: "qidian",
-          label: recommendedPlatformLabels.qidian,
-          fit: "可作为第二选择",
-          reason: "当谜面、线索链和长期伏笔更完整时，连载价值更高。",
-        },
-      ],
-      "infinite-flow": [
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "优先发布",
-          reason: "副本开局、规则压力和即时刺激更适合快节奏平台起量。",
-        },
-        {
-          id: "qidian",
-          label: recommendedPlatformLabels.qidian,
-          fit: "可作为第二选择",
-          reason: "世界规则和副本升级线继续做深后，长篇追更潜力更强。",
-        },
-        {
-          id: "qimao",
-          label: recommendedPlatformLabels.qimao,
-          fit: "可作为第二选择",
-          reason: "规则求生和高压冲突在大众阅读分发里也容易拿到反馈。",
-        },
-      ],
-      other: [
-        {
-          id: "fanqie",
-          label: recommendedPlatformLabels.fanqie,
-          fit: "优先发布",
-          reason: "题材未完全定型时，先看快节奏平台的真实点击和留存更高效。",
-        },
-        {
-          id: "qidian",
-          label: recommendedPlatformLabels.qidian,
-          fit: "可作为第二选择",
-          reason: "如果后续形成更稳定的世界观和成长主线，适合长篇连载验证。",
-        },
-      ],
-    };
-
-    return byGenre[genre] || byGenre.other;
-  }
-
-  private mockQuickReview(input: QuickReviewDto) {
+  private mockQuickReview(input: QuickReviewDto, textSample: QuickReviewTextSample) {
     const textLength = input.chapterText.trim().length;
     const quickScore = textLength >= 300 ? 6.2 : 5.4;
     const genre = this.normalizeQuickReviewGenre(input.genre) || "other";
@@ -1256,8 +1208,10 @@ ${formatStoryCraftPromptBrief()}
 
     return {
       title: input.title || "未命名章节",
+      schemaVersion: "quick-review.v3",
       genre,
       inputKind: this.normalizeQuickReviewInputKind(input.inputKind),
+      chapterPosition: this.normalizeChapterPosition(input.chapterPosition),
       positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
       sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
       mainProblem: issue.title,
@@ -1266,10 +1220,7 @@ ${formatStoryCraftPromptBrief()}
         "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
         "需要完整证据链时进入章节质检并生成 Rubric。",
       ],
-      recommendedPlatforms: this.buildFallbackRecommendedPlatforms(
-        genre,
-        textLength,
-      ),
+      recommendedPlatforms: [],
       readyForFullReview: textLength >= 80,
       readyReason: "当前是本地演示结果；真实点评需要使用可用模型服务。",
       quickScore,
@@ -1290,11 +1241,10 @@ ${formatStoryCraftPromptBrief()}
         input.previousPrompt,
       ),
       nextPrompt,
-      methodologyCards: this.normalizeMethodologyCards(
-        null,
-        [issue],
-        nextPrompt.prompt,
-      ),
+      methodologyCards: input.includeMethodologyCards
+        ? this.normalizeMethodologyCards(null, [issue], nextPrompt.prompt)
+        : [],
+      analysisScope: textSample.analysisScope,
     };
   }
 

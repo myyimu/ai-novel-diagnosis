@@ -2,9 +2,10 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ListTree, Search, Settings, Sparkles } from "lucide-react";
+import { BookOpen, ListTree, RefreshCw, Search, Settings, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useProviderConnection } from "@/hooks/use-provider-connection";
 
 type NavKey =
 	| "quick"
@@ -92,6 +93,8 @@ export function RedesignWorkspaceShell({
 	providerLabel = "Qwen · OpenAI Compatible",
 }: RedesignWorkspaceShellProps) {
 	const router = useRouter();
+	const { providerConnection, testCurrentProvider } = useProviderConnection();
+	const providerStatusView = getProviderStatusView(providerConnection.status);
 
 	return (
 		<div className="grid min-h-screen grid-cols-[236px_minmax(0,1fr)] bg-[#f6f7f9] text-[#1f2329] max-[820px]:grid-cols-[64px_minmax(0,1fr)]">
@@ -153,19 +156,41 @@ export function RedesignWorkspaceShell({
 				<div className="mt-auto grid gap-2.5">
 					<div className="rounded-xl border border-[#e6e8eb] bg-[#fafafa] p-3 max-[820px]:px-2 max-[820px]:text-center max-[820px]:group-hover/sidebar:px-3 max-[820px]:group-hover/sidebar:text-left max-[820px]:group-focus-within/sidebar:px-3 max-[820px]:group-focus-within/sidebar:text-left">
 						<div className="flex items-center justify-between text-xs text-[#69707d] max-[820px]:justify-center max-[820px]:group-hover/sidebar:justify-between max-[820px]:group-focus-within/sidebar:justify-between">
-							<span>
-								<i className="mr-1.5 inline-block size-2 rounded-full bg-[#22a06b] shadow-[0_0_0_3px_rgba(34,160,107,.12)]" />
+							<span className={providerStatusView.textClassName}>
+								<i
+									className={`mr-1.5 inline-block size-2 rounded-full ${providerStatusView.dotClassName}`}
+								/>
 								<span className="max-[820px]:hidden max-[820px]:group-hover/sidebar:inline max-[820px]:group-focus-within/sidebar:inline">
-									模型已连接
+									{providerStatusView.label}
 								</span>
 							</span>
-							<span className="max-[820px]:hidden max-[820px]:group-hover/sidebar:inline max-[820px]:group-focus-within/sidebar:inline">
-								本地
-							</span>
+							<button
+								type="button"
+								onClick={() => {
+									void testCurrentProvider();
+								}}
+								disabled={providerConnection.status === "testing"}
+								aria-label="刷新模型连接状态"
+								title="刷新模型连接状态"
+								className="grid size-6 place-items-center rounded-md border border-[#d8dbe0] bg-white text-[#69707d] transition hover:border-[#ff8b5f] hover:text-[#d94710] disabled:cursor-wait disabled:opacity-70 max-[820px]:hidden max-[820px]:group-hover/sidebar:grid max-[820px]:group-focus-within/sidebar:grid"
+							>
+								<RefreshCw
+									className={`size-3.5 ${
+										providerConnection.status === "testing"
+											? "animate-spin"
+											: ""
+									}`}
+								/>
+							</button>
 						</div>
 						<div className="mt-1.5 truncate text-[13px] font-bold max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
 							{providerLabel}
 						</div>
+						{providerConnection.status === "error" ? (
+							<div className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#b42318] max-[820px]:hidden max-[820px]:group-hover/sidebar:block max-[820px]:group-focus-within/sidebar:block">
+								{providerConnection.message}
+							</div>
+						) : null}
 						<button
 							type="button"
 							onClick={() => router.push("/settings/provider")}
@@ -190,6 +215,35 @@ export function RedesignWorkspaceShell({
 			</main>
 		</div>
 	);
+}
+
+function getProviderStatusView(status: "unknown" | "testing" | "success" | "error") {
+	if (status === "success") {
+		return {
+			label: "模型已连接",
+			textClassName: "text-[#176e50]",
+			dotClassName: "bg-[#22a06b] shadow-[0_0_0_3px_rgba(34,160,107,.12)]",
+		};
+	}
+	if (status === "error") {
+		return {
+			label: "模型连接失败",
+			textClassName: "text-[#b42318]",
+			dotClassName: "bg-[#f04438] shadow-[0_0_0_3px_rgba(240,68,56,.12)]",
+		};
+	}
+	if (status === "testing") {
+		return {
+			label: "正在检测",
+			textClassName: "text-[#8c5009]",
+			dotClassName: "bg-[#f79009] shadow-[0_0_0_3px_rgba(247,144,9,.14)]",
+		};
+	}
+	return {
+		label: "模型未测试",
+		textClassName: "text-[#69707d]",
+		dotClassName: "bg-[#98a2b3] shadow-[0_0_0_3px_rgba(152,162,179,.14)]",
+	};
 }
 
 export function RedesignTopButton({

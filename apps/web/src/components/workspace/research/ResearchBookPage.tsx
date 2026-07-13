@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import type { ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,12 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
+import {
+	countLikelyChapterHeadings,
+	looksLikeMarkdownText,
+	markdownToPlainText,
+	replaceTextSelection,
+} from "@/lib/pasted-text";
 import { AlertCircle, BookOpen, CheckCircle2, Loader2, Upload } from "lucide-react";
 
 export function ResearchBookPage() {
@@ -18,6 +25,7 @@ export function ResearchBookPage() {
 		bookFile,
 		bookText,
 		bookUpload,
+		uploadHistory,
 		bookJob,
 		bookAnalysisResult,
 		bookStatusText,
@@ -42,11 +50,38 @@ export function ResearchBookPage() {
 		analyzeBook();
 	};
 
+	const handleBookTextPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+		const pastedText = event.clipboardData.getData("text");
+		if (!looksLikeMarkdownText(pastedText)) {
+			return;
+		}
+
+		const shouldConvert = window.confirm(
+			"检测到你粘贴的内容像 Markdown，是否自动转换为纯正文？",
+		);
+		if (!shouldConvert) {
+			return;
+		}
+
+		event.preventDefault();
+		const target = event.currentTarget;
+		const convertedText = markdownToPlainText(pastedText);
+		const nextText = replaceTextSelection(
+			bookText,
+			convertedText,
+			target.selectionStart,
+			target.selectionEnd,
+		);
+		setBookText(nextText);
+	};
+
 	const isJobRunning = bookJob?.status === "queued" || bookJob?.status === "running";
 	const isPreviewing = loading === "upload";
 	const hasInput = Boolean(bookFile || bookText.trim());
 	const hasJob = Boolean(bookJob?.id);
 	const hasResult = Boolean(bookAnalysisResult);
+	const detectedChapterHeadingCount = countLikelyChapterHeadings(bookText);
+	const restoredPreview = Boolean(bookUpload) && !bookFile && !bookText.trim();
 
 	return (
 		<RedesignWorkspaceShell
@@ -154,12 +189,19 @@ export function ResearchBookPage() {
 								<textarea
 									value={bookText}
 									onChange={(event) => setBookText(event.target.value)}
+									onPaste={handleBookTextPaste}
 									placeholder="粘贴整本小说或多个章节正文……"
 									className="min-h-[230px] w-full resize-y rounded-[9px] border border-[#d4d8de] bg-white px-3.5 py-3 text-sm leading-7 outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 									disabled={isJobRunning}
 								/>
 								<div className="mt-1.5 text-[10px] text-[#6f7782]">
 									当前字数：{bookText.trim().length} 字
+									{detectedChapterHeadingCount >= 2 ? (
+										<span className="ml-2 text-[#c74413]">
+											检测到 {detectedChapterHeadingCount}{" "}
+											个明显章节标题，会自动拆章。
+										</span>
+									) : null}
 								</div>
 							</div>
 						</div>
@@ -172,6 +214,22 @@ export function ResearchBookPage() {
 									: "上传或粘贴后先检查章节拆分，避免错章影响后续分析。"}
 							</span>
 						</div>
+
+						{uploadHistory.length > 0 ? (
+							<div className="mt-3 rounded-[10px] border border-[#e6e8eb] bg-[#fbfcfd] p-3 text-[10px] leading-5 text-[#5b6572]">
+								<strong className="text-[#1f2329]">
+									{restoredPreview ? "已恢复最近一次章节预览" : "上传记录已持久化"}
+								</strong>
+								<span className="ml-2">
+									{restoredPreview
+										? `${bookUpload?.originalFilename} · ${bookUpload?.chapterCount} 个章节片段，可直接继续创建书籍。`
+										: `本地服务中已保存 ${uploadHistory.length} 条上传记录，重开页面后会自动恢复最近一次预览。`}
+								</span>
+								<span className="ml-2 text-[#7a838f]">
+									最近更新：{new Date(uploadHistory[0]!.updatedAt).toLocaleString()}
+								</span>
+							</div>
+						) : null}
 
 						{bookUpload ? (
 							<div className="mt-4 rounded-[12px] border border-[#e4e7eb] bg-white">

@@ -113,7 +113,7 @@ function resolveProxyTimeoutMessage(path: string[]) {
 	}
 
 	if (isModelBackedAnalysisPath(path)) {
-		return "模型请求仍在处理或排队，请稍后重试。";
+		return "当前模型可能在排队，可稍后重试或切换。";
 	}
 
 	return "Request timed out, please retry later";

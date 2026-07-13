@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceStore, WorkspaceStoreState } from "./workspace-store";
-import { mergeWorkspaceState, partializeWorkspaceState } from "./workspace-store";
+import {
+	defaultProviderConnection,
+	mergeWorkspaceState,
+	partializeWorkspaceState,
+} from "./workspace-store";
 
 function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceStoreState {
 	return {
 		projects: [
 			{
 				id: "default-project",
-				name: "默认项目",
+				name: "默认书籍",
 				createdAt: "2026-06-24T00:00:00.000Z",
 				updatedAt: "2026-06-24T00:00:00.000Z",
 			},
@@ -22,6 +26,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 			temperature: 0.2,
 			jsonMode: false,
 		},
+		providerConnection: defaultProviderConnection,
 		providerConfigHistory: [],
 		referenceTitle: "",
 		genre: "xuanhuan",
@@ -60,10 +65,13 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		chapterText: "",
 		quickReviewGenre: "",
 		quickReviewInputKind: "human-draft",
+		quickReviewChapterPosition: "unknown",
+		quickReviewDiagnosticFocus: "为什么没人追读",
 		quickReviewPreviousPrompt: "",
 		quickReviewCoreSellingPoint: "",
 		quickReviewMustKeepMechanisms: "",
 		quickReviewTargetReaderPleasures: "",
+		saveQuickReviewMethodology: false,
 		rubricResult: null,
 		scoreResult: null,
 		quickReviewResult: null,
@@ -368,6 +376,53 @@ describe("workspace store persistence", () => {
 			baseUrl: "https://new-api.rugao.me/v1",
 			apiKey: "sk-test",
 			model: "deepseek-v4-flash",
+		});
+	});
+
+	it("keeps persisted Zhipu provider settings", () => {
+		const merged = mergeWorkspaceState(
+			{
+				provider: {
+					preset: "zhipu",
+					kind: "openai-compatible",
+					baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+					apiKey: "sk-test",
+					model: "glm-5.2",
+					temperature: 0.2,
+					jsonMode: false,
+				},
+			},
+			createState() as WorkspaceStore,
+		);
+
+		expect(merged.provider).toMatchObject({
+			preset: "zhipu",
+			kind: "openai-compatible",
+			baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+			apiKey: "sk-test",
+			model: "glm-5.2",
+		});
+	});
+
+	it("resets persisted in-flight provider connection checks", () => {
+		const merged = mergeWorkspaceState(
+			{
+				providerConnection: {
+					status: "testing",
+					providerName: "智谱",
+					modelName: "glm-5.2",
+					message: "正在测试模型连接...",
+					checkedAt: "2026-07-13T02:00:00.000Z",
+					durationMs: 0,
+				},
+			},
+			createState() as WorkspaceStore,
+		);
+
+		expect(merged.providerConnection).toMatchObject({
+			status: "unknown",
+			providerName: "智谱",
+			modelName: "glm-5.2",
 		});
 	});
 

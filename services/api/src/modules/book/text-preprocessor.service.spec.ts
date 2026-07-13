@@ -31,4 +31,27 @@ describe("TextPreprocessorService", () => {
     expect(result.chapters[0].title).toBe("自动分段");
     expect(result.chapters[0].splitBy).toBe("auto-chunk");
   });
+
+  it("splits markdown and numbered Chinese chapter headings", () => {
+    const result = service.preprocess(
+      [
+        "# 第一章 开局",
+        "主角被取消资格。",
+        "",
+        "第 2 章 旧案",
+        "主角发现玉牌线索。",
+        "",
+        "章节3 风雨来",
+        "敌人登门。",
+      ].join("\n"),
+    );
+
+    expect(result.chapters).toHaveLength(3);
+    expect(result.chapters.map((chapter) => chapter.title)).toEqual([
+      "第一章 开局",
+      "第 2 章 旧案",
+      "章节3 风雨来",
+    ]);
+    expect(result.chapters.every((chapter) => chapter.splitBy === "heading")).toBe(true);
+  });
 });

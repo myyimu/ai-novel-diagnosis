@@ -86,8 +86,9 @@ describe("novel diagnosis golden fixtures", () => {
       expect(fixture.result.genre).toBe(fixture.genre);
       expect(fixture.result.inputKind).toBe(fixture.inputKind);
       expect(fixture.result.gateDecision).toBe(fixture.expected.gateDecision);
-      expect(fixture.result.quickScore).toBeGreaterThanOrEqual(minScore);
-      expect(fixture.result.quickScore).toBeLessThanOrEqual(maxScore);
+      expect(typeof fixture.result.quickScore).toBe("number");
+      expect(fixture.result.quickScore ?? 0).toBeGreaterThanOrEqual(minScore);
+      expect(fixture.result.quickScore ?? 0).toBeLessThanOrEqual(maxScore);
       expect(fixture.result.confidence).toBeGreaterThanOrEqual(0.6);
       expect(fixture.result.mainProblem.length).toBeGreaterThan(10);
       expect(primaryIssue?.category).toBe(fixture.expected.topIssueCategory);

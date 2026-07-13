@@ -323,20 +323,26 @@ export function requestQuickReview({
 	chapterTitle,
 	quickReviewGenre,
 	quickReviewInputKind,
+	quickReviewChapterPosition,
+	quickReviewDiagnosticFocus,
 	quickReviewPreviousPrompt,
 	quickReviewCoreSellingPoint,
 	quickReviewMustKeepMechanisms,
 	quickReviewTargetReaderPleasures,
+	includeMethodologyCards,
 }: {
 	provider: ProviderForm;
 	chapterText: string;
 	chapterTitle: string;
 	quickReviewGenre: string;
 	quickReviewInputKind?: QuickReviewInputKind;
+	quickReviewChapterPosition?: import("@/stores/workspace-store").ChapterPosition;
+	quickReviewDiagnosticFocus?: string;
 	quickReviewPreviousPrompt?: string;
 	quickReviewCoreSellingPoint?: string;
 	quickReviewMustKeepMechanisms?: string;
 	quickReviewTargetReaderPleasures?: string;
+	includeMethodologyCards?: boolean;
 }) {
 	const compactedChapterText = compactChapterText(chapterText);
 
@@ -346,10 +352,13 @@ export function requestQuickReview({
 		title: chapterTitle || undefined,
 		genre: quickReviewGenre || undefined,
 		inputKind: quickReviewInputKind || undefined,
+		chapterPosition: quickReviewChapterPosition || undefined,
+		diagnosticFocus: quickReviewDiagnosticFocus?.trim() || undefined,
 		previousPrompt: quickReviewPreviousPrompt?.trim() || undefined,
 		coreSellingPoint: quickReviewCoreSellingPoint?.trim() || undefined,
 		mustKeepMechanisms: quickReviewMustKeepMechanisms?.trim() || undefined,
 		targetReaderPleasures: quickReviewTargetReaderPleasures?.trim() || undefined,
+		includeMethodologyCards: Boolean(includeMethodologyCards),
 	});
 }
 

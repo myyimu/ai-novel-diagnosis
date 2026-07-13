@@ -452,6 +452,7 @@ function buildRevisionComparisonNextAction({
 
 function getGateRank(gate: RevisionSession["gateDecision"]) {
 	const rank: Record<string, number> = {
+		insufficient: 0,
 		discard: 0,
 		rebuild: 1,
 		revise: 2,
@@ -702,6 +703,7 @@ function formatGateLabel(gate: string | undefined) {
 		revise: "修改",
 		rebuild: "重构",
 		discard: "废稿",
+		insufficient: "信息不足",
 	};
 
 	return map[gate || ""] || "修改";

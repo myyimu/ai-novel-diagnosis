@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
+	ChapterPosition,
 	MethodologyCard,
 	ProviderKind,
 	ProviderPresetId,
@@ -12,6 +13,7 @@ import type {
 } from "@ai-novel-diagnosis/ai-core";
 
 export type {
+	ChapterPosition,
 	MethodologyCard,
 	ProviderKind,
 	ProviderPresetId,
@@ -21,6 +23,8 @@ export type {
 	RubricResult,
 	ScoreResult,
 };
+
+export const defaultQuickReviewDiagnosticFocus = "为什么没人追读";
 
 export interface ProviderForm {
 	preset: ProviderPresetId;
@@ -39,6 +43,17 @@ export interface ProviderConfigHistoryEntry {
 	provider: ProviderForm;
 }
 
+export type ProviderConnectionStatus = "unknown" | "testing" | "success" | "error";
+
+export interface ProviderConnectionState {
+	status: ProviderConnectionStatus;
+	providerName: string;
+	modelName: string;
+	message: string;
+	checkedAt: string;
+	durationMs: number;
+}
+
 export const defaultProvider: ProviderForm = {
 	preset: "shared-gpu",
 	kind: "openai-compatible",
@@ -47,6 +62,15 @@ export const defaultProvider: ProviderForm = {
 	model: "",
 	temperature: 0.2,
 	jsonMode: false,
+};
+
+export const defaultProviderConnection: ProviderConnectionState = {
+	status: "unknown",
+	providerName: "",
+	modelName: "",
+	message: "尚未测试模型连接。",
+	checkedAt: "",
+	durationMs: 0,
 };
 
 const PROVIDER_CONFIG_HISTORY_MAX_ENTRIES = 10;
@@ -735,6 +759,7 @@ export interface WorkspaceStoreState {
 	projects: WorkspaceProject[];
 	activeProjectId: string;
 	provider: ProviderForm;
+	providerConnection: ProviderConnectionState;
 	providerConfigHistory: ProviderConfigHistoryEntry[];
 	referenceTitle: string;
 	genre: string;
@@ -773,10 +798,13 @@ export interface WorkspaceStoreState {
 	chapterText: string;
 	quickReviewGenre: string;
 	quickReviewInputKind: QuickReviewInputKind;
+	quickReviewChapterPosition: ChapterPosition;
+	quickReviewDiagnosticFocus: string;
 	quickReviewPreviousPrompt: string;
 	quickReviewCoreSellingPoint: string;
 	quickReviewMustKeepMechanisms: string;
 	quickReviewTargetReaderPleasures: string;
+	saveQuickReviewMethodology: boolean;
 	rubricResult: RubricResult | null;
 	scoreResult: ScoreResult | null;
 	quickReviewResult: QuickReviewResult | null;
@@ -809,6 +837,7 @@ interface WorkspaceStoreActions {
 	setProjects: StoreSetter<WorkspaceProject[]>;
 	setActiveProjectId: StoreSetter<string>;
 	setProvider: StoreSetter<ProviderForm>;
+	setProviderConnection: StoreSetter<ProviderConnectionState>;
 	setProviderConfigHistory: StoreSetter<ProviderConfigHistoryEntry[]>;
 	setReferenceTitle: StoreSetter<string>;
 	setGenre: StoreSetter<string>;
@@ -847,10 +876,13 @@ interface WorkspaceStoreActions {
 	setChapterText: StoreSetter<string>;
 	setQuickReviewGenre: StoreSetter<string>;
 	setQuickReviewInputKind: StoreSetter<QuickReviewInputKind>;
+	setQuickReviewChapterPosition: StoreSetter<ChapterPosition>;
+	setQuickReviewDiagnosticFocus: StoreSetter<string>;
 	setQuickReviewPreviousPrompt: StoreSetter<string>;
 	setQuickReviewCoreSellingPoint: StoreSetter<string>;
 	setQuickReviewMustKeepMechanisms: StoreSetter<string>;
 	setQuickReviewTargetReaderPleasures: StoreSetter<string>;
+	setSaveQuickReviewMethodology: StoreSetter<boolean>;
 	setRubricResult: StoreSetter<RubricResult | null>;
 	setScoreResult: StoreSetter<ScoreResult | null>;
 	setQuickReviewResult: StoreSetter<QuickReviewResult | null>;
@@ -883,7 +915,7 @@ export type WorkspaceStore = WorkspaceStoreState & WorkspaceStoreActions;
 
 export const defaultWorkspaceProject: WorkspaceProject = {
 	id: "default-project",
-	name: "默认项目",
+	name: "默认书籍",
 	createdAt: "2026-06-24T00:00:00.000Z",
 	updatedAt: "2026-06-24T00:00:00.000Z",
 };
@@ -892,6 +924,7 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	projects: [defaultWorkspaceProject],
 	activeProjectId: defaultWorkspaceProject.id,
 	provider: defaultProvider,
+	providerConnection: defaultProviderConnection,
 	providerConfigHistory: [],
 	referenceTitle: "",
 	genre: "xuanhuan",
@@ -930,10 +963,13 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	chapterText: "",
 	quickReviewGenre: "",
 	quickReviewInputKind: "human-draft",
+	quickReviewChapterPosition: "unknown",
+	quickReviewDiagnosticFocus: defaultQuickReviewDiagnosticFocus,
 	quickReviewPreviousPrompt: "",
 	quickReviewCoreSellingPoint: "",
 	quickReviewMustKeepMechanisms: "",
 	quickReviewTargetReaderPleasures: "",
+	saveQuickReviewMethodology: false,
 	rubricResult: null,
 	scoreResult: null,
 	quickReviewResult: null,
@@ -968,6 +1004,7 @@ const persistableWorkspaceKeys = [
 	"projects",
 	"activeProjectId",
 	"provider",
+	"providerConnection",
 	"referenceTitle",
 	"genre",
 	"platform",
@@ -1005,10 +1042,13 @@ const persistableWorkspaceKeys = [
 	"chapterText",
 	"quickReviewGenre",
 	"quickReviewInputKind",
+	"quickReviewChapterPosition",
+	"quickReviewDiagnosticFocus",
 	"quickReviewPreviousPrompt",
 	"quickReviewCoreSellingPoint",
 	"quickReviewMustKeepMechanisms",
 	"quickReviewTargetReaderPleasures",
+	"saveQuickReviewMethodology",
 	"providerConfigHistory",
 	"rubricResult",
 	"scoreResult",
@@ -1017,6 +1057,8 @@ const persistableWorkspaceKeys = [
 	"scoreProgress",
 	"bookTitle",
 	"bookGenre",
+	"bookUpload",
+	"uploadHistory",
 	"bookJob",
 	"selectedResearchJobIds",
 	"comparisonFocus",
@@ -1127,6 +1169,7 @@ export function mergeWorkspaceState(
 		"shared-gpu",
 		"deepseek",
 		"doubao",
+		"zhipu",
 		"qwen",
 		"ollama",
 		"new-api",
@@ -1156,6 +1199,19 @@ export function mergeWorkspaceState(
 	const providerConfigHistory = pruneProviderConfigHistory(
 		(persisted as { providerConfigHistory?: unknown }).providerConfigHistory,
 	);
+	const providerConnection =
+		persisted.providerConnection &&
+		typeof persisted.providerConnection === "object" &&
+		["unknown", "testing", "success", "error"].includes(persisted.providerConnection.status)
+			? {
+					...defaultProviderConnection,
+					...persisted.providerConnection,
+					status:
+						persisted.providerConnection.status === "testing"
+							? "unknown"
+							: persisted.providerConnection.status,
+				}
+			: currentState.providerConnection;
 	const projects =
 		Array.isArray(persisted.projects) && persisted.projects.length
 			? persisted.projects
@@ -1172,6 +1228,7 @@ export function mergeWorkspaceState(
 		projects,
 		activeProjectId,
 		providerConfigHistory,
+		providerConnection,
 		provider: normalizedProvider
 			? {
 					...currentState.provider,
@@ -1179,8 +1236,12 @@ export function mergeWorkspaceState(
 				}
 			: currentState.provider,
 		quickReviewCoreSellingPoint: persisted.quickReviewCoreSellingPoint || "",
+		quickReviewChapterPosition: persisted.quickReviewChapterPosition || "unknown",
+		quickReviewDiagnosticFocus:
+			persisted.quickReviewDiagnosticFocus || defaultQuickReviewDiagnosticFocus,
 		quickReviewMustKeepMechanisms: persisted.quickReviewMustKeepMechanisms || "",
 		quickReviewTargetReaderPleasures: persisted.quickReviewTargetReaderPleasures || "",
+		saveQuickReviewMethodology: Boolean(persisted.saveQuickReviewMethodology),
 		bookFile: null,
 	};
 }
@@ -1202,6 +1263,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setProjects: makeSetter("projects"),
 				setActiveProjectId: makeSetter("activeProjectId"),
 				setProvider: makeSetter("provider"),
+				setProviderConnection: makeSetter("providerConnection"),
 				setProviderConfigHistory: makeSetter("providerConfigHistory"),
 				setReferenceTitle: makeSetter("referenceTitle"),
 				setGenre: makeSetter("genre"),
@@ -1240,10 +1302,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setChapterText: makeSetter("chapterText"),
 				setQuickReviewGenre: makeSetter("quickReviewGenre"),
 				setQuickReviewInputKind: makeSetter("quickReviewInputKind"),
+				setQuickReviewChapterPosition: makeSetter("quickReviewChapterPosition"),
+				setQuickReviewDiagnosticFocus: makeSetter("quickReviewDiagnosticFocus"),
 				setQuickReviewPreviousPrompt: makeSetter("quickReviewPreviousPrompt"),
 				setQuickReviewCoreSellingPoint: makeSetter("quickReviewCoreSellingPoint"),
 				setQuickReviewMustKeepMechanisms: makeSetter("quickReviewMustKeepMechanisms"),
 				setQuickReviewTargetReaderPleasures: makeSetter("quickReviewTargetReaderPleasures"),
+				setSaveQuickReviewMethodology: makeSetter("saveQuickReviewMethodology"),
 				setRubricResult: makeSetter("rubricResult"),
 				setScoreResult: makeSetter("scoreResult"),
 				setQuickReviewResult: makeSetter("quickReviewResult"),

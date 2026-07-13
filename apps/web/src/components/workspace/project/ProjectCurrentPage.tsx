@@ -78,6 +78,16 @@ export function ProjectCurrentPage() {
 	const methodologyCount = projectMethodologyCards.length;
 	const totalAssets = revisionCount + methodologyCount;
 	const completion = Math.min(100, totalAssets ? 42 + totalAssets * 12 : 18);
+	const activeProjectRouteId = activeProjectId || activeProject?.id || "default-project";
+	const activeChapterSeed = [
+		activeProjectRouteId,
+		chapterTitle.trim() || "第一章",
+		chapterText.trim(),
+	].join("|");
+	const activeChapterHref = `/project/current?id=${encodeURIComponent(
+		activeProjectRouteId,
+	)}&chapter=${encodeURIComponent(`chapter-${hashString(activeChapterSeed)}`)}`;
+	const openActiveBook = () => router.push(activeChapterHref);
 
 	return (
 		<RedesignWorkspaceShell
@@ -85,7 +95,7 @@ export function ProjectCurrentPage() {
 			providerLabel={providerLabel}
 			crumb={
 				<>
-					项目 / <b className="text-[#1f2329]">书籍列表</b>
+					我的书籍 / <b className="text-[#1f2329]">书籍列表</b>
 				</>
 			}
 			topActions={
@@ -116,7 +126,7 @@ export function ProjectCurrentPage() {
 						</h1>
 						<p className="m-0 max-w-[740px] text-sm leading-6 text-[#69707d]">
 							所有内容按“书籍 - 章节 - 诊断 - 修改 -
-							复诊”保存，快速诊断也会进入同一套项目上下文。
+							复诊”保存，快速诊断也会进入同一套书籍上下文。
 						</p>
 					</div>
 					<div className="flex flex-wrap gap-2 max-[780px]:mt-4">
@@ -155,7 +165,19 @@ export function ProjectCurrentPage() {
 
 				<section className="grid items-start gap-5 [grid-template-columns:minmax(0,1fr)_340px] max-[1100px]:grid-cols-1">
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						<article className="relative overflow-hidden rounded-[14px] border border-[#e6e8eb] bg-white p-[18px] shadow-[0_4px_18px_rgba(22,27,34,.06)] transition hover:-translate-y-0.5 hover:border-[#ffc3aa] hover:shadow-[0_12px_28px_rgba(255,90,31,.09)]">
+						<article
+							role="button"
+							tabIndex={0}
+							onClick={openActiveBook}
+							onKeyDown={(event) => {
+								if (event.key === "Enter" || event.key === " ") {
+									event.preventDefault();
+									openActiveBook();
+								}
+							}}
+							className="relative cursor-pointer overflow-hidden rounded-[14px] border border-[#e6e8eb] bg-white p-[18px] shadow-[0_4px_18px_rgba(22,27,34,.06)] transition hover:-translate-y-0.5 hover:border-[#ffc3aa] hover:shadow-[0_12px_28px_rgba(255,90,31,.09)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff8a5c]"
+							aria-label={`打开书籍：${activeProject?.name || "默认书籍"}`}
+						>
 							<div className="absolute inset-y-0 left-0 w-1 bg-[#ff5a1f]" />
 							<div className="flex items-start justify-between gap-3">
 								<div className="grid h-9 w-10 place-items-center rounded-[9px] bg-[#fff2ec] text-[#ff5a1f]">
@@ -186,7 +208,11 @@ export function ProjectCurrentPage() {
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => router.push("/project/revisions")}
+									onKeyDown={(event) => event.stopPropagation()}
+									onClick={(event) => {
+										event.stopPropagation();
+										router.push("/project/revisions");
+									}}
 									className="rounded-[9px] border-[#d8dbe0]"
 								>
 									<FileText className="mr-2 size-4" />
@@ -195,7 +221,11 @@ export function ProjectCurrentPage() {
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => router.push("/project/methodology")}
+									onKeyDown={(event) => event.stopPropagation()}
+									onClick={(event) => {
+										event.stopPropagation();
+										router.push("/project/methodology");
+									}}
 									className="rounded-[9px] border-[#d8dbe0]"
 								>
 									<Lightbulb className="mr-2 size-4" />

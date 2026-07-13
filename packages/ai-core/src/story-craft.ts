@@ -1,4 +1,4 @@
-import type { RubricMetric } from "./types";
+import type { QuickReviewPromptMode, RubricMetric } from "./types";
 
 export interface StoryCraftDimension {
   id: string;
@@ -11,6 +11,12 @@ export interface StoryCraftHeuristic {
   id: string;
   label: string;
   promptRule: string;
+}
+
+export interface StoryCraftCriterion {
+  id: string;
+  label: string;
+  rule: string;
 }
 
 export const STORY_CRAFT_RUBRIC_DIMENSIONS: StoryCraftDimension[] = [
@@ -175,4 +181,95 @@ export function formatStoryCraftPromptBrief(): string {
   ).join("\n");
 
   return ["吸纳的网文工艺诊断标准：", dimensions, "", "诊断执行规则：", heuristics].join("\n");
+}
+
+/** Selects a compact rule set for quick diagnosis prompt modes.
+ *
+ * @example
+ * selectStoryCraftCriteria("first-chapter").map((item) => item.label);
+ */
+export function selectStoryCraftCriteria(mode: QuickReviewPromptMode): StoryCraftCriterion[] {
+  const dimensionMap = new Map(
+    STORY_CRAFT_RUBRIC_DIMENSIONS.map((item) => [
+      item.id,
+      {
+        id: item.id,
+        label: item.label,
+        rule: `${item.diagnosticQuestion} 失败信号：${item.failSignal}`,
+      },
+    ]),
+  );
+  const heuristicMap = new Map(
+    STORY_CRAFT_HEURISTICS.map((item) => [
+      item.id,
+      {
+        id: item.id,
+        label: item.label,
+        rule: item.promptRule,
+      },
+    ]),
+  );
+  const idsByMode: Record<QuickReviewPromptMode, string[]> = {
+    "first-chapter": [
+      "core-selling-point",
+      "minimum-plot-loop",
+      "emotion-engine",
+      "hook-recovery",
+      "character-motivation",
+      "judge-mechanism-before-style",
+      "show-emotion-through-action",
+    ],
+    "early-chapter": [
+      "core-selling-point",
+      "minimum-plot-loop",
+      "payoff-loop",
+      "hook-recovery",
+      "character-motivation",
+      "judge-mechanism-before-style",
+      "avoid-summary-ending",
+    ],
+    "chapter-progress": [
+      "minimum-plot-loop",
+      "payoff-loop",
+      "emotion-engine",
+      "character-motivation",
+      "continuity-ledger",
+      "judge-mechanism-before-style",
+    ],
+    "generic-draft": [
+      "core-selling-point",
+      "minimum-plot-loop",
+      "emotion-engine",
+      "hook-recovery",
+      "prose-naturalness",
+      "judge-mechanism-before-style",
+    ],
+    "outline-review": [
+      "core-selling-point",
+      "minimum-plot-loop",
+      "payoff-loop",
+      "character-motivation",
+      "continuity-ledger",
+      "track-open-promises",
+    ],
+    "idea-review": [
+      "core-selling-point",
+      "emotion-engine",
+      "character-motivation",
+      "payoff-loop",
+      "judge-mechanism-before-style",
+    ],
+    "prompt-review": [
+      "core-selling-point",
+      "minimum-plot-loop",
+      "hook-recovery",
+      "character-motivation",
+      "judge-mechanism-before-style",
+      "show-emotion-through-action",
+    ],
+  };
+
+  return idsByMode[mode]
+    .map((id) => dimensionMap.get(id) || heuristicMap.get(id))
+    .filter((item): item is StoryCraftCriterion => Boolean(item));
 }

@@ -17,11 +17,46 @@ export const providerPresets: Record<ProviderPresetId, ProviderPreset> = {
 		baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
 		baseUrlOptions: [
 			{ label: "火山方舟标准推理", url: "https://ark.cn-beijing.volces.com/api/v3" },
-			{ label: "火山方舟 Coding", url: "https://ark.cn-beijing.volces.com/api/coding/v3" },
-			{ label: "火山方舟 Plan", url: "https://ark.cn-beijing.volces.com/api/plan/v3" },
+			{
+				label: "火山方舟 Coding Plan",
+				url: "https://ark.cn-beijing.volces.com/api/coding/v3",
+			},
+			{
+				label: "火山方舟 Plan 套餐",
+				url: "https://ark.cn-beijing.volces.com/api/plan/v3",
+			},
 		],
 		model: "doubao-seed-1-6",
 		modelOptions: ["doubao-seed-1-6"],
+		jsonMode: false,
+		needsApiKey: true,
+	},
+	zhipu: {
+		label: "智谱",
+		kind: "openai-compatible",
+		baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+		baseUrlOptions: [
+			{
+				label: "智谱标准推理",
+				url: "https://open.bigmodel.cn/api/paas/v4",
+			},
+			{
+				label: "智谱 Coding Plan",
+				url: "https://open.bigmodel.cn/api/coding/paas/v4",
+			},
+		],
+		model: "glm-5.2",
+		modelOptions: [
+			"glm-5.2",
+			"glm-5-turbo",
+			"glm-4.7",
+			"glm-5.2-air",
+			"glm-4.6",
+			"glm-4.5",
+			"glm-4.5-air",
+			"glm-4.5-x",
+			"glm-4-flash-250414",
+		],
 		jsonMode: false,
 		needsApiKey: true,
 	},
@@ -117,6 +152,7 @@ export const providerPresets: Record<ProviderPresetId, ProviderPreset> = {
 export const providerPresetOrder: ProviderPresetId[] = [
 	"shared-gpu",
 	"doubao",
+	"zhipu",
 	"qwen",
 	"deepseek",
 	"custom",

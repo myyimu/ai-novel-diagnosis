@@ -745,6 +745,10 @@ function buildGateView(result: QuickReviewResult | null) {
 			label: "当前版本不建议继续投入",
 			className: "border-destructive/40 bg-destructive/10 text-destructive",
 		},
+		insufficient: {
+			label: "信息不足，暂不判断",
+			className: "border-warning-border bg-warning-surface text-warning-foreground",
+		},
 	} as const;
 
 	return map[gate] ?? map.revise;
@@ -785,6 +789,7 @@ export function formatGateLabel(gate: string | undefined) {
 		revise: "修改",
 		rebuild: "重构",
 		discard: "废稿",
+		insufficient: "信息不足",
 	};
 
 	return map[gate || ""] || "修改";

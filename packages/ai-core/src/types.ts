@@ -8,6 +8,7 @@ export type ProviderPresetId =
   | "shared-gpu"
   | "deepseek"
   | "doubao"
+  | "zhipu"
   | "qwen"
   | "ollama"
   | "new-api";
@@ -217,7 +218,28 @@ export interface RecommendedPlatform {
 
 export type QuickReviewInputKind = "human-draft" | "ai-draft" | "idea" | "outline" | "prompt";
 
-export type GateDecision = "continue" | "revise" | "rebuild" | "discard";
+/** Chapter location hint used to avoid applying first-chapter rules to every draft.
+ *
+ * @example
+ * const position: ChapterPosition = "middle";
+ */
+export type ChapterPosition = "first" | "early" | "middle" | "final" | "unknown";
+
+/** Prompt mode selected from input kind and chapter position.
+ *
+ * @example
+ * const mode: QuickReviewPromptMode = "chapter-progress";
+ */
+export type QuickReviewPromptMode =
+  | "first-chapter"
+  | "early-chapter"
+  | "chapter-progress"
+  | "generic-draft"
+  | "outline-review"
+  | "idea-review"
+  | "prompt-review";
+
+export type GateDecision = "continue" | "revise" | "rebuild" | "discard" | "insufficient";
 
 export type DiagnosisIssueSeverity = "critical" | "high" | "medium" | "low";
 
@@ -275,9 +297,11 @@ export interface MethodologyCard {
 }
 
 export interface QuickReviewResult {
+  schemaVersion?: "quick-review.v3";
   title: string;
   genre: string;
   inputKind?: QuickReviewInputKind;
+  chapterPosition?: ChapterPosition;
   positioning: string;
   sellingPoints: string[];
   mainProblem: string;
@@ -285,7 +309,7 @@ export interface QuickReviewResult {
   recommendedPlatforms: RecommendedPlatform[];
   readyForFullReview: boolean;
   readyReason: string;
-  quickScore: number;
+  quickScore: number | null;
   confidence: number;
   gateDecision?: GateDecision;
   gateReason?: string;
@@ -316,6 +340,13 @@ export interface QuickReviewResult {
     whyThisWorks: string[];
   };
   methodologyCards?: MethodologyCard[];
+  analysisScope?: {
+    originalCharacters: number;
+    sampledCharacters: number;
+    isPartial: boolean;
+    samplingStrategy: "full" | "head-tail.v1";
+    assumptions: string[];
+  };
 }
 
 export interface MetricScore {

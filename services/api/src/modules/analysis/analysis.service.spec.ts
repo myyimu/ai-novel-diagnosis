@@ -199,6 +199,8 @@ describe("AnalysisService", () => {
 
     await service.quickReview({
       provider,
+      diagnosticFocus: "重点检查追读钩子是否成立。",
+      chapterPosition: "middle",
       coreSellingPoint: "隐世强者拒绝权力，用不争制造反差爽感。",
       mustKeepMechanisms: "倒计时、拒绝邀请、论坛体。",
       targetReaderPleasures: "读者想看别人误判主角和权力系统被带偏。",
@@ -209,7 +211,7 @@ describe("AnalysisService", () => {
     expect(modelProviders.chat).toHaveBeenCalledWith(
       provider,
       expect.any(Array),
-      expect.objectContaining({ maxOutputTokens: 2200 }),
+      expect.objectContaining({ maxOutputTokens: 1800 }),
     );
 
     const [, messages] = modelProviders.chat.mock.calls[0] as unknown as [
@@ -217,21 +219,19 @@ describe("AnalysisService", () => {
       Array<{ content: string }>,
       unknown,
     ];
-    expect(messages[0].content).toContain("网文第一章诊断编辑");
-    expect(messages[1].content).toContain("Rubric ID：quick-review");
-    expect(messages[1].content).toContain("检查指标：");
+    expect(messages[0].content).toContain("中文网文诊断编辑");
+    expect(messages[1].content).toContain("任务模式：chapter-progress");
+    expect(messages[1].content).toContain("章节位置：middle");
+    expect(messages[1].content).toContain("本次诊断重点：重点检查追读钩子是否成立。");
     expect(messages[1].content).toContain("严格返回这个 JSON 结构");
-    expect(messages[1].content).toContain("gateDecision");
     expect(messages[1].content).toContain("issues");
-    expect(messages[1].content).toContain("用户声明的核心卖点");
+    expect(messages[1].content).toContain("核心卖点");
     expect(messages[1].content).toContain("隐世强者拒绝权力");
-    expect(messages[1].content).toContain("吸纳的网文工艺诊断标准");
     expect(messages[1].content).toContain("最小剧情循环");
-    expect(messages[1].content).toContain("学结构，不搬内容");
-    expect(messages[1].content).toContain("诊断前先执行“一刀切误判防护层”");
-    expect(messages[1].content).toContain("先判断机制是否成立");
-    expect(messages[1].content).toContain(
-      "不能把特殊机制一刀切归因为 AI 痕迹或结构缺陷",
+    expect(messages[1].content).toContain("先判断它是否服务卖点和读者期待");
+    expect(messages[1].content).toContain("禁止输出 recommendedPlatforms");
+    expect(messages[0].content).toContain(
+      "不得删除用户声明必须保留的机制",
     );
   });
 
@@ -273,11 +273,11 @@ describe("AnalysisService", () => {
         kind: "openai-compatible",
       },
       expect.any(Array),
-      expect.objectContaining({ maxOutputTokens: 2200 }),
+      expect.objectContaining({ maxOutputTokens: 1800 }),
     );
   });
 
-  it("should fall back to heuristic platform recommendations when the model omits them", async () => {
+  it("should keep platform recommendations out of quick review results", async () => {
     const modelProviders = {
       chat: jest.fn(async () =>
         JSON.stringify({
@@ -302,11 +302,56 @@ describe("AnalysisService", () => {
       genre: "romance",
     });
 
-    expect(result.recommendedPlatforms).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "jinjiang", fit: "优先发布" }),
-      ]),
-    );
+    expect(result.recommendedPlatforms).toEqual([]);
+  });
+
+  it("should derive the main problem from issues when the model omits mainProblem", async () => {
+    const modelProviders = {
+      chat: jest.fn(async () =>
+        JSON.stringify({
+          title: "第一章",
+          genre: "xuanhuan",
+          positioning: "公开羞辱后进入反击线",
+          sellingPoints: ["冲突进入较快"],
+          actionableFixes: ["前置失败代价"],
+          readyForFullReview: true,
+          readyReason: "正文长度足够",
+          quickScore: 6.2,
+          confidence: 0.68,
+          issues: [
+            {
+              title: "失败代价没有落到具体损失",
+              description: "冲突存在，但主角如果失败会失去什么还不够清楚。",
+              evidence: [
+                {
+                  quote: "否则就让家族一起赔命",
+                  locationHint: "开头",
+                  confidence: 0.75,
+                },
+              ],
+              fixAction: "把家族即将失去的资格、资源或人命写成当场后果。",
+            },
+          ],
+        }),
+      ),
+    };
+    const service = createService({ modelProviders });
+
+    const result = await service.quickReview({
+      provider: {
+        preset: "deepseek",
+        kind: "openai-compatible",
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKey: "sk-user-owned",
+        model: "deepseek-chat",
+      },
+      chapterText:
+        "主角刚进入考场，就发现考官正是三年前废掉他经脉的人。旁人当场羞辱他，要求他放弃资格，否则就让家族一起赔命。",
+    });
+
+    expect(result.mainProblem).toBe("失败代价没有落到具体损失");
+    expect(result.oneLineDiagnosis).toContain("失败代价没有落到具体损失");
+    expect(result.mainProblem).not.toContain("模型没有返回明确问题");
   });
 
   it("should score chapters with the shared ai-core scoring prompt", async () => {

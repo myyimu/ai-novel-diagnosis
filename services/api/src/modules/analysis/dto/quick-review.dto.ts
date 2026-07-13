@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  IsBoolean,
   IsOptional,
   IsIn,
   IsString,
@@ -21,6 +22,17 @@ export class QuickReviewDto {
   @IsString()
   @IsIn(["human-draft", "ai-draft", "idea", "outline", "prompt"])
   inputKind?: "human-draft" | "ai-draft" | "idea" | "outline" | "prompt";
+
+  @ApiPropertyOptional({
+    description:
+      "Chapter position hint. Defaults to unknown so non-first chapters are not forced into first-chapter rules.",
+    enum: ["first", "early", "middle", "final", "unknown"],
+    example: "unknown",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(["first", "early", "middle", "final", "unknown"])
+  chapterPosition?: "first" | "early" | "middle" | "final" | "unknown";
 
   @ApiPropertyOptional({
     description: "Chapter title. If omitted, the LLM infers one.",
@@ -48,6 +60,16 @@ export class QuickReviewDto {
   @MinLength(50)
   @MaxLength(30000)
   chapterText!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "The user's current diagnostic focus. This is separate from the protected core selling point.",
+    example: "重点检查男女主关系推进是否自然。",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  diagnosticFocus?: string;
 
   @ApiPropertyOptional({
     description:
@@ -88,6 +110,15 @@ export class QuickReviewDto {
   @IsString()
   @MaxLength(1000)
   targetReaderPleasures?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Whether to ask the model to generate reusable methodology cards. Defaults to false for lightweight rewrite diagnosis.",
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeMethodologyCards?: boolean;
 
   @ApiPropertyOptional({
     description:

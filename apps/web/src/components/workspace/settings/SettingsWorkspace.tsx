@@ -22,6 +22,7 @@ export function SettingsWorkspace() {
 		providerBaseUrlOptions,
 		filteredProviderModelOptions,
 		providerModelsLoading,
+		providerConnection,
 		providerTestResult,
 		applyProviderPreset,
 		setProviderModelSearch,
@@ -65,6 +66,7 @@ export function SettingsWorkspace() {
 				? "无需配置"
 				: "已配置"
 			: "未配置";
+	const connectionBadge = getConnectionBadge(providerConnection.status);
 
 	return (
 		<RedesignWorkspaceShell
@@ -100,8 +102,10 @@ export function SettingsWorkspace() {
 							只保存在当前浏览器。
 						</p>
 					</div>
-					<div className="rounded-full border border-[#cfe8dc] bg-[#eaf8f1] px-3 py-1 text-xs font-bold text-[#176e50] max-[720px]:mt-4 max-[720px]:inline-flex">
-						模型已连接
+					<div
+						className={`rounded-full border px-3 py-1 text-xs font-bold max-[720px]:mt-4 max-[720px]:inline-flex ${connectionBadge.className}`}
+					>
+						{connectionBadge.label}
 					</div>
 				</section>
 
@@ -152,6 +156,7 @@ export function SettingsWorkspace() {
 					onResetProviderSettings={handleResetProviderSettings}
 					onTestProvider={testProvider}
 					onLoadProviderModelOptions={loadProviderModelOptions}
+					onConfirmProviderChange={testProvider}
 					onApplyProviderConfigHistory={applyProviderConfigHistory}
 					onDeleteProviderConfigHistory={deleteProviderConfigHistory}
 					onClearProviderConfigHistory={clearProviderConfigHistory}
@@ -159,4 +164,29 @@ export function SettingsWorkspace() {
 			</main>
 		</RedesignWorkspaceShell>
 	);
+}
+
+function getConnectionBadge(status: "unknown" | "testing" | "success" | "error") {
+	if (status === "success") {
+		return {
+			label: "模型已连接",
+			className: "border-[#cfe8dc] bg-[#eaf8f1] text-[#176e50]",
+		};
+	}
+	if (status === "error") {
+		return {
+			label: "模型连接失败",
+			className: "border-[#ffd0c2] bg-[#fff0eb] text-[#b42318]",
+		};
+	}
+	if (status === "testing") {
+		return {
+			label: "正在检测模型",
+			className: "border-[#ffe1a6] bg-[#fff7e6] text-[#8c5009]",
+		};
+	}
+	return {
+		label: "模型未测试",
+		className: "border-[#d8dbe0] bg-white text-[#69707d]",
+	};
 }

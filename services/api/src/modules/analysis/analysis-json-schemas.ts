@@ -22,21 +22,11 @@ function arraySchema(items: Record<string, unknown>) {
   };
 }
 
-const recommendedPlatformSchema = objectSchema({
-  id: {
-    type: "string",
-    enum: ["qidian", "fanqie", "jinjiang", "qimao", "wechat-short", "other"],
-  },
-  label: stringSchema,
-  fit: stringSchema,
-  reason: stringSchema,
-});
-
 const evidenceAnchorSchema = objectSchema({
   quote: stringSchema,
   locationHint: stringSchema,
   confidence: numberSchema,
-});
+}, ["quote", "locationHint"]);
 
 const diagnosisIssueSchema = objectSchema({
   id: stringSchema,
@@ -79,7 +69,6 @@ const strengthSchema = objectSchema(
 );
 
 const revisionPlanSchema = objectSchema({
-  priorityIssueIds: stringArraySchema,
   keep: stringArraySchema,
   change: stringArraySchema,
   avoid: stringArraySchema,
@@ -100,46 +89,11 @@ const nextPromptSchema = objectSchema({
   title: stringSchema,
   prompt: stringSchema,
   linkedIssueIds: stringArraySchema,
-  whyThisWorks: stringArraySchema,
-});
-
-const methodologyCardSchema = objectSchema(
-  {
-    id: stringSchema,
-    sourceIssueId: stringSchema,
-    type: {
-      type: "string",
-      enum: [
-        "opening_rule",
-        "prompt_rule",
-        "pacing_rule",
-        "hook_rule",
-        "payoff_rule",
-        "anti_pattern",
-      ],
-    },
-    title: stringSchema,
-    triggerProblem: stringSchema,
-    reusableRule: stringSchema,
-    selfCheckQuestion: stringSchema,
-    promptTemplate: stringSchema,
-    exampleBefore: stringSchema,
-    exampleAfter: stringSchema,
-  },
-  [
-    "id",
-    "sourceIssueId",
-    "type",
-    "title",
-    "triggerProblem",
-    "reusableRule",
-    "selfCheckQuestion",
-  ],
-);
+}, ["title", "prompt", "linkedIssueIds"]);
 
 export const quickReviewJsonSchema = objectSchema({
-  title: stringSchema,
-  genre: {
+  inferredTitle: stringSchema,
+  inferredGenre: {
     type: "string",
     enum: [
       "xuanhuan",
@@ -150,31 +104,19 @@ export const quickReviewJsonSchema = objectSchema({
       "other",
     ],
   },
-  inputKind: {
-    type: "string",
-    enum: ["human-draft", "ai-draft", "idea", "outline", "prompt"],
-  },
-  positioning: stringSchema,
-  sellingPoints: stringArraySchema,
+  readerPromise: objectSchema(
+    {
+      summary: stringSchema,
+      evidence: stringSchema,
+    },
+    ["summary"],
+  ),
   mainProblem: stringSchema,
-  actionableFixes: stringArraySchema,
-  recommendedPlatforms: arraySchema(recommendedPlatformSchema),
-  readyForFullReview: booleanSchema,
-  readyReason: stringSchema,
-  quickScore: numberSchema,
-  confidence: numberSchema,
-  gateDecision: {
-    type: "string",
-    enum: ["continue", "revise", "rebuild", "discard"],
-  },
-  gateReason: stringSchema,
-  oneLineDiagnosis: stringSchema,
   issues: arraySchema(diagnosisIssueSchema),
   strengths: arraySchema(strengthSchema),
   revisionPlan: revisionPlanSchema,
   promptDiagnosis: promptDiagnosisSchema,
   nextPrompt: nextPromptSchema,
-  methodologyCards: arraySchema(methodologyCardSchema),
 });
 
 export const referenceProfileJsonSchema = objectSchema({

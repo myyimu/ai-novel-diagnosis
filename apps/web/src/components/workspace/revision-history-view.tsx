@@ -344,6 +344,7 @@ function formatGateLabel(gate: string | undefined) {
 		revise: "修改",
 		rebuild: "重构",
 		discard: "废稿",
+		insufficient: "信息不足",
 	};
 	return map[gate || ""] || "修改";
 }

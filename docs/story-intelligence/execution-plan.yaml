@@ -1,0 +1,408 @@
+schema_version: "agent-execution-plan.v1"
+document_version: "1.0.0"
+status: "proposed"
+last_updated: "2026-07-13"
+project_root: "E:/ai-novel-diagnosis"
+objective: "在不削弱快速诊断主流程的前提下，实现证据可追溯、可增量运行的整书故事体检。"
+
+required_reading:
+  - "docs/story-intelligence/README.md"
+  - "docs/story-intelligence/model-protocol.md"
+  - "AGENTS.md"
+  - "docs/quick-diagnosis-v3-execution-spec.md"
+  - "docs/feature-prioritization-and-design-slots.md"
+
+product_decisions:
+  feature_name: "故事体检"
+  primary_route: "/project/health"
+  ingestion_route: "/research/book"
+  quick_review_behavior: "只展示单章可证实的局部统计和异常，不声称整书结论。"
+  result_layers:
+    - "deterministic_statistics"
+    - "structured_candidates"
+    - "verified_findings"
+    - "human_review"
+  no_global_score: true
+  max_top_findings: 3
+
+non_goals:
+  - "预测平台流量、签约或商业成功"
+  - "用固定故事模板判定作品好坏"
+  - "自动重写整本小说"
+  - "让 QuickReviewResult 承载整书体检字段"
+  - "在证据不足时输出确定性漏洞"
+
+guardrails:
+  - "保留用户当前未提交改动，不覆盖无关文件。"
+  - "新增代码禁止 any、console.log 和业务层 process.env。"
+  - "Controller 只做路由和 DTO 解析，数据库只允许 repository 访问。"
+  - "模型 quote 必须由服务端回查正文，offset 必须由服务端计算。"
+  - "部分结果必须携带 coverage.isPartial=true。"
+  - "所有用户可见公共类型变化必须添加 changeset。"
+  - "显式 git add 文件，禁止 git add -A。"
+
+phases:
+  - id: "foundation"
+    name: "可信事实层"
+    exit_criteria:
+      - "StoryAuditResult v1 在共享包、API 和 Web 之间一致。"
+      - "对话统计可在无模型时运行。"
+      - "结果包含覆盖率和证据定位质量。"
+    tasks:
+      - id: "FND-001"
+        title: "新增共享故事体检契约"
+        depends_on: []
+        files:
+          create:
+            - "packages/ai-core/src/story-audit.ts"
+            - "packages/ai-core/src/story-audit.test.ts"
+            - ".changeset/add-story-audit-contract.md"
+          modify:
+            - "packages/ai-core/src/index.ts"
+        actions:
+          - "按 model-protocol.md 实现 story-audit.v1 类型。"
+          - "为 schema version、Finding 状态和公共类型添加 JSDoc。"
+          - "只从 index.ts 导出稳定公共类型。"
+        acceptance:
+          - "pnpm --filter ai-core typecheck"
+          - "pnpm --filter ai-core lint"
+          - "pnpm --filter ai-core test"
+          - "pnpm --filter ai-core build"
+
+      - id: "FND-002"
+        title: "实现确定性对话统计"
+        depends_on:
+          - "FND-001"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/dialogue-statistics.service.ts"
+            - "services/api/src/modules/story-audit/dialogue-statistics.service.spec.ts"
+        actions:
+          - "返回对话区间、比例、轮次、标签数、warning。"
+          - "支持四类引号、嵌套、跨段和未闭合引号。"
+          - "支持排除短信、书信、系统提示和内心独白的配置。"
+        acceptance:
+          - "相同文本重复运行结果完全一致。"
+          - "未闭合引号不会吞掉剩余全文。"
+          - "所有分支有单元测试。"
+
+      - id: "FND-003"
+        title: "新增故事体检 DTO、模块与异步任务入口"
+        depends_on:
+          - "FND-001"
+          - "FND-002"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/dto/create-story-audit.dto.ts"
+            - "services/api/src/modules/story-audit/story-audit.controller.ts"
+            - "services/api/src/modules/story-audit/story-audit.module.ts"
+            - "services/api/src/modules/story-audit/story-audit.service.ts"
+            - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
+          modify:
+            - "services/api/src/app.module.ts"
+        api:
+          create_job: "POST /story-audit/jobs"
+          get_job: "GET /story-audit/jobs/:jobId"
+        actions:
+          - "DTO 使用 class-validator，禁止 inline 输入类型。"
+          - "复用现有 book job 的章节切分与分析产物；首版结果可继续保存在 JSON result 中，不新建数据库表。"
+          - "模型不可用时仍返回 statistics profile。"
+        acceptance:
+          - "Controller 不超过 50 行且无业务逻辑。"
+          - "profiles、scope 和 preferences 均有 400 校验测试。"
+          - "部分失败返回 coverage，不伪装成功全书分析。"
+
+      - id: "FND-004"
+        title: "建立场景、事件和事实 Map 输出"
+        depends_on:
+          - "FND-003"
+        files:
+          modify:
+            - "services/api/src/modules/book/book-analysis.service.ts"
+            - "services/api/src/modules/book/book-analysis.service.spec.ts"
+            - "services/api/src/modules/story-audit/story-audit.service.ts"
+            - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
+        actions:
+          - "扩展 chapter map 或增加兼容的 audit map，不破坏现有整书拆解结果。"
+          - "抽取 StoryScene、StoryEvent、StoryFact 和证据短引文。"
+          - "由服务端回查 quote 并生成 offset。"
+        acceptance:
+          - "无证据事实不会进入 explicit-text。"
+          - "Map 只处理可见章节，不推断不可见全文。"
+          - "旧 book analysis fixture 继续通过。"
+
+  - id: "timeline_structure"
+    name: "时间与结构"
+    depends_on:
+      - "foundation"
+    exit_criteria:
+      - "时间冲突由全局约束产生候选。"
+      - "结构图可以点击回章节证据。"
+    tasks:
+      - id: "TLS-001"
+        title: "实现实体消歧和全局事件图"
+        depends_on:
+          - "FND-004"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/story-graph.service.ts"
+            - "services/api/src/modules/story-audit/story-graph.service.spec.ts"
+        actions:
+          - "合并人物别名、地点和事件引用，但保留低置信歧义。"
+          - "分别保存 narrativeOrder 与故事内时间关系。"
+          - "用拓扑约束检测时间环和互斥关系。"
+        acceptance:
+          - "倒叙 fixture 不产生时间冲突。"
+          - "before/after 环产生带双证据的 candidate。"
+          - "unknown 时间不被强制归一化。"
+
+      - id: "TLS-002"
+        title: "生成剧情线矩阵和伏笔回收边"
+        depends_on:
+          - "FND-004"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/story-structure.service.ts"
+            - "services/api/src/modules/story-audit/story-structure.service.spec.ts"
+        actions:
+          - "复用 plotlines、chapterFunctionTable、foreshadowingLedger 和 chronicle。"
+          - "输出 plotlineMatrix 与 setupPayoffEdges。"
+          - "未选择模板时不输出结构扣分。"
+        acceptance:
+          - "未完结文本的 open setup 只能是 candidate 或 unknown。"
+          - "结构视图不复制一份独立事实数据。"
+
+      - id: "TLS-003"
+        title: "增加模型独立复核器"
+        depends_on:
+          - "TLS-001"
+          - "TLS-002"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/story-audit-verifier.service.ts"
+            - "services/api/src/modules/story-audit/story-audit-verifier.service.spec.ts"
+        actions:
+          - "Verifier 只接收候选、局部上下文、相关 canon 和图邻居。"
+          - "检查倒叙、梦境、预言、撒谎、不可靠叙述等替代解释。"
+          - "服务端计算最终 confidence 和 status。"
+        acceptance:
+          - "证据不足不得 verified。"
+          - "模型返回的未知 anchorId 被拒绝。"
+          - "JSON 修复后仍需 schema 校验。"
+
+  - id: "character_plot"
+    name: "人物一致性与剧情漏洞"
+    depends_on:
+      - "timeline_structure"
+    exit_criteria:
+      - "人物状态随场景变化且支持 canon 优先级。"
+      - "剧情漏洞只以证据候选形式出现。"
+    tasks:
+      - id: "CHP-001"
+        title: "实现人物状态账本"
+        depends_on:
+          - "TLS-001"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/character-ledger.service.ts"
+            - "services/api/src/modules/story-audit/character-ledger.service.spec.ts"
+        actions:
+          - "跟踪身份、能力、知识、目标、信念、关系、位置、持有物和伤势。"
+          - "保留有效区间和 sourcePriority。"
+          - "合理成长、伪装和情境变化不得由单条规则直接判错。"
+        acceptance:
+          - "author-canon 优先于模型推断但不删除冲突证据。"
+          - "知识获得晚于使用时生成 knowledge_violation candidate。"
+          - "合理成长 fixture 不生成 verified 冲突。"
+
+      - id: "CHP-002"
+        title: "实现剧情漏洞候选规则"
+        depends_on:
+          - "CHP-001"
+          - "TLS-002"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/plot-gap-detector.service.ts"
+            - "services/api/src/modules/story-audit/plot-gap-detector.service.spec.ts"
+        actions:
+          - "覆盖 causal_gap、dropped_goal、unresolved_setup、world_rule_violation 和 ability_violation。"
+          - "候选进入同一 verifier，不新增自由审稿 prompt。"
+          - "按叙事跨度、读者可见性和置信度排序。"
+        acceptance:
+          - "每个高优候选至少双证据或正文证据加 canon。"
+          - "单章/部分分析不生成全书 dropped_goal 结论。"
+          - "默认顶部最多 3 个 finding。"
+
+      - id: "CHP-003"
+        title: "生成人物弧光多维序列"
+        depends_on:
+          - "CHP-001"
+        files:
+          create:
+            - "services/api/src/modules/story-audit/character-arc.service.ts"
+            - "services/api/src/modules/story-audit/character-arc.service.spec.ts"
+        actions:
+          - "输出 goalDistance、agency、beliefState、relationshipStates、cost 和 irreversibleChoice。"
+          - "中性段、连续胜利和跳变只生成 structure_signal。"
+        acceptance:
+          - "每个变化点可追溯到 sceneId 和 evidence。"
+          - "不得生成单一人物成长总分。"
+
+  - id: "web_experience"
+    name: "Web 故事体检工作台"
+    depends_on:
+      - "timeline_structure"
+    exit_criteria:
+      - "用户可在项目内查看、复核并管理 finding。"
+      - "图表和问题均能回到原文证据。"
+    tasks:
+      - id: "WEB-001"
+        title: "新增项目故事体检路由与导航"
+        depends_on:
+          - "FND-003"
+        files:
+          create:
+            - "apps/web/src/app/project/health/page.tsx"
+            - "apps/web/src/components/workspace/project/ProjectHealthPage.tsx"
+          modify:
+            - "apps/web/src/lib/workspace-routes.ts"
+            - "apps/web/src/components/workspace/RedesignWorkspaceShell.tsx"
+        actions:
+          - "在我的书籍下增加故事体检，不增加顶层工作区。"
+          - "显示 coverage、partial 状态和结果来源。"
+        acceptance:
+          - "旧路由继续解析。"
+          - "无结果时引导去 /research/book 导入。"
+          - "移动端不依赖固定五栏布局。"
+
+      - id: "WEB-002"
+        title: "实现五页签体检结果与证据检查器"
+        depends_on:
+          - "WEB-001"
+          - "TLS-003"
+          - "CHP-001"
+        files:
+          create:
+            - "apps/web/src/components/workspace/project/story-audit/StoryAuditOverview.tsx"
+            - "apps/web/src/components/workspace/project/story-audit/ContinuityPanel.tsx"
+            - "apps/web/src/components/workspace/project/story-audit/StructurePanel.tsx"
+            - "apps/web/src/components/workspace/project/story-audit/CharacterPanel.tsx"
+            - "apps/web/src/components/workspace/project/story-audit/TextStatisticsPanel.tsx"
+            - "apps/web/src/components/workspace/project/story-audit/FindingInspector.tsx"
+        actions:
+          - "页签为总览、一致性、结构、人物、文本统计。"
+          - "finding 展示证据、替代解释、置信度和作者操作。"
+          - "统计、规则、模型和人工结论使用不同来源标签。"
+        acceptance:
+          - "高优问题点击可打开两侧证据。"
+          - "图表无数据时展示原因，不补 mock 结论。"
+          - "色彩不是唯一的严重级别信息。"
+
+      - id: "WEB-003"
+        title: "接入作者复核与复诊状态"
+        depends_on:
+          - "WEB-002"
+        files:
+          modify:
+            - "apps/web/src/stores/workspace-store.ts"
+            - "apps/web/src/stores/workspace-store.test.ts"
+            - "apps/web/src/hooks/use-workspace-handlers.ts"
+            - "apps/web/src/components/workspace/project/ProjectCurrentPage.tsx"
+        actions:
+          - "支持 confirmed、author_intent、insufficient_evidence、false_positive、planned、resolved。"
+          - "章节页展示来自故事体检的证据标记。"
+          - "复诊时沿用作者已确认 canon 与误报决定。"
+        acceptance:
+          - "刷新后作者复核状态仍保留。"
+          - "误报不会被沉淀为方法论卡。"
+          - "resolved 必须关联新版本或人工说明。"
+
+  - id: "quality_release"
+    name: "质量、导出与发布"
+    depends_on:
+      - "character_plot"
+      - "web_experience"
+    tasks:
+      - id: "QAR-001"
+        title: "增加 Golden fixtures 和精确率评测"
+        depends_on:
+          - "CHP-003"
+          - "WEB-003"
+        files:
+          create:
+            - "fixtures/story-audit/README.md"
+            - "fixtures/story-audit/manifest.json"
+        actions:
+          - "覆盖 model-protocol.md 的十类 fixture。"
+          - "记录 category、status、anchor 和替代解释期望。"
+          - "评测高优候选 precision，不只测 JSON 格式。"
+        acceptance:
+          - "时间冲突高优 precision >= 0.85。"
+          - "人物/剧情漏洞高优 precision >= 0.70。"
+          - "未达阈值的类别默认不进入顶部警报。"
+
+      - id: "QAR-002"
+        title: "增加 Markdown/JSON 导出"
+        depends_on:
+          - "WEB-002"
+        files:
+          modify:
+            - "services/api/src/modules/book/book-export.service.ts"
+            - "services/api/src/modules/book/book-export.service.spec.ts"
+            - "apps/web/src/components/workspace/export-view.tsx"
+        actions:
+          - "导出 coverage、统计、finding、证据、作者复核和 schemaVersion。"
+          - "Markdown 面向作者，JSON 面向其他模型和工具。"
+        acceptance:
+          - "导出不包含上传全文，只包含受控短证据。"
+          - "部分结果在导出标题和元数据中明确标识。"
+
+      - id: "QAR-003"
+        title: "完成全仓质量门与文档同步"
+        depends_on:
+          - "QAR-001"
+          - "QAR-002"
+        files:
+          modify:
+            - "README.md"
+            - "docs/architecture.md"
+            - "docs/feature-prioritization-and-design-slots.md"
+        actions:
+          - "同步新增路由、能力边界和隐私说明。"
+          - "逐项目运行质量门并修复根因。"
+          - "显式 stage 文件并使用 Conventional Commit。"
+        acceptance:
+          - "pnpm run check"
+          - "pnpm run test"
+          - "pnpm run build"
+          - "git status --short 只显示意图内文件"
+          - "无 .env、dist、日志或本地稿件被 staged"
+
+recommended_delivery_order:
+  - "FND-001"
+  - "FND-002"
+  - "FND-003"
+  - "FND-004"
+  - "TLS-001"
+  - "TLS-002"
+  - "TLS-003"
+  - "WEB-001"
+  - "WEB-002"
+  - "CHP-001"
+  - "CHP-002"
+  - "CHP-003"
+  - "WEB-003"
+  - "QAR-001"
+  - "QAR-002"
+  - "QAR-003"
+
+definition_of_done:
+  - "所有 required_reading 已读取。"
+  - "实现与 story-audit.v1 契约一致。"
+  - "高优 finding 有双侧可点击证据。"
+  - "确定性统计可稳定复算。"
+  - "partial 和模型失败有显式降级。"
+  - "作者复核决定可持久化并进入复诊。"
+  - "Golden 精确率达到默认展示阈值。"
+  - "所有适用质量门通过。"
+  - "changeset、文档和 Conventional Commit 完成。"

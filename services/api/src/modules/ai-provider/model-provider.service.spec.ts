@@ -153,6 +153,31 @@ describe("ModelProviderService shared-gpu fallback", () => {
     );
   });
 
+  it("exposes the Zhipu preset with OpenAI-compatible defaults", () => {
+    const service = new ModelProviderService();
+    const preset = service.getPresets().find((item) => item.id === "zhipu");
+    const resolved = service.resolve({
+      preset: "zhipu",
+      kind: "openai-compatible",
+      baseUrl: "",
+      apiKey: "sk-test",
+      model: "",
+      temperature: 0.2,
+      jsonMode: false,
+    });
+
+    expect(preset).toMatchObject({
+      label: "智谱",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      model: "glm-5.2",
+      needsApiKey: true,
+    });
+    expect(resolved).toMatchObject({
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      model: "glm-5.2",
+    });
+  });
+
   it("rejects custom provider URLs that point to localhost", async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock as never;
