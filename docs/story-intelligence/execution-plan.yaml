@@ -16,6 +16,10 @@ product_decisions:
   feature_name: "故事体检"
   primary_route: "/project/health"
   ingestion_route: "/research/book"
+  job_api: "/analysis/book/jobs"
+  result_embedding: "BookAnalysisResult.storyAudit"
+  reuse_cached_book_analysis: true
+  create_parallel_job_system: false
   quick_review_behavior: "只展示单章可证实的局部统计和异常，不声称整书结论。"
   result_layers:
     - "deterministic_statistics"
@@ -30,6 +34,7 @@ non_goals:
   - "用固定故事模板判定作品好坏"
   - "自动重写整本小说"
   - "让 QuickReviewResult 承载整书体检字段"
+  - "新建与 BookAnalysisJob、CachedBookAnalysis 或 chunkEvidenceIndex 重复的基础设施"
   - "在证据不足时输出确定性漏洞"
 
 guardrails:
@@ -87,33 +92,40 @@ phases:
           - "所有分支有单元测试。"
 
       - id: "FND-003"
-        title: "新增故事体检 DTO、模块与异步任务入口"
+        title: "把故事体检接入现有整书任务"
         depends_on:
           - "FND-001"
           - "FND-002"
         files:
           create:
-            - "services/api/src/modules/story-audit/dto/create-story-audit.dto.ts"
-            - "services/api/src/modules/story-audit/story-audit.controller.ts"
             - "services/api/src/modules/story-audit/story-audit.module.ts"
             - "services/api/src/modules/story-audit/story-audit.service.ts"
             - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
           modify:
-            - "services/api/src/app.module.ts"
+            - "services/api/src/modules/analysis/dto/analyze-book.dto.ts"
+            - "services/api/src/modules/analysis/dto/create-book-job-from-upload.dto.ts"
+            - "services/api/src/modules/book/book.controller.ts"
+            - "services/api/src/modules/book/book.module.ts"
+            - "services/api/src/modules/book/book-analysis.service.ts"
+            - "services/api/src/modules/book/book-analysis.service.spec.ts"
         api:
-          create_job: "POST /story-audit/jobs"
-          get_job: "GET /story-audit/jobs/:jobId"
+          create_job: "POST /analysis/book/jobs"
+          create_from_upload: "POST /analysis/book/uploads/:uploadId/jobs"
+          get_job: "GET /analysis/book/jobs/:jobId"
         actions:
-          - "DTO 使用 class-validator，禁止 inline 输入类型。"
-          - "复用现有 book job 的章节切分与分析产物；首版结果可继续保存在 JSON result 中，不新建数据库表。"
+          - "在现有 DTO 增加 purpose=own-draft|reference-study 和可选 profiles，使用 class-validator。"
+          - "复用 BookAnalysisJobService、章节切分、断点恢复、持久化和 job status，不创建第二套 job。"
+          - "把 StoryAuditResult 放入 BookAnalysisResult.storyAudit；首版继续保存在现有 JSON result，不新建数据库表。"
+          - "reference-study 默认保持现有研究资产流程；own-draft 默认启用故事体检并弱化原创化资产。"
           - "模型不可用时仍返回 statistics profile。"
         acceptance:
-          - "Controller 不超过 50 行且无业务逻辑。"
-          - "profiles、scope 和 preferences 均有 400 校验测试。"
+          - "现有 /analysis/book/jobs、resume、search、export 行为保持兼容。"
+          - "purpose 和 profiles 有 400 校验测试。"
+          - "CachedBookAnalysis 无需新增平行缓存即可恢复 storyAudit。"
           - "部分失败返回 coverage，不伪装成功全书分析。"
 
       - id: "FND-004"
-        title: "建立场景、事件和事实 Map 输出"
+        title: "在现有 chapterMaps 上补场景、事件和事实"
         depends_on:
           - "FND-003"
         files:
@@ -123,9 +135,10 @@ phases:
             - "services/api/src/modules/story-audit/story-audit.service.ts"
             - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
         actions:
-          - "扩展 chapter map 或增加兼容的 audit map，不破坏现有整书拆解结果。"
+          - "兼容扩展现有 chapter map，不创建内容重复的 audit map。"
           - "抽取 StoryScene、StoryEvent、StoryFact 和证据短引文。"
           - "由服务端回查 quote 并生成 offset。"
+          - "复用 chunkEvidenceIndex 和现有证据搜索，不建立第二套全文索引。"
         acceptance:
           - "无证据事实不会进入 explicit-text。"
           - "Map 只处理可见章节，不推断不可见全文。"
@@ -257,7 +270,7 @@ phases:
       - "图表和问题均能回到原文证据。"
     tasks:
       - id: "WEB-001"
-        title: "新增项目故事体检路由与导航"
+        title: "把整书导入和项目故事体检连接起来"
         depends_on:
           - "FND-003"
         files:
@@ -267,8 +280,16 @@ phases:
           modify:
             - "apps/web/src/lib/workspace-routes.ts"
             - "apps/web/src/components/workspace/RedesignWorkspaceShell.tsx"
+            - "apps/web/src/components/workspace/research/ResearchBookPage.tsx"
+            - "apps/web/src/lib/workspace-analysis-client.ts"
+            - "apps/web/src/stores/workspace-store.ts"
+            - "apps/web/src/stores/workspace-store.test.ts"
+            - "apps/web/src/hooks/use-workspace-handlers.ts"
         actions:
           - "在我的书籍下增加故事体检，不增加顶层工作区。"
+          - "整书导入增加我的作品/参考作品选择，并传递 purpose/profiles。"
+          - "复用 CachedBookAnalysis，把 bookJobId 关联到 WorkspaceProject，不新增 CachedStoryAudit。"
+          - "我的作品任务完成后主 CTA 进入 /project/health；参考作品继续进入研究结果。"
           - "显示 coverage、partial 状态和结果来源。"
         acceptance:
           - "旧路由继续解析。"
@@ -312,6 +333,8 @@ phases:
           - "支持 confirmed、author_intent、insufficient_evidence、false_positive、planned、resolved。"
           - "章节页展示来自故事体检的证据标记。"
           - "复诊时沿用作者已确认 canon 与误报决定。"
+          - "RevisionSession 只增加 storyAuditFindingIds；QuickReview issues 继续保持章节流失诊断语义。"
+          - "只有重复且 confirmed 的 finding 可以建议生成 MethodologyCard。"
         acceptance:
           - "刷新后作者复核状态仍保留。"
           - "误报不会被沉淀为方法论卡。"
@@ -351,7 +374,7 @@ phases:
             - "services/api/src/modules/book/book-export.service.spec.ts"
             - "apps/web/src/components/workspace/export-view.tsx"
         actions:
-          - "导出 coverage、统计、finding、证据、作者复核和 schemaVersion。"
+          - "在现有 BookExportService 和 /analysis/book/jobs/:jobId/export 中增加 coverage、统计、finding、证据、作者复核和 schemaVersion。"
           - "Markdown 面向作者，JSON 面向其他模型和工具。"
         acceptance:
           - "导出不包含上传全文，只包含受控短证据。"
