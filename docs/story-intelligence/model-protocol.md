@@ -26,6 +26,36 @@ last_updated: 2026-07-13
 
 禁止跳过 Map/Reduce，直接把整本书交给一个模型输出最终漏洞列表。
 
+### 2.1 与现有整书流水线的关系
+
+故事体检是现有 `/analysis/book/jobs` 的可选分析 profile，不是第二套上传、任务、持久化或证据检索系统：
+
+```text
+现有 TXT upload/preprocess
+  -> 现有 BookAnalysisJob + chapterMaps
+  -> 现有 characters/relationships/plotlines/chronicle/writingSupport
+  -> 新增 storyAudit 派生结果
+  -> 仍由现有 job status/search/export 对外提供
+```
+
+运行时结果嵌入现有返回值：
+
+```ts
+interface BookAnalysisResult {
+  analysisPurpose?: "own-draft" | "reference-study";
+  storyAudit?: StoryAuditResult;
+}
+```
+
+现有字段是种子和兼容回退，不是第二份真相：
+
+- `mapReduce.chapterMaps/sourceAnchors` 提供章节 Map 和证据。
+- `characters/relationships` 提供实体消歧种子。
+- `plotlines/chronicle` 提供剧情线与事件种子。
+- `writingSupport.chapterFunctionTable/foreshadowingLedger` 提供结构与伏笔种子。
+- `writingSupport.continuationPack` 和 `generationAssets` 只能生成待作者确认的 canon 候选。
+- `storyAudit.scenes/events/facts` 是一致性推理使用的规范化派生层，不能反向悄悄覆盖旧资产。
+
 ## 3. 公共契约草案
 
 实现时将以下类型放入 `packages/ai-core/src/story-audit.ts`，由 `src/index.ts` 显式导出。字段调整必须同步更新测试、API DTO 和本文档。
@@ -43,6 +73,7 @@ export type StoryAuditProfile =
 export interface StoryAuditRequest {
   projectId: string;
   bookJobId: string;
+  purpose: "own-draft" | "reference-study";
   profiles: StoryAuditProfile[];
   scope?: {
     chapterIds?: string[];
@@ -363,6 +394,8 @@ promptVersion
 
 修改单章时只重跑该章 Map，并重算受影响的实体、时间图邻居、剧情线和候选；不要默认重跑全书。任何结果都必须保存 `coverage` 和 prompt/model 版本。
 
+复用现有 `CachedBookAnalysis`，把 `storyAudit` 作为 `BookAnalysisResult` 的可选字段缓存。禁止新增内容相同的 `CachedStoryAudit`。项目状态只保存 `bookJobId`、作者复核状态和必要索引，不复制整份正文或整份审计结果。
+
 ## 8. 降级与失败行为
 
 - 模型不可用：仍返回对话统计和可确定计算的结构数据。
@@ -396,4 +429,3 @@ promptVersion
 - 所有高优 finding 可以跳转到两侧原文。
 - partial、模型失败和实体不确定都有显式降级路径。
 - 通过各子项目 AGENTS.md 要求的 typecheck、lint、test、build 与 changeset。
-

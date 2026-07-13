@@ -99,6 +99,84 @@ model_protocol: ./model-protocol.md
 确认问题 | 标记为创作意图 | 证据不足 | 稍后处理 | 加入修改计划
 ```
 
+### 4.3 与当前产品能力的融合映射
+
+故事体检不是第二套整书分析。现有 `BookAnalysisResult` 已经包含大量上游资产，新增能力必须优先复用：
+
+| 当前已有资产 | 当前位置 | 故事体检如何复用 | 只补什么 |
+| --- | --- | --- | --- |
+| TXT 清洗、章节切分 | `TextPreprocessorService`、`/analysis/book/preprocess` | 作为唯一正文标准化与章节 ID 来源 | 增加场景级切分结果，不再另建预处理器 |
+| 异步 Map-Reduce、断点恢复、部分结果 | `BookAnalysisJobService`、`/analysis/book/jobs` | 继续作为唯一整书任务系统 | 任务输入增加 `purpose/profiles`，结果可选带 `storyAudit` |
+| `chapterMaps` | `BookAnalysisResult.mapReduce` | 作为场景、事件、人物事实抽取的 Map 基础 | 补 `scenes/events/facts/dialogueAtoms`，保持旧字段兼容 |
+| `sourceAnchors`、`chunkEvidenceIndex`、证据搜索 | `mapReduce`、`GET /analysis/book/jobs/:jobId/search` | 作为 finding 跳转和证据回查基础 | 补双证据关联，不再实现第二套全文检索 |
+| `characters`、`relationships`、图谱质量 | `BookAnalysisResult`、关系图谱工作台 | 作为实体消歧和人物账本种子 | 增加随场景变化的状态，不复制人物卡和关系图 |
+| `plotlines`、`chronicle` | `BookAnalysisResult` | 作为剧情线矩阵与事件时间线种子 | 补故事内时间关系和约束，不另造静态时间线 |
+| `chapterFunctionTable` | `writingSupport` | 作为结构图的章节级回退数据 | 有场景表时下钻到场景，无场景表时显示章节级精度 |
+| `foreshadowingLedger` | `writingSupport` | 作为 setup-payoff 初始账本 | 增加 reminder、unknown 和证据边 |
+| `emotionalBeatMap`、`pacingCurve` | `writingSupport` | 继续负责情绪和节奏视图 | 不把它们伪装成人物弧光 |
+| `continuationPack.oocGuards/settingGuards` | `writingSupport` | 作为待作者确认的 canon 候选 | canon 确认后才提高冲突检测权重 |
+| `characterVoiceGuide`、`styleBible.dialogueRules` | `generationAssets` | 作为角色语气参照 | 对话占比仍由程序计算，语气漂移后置复核 |
+| `RevisionSession` | Web 项目状态 | 继续承载改稿/复诊版本链 | 增加 `storyAuditFindingIds` 和问题状态变化 |
+| `MethodologyCard` | `/project/methodology` | 只沉淀重复且人工确认的问题 | 误报、创作意图和未确认候选不得入库 |
+| `BookExportService` | `/analysis/book/jobs/:jobId/export` | 继续作为唯一整书导出入口 | 增加 audit Markdown/JSON 分区，不新建下载系统 |
+
+建议对现有结果做兼容式扩展，不创建平行缓存：
+
+```ts
+interface BookAnalysisResult {
+  // 现有字段保持不变
+  analysisPurpose?: "own-draft" | "reference-study";
+  storyAudit?: StoryAuditResult;
+}
+
+interface WorkspaceProject {
+  // 现有字段保持不变
+  bookJobId?: string;
+  analysisPurpose?: "own-draft" | "reference-study";
+}
+
+interface RevisionSession {
+  // 现有字段保持不变
+  storyAuditFindingIds?: string[];
+}
+```
+
+这样现有 `CachedBookAnalysis` 会自然缓存故事体检，不需要 `CachedStoryAudit`；已有整书任务历史、恢复、搜索和导出仍然有效。
+
+### 4.4 两类整书导入必须分流
+
+当前“整书拆解”同时可能接收作者自己的稿子和成熟参考作品。两者目标不同，导入页应新增一个明确选择：
+
+```text
+这是：我的作品 | 参考作品
+```
+
+- **我的作品**：默认 profiles 为 `statistics + continuity + structure + character`；结果进入 `/project/health`；不主推“原创化改写资产”。
+- **参考作品**：保持当前拆书、关系图谱、结构学习、原创化边界和研究库流程；默认不跑漏洞警报，避免把学习样本当待修改稿。
+- 用户可以之后追加 profile，但系统不应同时生成两套重复人物/时间线资产。
+
+### 4.5 与现有核心闭环的连接
+
+融合后的用户路径应是：
+
+```text
+快速诊断一章
+  -> 保存到当前书籍
+  -> 章节增多或导入整本
+  -> 复用整书 Map-Reduce 生成故事体检
+  -> 在项目页确认 1～3 个问题
+  -> 加入修改计划
+  -> 修改后复诊
+  -> 仅把重复且确认的问题沉淀为方法论
+```
+
+边界保持如下：
+
+- `QuickReviewResult.issues` 继续回答“这一章为什么没人追”，不新增全书漏洞 category；可以只保存 `relatedStoryAuditFindingIds` 做交叉引用。
+- 深度质检/Rubric 继续回答“相对成熟样本标准写得怎样”，故事体检不替代参考样本评分。
+- 关系图谱继续回答“谁和谁如何关联”，人物一致性只在图谱之上增加随时间变化的状态和冲突。
+- 诊断看板继续做复诊趋势，不重复展示某一本书的时间线、结构图或人物弧。
+
 ## 5. 各能力的产品规格
 
 ### 5.1 对话占比分析
@@ -241,4 +319,3 @@ model_protocol: ./model-protocol.md
 1. 本文档：确定产品边界和页面位置。
 2. [`model-protocol.md`](./model-protocol.md)：确定数据契约、流水线和模型输出规则。
 3. [`execution-plan.yaml`](./execution-plan.yaml)：按依赖顺序领取任务并执行验收。
-
