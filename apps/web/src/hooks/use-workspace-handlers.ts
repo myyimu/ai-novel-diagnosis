@@ -982,7 +982,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			session,
 			methodologyCards: saveQuickReviewMethodology
 				? mergedCards.cards.filter(
-						(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
+						(card) =>
+							(card.projectId || defaultWorkspaceProject.id) === activeProjectId,
 					)
 				: [],
 		})

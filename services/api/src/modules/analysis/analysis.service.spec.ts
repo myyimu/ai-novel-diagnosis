@@ -222,7 +222,9 @@ describe("AnalysisService", () => {
     expect(messages[0].content).toContain("中文网文诊断编辑");
     expect(messages[1].content).toContain("任务模式：chapter-progress");
     expect(messages[1].content).toContain("章节位置：middle");
-    expect(messages[1].content).toContain("本次诊断重点：重点检查追读钩子是否成立。");
+    expect(messages[1].content).toContain(
+      "本次诊断重点：重点检查追读钩子是否成立。",
+    );
     expect(messages[1].content).toContain("严格返回这个 JSON 结构");
     expect(messages[1].content).toContain("issues");
     expect(messages[1].content).toContain("核心卖点");
@@ -230,9 +232,7 @@ describe("AnalysisService", () => {
     expect(messages[1].content).toContain("最小剧情循环");
     expect(messages[1].content).toContain("先判断它是否服务卖点和读者期待");
     expect(messages[1].content).toContain("禁止输出 recommendedPlatforms");
-    expect(messages[0].content).toContain(
-      "不得删除用户声明必须保留的机制",
-    );
+    expect(messages[0].content).toContain("不得删除用户声明必须保留的机制");
   });
 
   it("should keep mock quick review local without calling the provider", async () => {

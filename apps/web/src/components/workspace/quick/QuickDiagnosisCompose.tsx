@@ -656,11 +656,10 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 						<div className="flex items-start gap-3 rounded-[11px] border border-[#d8e2f6] bg-[#edf4ff] p-3 text-xs leading-5 text-[#405a85]">
 							<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
 							<div>
-								<strong className="block text-[#2f5faa]">
-									等待模型返回结果
-								</strong>
+								<strong className="block text-[#2f5faa]">等待模型返回结果</strong>
 								<span className="mt-0.5 block">
-									已等待 {handlers.quickReviewElapsedSeconds} 秒。返回后会保存本章诊断，并打开章节工作区。
+									已等待 {handlers.quickReviewElapsedSeconds}{" "}
+									秒。返回后会保存本章诊断，并打开章节工作区。
 								</span>
 							</div>
 						</div>
@@ -751,8 +750,9 @@ function ResultSection({
 							</div>
 							{result.analysisScope?.isPartial ? (
 								<div className="mt-3 rounded-[10px] border border-[#f5d9a8] bg-[#fff7e6] px-3 py-2 text-[11px] leading-5 text-[#7f4a0c]">
-									本次只检查了开头和结尾：原文 {result.analysisScope.originalCharacters} 字，
-									采样 {result.analysisScope.sampledCharacters} 字，中段未完整诊断。
+									本次只检查了开头和结尾：原文{" "}
+									{result.analysisScope.originalCharacters} 字， 采样{" "}
+									{result.analysisScope.sampledCharacters} 字，中段未完整诊断。
 								</div>
 							) : null}
 						</div>

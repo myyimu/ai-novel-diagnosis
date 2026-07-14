@@ -520,11 +520,17 @@ export class AnalysisService {
     return "unknown";
   }
 
-  private buildQuickReviewTextSample(input: QuickReviewDto): QuickReviewTextSample {
+  private buildQuickReviewTextSample(
+    input: QuickReviewDto,
+  ): QuickReviewTextSample {
     const trimmed = input.chapterText.trim();
-    const chapterPosition = this.normalizeChapterPosition(input.chapterPosition);
+    const chapterPosition = this.normalizeChapterPosition(
+      input.chapterPosition,
+    );
     const assumptions =
-      chapterPosition === "unknown" ? ["章节位置未知，未强制使用第一章标准。"] : [];
+      chapterPosition === "unknown"
+        ? ["章节位置未知，未强制使用第一章标准。"]
+        : [];
 
     if (trimmed.length <= quickReviewSamplingLimit) {
       return {
@@ -547,7 +553,10 @@ export class AnalysisService {
         sampledCharacters: text.length,
         isPartial: true,
         samplingStrategy: QUICK_REVIEW_SAMPLING_VERSION,
-        assumptions: [...assumptions, "正文过长，本次只检查开头和结尾，中段未完整诊断。"],
+        assumptions: [
+          ...assumptions,
+          "正文过长，本次只检查开头和结尾，中段未完整诊断。",
+        ],
       },
     };
   }
@@ -795,7 +804,10 @@ export class AnalysisService {
     return text.trim().replace(/\s+/g, " ").slice(0, 120);
   }
 
-  private verifyDiagnosisEvidence(issues: DiagnosisIssue[], sampledText: string) {
+  private verifyDiagnosisEvidence(
+    issues: DiagnosisIssue[],
+    sampledText: string,
+  ) {
     let removedEvidenceCount = 0;
     const normalizedSample = this.normalizeEvidenceText(sampledText);
     const verifiedIssues = issues.map((issue) => {
@@ -821,7 +833,9 @@ export class AnalysisService {
     return value.replace(/\s+/g, "");
   }
 
-  private resolveQuickReviewGateDecision(issues: DiagnosisIssue[]): GateDecision {
+  private resolveQuickReviewGateDecision(
+    issues: DiagnosisIssue[],
+  ): GateDecision {
     if (issues.every((issue) => issue.evidence.length === 0)) {
       return "insufficient";
     }
@@ -885,7 +899,9 @@ export class AnalysisService {
         ? quickReviewConfidenceLengthBonus
         : 0) +
       (hasEvidenceForEveryIssue ? quickReviewConfidenceEvidenceBonus : 0) +
-      (input.genre?.trim() || genre !== "other" ? quickReviewConfidenceGenreBonus : 0) +
+      (input.genre?.trim() || genre !== "other"
+        ? quickReviewConfidenceGenreBonus
+        : 0) +
       (this.normalizeChapterPosition(input.chapterPosition) !== "unknown"
         ? quickReviewConfidenceChapterPositionBonus
         : 0) +
@@ -917,7 +933,8 @@ export class AnalysisService {
       revise: `当前稿件有潜力，但需要先解决“${topIssue}”。`,
       rebuild: `当前稿件的关键承诺或结构需要重构，优先处理“${topIssue}”。`,
       discard: "当前版本投入产出偏低，建议换角度重写或保留经验后另开一版。",
-      insufficient: "当前输入缺少可核验的证据片段，暂不建议按分数或 Gate 做投入判断。",
+      insufficient:
+        "当前输入缺少可核验的证据片段，暂不建议按分数或 Gate 做投入判断。",
     };
     return reasonMap[gate];
   }
@@ -1169,7 +1186,10 @@ export class AnalysisService {
     };
   }
 
-  private mockQuickReview(input: QuickReviewDto, textSample: QuickReviewTextSample) {
+  private mockQuickReview(
+    input: QuickReviewDto,
+    textSample: QuickReviewTextSample,
+  ) {
     const textLength = input.chapterText.trim().length;
     const quickScore = textLength >= 300 ? 6.2 : 5.4;
     const genre = this.normalizeQuickReviewGenre(input.genre) || "other";

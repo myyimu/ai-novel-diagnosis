@@ -52,6 +52,8 @@ describe("TextPreprocessorService", () => {
       "第 2 章 旧案",
       "章节3 风雨来",
     ]);
-    expect(result.chapters.every((chapter) => chapter.splitBy === "heading")).toBe(true);
+    expect(
+      result.chapters.every((chapter) => chapter.splitBy === "heading"),
+    ).toBe(true);
   });
 });

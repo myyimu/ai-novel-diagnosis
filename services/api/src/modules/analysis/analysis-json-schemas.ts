@@ -22,11 +22,14 @@ function arraySchema(items: Record<string, unknown>) {
   };
 }
 
-const evidenceAnchorSchema = objectSchema({
-  quote: stringSchema,
-  locationHint: stringSchema,
-  confidence: numberSchema,
-}, ["quote", "locationHint"]);
+const evidenceAnchorSchema = objectSchema(
+  {
+    quote: stringSchema,
+    locationHint: stringSchema,
+    confidence: numberSchema,
+  },
+  ["quote", "locationHint"],
+);
 
 const diagnosisIssueSchema = objectSchema({
   id: stringSchema,
@@ -85,11 +88,14 @@ const promptDiagnosisSchema = objectSchema(
   ["missingConstraints", "vagueInstructions", "improvedPromptPrinciples"],
 );
 
-const nextPromptSchema = objectSchema({
-  title: stringSchema,
-  prompt: stringSchema,
-  linkedIssueIds: stringArraySchema,
-}, ["title", "prompt", "linkedIssueIds"]);
+const nextPromptSchema = objectSchema(
+  {
+    title: stringSchema,
+    prompt: stringSchema,
+    linkedIssueIds: stringArraySchema,
+  },
+  ["title", "prompt", "linkedIssueIds"],
+);
 
 export const quickReviewJsonSchema = objectSchema({
   inferredTitle: stringSchema,

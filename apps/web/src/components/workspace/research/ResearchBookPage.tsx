@@ -218,7 +218,9 @@ export function ResearchBookPage() {
 						{uploadHistory.length > 0 ? (
 							<div className="mt-3 rounded-[10px] border border-[#e6e8eb] bg-[#fbfcfd] p-3 text-[10px] leading-5 text-[#5b6572]">
 								<strong className="text-[#1f2329]">
-									{restoredPreview ? "已恢复最近一次章节预览" : "上传记录已持久化"}
+									{restoredPreview
+										? "已恢复最近一次章节预览"
+										: "上传记录已持久化"}
 								</strong>
 								<span className="ml-2">
 									{restoredPreview
@@ -226,7 +228,8 @@ export function ResearchBookPage() {
 										: `本地服务中已保存 ${uploadHistory.length} 条上传记录，重开页面后会自动恢复最近一次预览。`}
 								</span>
 								<span className="ml-2 text-[#7a838f]">
-									最近更新：{new Date(uploadHistory[0]!.updatedAt).toLocaleString()}
+									最近更新：
+									{new Date(uploadHistory[0]!.updatedAt).toLocaleString()}
 								</span>
 							</div>
 						) : null}
