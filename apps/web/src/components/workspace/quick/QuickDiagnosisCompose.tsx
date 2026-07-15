@@ -10,6 +10,7 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
+import type { PlatformFitResult } from "@/lib/workspace-analysis-client";
 import {
 	looksLikeMarkdownText,
 	markdownToPlainText,
@@ -32,6 +33,7 @@ interface QuickDiagnosisHandlers {
 	quickReviewElapsedSeconds: number;
 	quickReviewResult: QuickReviewResult | null;
 	quickReviewError: string | null;
+	quickReviewPlatformFit: PlatformFitResult | null;
 	previousQuickReviewResult: QuickReviewResult | null;
 	quickReviewGenre: string;
 	quickReviewInputKind: import("@/stores/workspace-store").QuickReviewInputKind;
@@ -41,7 +43,6 @@ interface QuickDiagnosisHandlers {
 	quickReviewCoreSellingPoint: string;
 	quickReviewMustKeepMechanisms: string;
 	quickReviewTargetReaderPleasures: string;
-	saveQuickReviewMethodology: boolean;
 	chapterText: string;
 	chapterTitle: string;
 	activeProject?: WorkspaceProject;
@@ -65,9 +66,10 @@ interface QuickDiagnosisHandlers {
 	setQuickReviewCoreSellingPoint: (value: string) => void;
 	setQuickReviewMustKeepMechanisms: (value: string) => void;
 	setQuickReviewTargetReaderPleasures: (value: string) => void;
-	setSaveQuickReviewMethodology: (value: boolean) => void;
 	setChapterTitle: (value: string) => void;
 	runQuickExperience: () => void;
+	analyzeQuickReviewPlatformFit: () => void;
+	generateQuickReviewMethodology: () => void;
 	useExampleChapter: (exampleId: string) => void;
 	openView: (view: "provider" | "chapter" | "book") => void;
 	diagnosisExampleOptions: DiagnosisExampleOption[];
@@ -250,27 +252,6 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 					<RedesignTopButton onClick={() => handlers.openView("book")}>
 						改为导入整本书籍
 					</RedesignTopButton>
-				</section>
-
-				<section className="mb-4 rounded-[11px] border border-[#e6e8eb] bg-white px-[15px] py-[13px] shadow-[0_4px_18px_rgba(22,27,34,.06)]">
-					<label className="flex cursor-pointer items-start gap-3">
-						<input
-							type="checkbox"
-							checked={handlers.saveQuickReviewMethodology}
-							onChange={(event) =>
-								handlers.setSaveQuickReviewMethodology(event.target.checked)
-							}
-							className="mt-1 size-4 accent-[#ff5a1f]"
-						/>
-						<span className="min-w-0">
-							<strong className="block text-xs text-[#303640]">
-								保存可复用方法论卡
-							</strong>
-							<span className="mt-0.5 block text-[10px] leading-5 text-[#69707d]">
-								默认只保存本章诊断和改稿 Prompt；勾选后才把本次结论写入“方法论库”。
-							</span>
-						</span>
-					</label>
 				</section>
 
 				<section className="grid items-start gap-5 [grid-template-columns:minmax(0,1.55fr)_minmax(330px,.75fr)] max-[1100px]:grid-cols-1">
@@ -645,6 +626,12 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 						focusValue={focusValue}
 						rewritePrompt={rewritePrompt}
 						revisionCount={handlers.projectRevisionSessions.length}
+						methodologyCount={handlers.projectMethodologyCards.length}
+						platformFit={handlers.quickReviewPlatformFit}
+						isAnalyzingPlatformFit={handlers.loading === "platform-fit"}
+						onAnalyzePlatformFit={handlers.analyzeQuickReviewPlatformFit}
+						isGeneratingMethodology={handlers.loading === "methodology"}
+						onGenerateMethodology={handlers.generateQuickReviewMethodology}
 					/>
 				) : null}
 			</div>
@@ -664,7 +651,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 							</div>
 						</div>
 						<div className="mt-3 rounded-[10px] border border-[#e6e8eb] bg-[#fbfcfd] px-3 py-2 text-[11px] leading-5 text-[#69707d]">
-							方法论卡{handlers.saveQuickReviewMethodology ? "会" : "不会"}自动保存。
+							本次只生成诊断和改稿 Prompt；方法论卡可在结果页手动沉淀。
 						</div>
 					</div>
 				</div>
@@ -682,6 +669,12 @@ function ResultSection({
 	focusValue,
 	rewritePrompt,
 	revisionCount,
+	methodologyCount,
+	platformFit,
+	isAnalyzingPlatformFit,
+	onAnalyzePlatformFit,
+	isGeneratingMethodology,
+	onGenerateMethodology,
 }: {
 	result: QuickReviewResult;
 	issues: QuickIssue[];
@@ -691,6 +684,12 @@ function ResultSection({
 	focusValue: string;
 	rewritePrompt: string;
 	revisionCount: number;
+	methodologyCount: number;
+	platformFit: PlatformFitResult | null;
+	isAnalyzingPlatformFit: boolean;
+	onAnalyzePlatformFit: () => void;
+	isGeneratingMethodology: boolean;
+	onGenerateMethodology: () => void;
 }) {
 	return (
 		<section className="mt-[22px]">
@@ -898,8 +897,24 @@ function ResultSection({
 							<Button
 								variant="outline"
 								className="w-full rounded-[9px] border-[#d8dbe0]"
+								onClick={onAnalyzePlatformFit}
+								disabled={isAnalyzingPlatformFit}
 							>
-								保存到书籍
+								{isAnalyzingPlatformFit ? (
+									<Loader2 className="mr-2 size-4 animate-spin" />
+								) : null}
+								分析平台适配
+							</Button>
+							<Button
+								variant="outline"
+								className="w-full rounded-[9px] border-[#d8dbe0]"
+								onClick={onGenerateMethodology}
+								disabled={isGeneratingMethodology || !issues.length}
+							>
+								{isGeneratingMethodology ? (
+									<Loader2 className="mr-2 size-4 animate-spin" />
+								) : null}
+								沉淀方法论卡
 							</Button>
 							<Button
 								variant="outline"
@@ -909,11 +924,43 @@ function ResultSection({
 							</Button>
 						</div>
 					</div>
+					{platformFit ? (
+						<div className="rounded-[14px] border border-[#d7e3fb] bg-[#f7faff] p-5 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
+							<h3 className="m-0 text-[15px] font-bold">平台适配假设</h3>
+							<p className="mt-2 text-xs leading-5 text-[#465979]">
+								{platformFit.summary}
+							</p>
+							<div className="mt-3 grid gap-2">
+								{platformFit.recommendations.slice(0, 3).map((item) => (
+									<div
+										key={`${item.platform}-${item.fitLevel}`}
+										className="rounded-[10px] border border-[#d7e3fb] bg-white px-3 py-2.5"
+									>
+										<div className="flex items-center justify-between gap-3">
+											<strong className="text-[13px]">{item.platform}</strong>
+											<span className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-[10px] font-bold text-[#2f5faa]">
+												{formatPlatformFitLevel(item.fitLevel)}
+											</span>
+										</div>
+										<p className="mt-1.5 text-xs leading-5 text-[#59616c]">
+											{item.reason}
+										</p>
+										<p className="mt-1.5 text-[11px] leading-5 text-[#7f4a0c]">
+											下一步：{item.nextAction}
+										</p>
+									</div>
+								))}
+							</div>
+							<p className="mt-3 text-[10px] leading-5 text-[#69707d]">
+								{platformFit.disclaimer}
+							</p>
+						</div>
+					) : null}
 					<div className="rounded-[11px] border border-[#f5d9a8] bg-[#fff7e6] px-3.5 py-[13px] text-xs text-[#7f4a0c]">
 						报告刻意减少了低优先级建议。完成当前问题后，再通过复诊确认是否引入新问题。
 					</div>
 					<div className="rounded-[11px] border border-[#e6e8eb] bg-white px-3.5 py-[13px] text-xs text-[#69707d]">
-						已沉淀 {revisionCount} 次修改效果。
+						已沉淀 {revisionCount} 次修改效果 · {methodologyCount} 张方法论卡。
 					</div>
 				</aside>
 			</div>
@@ -963,6 +1010,17 @@ function formatGateLabel(gate: string | undefined) {
 	};
 
 	return map[gate || ""] || "Revise";
+}
+
+function formatPlatformFitLevel(level: string) {
+	const map: Record<string, string> = {
+		high: "高适配",
+		medium: "中适配",
+		low: "低适配",
+		unknown: "待确认",
+	};
+
+	return map[level] || "待确认";
 }
 
 function buildRewritePrompt(result: QuickReviewResult | null) {

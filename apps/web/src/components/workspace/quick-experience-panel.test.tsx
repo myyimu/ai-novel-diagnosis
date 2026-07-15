@@ -209,8 +209,10 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("5.2");
 		expect(html).toContain("6.5");
 		expect(html).toContain("从“失败代价不清楚”变为“冲突压力不足”。");
-		expect(html).toContain("推荐发布平台");
-		expect(html).toContain("番茄小说");
+		expect(html).toContain("快速诊断不再输出平台推荐");
+		expect(html).toContain("分析平台适配");
+		expect(html).not.toContain("推荐发布平台");
+		expect(html).not.toContain("番茄小说");
 		expect(html).toContain("打开深度质检");
 		expect(html).toContain("样本/整本导入");
 	});
@@ -253,7 +255,7 @@ describe("QuickExperiencePanel", () => {
 		expect(html).toContain("类型待确认");
 		expect(html).toContain("模型没有返回明确卖点");
 		expect(html).toContain("模型没有返回具体改法");
-		expect(html).toContain("模型还没给出平台建议");
+		expect(html).toContain("快速诊断不再输出平台推荐");
 	});
 
 	it("renders visible progress while waiting for a quick review", () => {

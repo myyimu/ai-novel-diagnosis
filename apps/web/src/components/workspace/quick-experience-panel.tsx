@@ -90,11 +90,6 @@ export function QuickExperiencePanel({
 	const actionableFixes = Array.isArray(quickReviewResult?.actionableFixes)
 		? quickReviewResult.actionableFixes.filter(Boolean)
 		: [];
-	const recommendedPlatforms = Array.isArray(quickReviewResult?.recommendedPlatforms)
-		? quickReviewResult.recommendedPlatforms.filter(
-				(platform) => platform && platform.label && platform.reason,
-			)
-		: [];
 	const issues = Array.isArray(quickReviewResult?.issues)
 		? quickReviewResult.issues.filter((issue) => issue && issue.title)
 		: [];
@@ -662,32 +657,10 @@ export function QuickExperiencePanel({
 							</span>
 						</summary>
 						<div className="mt-4">
-							<p className="text-sm font-medium">推荐发布平台</p>
-							<div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-								{recommendedPlatforms.length ? (
-									recommendedPlatforms.map((platform) => (
-										<div
-											key={`${platform.id}-${platform.label}`}
-											className="rounded-md border border-border bg-card p-3"
-										>
-											<div className="flex items-center justify-between gap-2">
-												<p className="text-sm font-semibold">
-													{platform.label}
-												</p>
-												<span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-													{platform.fit}
-												</span>
-											</div>
-											<p className="mt-2 text-sm leading-6 text-muted-foreground">
-												{platform.reason}
-											</p>
-										</div>
-									))
-								) : (
-									<div className="rounded-md border border-border bg-card p-3 text-sm text-muted-foreground">
-										模型还没给出平台建议，建议先补充更完整的章节内容后重试。
-									</div>
-								)}
+							<p className="text-sm font-medium">平台适配</p>
+							<div className="mt-2 rounded-md border border-border bg-card p-3 text-sm leading-6 text-muted-foreground">
+								快速诊断不再输出平台推荐。平台适配需要目标平台、读者、阅读模式、篇幅和核心卖点，
+								请在新版结果页通过“分析平台适配”单独触发。
 							</div>
 							<div className="mt-4 flex flex-wrap gap-2">
 								<Button onClick={onOpenCritique}>打开深度质检</Button>

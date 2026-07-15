@@ -1,4 +1,6 @@
 import { AnalysisService } from "./analysis.service";
+import { validate } from "class-validator";
+import { AnalyzePlatformFitDto } from "./dto/analyze-platform-fit.dto";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 
 const quickReviewJson = JSON.stringify({
@@ -303,6 +305,228 @@ describe("AnalysisService", () => {
     });
 
     expect(result.recommendedPlatforms).toEqual([]);
+  });
+
+  it("should ignore deprecated methodology generation on quick review", async () => {
+    const modelProviders = {
+      chat: jest.fn(async () =>
+        JSON.stringify({
+          inferredTitle: "第一章",
+          inferredGenre: "xuanhuan",
+          readerPromise: { summary: "公开羞辱后反击" },
+          mainProblem: "失败代价不清",
+          issues: [
+            {
+              id: "issue-1",
+              severity: "high",
+              category: "opening",
+              title: "失败代价不清",
+              description: "主角如果失败会失去什么还不够明确。",
+              evidence: [
+                {
+                  quote: "否则就让家族一起赔命",
+                  locationHint: "开头",
+                },
+              ],
+              readerImpact: "读者无法判断主角为什么必须马上反击。",
+              fixAction: "前置具体损失。",
+              promptConstraint: "前 500 字写清失败代价。",
+              blocksNextStep: true,
+            },
+          ],
+          strengths: [],
+          revisionPlan: {
+            keep: ["公开冲突"],
+            change: ["前置代价"],
+            avoid: ["只润色句子"],
+            checkpoints: ["读者能否说清失败代价"],
+          },
+          nextPrompt: {
+            title: "重写开头",
+            prompt: "保留人物和事件，前置失败代价。",
+            linkedIssueIds: ["issue-1"],
+          },
+          methodologyCards: [
+            {
+              id: "method-1",
+              sourceIssueId: "issue-1",
+              type: "opening_rule",
+              title: "前置失败代价",
+              triggerProblem: "失败代价不清",
+              reusableRule: "开头必须写清失败损失。",
+              selfCheckQuestion: "读者能否说清失败会失去什么？",
+              promptTemplate: "前置失败代价。",
+            },
+          ],
+        }),
+      ),
+    };
+    const service = createService({ modelProviders });
+
+    const result = await service.quickReview({
+      includeMethodologyCards: true,
+      chapterText:
+        "主角刚进入考场，就发现考官正是三年前废掉他经脉的人。旁人当场羞辱他，要求他放弃资格，否则就让家族一起赔命。",
+    });
+
+    expect(result.methodologyCards).toEqual([]);
+  });
+
+  it("should generate methodology cards from structured quick review output without chapter text", async () => {
+    const modelProviders = {
+      chat: jest.fn(async () =>
+        JSON.stringify({
+          methodologyCards: [
+            {
+              id: "method-1",
+              sourceIssueId: "issue-1",
+              type: "opening_rule",
+              title: "前置失败代价",
+              triggerProblem: "失败代价不清",
+              reusableRule: "开头冲突必须落到具体损失。",
+              selfCheckQuestion: "前 500 字是否写清失败会失去什么？",
+              promptTemplate: "保留人物和事件，前置失败代价。",
+            },
+          ],
+        }),
+      ),
+    };
+    const service = createService({ modelProviders });
+    const provider: ProviderConfigDto = {
+      preset: "deepseek",
+      kind: "openai-compatible",
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: "sk-user-owned",
+      model: "deepseek-chat",
+    };
+
+    const result = await service.generateMethodologyCards({
+      provider,
+      projectId: "project-1",
+      revisionSessionId: "revision-1",
+      issues: [
+        {
+          id: "issue-1",
+          severity: "high",
+          category: "opening",
+          title: "失败代价不清",
+          description: "主角如果失败会失去什么还不够明确。",
+          evidence: [{ quote: "否则就让家族一起赔命", locationHint: "开头" }],
+          readerImpact: "读者无法判断主角为什么必须马上反击。",
+          fixAction: "前置具体损失。",
+          promptConstraint: "前 500 字写清失败代价。",
+          blocksNextStep: true,
+        },
+      ],
+      revisionPlan: {
+        keep: ["公开冲突"],
+        change: ["前置代价"],
+        avoid: ["只润色句子"],
+        checkpoints: ["读者能否说清失败代价"],
+      },
+      nextPrompt: {
+        title: "重写开头",
+        prompt: "保留人物和事件，前置失败代价。",
+        linkedIssueIds: ["issue-1"],
+      },
+    });
+
+    expect(result.methodologyCards[0]).toMatchObject({
+      title: "前置失败代价",
+      sourceIssueId: "issue-1",
+    });
+    expect(modelProviders.chat).toHaveBeenCalledWith(
+      provider,
+      expect.any(Array),
+      expect.objectContaining({
+        maxOutputTokens: 700,
+        jsonSchema: expect.objectContaining({
+          name: "methodology_cards_result",
+        }),
+      }),
+    );
+    const [, messages] = modelProviders.chat.mock.calls[0] as unknown as [
+      ProviderConfigDto,
+      Array<{ content: string }>,
+      unknown,
+    ];
+    expect(messages[1].content).toContain("已确认问题");
+    expect(messages[1].content).toContain("下一轮改稿 Prompt");
+    expect(messages[1].content).not.toContain("待改章节正文");
+  });
+
+  it("should analyze platform fit as explicit hypotheses only", async () => {
+    const modelProviders = {
+      chat: jest.fn(async () =>
+        JSON.stringify({
+          summary: "番茄适配度中等，需要更早兑现爽点。",
+          assumptions: ["只基于用户提供上下文"],
+          recommendations: [
+            {
+              platform: "番茄",
+              fitLevel: "medium",
+              reason: "快节奏读者需要更早的代价和反击。",
+              risks: ["开头设定解释偏多"],
+              requiredContext: ["真实完读率"],
+              nextAction: "先压缩设定并前置爽点。",
+            },
+          ],
+          disclaimer: "编辑假设，不代表平台内部算法结论。",
+          dataVersion: "manual-context.v1",
+        }),
+      ),
+    };
+    const service = createService({ modelProviders });
+
+    const result = await service.analyzePlatformFit({
+      provider: { kind: "openai-compatible", preset: "shared-gpu" },
+      candidatePlatform: "fanqie",
+      targetReader: "男频快节奏爽文读者",
+      readingMode: "移动端碎片阅读",
+      workLength: "长篇连载",
+      genre: "xuanhuan",
+      coreSellingPoint: "废柴公开受辱后反击",
+      issues: [
+        {
+          title: "失败代价不清",
+          readerImpact: "读者不知道为什么要追读。",
+          fixAction: "前置失败代价。",
+        },
+      ],
+    });
+
+    expect(result.recommendations[0]).toMatchObject({
+      platform: "番茄",
+      fitLevel: "medium",
+    });
+    expect(result.disclaimer).toContain("编辑假设");
+    const [, messages] = modelProviders.chat.mock.calls[0] as unknown as [
+      ProviderConfigDto,
+      Array<{ content: string }>,
+      unknown,
+    ];
+    expect(messages[0].content).toContain("不得声称知道平台内部算法");
+    expect(messages[1].content).toContain("候选平台：fanqie");
+  });
+
+  it("should reject platform fit requests without required context", async () => {
+    const dto = Object.assign(new AnalyzePlatformFitDto(), {
+      candidatePlatform: "fanqie",
+      targetReader: "",
+      readingMode: "移动端碎片阅读",
+      workLength: "长篇连载",
+      genre: "xuanhuan",
+      coreSellingPoint: "",
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === "targetReader")).toBe(
+      true,
+    );
+    expect(errors.some((error) => error.property === "coreSellingPoint")).toBe(
+      true,
+    );
   });
 
   it("should derive the main problem from issues when the model omits mainProblem", async () => {

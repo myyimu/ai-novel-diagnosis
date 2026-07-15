@@ -2,6 +2,7 @@ import { deleteJson, getJson, patchJson, postForm, postJson } from "@/lib/api-cl
 import type {
 	BookAnalysisJob,
 	BookUploadPreview,
+	MethodologyCard,
 	PersistedResearchLibrary,
 	ProjectMethodologyCard,
 	ProviderForm,
@@ -359,6 +360,107 @@ export function requestQuickReview({
 		mustKeepMechanisms: quickReviewMustKeepMechanisms?.trim() || undefined,
 		targetReaderPleasures: quickReviewTargetReaderPleasures?.trim() || undefined,
 		includeMethodologyCards: Boolean(includeMethodologyCards),
+	});
+}
+
+export function requestMethodologyCards({
+	provider,
+	projectId,
+	revisionSessionId,
+	issues,
+	revisionPlan,
+	nextPrompt,
+}: {
+	provider: ProviderForm;
+	projectId: string;
+	revisionSessionId: string;
+	issues: NonNullable<QuickReviewResult["issues"]>;
+	revisionPlan: NonNullable<QuickReviewResult["revisionPlan"]>;
+	nextPrompt: NonNullable<QuickReviewResult["nextPrompt"]>;
+}) {
+	return postJson<{ methodologyCards: MethodologyCard[] }>("/analysis/methodology-cards", {
+		provider,
+		projectId,
+		revisionSessionId,
+		issues: issues.slice(0, 3).map((issue) => ({
+			id: issue.id,
+			severity: issue.severity,
+			category: issue.category,
+			title: issue.title,
+			description: issue.description,
+			evidence: (issue.evidence || []).slice(0, 3).map((item) => ({
+				quote: item.quote,
+				locationHint: item.locationHint,
+			})),
+			readerImpact: issue.readerImpact,
+			fixAction: issue.fixAction,
+			promptConstraint: issue.promptConstraint,
+			blocksNextStep: issue.blocksNextStep,
+		})),
+		revisionPlan: {
+			keep: revisionPlan.keep || [],
+			change: revisionPlan.change || [],
+			avoid: revisionPlan.avoid || [],
+			checkpoints: revisionPlan.checkpoints || [],
+		},
+		nextPrompt: {
+			title: nextPrompt.title,
+			prompt: nextPrompt.prompt,
+			linkedIssueIds: nextPrompt.linkedIssueIds || [],
+		},
+	});
+}
+
+export interface PlatformFitResult {
+	summary: string;
+	assumptions: string[];
+	recommendations: Array<{
+		platform: string;
+		fitLevel: "high" | "medium" | "low" | "unknown";
+		reason: string;
+		risks: string[];
+		requiredContext: string[];
+		nextAction: string;
+	}>;
+	disclaimer: string;
+	dataVersion: string;
+}
+
+export function requestPlatformFit({
+	provider,
+	candidatePlatform,
+	targetReader,
+	readingMode,
+	workLength,
+	genre,
+	coreSellingPoint,
+	title,
+	issues,
+}: {
+	provider: ProviderForm;
+	candidatePlatform: string;
+	targetReader: string;
+	readingMode: string;
+	workLength: string;
+	genre: string;
+	coreSellingPoint: string;
+	title?: string;
+	issues?: NonNullable<QuickReviewResult["issues"]>;
+}) {
+	return postJson<PlatformFitResult>("/analysis/platform-fit", {
+		provider,
+		candidatePlatform,
+		targetReader,
+		readingMode,
+		workLength,
+		genre,
+		coreSellingPoint,
+		title,
+		issues: (issues || []).slice(0, 3).map((issue) => ({
+			title: issue.title,
+			readerImpact: issue.readerImpact,
+			fixAction: issue.fixAction,
+		})),
 	});
 }
 

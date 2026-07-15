@@ -97,6 +97,41 @@ const nextPromptSchema = objectSchema(
   ["title", "prompt", "linkedIssueIds"],
 );
 
+const methodologyCardSchema = objectSchema(
+  {
+    id: stringSchema,
+    sourceIssueId: stringSchema,
+    type: {
+      type: "string",
+      enum: [
+        "opening_rule",
+        "prompt_rule",
+        "pacing_rule",
+        "hook_rule",
+        "payoff_rule",
+        "anti_pattern",
+      ],
+    },
+    title: stringSchema,
+    triggerProblem: stringSchema,
+    reusableRule: stringSchema,
+    selfCheckQuestion: stringSchema,
+    promptTemplate: stringSchema,
+    exampleBefore: stringSchema,
+    exampleAfter: stringSchema,
+  },
+  [
+    "id",
+    "sourceIssueId",
+    "type",
+    "title",
+    "triggerProblem",
+    "reusableRule",
+    "selfCheckQuestion",
+    "promptTemplate",
+  ],
+);
+
 export const quickReviewJsonSchema = objectSchema({
   inferredTitle: stringSchema,
   inferredGenre: {
@@ -123,6 +158,30 @@ export const quickReviewJsonSchema = objectSchema({
   revisionPlan: revisionPlanSchema,
   promptDiagnosis: promptDiagnosisSchema,
   nextPrompt: nextPromptSchema,
+});
+
+export const methodologyCardsJsonSchema = objectSchema({
+  methodologyCards: arraySchema(methodologyCardSchema),
+});
+
+const platformRecommendationSchema = objectSchema({
+  platform: stringSchema,
+  fitLevel: {
+    type: "string",
+    enum: ["high", "medium", "low", "unknown"],
+  },
+  reason: stringSchema,
+  risks: stringArraySchema,
+  requiredContext: stringArraySchema,
+  nextAction: stringSchema,
+});
+
+export const platformFitJsonSchema = objectSchema({
+  summary: stringSchema,
+  assumptions: stringArraySchema,
+  recommendations: arraySchema(platformRecommendationSchema),
+  disclaimer: stringSchema,
+  dataVersion: stringSchema,
 });
 
 export const referenceProfileJsonSchema = objectSchema({

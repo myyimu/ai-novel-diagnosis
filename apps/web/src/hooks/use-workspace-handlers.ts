@@ -23,6 +23,8 @@ import {
 	readBookAnalysisJob,
 	readResearchLibrary,
 	readWorkspaceAssets,
+	requestMethodologyCards,
+	requestPlatformFit,
 	requestQuickReview,
 	requestReferenceProfile,
 	requestRubric,
@@ -33,6 +35,7 @@ import {
 	upsertRevisionAssets,
 	upsertWorkspaceProject,
 	type ReferenceProfileResult,
+	type PlatformFitResult,
 	type WorkspaceAssetsPayload,
 } from "@/lib/workspace-analysis-client";
 import {
@@ -132,6 +135,8 @@ export type LoadingState =
 	| "rubric"
 	| "score"
 	| "quick"
+	| "methodology"
+	| "platform-fit"
 	| "upload"
 	| "book"
 	| "history"
@@ -389,6 +394,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const [previousQuickReviewResult, setPreviousQuickReviewResult] =
 		useState<QuickReviewResult | null>(null);
 	const [quickReviewError, setQuickReviewError] = useState<string | null>(null);
+	const [quickReviewPlatformFit, setQuickReviewPlatformFit] = useState<PlatformFitResult | null>(
+		null,
+	);
 
 	/* ──────────── refs ──────────── */
 
@@ -850,7 +858,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			quickReviewCoreSellingPoint,
 			quickReviewMustKeepMechanisms,
 			quickReviewTargetReaderPleasures,
-			includeMethodologyCards: saveQuickReviewMethodology,
+			includeMethodologyCards: false,
 			chapterTitle,
 			chapterText,
 		});
@@ -946,19 +954,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const project: WorkspaceProject = activeProject
 			? { ...activeProject, updatedAt: now }
 			: { ...defaultWorkspaceProject, updatedAt: now };
-		const mergedCards = saveQuickReviewMethodology
-			? mergeProjectMethodologyCards({
-					projectId: activeProjectId,
-					currentCards: methodologyCards,
-					resultCards: result.methodologyCards,
-					result,
-					chapterTitle,
-					now,
-				})
-			: {
-					cards: methodologyCards,
-					cardIds: [],
-				};
+		const mergedCards = {
+			cards: methodologyCards,
+			cardIds: [],
+		};
 		const session = createRevisionSession({
 			projectId: activeProjectId,
 			chapterTitle,
@@ -968,9 +967,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			now,
 		});
 
-		if (saveQuickReviewMethodology) {
-			setMethodologyCards(mergedCards.cards);
-		}
 		setRevisionSessions((current) => upsertRevisionSession(current, session));
 		setProjects((current) =>
 			current.map((project) =>
@@ -980,12 +976,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		void upsertRevisionAssets({
 			project,
 			session,
-			methodologyCards: saveQuickReviewMethodology
-				? mergedCards.cards.filter(
-						(card) =>
-							(card.projectId || defaultWorkspaceProject.id) === activeProjectId,
-					)
-				: [],
+			methodologyCards: [],
 		})
 			.then(applyWorkspaceAssets)
 			.catch(() => {
@@ -1508,6 +1499,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					setPreviousQuickReviewResult(quickReviewResult);
 				}
 				setQuickReviewResult(cached.result);
+				setQuickReviewPlatformFit(null);
 				setQuickReviewError(null);
 				rememberQuickReviewIteration(cached.result);
 				setStatus("已使用缓存的问题分析；如需让 AI 重新分析，请点“重新分析”。");
@@ -1524,6 +1516,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				setPreviousQuickReviewResult(quickReviewResult);
 			}
 			setQuickReviewResult(result);
+			setQuickReviewPlatformFit(null);
 			setQuickReviewError(null);
 			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
@@ -1537,6 +1530,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			setPreviousQuickReviewResult(quickReviewResult);
 		}
 		setQuickReviewResult(null);
+		setQuickReviewPlatformFit(null);
 		setQuickReviewError(null);
 		setStatus("正在读取章节...");
 		const queueStatusTimer = window.setTimeout(() => {
@@ -1560,9 +1554,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				quickReviewCoreSellingPoint,
 				quickReviewMustKeepMechanisms,
 				quickReviewTargetReaderPleasures,
-				includeMethodologyCards: saveQuickReviewMethodology,
+				includeMethodologyCards: false,
 			});
 			setQuickReviewResult(result);
+			setQuickReviewPlatformFit(null);
 			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
 			setStatus(
@@ -1578,6 +1573,147 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			toast.error("诊断失败", { description: message });
 		} finally {
 			window.clearTimeout(queueStatusTimer);
+			setLoading(null);
+		}
+	}
+
+	async function analyzeQuickReviewPlatformFit() {
+		if (!quickReviewResult) {
+			setStatus("请先完成一次快速诊断，再分析平台适配。");
+			return;
+		}
+
+		const resolvedGenre = quickReviewGenre || quickReviewResult.genre || genre;
+		const coreSellingPoint =
+			quickReviewCoreSellingPoint.trim() ||
+			quickReviewResult.positioning?.trim() ||
+			quickReviewResult.mainProblem?.trim();
+		if (!resolvedGenre || !coreSellingPoint) {
+			setStatus("平台适配需要题材和核心卖点，请先补充后再分析。");
+			return;
+		}
+
+		setLoading("platform-fit");
+		setStatus("正在分析平台适配假设...");
+		try {
+			const result = await requestPlatformFit({
+				provider: providerPayload,
+				candidatePlatform: platform || "help-me-choose",
+				targetReader: audienceLabel,
+				readingMode: readingModeLabel,
+				workLength: bookText.trim()
+					? `整本或样本约 ${bookText.trim().length} 字`
+					: `当前诊断片段 ${chapterText.trim().length} 字，篇幅计划待补充`,
+				genre: resolvedGenre,
+				coreSellingPoint,
+				title: chapterTitle || quickReviewResult.title,
+				issues: quickReviewResult.issues,
+			});
+			setQuickReviewPlatformFit(result);
+			setStatus("平台适配假设已生成。");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "平台适配分析失败。";
+			setStatus(message);
+			toast.error("平台适配分析失败", { description: message });
+		} finally {
+			setLoading(null);
+		}
+	}
+
+	async function generateQuickReviewMethodology() {
+		if (!quickReviewResult) {
+			setStatus("请先完成一次快速诊断，再沉淀方法论卡。");
+			return;
+		}
+
+		const issues = Array.isArray(quickReviewResult.issues)
+			? quickReviewResult.issues.filter((issue) => issue?.title).slice(0, 3)
+			: [];
+		if (!issues.length || !quickReviewResult.revisionPlan || !quickReviewResult.nextPrompt) {
+			setStatus("当前诊断缺少结构化问题、改稿计划或下一轮 Prompt，暂不能沉淀方法论卡。");
+			return;
+		}
+
+		const latestSession =
+			projectRevisionSessions.find(
+				(session) =>
+					session.textHash === hashString(chapterText.trim()) &&
+					session.mainProblem === quickReviewResult.mainProblem,
+			) ?? projectRevisionSessions[0];
+
+		setLoading("methodology");
+		setStatus("正在把本次诊断沉淀为方法论卡...");
+		try {
+			const response = await requestMethodologyCards({
+				provider: providerPayload,
+				projectId: activeProjectId || defaultWorkspaceProject.id,
+				revisionSessionId: latestSession?.id || "revision-unsaved",
+				issues,
+				revisionPlan: quickReviewResult.revisionPlan,
+				nextPrompt: quickReviewResult.nextPrompt,
+			});
+			if (!response.methodologyCards.length) {
+				setStatus("模型没有返回可沉淀的方法论卡，本次诊断仍已保留。");
+				return;
+			}
+
+			const now = new Date().toISOString();
+			const project: WorkspaceProject = activeProject
+				? { ...activeProject, updatedAt: now }
+				: { ...defaultWorkspaceProject, updatedAt: now };
+			const resultWithCards: QuickReviewResult = {
+				...quickReviewResult,
+				methodologyCards: response.methodologyCards,
+			};
+			const mergedCards = mergeProjectMethodologyCards({
+				projectId: activeProjectId,
+				currentCards: methodologyCards,
+				resultCards: response.methodologyCards,
+				result: resultWithCards,
+				chapterTitle,
+				now,
+			});
+			const session =
+				latestSession ??
+				createRevisionSession({
+					projectId: activeProjectId,
+					chapterTitle,
+					chapterText,
+					result: quickReviewResult,
+					methodologyCardIds: [],
+					now,
+				});
+			const updatedSession = {
+				...session,
+				methodologyCardIds: Array.from(
+					new Set([...(session.methodologyCardIds || []), ...mergedCards.cardIds]),
+				),
+			};
+
+			setMethodologyCards(mergedCards.cards);
+			setRevisionSessions((current) => upsertRevisionSession(current, updatedSession));
+			setProjects((current) =>
+				current.map((item) =>
+					item.id === activeProjectId ? { ...item, updatedAt: now } : item,
+				),
+			);
+			void upsertRevisionAssets({
+				project,
+				session: updatedSession,
+				methodologyCards: mergedCards.cards.filter(
+					(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
+				),
+			})
+				.then(applyWorkspaceAssets)
+				.catch(() => {
+					setStatus("方法论卡已本地保存；后端暂时未同步成功。");
+				});
+			setStatus(`已沉淀 ${mergedCards.cardIds.length} 张方法论卡。`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "方法论卡生成失败。";
+			setStatus(message);
+			toast.error("方法论卡生成失败", { description: message });
+		} finally {
 			setLoading(null);
 		}
 	}
@@ -2250,6 +2386,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		previousQuickReviewResult,
 		quickReviewElapsedSeconds,
 		quickReviewError,
+		quickReviewPlatformFit,
 		quickReviewCacheHit,
 
 		/* rubric / score */
@@ -2311,6 +2448,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		useExampleReference,
 		useExampleBook,
 		runQuickExperience,
+		analyzeQuickReviewPlatformFit,
+		generateQuickReviewMethodology,
 		buildRubric,
 		scoreChapter,
 		analyzeBook,

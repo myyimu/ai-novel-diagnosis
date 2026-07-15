@@ -113,8 +113,9 @@ export class QuickReviewDto {
 
   @ApiPropertyOptional({
     description:
-      "Whether to ask the model to generate reusable methodology cards. Defaults to false for lightweight rewrite diagnosis.",
+      "Deprecated. Methodology cards are now generated through POST /analysis/methodology-cards after quick review.",
     example: false,
+    deprecated: true,
   })
   @IsOptional()
   @IsBoolean()

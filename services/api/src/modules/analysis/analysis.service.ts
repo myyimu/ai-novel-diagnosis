@@ -21,12 +21,16 @@ import {
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
+import { AnalyzePlatformFitDto } from "./dto/analyze-platform-fit.dto";
 import { BuildRubricDto } from "./dto/build-rubric.dto";
+import { GenerateMethodologyCardsDto } from "./dto/generate-methodology-cards.dto";
 import { InferReferenceProfileDto } from "./dto/infer-reference-profile.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { QuickReviewDto } from "./dto/quick-review.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import {
+  methodologyCardsJsonSchema,
+  platformFitJsonSchema,
   quickReviewJsonSchema,
   referenceProfileJsonSchema,
   rubricJsonSchema,
@@ -373,6 +377,81 @@ export class AnalysisService {
     );
   }
 
+  async generateMethodologyCards(input: GenerateMethodologyCardsDto) {
+    const provider = this.resolveQuickReviewProvider(input.provider);
+    const issues = input.issues
+      .map((issue) => this.normalizeMethodologyInputIssue(issue))
+      .slice(0, 3);
+    const promptText = input.nextPrompt.prompt.trim();
+
+    if (provider.kind === "mock") {
+      return {
+        methodologyCards: this.normalizeMethodologyCards(
+          null,
+          issues,
+          promptText,
+        ),
+      };
+    }
+
+    const content = await this.modelProviders.chat(
+      provider,
+      this.buildMethodologyCardsPrompt(input, issues).messages,
+      {
+        maxOutputTokens: 700,
+        jsonSchema: {
+          name: "methodology_cards_result",
+          schema: methodologyCardsJsonSchema,
+        },
+      },
+    );
+    const parsed = await parseJsonWithRepair(
+      this.modelProviders,
+      provider,
+      content,
+      "方法论卡",
+    );
+    const source =
+      parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>).methodologyCards
+        : parsed;
+
+    return {
+      methodologyCards: this.normalizeMethodologyCards(
+        source,
+        issues,
+        promptText,
+      ),
+    };
+  }
+
+  async analyzePlatformFit(input: AnalyzePlatformFitDto) {
+    const provider = this.resolveQuickReviewProvider(input.provider);
+    if (provider.kind === "mock") {
+      return this.mockPlatformFit(input);
+    }
+
+    const content = await this.modelProviders.chat(
+      provider,
+      this.buildPlatformFitPrompt(input).messages,
+      {
+        maxOutputTokens: 900,
+        jsonSchema: {
+          name: "platform_fit_result",
+          schema: platformFitJsonSchema,
+        },
+      },
+    );
+    const parsed = await parseJsonWithRepair(
+      this.modelProviders,
+      provider,
+      content,
+      "平台适配",
+    );
+
+    return this.normalizePlatformFitResult(parsed, input);
+  }
+
   private buildQuickReviewPrompt(input: QuickReviewDto, textSample: string) {
     return buildQuickReviewPrompt({
       title: input.title,
@@ -386,6 +465,232 @@ export class AnalysisService {
       targetReaderPleasures: input.targetReaderPleasures,
       sampledText: textSample,
     });
+  }
+
+  private buildMethodologyCardsPrompt(
+    input: GenerateMethodologyCardsDto,
+    issues: DiagnosisIssue[],
+  ) {
+    const issueLines = issues
+      .map((issue, index) =>
+        [
+          `${index + 1}. ${issue.title}`,
+          `severity: ${issue.severity}`,
+          `category: ${issue.category}`,
+          `readerImpact: ${issue.readerImpact}`,
+          `fixAction: ${issue.fixAction}`,
+          `promptConstraint: ${issue.promptConstraint}`,
+          `evidence: ${issue.evidence
+            .slice(0, 2)
+            .map((item) => `${item.locationHint}:${item.quote}`)
+            .join("；")}`,
+        ].join("\n"),
+      )
+      .join("\n\n");
+
+    return {
+      messages: [
+        {
+          role: "system" as const,
+          content:
+            "你是中文网文改稿方法论编辑。你的任务是把一次快速诊断中已经确认的问题，沉淀成作者下次写作前可复用的自查卡。不要重新诊断正文，不预测平台流量，不要求用户重发整章正文。只返回合法 JSON。",
+        },
+        {
+          role: "user" as const,
+          content: [
+            `项目ID：${input.projectId}`,
+            `复诊ID：${input.revisionSessionId}`,
+            "",
+            "已确认问题：",
+            issueLines,
+            "",
+            "改稿计划：",
+            `保留：${input.revisionPlan.keep.join("；") || "无"}`,
+            `修改：${input.revisionPlan.change.join("；") || "无"}`,
+            `避免：${input.revisionPlan.avoid.join("；") || "无"}`,
+            `复诊检查点：${input.revisionPlan.checkpoints.join("；") || "无"}`,
+            "",
+            "下一轮改稿 Prompt：",
+            input.nextPrompt.prompt,
+            "",
+            "生成要求：",
+            "1. 最多生成 1-3 张方法论卡。",
+            "2. 只沉淀可复用规则，不复述整章内容。",
+            "3. 每张卡必须绑定 sourceIssueId。",
+            "4. reusableRule 必须是下一次可执行的写作规则。",
+            "5. selfCheckQuestion 必须是提交前能用是/否检查的问题。",
+            '6. JSON 结构：{"methodologyCards":[{"id":"","sourceIssueId":"","type":"opening_rule|prompt_rule|pacing_rule|hook_rule|payoff_rule|anti_pattern","title":"","triggerProblem":"","reusableRule":"","selfCheckQuestion":"","promptTemplate":"","exampleBefore":"","exampleAfter":""}]}',
+          ].join("\n"),
+        },
+      ],
+    };
+  }
+
+  private buildPlatformFitPrompt(input: AnalyzePlatformFitDto) {
+    const issueLines = (input.issues || [])
+      .slice(0, 3)
+      .map(
+        (issue, index) =>
+          `${index + 1}. ${issue.title}；读者影响：${issue.readerImpact}；改法：${issue.fixAction}`,
+      )
+      .join("\n");
+
+    return {
+      messages: [
+        {
+          role: "system" as const,
+          content:
+            "你是中文网文平台适配顾问。你只能根据用户提供的平台、读者、阅读模式、篇幅、题材和核心卖点给出编辑假设；不得声称知道平台内部算法、实时流量规则、签约概率或收入结果。只返回合法 JSON。",
+        },
+        {
+          role: "user" as const,
+          content: [
+            `候选平台：${input.candidatePlatform}`,
+            `目标读者：${input.targetReader}`,
+            `阅读模式：${input.readingMode}`,
+            `作品篇幅/连载预期：${input.workLength}`,
+            `题材：${input.genre}`,
+            `核心卖点：${input.coreSellingPoint}`,
+            `作品/章节标题：${input.title || "未提供"}`,
+            "",
+            "快速诊断中已确认的问题（可用于判断适配风险，不要重新诊断正文）：",
+            issueLines || "未提供",
+            "",
+            "输出要求：",
+            "1. 标记为编辑假设，不得宣称平台内部算法结论。",
+            "2. 如果候选平台为 help-me-choose，可给 2-3 个候选方向。",
+            "3. 每个 recommendation 必须包含 fitLevel、reason、risks、requiredContext、nextAction。",
+            "4. requiredContext 写还需要用户补充的数据或平台信息。",
+            '5. JSON 结构：{"summary":"","assumptions":[],"recommendations":[{"platform":"","fitLevel":"high|medium|low|unknown","reason":"","risks":[],"requiredContext":[],"nextAction":""}],"disclaimer":"","dataVersion":""}',
+          ].join("\n"),
+        },
+      ],
+    };
+  }
+
+  private normalizePlatformFitResult(
+    value: unknown,
+    input: AnalyzePlatformFitDto,
+  ) {
+    const source =
+      value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {};
+    const rawRecommendations = Array.isArray(source.recommendations)
+      ? source.recommendations
+      : [];
+    const recommendations = rawRecommendations
+      .flatMap((item) => {
+        const recommendation = this.normalizePlatformRecommendation(
+          item,
+          input,
+        );
+        return recommendation ? [recommendation] : [];
+      })
+      .slice(0, 3);
+
+    return {
+      summary:
+        asText(source.summary) ||
+        `当前只基于“${input.genre} / ${input.coreSellingPoint}”做平台适配假设。`,
+      assumptions: asTextList(source.assumptions).slice(0, 5),
+      recommendations:
+        recommendations.length > 0
+          ? recommendations
+          : [this.buildFallbackPlatformRecommendation(input)],
+      disclaimer:
+        asText(source.disclaimer) ||
+        "这是基于用户上下文的编辑假设，不代表平台内部算法、签约、流量或收入结论。",
+      dataVersion: asText(source.dataVersion) || "manual-context.v1",
+    };
+  }
+
+  private normalizePlatformRecommendation(
+    value: unknown,
+    input: AnalyzePlatformFitDto,
+  ) {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+    const source = value as Record<string, unknown>;
+    return {
+      platform: asText(source.platform) || input.candidatePlatform,
+      fitLevel: this.normalizePlatformFitLevel(source.fitLevel),
+      reason:
+        asText(source.reason) ||
+        "当前上下文不足，只能给出低置信度的平台适配假设。",
+      risks: asTextList(source.risks).slice(0, 4),
+      requiredContext: asTextList(source.requiredContext).slice(0, 4),
+      nextAction:
+        asText(source.nextAction) ||
+        "补充目标平台、读者画像和连载计划后再做平台适配判断。",
+    };
+  }
+
+  private normalizePlatformFitLevel(value: unknown) {
+    const fitLevel = asText(value).toLowerCase();
+    if (["high", "medium", "low", "unknown"].includes(fitLevel)) {
+      return fitLevel;
+    }
+    return "unknown";
+  }
+
+  private buildFallbackPlatformRecommendation(input: AnalyzePlatformFitDto) {
+    return {
+      platform: input.candidatePlatform,
+      fitLevel: "unknown",
+      reason: "缺少可更新的平台规则和数据表现，只能保守标记为待确认。",
+      risks: ["未接入平台最新规则", "未提供真实点击、完读或追读数据"],
+      requiredContext: ["目标平台最新规则", "目标读者画像", "作品连载计划"],
+      nextAction: "先补齐平台和读者上下文，再进入完整评分或平台适配复核。",
+    };
+  }
+
+  private mockPlatformFit(input: AnalyzePlatformFitDto) {
+    const platformLabel =
+      labelMaps.platform[
+        input.candidatePlatform as keyof typeof labelMaps.platform
+      ] || input.candidatePlatform;
+    return {
+      summary: `演示模式：${platformLabel} 与“${input.coreSellingPoint}”的适配需要真实模型或人工规则复核。`,
+      assumptions: [
+        "当前没有调用外部模型。",
+        "平台适配只基于用户提供的上下文，不使用平台内部算法。",
+      ],
+      recommendations: [
+        {
+          platform: platformLabel,
+          fitLevel: "unknown",
+          reason: "mock provider 只能验证平台适配流程，不判断真实平台匹配度。",
+          risks: ["缺少目标平台最新规则", "缺少真实数据表现"],
+          requiredContext: ["候选平台", "目标读者", "阅读模式", "作品篇幅"],
+          nextAction: "切换共享站或自有模型后重新分析平台适配。",
+        },
+      ],
+      disclaimer: "这是演示数据，不代表平台内部算法、签约、流量或收入结论。",
+      dataVersion: "mock.v1",
+    };
+  }
+
+  private normalizeMethodologyInputIssue(
+    issue: GenerateMethodologyCardsDto["issues"][number],
+  ): DiagnosisIssue {
+    return {
+      id: issue.id,
+      severity: issue.severity,
+      category: issue.category,
+      title: issue.title,
+      description: issue.description,
+      evidence: issue.evidence.map((item) => ({
+        quote: item.quote,
+        locationHint: item.locationHint,
+        confidence: 1,
+      })),
+      readerImpact: issue.readerImpact,
+      fixAction: issue.fixAction,
+      promptConstraint: issue.promptConstraint,
+      blocksNextStep: issue.blocksNextStep,
+    };
   }
 
   private normalizeQuickReviewResult(
@@ -445,13 +750,7 @@ export class AnalysisService {
       issues,
       previousPrompt: input.previousPrompt,
     });
-    const methodologyCards = input.includeMethodologyCards
-      ? this.normalizeMethodologyCards(
-          source.methodologyCards,
-          issues,
-          nextPrompt.prompt,
-        )
-      : [];
+    const methodologyCards: MethodologyCard[] = [];
 
     return {
       schemaVersion: "quick-review.v3",
@@ -1261,9 +1560,7 @@ export class AnalysisService {
         input.previousPrompt,
       ),
       nextPrompt,
-      methodologyCards: input.includeMethodologyCards
-        ? this.normalizeMethodologyCards(null, [issue], nextPrompt.prompt)
-        : [],
+      methodologyCards: [],
       analysisScope: textSample.analysisScope,
     };
   }

@@ -2,7 +2,9 @@ import { Body, Controller, Get, HttpCode, Post } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Public } from "@/core/decorators/public.decorators";
 import { AnalysisService } from "./analysis.service";
+import { AnalyzePlatformFitDto } from "./dto/analyze-platform-fit.dto";
 import { BuildRubricDto } from "./dto/build-rubric.dto";
+import { GenerateMethodologyCardsDto } from "./dto/generate-methodology-cards.dto";
 import { InferReferenceProfileDto } from "./dto/infer-reference-profile.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { QuickReviewDto } from "./dto/quick-review.dto";
@@ -44,6 +46,29 @@ export class AnalysisController {
   @ApiResponse({ status: 200, description: "Structured quick review" })
   quickReview(@Body() body: QuickReviewDto) {
     return this.analysisService.quickReview(body);
+  }
+
+  @Post("methodology-cards")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary:
+      "Generate reusable methodology cards from a completed quick review",
+  })
+  @ApiResponse({ status: 200, description: "Generated methodology cards" })
+  generateMethodologyCards(@Body() body: GenerateMethodologyCardsDto) {
+    return this.analysisService.generateMethodologyCards(body);
+  }
+
+  @Post("platform-fit")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Analyze platform fit as an explicit optional quick-review action",
+  })
+  @ApiResponse({ status: 200, description: "Platform fit hypotheses" })
+  analyzePlatformFit(@Body() body: AnalyzePlatformFitDto) {
+    return this.analysisService.analyzePlatformFit(body);
   }
 
   @Post("provider/test")

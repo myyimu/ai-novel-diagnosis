@@ -72,6 +72,11 @@ interface ChapterDiagnosisComposeProps {
 }
 
 export function ChapterDiagnosisCompose({ handlers }: ChapterDiagnosisComposeProps) {
+	const chapterLoading =
+		handlers.loading === "methodology" || handlers.loading === "platform-fit"
+			? null
+			: handlers.loading;
+
 	return (
 		<WorkspaceTaskFrame
 			title="深度质检"
@@ -96,7 +101,7 @@ export function ChapterDiagnosisCompose({ handlers }: ChapterDiagnosisComposePro
 			}}
 		>
 			<ChapterCritiqueView
-				loading={handlers.loading}
+				loading={chapterLoading}
 				providerLabel={handlers.providerLabel}
 				quickLoading={handlers.loading === "quick"}
 				quickElapsedSeconds={handlers.quickReviewElapsedSeconds}
