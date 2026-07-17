@@ -1172,6 +1172,7 @@ export function mergeWorkspaceState(
 		"zhipu",
 		"qwen",
 		"ollama",
+		"local",
 		"new-api",
 	];
 	const safeProvider =

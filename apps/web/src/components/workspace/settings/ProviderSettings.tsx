@@ -94,7 +94,7 @@ function getProviderPrivacyHint(provider: ProviderSettingsProps["provider"]) {
 			className: "border-[#ffd6a8] bg-[#fff7e6] text-[#9a4a00]",
 		};
 	}
-	if (provider.preset === "ollama") {
+	if (provider.preset === "ollama" || provider.preset === "local") {
 		return {
 			text: "离线本地，无 API 费用",
 			className: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",

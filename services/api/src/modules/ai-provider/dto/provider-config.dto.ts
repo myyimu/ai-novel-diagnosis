@@ -29,6 +29,7 @@ export class ProviderConfigDto {
       "zhipu",
       "qwen",
       "ollama",
+      "local",
       "new-api",
     ],
     example: "deepseek",
@@ -43,6 +44,7 @@ export class ProviderConfigDto {
     "zhipu",
     "qwen",
     "ollama",
+    "local",
     "new-api",
   ])
   preset?: ProviderPresetId;

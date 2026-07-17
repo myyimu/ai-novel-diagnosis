@@ -178,27 +178,36 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
   });
 
-  it("rejects custom provider URLs that point to localhost", async () => {
-    const fetchMock = jest.fn();
+  it("allows custom provider URLs that point to localhost over http", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    });
     global.fetch = fetchMock as never;
 
     const service = new ModelProviderService();
+    const result = await service.chat(
+      {
+        preset: "custom",
+        kind: "openai-compatible",
+        baseUrl: "http://127.0.0.1:8080/v1",
+        apiKey: "sk-test",
+        model: "local-test",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "hello" }],
+    );
 
-    await expect(
-      service.chat(
-        {
-          preset: "custom",
-          kind: "openai-compatible",
-          baseUrl: "http://127.0.0.1:8080/v1",
-          apiKey: "sk-test",
-          model: "local-test",
-          temperature: 0.2,
-          jsonMode: false,
-        },
-        [{ role: "user", content: "hello" }],
-      ),
-    ).rejects.toThrow("https");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toBe('{"ok":true}');
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8080/v1/chat/completions",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   it("allows the Ollama preset to call the local default endpoint", async () => {
