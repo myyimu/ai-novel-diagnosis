@@ -1,4 +1,5 @@
 ﻿import { BadRequestException } from "@nestjs/common";
+import { StoryAuditOrchestratorService } from "@/modules/story-audit/story-audit-orchestrator.service";
 import { BookAnalysisService } from "./book-analysis.service";
 
 function createBookService(options?: {
@@ -13,6 +14,7 @@ function createBookService(options?: {
     (options?.modelProviders ?? { chat: jest.fn() }) as never,
     (options?.persistence ?? {}) as never,
     {} as never,
+    new StoryAuditOrchestratorService(),
   );
 }
 
@@ -87,6 +89,7 @@ describe("BookAnalysisService", () => {
       { chat: jest.fn() } as never,
       {} as never,
       {} as never,
+      new StoryAuditOrchestratorService(),
     );
 
     await service.getBookAnalysisJob("job-1", { includeResult: false });
@@ -545,6 +548,7 @@ describe("BookAnalysisService", () => {
       { chat: jest.fn() } as never,
       {} as never,
       {} as never,
+      new StoryAuditOrchestratorService(),
     );
 
     const job = await service.createBookAnalysisJob({
@@ -617,6 +621,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         bookExports as never,
+        new StoryAuditOrchestratorService(),
       );
 
       const result = await service.distillBookSkill({
@@ -647,6 +652,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         {} as never,
+        new StoryAuditOrchestratorService(),
       );
 
       await expect(
@@ -687,6 +693,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         {} as never,
+        new StoryAuditOrchestratorService(),
       );
 
       await expect(

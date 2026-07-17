@@ -10,6 +10,7 @@ import type {
 	RubricMetric,
 	RubricResult,
 	ScoreResult,
+	StoryAuditResult,
 } from "@ai-novel-diagnosis/ai-core";
 
 export type {
@@ -521,6 +522,10 @@ export interface BookAnalysisResult {
 		}>;
 		reducerNote: string;
 	};
+	/** Resolved analysis purpose (own-draft runs the story audit). */
+	analysisPurpose?: "own-draft" | "reference-study";
+	/** Derived story audit layer; present only for own-draft runs. */
+	storyAudit?: StoryAuditResult;
 }
 
 export interface BookPreprocessingPreview {

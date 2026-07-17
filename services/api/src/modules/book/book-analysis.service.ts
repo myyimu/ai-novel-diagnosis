@@ -1,6 +1,7 @@
 ﻿import { BadRequestException, Injectable } from "@nestjs/common";
 import { OWN_DRAFT_DEFAULT_PROFILES } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
+import { StoryAuditOrchestratorService } from "@/modules/story-audit/story-audit-orchestrator.service";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
 import {
@@ -104,6 +105,7 @@ export class BookAnalysisService {
     private readonly modelProviders: ModelProviderService,
     private readonly persistence: AnalysisPersistenceRepository,
     private readonly bookExports: BookExportService,
+    private readonly storyAuditOrchestrator: StoryAuditOrchestratorService,
   ) {}
 
   async analyzeBook(_input: AnalyzeBookDto) {
@@ -154,6 +156,7 @@ export class BookAnalysisService {
               phase: metadata?.phase,
             });
           },
+          { jobId },
         );
         await this.bookJobs.complete(jobId, result);
         return result;
@@ -243,6 +246,12 @@ export class BookAnalysisService {
       title: upload.title,
       genre: upload.genre,
       text,
+      ...(job.inputSummary.purpose
+        ? { purpose: job.inputSummary.purpose }
+        : {}),
+      ...(job.inputSummary.profiles
+        ? { profiles: job.inputSummary.profiles }
+        : {}),
     };
 
     return this.bookJobs.resume(input.jobId, async (jobId) => {
@@ -455,6 +464,8 @@ export class BookAnalysisService {
       title: upload.title,
       genre: upload.genre,
       text,
+      purpose: storyAuditInput.purpose,
+      profiles: storyAuditInput.profiles,
     };
 
     return this.bookJobs.create(
@@ -493,6 +504,7 @@ export class BookAnalysisService {
               phase: metadata?.phase,
             });
           },
+          { jobId },
         );
         await this.bookJobs.complete(jobId, result);
         return result;
@@ -743,9 +755,20 @@ export class BookAnalysisService {
         ? this.mockBookReduce(input, preprocessing, chapterMaps)
         : await this.reduceBookMaps(input, preprocessing, chapterMaps);
     const normalized = this.normalizeBookAnalysisResult(input, reduced);
+    const storyAuditInput = this.resolveStoryAuditInput(input);
+    const storyAudit = options.jobId
+      ? this.storyAuditOrchestrator.generateStoryAudit({
+          chapters,
+          purpose: storyAuditInput.purpose,
+          profiles: storyAuditInput.profiles,
+          bookJobId: options.jobId,
+        })
+      : null;
 
     return {
       ...normalized,
+      analysisPurpose: storyAuditInput.purpose,
+      ...(storyAudit ? { storyAudit } : {}),
       preprocessing: {
         cleaning: preprocessing.cleaning,
         chapters: chapters.map(({ text: _text, ...chapter }) => chapter),

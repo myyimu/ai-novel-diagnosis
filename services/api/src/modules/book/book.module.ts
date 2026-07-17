@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AiProviderModule } from "@/modules/ai-provider/ai-provider.module";
+import { StoryAuditModule } from "@/modules/story-audit/story-audit.module";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
 import { BookAnalysisJobService } from "./book-analysis-job.service";
 import { BookAnalysisService } from "./book-analysis.service";
@@ -9,7 +10,7 @@ import { BookUploadService } from "./book-upload.service";
 import { TextPreprocessorService } from "./text-preprocessor.service";
 
 @Module({
-  imports: [AiProviderModule],
+  imports: [AiProviderModule, StoryAuditModule],
   controllers: [BookController],
   providers: [
     AnalysisPersistenceRepository,
