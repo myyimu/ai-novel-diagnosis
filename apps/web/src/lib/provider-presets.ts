@@ -114,6 +114,20 @@ export const providerPresets: Record<ProviderPresetId, ProviderPreset> = {
 		jsonMode: false,
 		needsApiKey: false,
 	},
+	local: {
+		label: "本地 OpenAI 兼容模型",
+		kind: "openai-compatible",
+		baseUrl: "http://localhost:5000/api/v1",
+		baseUrlOptions: [
+			{ label: "本机 5000", url: "http://localhost:5000/api/v1" },
+			{ label: "本机 8000", url: "http://localhost:8000/v1" },
+			{ label: "本机 Ollama", url: "http://localhost:11434/v1" },
+		],
+		model: "",
+		modelOptions: [],
+		jsonMode: false,
+		needsApiKey: false,
+	},
 	mock: {
 		label: "本地演示",
 		kind: "mock",
@@ -157,6 +171,7 @@ export const providerPresetOrder: ProviderPresetId[] = [
 	"deepseek",
 	"custom",
 	"ollama",
+	"local",
 	"mock",
 ];
 

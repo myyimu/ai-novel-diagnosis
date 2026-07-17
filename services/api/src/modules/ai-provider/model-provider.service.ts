@@ -217,6 +217,21 @@ const providerPresets: ProviderPresetWithId[] = [
     needsApiKey: false,
   },
   {
+    id: "local",
+    label: "本地 OpenAI 兼容模型",
+    kind: "openai-compatible",
+    baseUrl: "http://localhost:5000/api/v1",
+    baseUrlOptions: [
+      { label: "本机 5000", url: "http://localhost:5000/api/v1" },
+      { label: "本机 8000", url: "http://localhost:8000/v1" },
+      { label: "本机 Ollama", url: "http://localhost:11434/v1" },
+    ],
+    model: "",
+    modelOptions: [],
+    jsonMode: false,
+    needsApiKey: false,
+  },
+  {
     id: "mock",
     label: "本地演示",
     kind: "mock",
@@ -293,13 +308,42 @@ function isPrivateIpAddress(address: string) {
   );
 }
 
-function isAllowedLocalOllama(provider: ProviderConfigDto, url: URL) {
-  return (
-    provider.preset === "ollama" &&
-    url.protocol === "http:" &&
-    ["localhost", "127.0.0.1", "::1"].includes(url.hostname) &&
-    (url.port === "" || url.port === "11434")
-  );
+function isAllowedLocalProvider(provider: ProviderConfigDto, url: URL) {
+  const localHosts = ["localhost", "127.0.0.1", "::1"];
+  const isLocalHost = localHosts.includes(url.hostname);
+  const preset = provider.preset;
+
+  // Ollama preset is always allowed on its local default port.
+  if (preset === "ollama") {
+    return (
+      url.protocol === "http:" &&
+      isLocalHost &&
+      (url.port === "" || url.port === "11434")
+    );
+  }
+
+  // "local" and "custom" presets allow any local http port so users can
+  // point at self-hosted OpenAI-compatible servers (vLLM, LM Studio, etc.).
+  if (preset === "local" || preset === "custom") {
+    return url.protocol === "http:" && isLocalHost;
+  }
+
+  return false;
+}
+
+function isLocalBaseUrl(baseUrl?: string) {
+  if (!baseUrl) {
+    return false;
+  }
+  try {
+    const url = new URL(baseUrl);
+    return (
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -818,7 +862,15 @@ export class ModelProviderService {
   }
 
   private shouldUseJsonSchema(provider: ProviderConfigDto) {
-    if (provider.preset === "shared-gpu" || provider.preset === "ollama") {
+    // Local/self-hosted endpoints (Ollama, vLLM, LM Studio, custom localhost)
+    // rarely support OpenAI's strict json_schema response_format, so skip it
+    // and fall back to plain json_object mode.
+    if (
+      provider.preset === "shared-gpu" ||
+      provider.preset === "ollama" ||
+      provider.preset === "local" ||
+      isLocalBaseUrl(provider.baseUrl)
+    ) {
       return false;
     }
 
@@ -973,7 +1025,7 @@ export class ModelProviderService {
       throw new BadRequestException("Provider baseUrl must be a valid URL.");
     }
 
-    if (isAllowedLocalOllama(provider, url)) {
+    if (isAllowedLocalProvider(provider, url)) {
       return;
     }
 

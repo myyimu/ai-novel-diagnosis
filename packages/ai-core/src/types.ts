@@ -11,6 +11,7 @@ export type ProviderPresetId =
   | "zhipu"
   | "qwen"
   | "ollama"
+  | "local"
   | "new-api";
 
 export interface ProviderBaseUrlOption {
