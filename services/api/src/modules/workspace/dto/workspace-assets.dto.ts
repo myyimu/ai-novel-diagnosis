@@ -14,6 +14,14 @@ export class WorkspaceProjectDto {
   @IsString()
   name!: string;
 
+  @IsOptional()
+  @IsString()
+  bookJobId?: string;
+
+  @IsOptional()
+  @IsString()
+  analysisPurpose?: string;
+
   @IsString()
   createdAt!: string;
 
@@ -77,6 +85,10 @@ export class RevisionSessionDto {
 
   @IsArray()
   methodologyCardIds!: string[];
+
+  @IsOptional()
+  @IsArray()
+  storyAuditFindingIds?: string[];
 }
 
 export class ProjectMethodologyCardDto {

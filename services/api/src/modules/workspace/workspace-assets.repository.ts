@@ -13,6 +13,8 @@ import {
 export interface WorkspaceProjectSnapshot {
   id: string;
   name: string;
+  bookJobId?: string;
+  analysisPurpose?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -35,6 +37,7 @@ export interface RevisionSessionSnapshot {
   revisionNote?: string;
   revisionNoteUpdatedAt?: string;
   methodologyCardIds: string[];
+  storyAuditFindingIds?: string[];
 }
 
 export interface ProjectMethodologyCardSnapshot {
@@ -100,6 +103,8 @@ export class WorkspaceAssetsRepository {
       .values({
         id: project.id,
         name: project.name,
+        bookJobId: project.bookJobId,
+        analysisPurpose: project.analysisPurpose,
         createdAt: toDate(project.createdAt, now),
         updatedAt: toDate(project.updatedAt, now),
       })
@@ -107,6 +112,8 @@ export class WorkspaceAssetsRepository {
         target: workspaceProjects.id,
         set: {
           name: project.name,
+          bookJobId: project.bookJobId,
+          analysisPurpose: project.analysisPurpose,
           updatedAt: toDate(project.updatedAt, now),
         },
       })
@@ -147,6 +154,7 @@ export class WorkspaceAssetsRepository {
           ? toDate(session.revisionNoteUpdatedAt, now)
           : undefined,
         methodologyCardIds: session.methodologyCardIds,
+        storyAuditFindingIds: session.storyAuditFindingIds || [],
       })
       .onConflictDoUpdate({
         target: revisionSessions.id,
@@ -168,6 +176,7 @@ export class WorkspaceAssetsRepository {
             ? toDate(session.revisionNoteUpdatedAt, now)
             : null,
           methodologyCardIds: session.methodologyCardIds,
+          storyAuditFindingIds: session.storyAuditFindingIds || [],
         },
       });
 
@@ -286,6 +295,8 @@ export class WorkspaceAssetsRepository {
     return {
       id: row.id,
       name: row.name,
+      bookJobId: row.bookJobId ?? undefined,
+      analysisPurpose: row.analysisPurpose ?? undefined,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -312,6 +323,7 @@ export class WorkspaceAssetsRepository {
       revisionNote: row.revisionNote ?? undefined,
       revisionNoteUpdatedAt: row.revisionNoteUpdatedAt?.toISOString(),
       methodologyCardIds: toStringList(row.methodologyCardIds),
+      storyAuditFindingIds: toStringList(row.storyAuditFindingIds),
     };
   }
 

@@ -8,6 +8,13 @@
       "when": 1782286918834,
       "tag": "0000_furry_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784271690710,
+      "tag": "0001_strong_hemingway",
+      "breakpoints": true
     }
   ]
 }

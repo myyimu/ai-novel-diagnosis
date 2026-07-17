@@ -14,6 +14,7 @@ import { BookModule } from "@/modules/book/book.module";
 import { HealthModule } from "@/modules/health/health.module";
 import { LibraryModule } from "@/modules/library/library.module";
 import { MetricsModule } from "@/modules/metrics/metrics.module";
+import { StoryAuditModule } from "@/modules/story-audit/story-audit.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
 import { DrizzleModule } from "@/service/drizzle/drizzle.module";
@@ -42,6 +43,7 @@ import { AppController } from "./app.controller";
     WorkspaceModule,
     LibraryModule,
     BookModule,
+    StoryAuditModule,
   ],
   controllers: [AppController],
   providers: [

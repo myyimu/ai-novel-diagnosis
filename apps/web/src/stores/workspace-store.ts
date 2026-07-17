@@ -728,6 +728,10 @@ export interface CachedBookAnalysis {
 export interface WorkspaceProject {
 	id: string;
 	name: string;
+	/** Linked whole-book analysis job; lets a project restore its story audit. */
+	bookJobId?: string;
+	/** Resolved analysis purpose; missing on legacy projects = reference-study. */
+	analysisPurpose?: "own-draft" | "reference-study";
 	createdAt: string;
 	updatedAt: string;
 }
@@ -750,6 +754,8 @@ export interface RevisionSession {
 	revisionNote?: string;
 	revisionNoteUpdatedAt?: string;
 	methodologyCardIds: string[];
+	/** Story audit findings promoted into this revision session's plan. */
+	storyAuditFindingIds?: string[];
 }
 
 export interface ProjectMethodologyCard extends MethodologyCard {

@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -87,6 +88,8 @@ export const modelUsageEvents = pgTable("model_usage_events", {
 export const workspaceProjects = pgTable("workspace_projects", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
+  bookJobId: text("book_job_id"),
+  analysisPurpose: varchar("analysis_purpose", { length: 32 }),
   createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
 });
@@ -112,7 +115,34 @@ export const revisionSessions = pgTable("revision_sessions", {
     precision: 3,
   }),
   methodologyCardIds: jsonb("methodology_card_ids").notNull(),
+  storyAuditFindingIds: jsonb("story_audit_finding_ids").notNull().default([]),
 });
+
+export const storyAuditFindingReviews = pgTable(
+  "story_audit_finding_reviews",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    projectId: text("project_id").notNull(),
+    bookJobId: text("book_job_id").notNull(),
+    auditId: text("audit_id").notNull(),
+    findingId: text("finding_id").notNull(),
+    reviewState: varchar("review_state", { length: 32 }).notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 })
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    uniqFindingReview: uniqueIndex("story_audit_finding_reviews_uniq").on(
+      table.projectId,
+      table.auditId,
+      table.findingId,
+    ),
+  }),
+);
 
 export const methodologyCards = pgTable("methodology_cards", {
   projectCardId: text("project_card_id").primaryKey(),
@@ -140,4 +170,6 @@ export type BookAnalysisJobInsert = typeof bookAnalysisJobs.$inferInsert;
 export type WorkspaceProjectSelect = typeof workspaceProjects.$inferSelect;
 export type RevisionSessionSelect = typeof revisionSessions.$inferSelect;
 export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;
+export type StoryAuditFindingReviewSelect =
+  typeof storyAuditFindingReviews.$inferSelect;
 export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;
