@@ -15,7 +15,15 @@ import type {
 import {
 	QUICK_REVIEW_PROMPT_VERSION,
 	QUICK_REVIEW_SAMPLING_VERSION,
+	STORY_AUDIT_SCHEMA_VERSION,
 } from "@ai-novel-diagnosis/ai-core";
+
+/**
+ * Story audit prompt/pipeline version anchor for book cache keys. Bumps when
+ * the extractor/verifier prompts or dialogue rules change. SIA-004/SIA-007
+ * will specialize this into separate extractor/verifier prompt versions.
+ */
+const STORY_AUDIT_PROMPT_VERSION = "story-audit.v1";
 
 export function hashString(value: string): string {
 	let hash = 0;
@@ -246,12 +254,16 @@ export function buildBookAnalysisCacheKey({
 	bookTitle,
 	bookText,
 	bookFile,
+	purpose,
+	profiles,
 }: {
 	provider: ProviderForm;
 	bookGenre: string;
 	bookTitle: string;
 	bookText: string;
 	bookFile: File | null;
+	purpose?: "own-draft" | "reference-study";
+	profiles?: string[];
 }) {
 	const bookFingerprint = bookFile
 		? [bookFile.name, bookFile.size, bookFile.lastModified].join(":")
@@ -262,6 +274,10 @@ export function buildBookAnalysisCacheKey({
 		bookGenre,
 		bookTitle.trim(),
 		bookFingerprint,
+		STORY_AUDIT_SCHEMA_VERSION,
+		STORY_AUDIT_PROMPT_VERSION,
+		purpose ?? "reference-study",
+		[...(profiles ?? [])].sort().join(","),
 	].join("|");
 }
 

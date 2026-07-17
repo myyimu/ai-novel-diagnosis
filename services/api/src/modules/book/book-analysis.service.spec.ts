@@ -698,4 +698,50 @@ describe("BookAnalysisService", () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
+
+  describe("resolveStoryAuditInput", () => {
+    const resolve = createBookService() as unknown as {
+      resolveStoryAuditInput: (input: {
+        purpose?: string;
+        profiles?: string[];
+      }) => { purpose: "own-draft" | "reference-study"; profiles: string[] };
+    };
+
+    it("should default purpose to reference-study when omitted", () => {
+      const result = resolve.resolveStoryAuditInput({});
+      expect(result.purpose).toBe("reference-study");
+      expect(result.profiles).toEqual([]);
+    });
+
+    it("should apply the own-draft default profiles when none are provided", () => {
+      const result = resolve.resolveStoryAuditInput({ purpose: "own-draft" });
+      expect(result.purpose).toBe("own-draft");
+      expect(result.profiles).toEqual([
+        "statistics",
+        "continuity",
+        "structure",
+        "character",
+      ]);
+    });
+
+    it("should keep explicitly provided profiles instead of the default set", () => {
+      const result = resolve.resolveStoryAuditInput({
+        purpose: "own-draft",
+        profiles: ["statistics"],
+      });
+      expect(result.profiles).toEqual(["statistics"]);
+    });
+
+    it("should not grant default profiles to reference studies", () => {
+      const result = resolve.resolveStoryAuditInput({
+        purpose: "reference-study",
+      });
+      expect(result.profiles).toEqual([]);
+    });
+
+    it("should treat an unrecognized purpose as reference-study", () => {
+      const result = resolve.resolveStoryAuditInput({ purpose: "bogus" });
+      expect(result.purpose).toBe("reference-study");
+    });
+  });
 });

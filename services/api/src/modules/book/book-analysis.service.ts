@@ -1,4 +1,5 @@
 ﻿import { BadRequestException, Injectable } from "@nestjs/common";
+import { OWN_DRAFT_DEFAULT_PROFILES } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
@@ -116,6 +117,7 @@ export class BookAnalysisService {
   }
 
   async createBookAnalysisJob(input: AnalyzeBookDto) {
+    const storyAuditInput = this.resolveStoryAuditInput(input);
     return this.bookJobs.create(
       {
         title: input.title,
@@ -126,6 +128,8 @@ export class BookAnalysisService {
         ...(input.publishedYear !== undefined
           ? { publishedYear: input.publishedYear }
           : {}),
+        purpose: storyAuditInput.purpose,
+        profiles: storyAuditInput.profiles,
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);
@@ -406,15 +410,46 @@ export class BookAnalysisService {
     };
   }
 
+  /**
+   * Resolve the analysis purpose and story audit profiles from request input,
+   * applying backward-compatible defaults so existing callers behave as before.
+   *
+   * - `purpose` defaults to `reference-study` when omitted or unrecognized.
+   * - `profiles` defaults to the own-draft profile set only when the purpose is
+   *   `own-draft` and no profiles were supplied; reference studies run no story
+   *   audit profiles unless the caller explicitly opts in.
+   *
+   * Resolved values are persisted into `inputSummary` so job history stays
+   * self-explanatory regardless of future default changes.
+   */
+  private resolveStoryAuditInput(input: {
+    purpose?: string;
+    profiles?: string[];
+  }): { purpose: "own-draft" | "reference-study"; profiles: string[] } {
+    const purpose: "own-draft" | "reference-study" =
+      input.purpose === "own-draft" ? "own-draft" : "reference-study";
+    const requested = Array.isArray(input.profiles)
+      ? input.profiles.filter((profile) => typeof profile === "string")
+      : [];
+    const profiles =
+      purpose === "own-draft" && requested.length === 0
+        ? [...OWN_DRAFT_DEFAULT_PROFILES]
+        : requested;
+    return { purpose, profiles };
+  }
+
   async createBookAnalysisJobFromUpload(input: {
     uploadId: string;
     provider: ProviderConfigDto;
     author?: string;
     platform?: string;
     publishedYear?: number;
+    purpose?: string;
+    profiles?: string[];
   }) {
     const upload = await this.bookUploads.getUpload(input.uploadId);
     const text = await this.bookUploads.readNormalizedText(input.uploadId);
+    const storyAuditInput = this.resolveStoryAuditInput(input);
     const analysisInput: AnalyzeBookDto = {
       provider: input.provider,
       title: upload.title,
@@ -432,6 +467,8 @@ export class BookAnalysisService {
         ...(input.publishedYear !== undefined
           ? { publishedYear: input.publishedYear }
           : {}),
+        purpose: storyAuditInput.purpose,
+        profiles: storyAuditInput.profiles,
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);

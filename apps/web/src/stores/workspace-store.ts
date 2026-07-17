@@ -550,6 +550,13 @@ export interface BookAnalysisJob {
 		title: string;
 		genre: string;
 		textLength: number;
+		author?: string;
+		platform?: string;
+		publishedYear?: number;
+		/** Resolved analysis purpose. Missing on legacy jobs = reference-study. */
+		purpose?: "own-draft" | "reference-study";
+		/** Resolved story audit profiles (empty for reference studies). */
+		profiles?: string[];
 	};
 	progress: {
 		stage: "queued" | "preprocess" | "map" | "reduce" | "succeeded" | "failed";

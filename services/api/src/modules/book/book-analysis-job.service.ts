@@ -55,6 +55,16 @@ export interface BookAnalysisJobSnapshot {
     author?: string;
     platform?: string;
     publishedYear?: number;
+    /**
+     * Resolved analysis purpose. Omitted on legacy jobs; clients must treat a
+     * missing value as `reference-study` to preserve existing behavior.
+     */
+    purpose?: "own-draft" | "reference-study";
+    /**
+     * Resolved story audit profiles (e.g. `statistics`, `continuity`). Empty
+     * for reference studies; the own-draft default is recorded here verbatim.
+     */
+    profiles?: string[];
   };
   progress: BookAnalysisJobProgress;
   preprocessing?: Omit<BookPreprocessResult, "chapters"> & {

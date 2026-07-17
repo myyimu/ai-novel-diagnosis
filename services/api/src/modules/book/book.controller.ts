@@ -241,6 +241,8 @@ export class BookController {
       ...(body.publishedYear !== undefined
         ? { publishedYear: body.publishedYear }
         : {}),
+      ...(body.purpose ? { purpose: body.purpose } : {}),
+      ...(body.profiles ? { profiles: body.profiles } : {}),
     });
   }
 }

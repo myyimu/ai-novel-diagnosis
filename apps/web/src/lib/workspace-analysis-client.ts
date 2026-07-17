@@ -535,9 +535,18 @@ export function uploadBookPreview({
 	return postForm<BookUploadPreview>("/analysis/book/uploads", formData);
 }
 
-export function createBookAnalysisJobFromUpload(uploadId: string, provider: ProviderForm) {
+export function createBookAnalysisJobFromUpload(
+	uploadId: string,
+	provider: ProviderForm,
+	options?: {
+		purpose?: "own-draft" | "reference-study";
+		profiles?: string[];
+	},
+) {
 	return postJson<BookAnalysisJob>(`/analysis/book/uploads/${uploadId}/jobs`, {
 		provider,
+		...(options?.purpose ? { purpose: options.purpose } : {}),
+		...(options?.profiles ? { profiles: options.profiles } : {}),
 	});
 }
 

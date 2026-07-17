@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  IsArray,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -13,6 +14,15 @@ import {
   ValidateNested,
 } from "class-validator";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
+
+const BOOK_ANALYSIS_PURPOSES = ["own-draft", "reference-study"] as const;
+const STORY_AUDIT_PROFILES = [
+  "statistics",
+  "continuity",
+  "structure",
+  "character",
+  "full",
+] as const;
 
 export class AnalyzeBookDto {
   @ApiProperty({ type: ProviderConfigDto })
@@ -82,4 +92,31 @@ export class AnalyzeBookDto {
   @Min(1900)
   @Max(2100)
   publishedYear?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Whether this text is the author's own draft or a reference study. " +
+      "Defaults to reference-study so existing research requests keep their behavior.",
+    enum: [...BOOK_ANALYSIS_PURPOSES],
+    default: "reference-study",
+    example: "own-draft",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn([...BOOK_ANALYSIS_PURPOSES])
+  purpose?: (typeof BOOK_ANALYSIS_PURPOSES)[number];
+
+  @ApiPropertyOptional({
+    description:
+      "Story audit profiles to run for an own-draft book. " +
+      "Defaults to statistics + continuity + structure + character when purpose is own-draft.",
+    isArray: true,
+    enum: [...STORY_AUDIT_PROFILES],
+    example: ["statistics", "continuity", "structure", "character"],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @IsIn([...STORY_AUDIT_PROFILES], { each: true })
+  profiles?: string[];
 }
