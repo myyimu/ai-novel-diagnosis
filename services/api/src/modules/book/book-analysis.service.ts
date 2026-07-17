@@ -1,7 +1,12 @@
 ﻿import { BadRequestException, Injectable } from "@nestjs/common";
 import { OWN_DRAFT_DEFAULT_PROFILES } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
-import { StoryAuditOrchestratorService } from "@/modules/story-audit/story-audit-orchestrator.service";
+import {
+  type StoryAuditChapterEvent,
+  type StoryAuditChapterFact,
+  type StoryAuditEvidenceAnchor,
+  StoryAuditOrchestratorService,
+} from "@/modules/story-audit/story-audit-orchestrator.service";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
 import {
@@ -60,18 +65,49 @@ interface ChapterMapResult {
     startOffset: number;
     endOffset: number;
   }>;
+  storyExtractionAttempted?: boolean;
+  storyEvents?: StoryAuditChapterEvent[];
+  storyFacts?: StoryAuditChapterFact[];
 }
+
+type RawStoryEvidence = Array<{ quote?: string }>;
 
 type RawChapterMapResult = Partial<
   Omit<
     ChapterMapResult,
-    "chunkStartOffset" | "chunkEndOffset" | "splitBy" | "sourceAnchors"
+    | "chunkStartOffset"
+    | "chunkEndOffset"
+    | "splitBy"
+    | "sourceAnchors"
+    | "storyExtractionAttempted"
+    | "storyEvents"
+    | "storyFacts"
   >
 > & {
   evidenceSnippets?: string[];
   sourceAnchors?: Array<{
     label?: string;
     quote?: string;
+  }>;
+  storyEvents?: Array<{
+    id?: string;
+    summary?: string;
+    participantIds?: string[];
+    locationIds?: string[];
+    absoluteTime?: string;
+    relativeTimeText?: string;
+    evidence?: RawStoryEvidence;
+  }>;
+  storyFacts?: Array<{
+    id?: string;
+    subjectId?: string;
+    predicate?: string;
+    object?: string;
+    kind?: string;
+    polarity?: string;
+    sourcePriority?: string;
+    confidence?: number;
+    evidence?: RawStoryEvidence;
   }>;
 };
 
@@ -759,6 +795,7 @@ export class BookAnalysisService {
     const storyAudit = options.jobId
       ? this.storyAuditOrchestrator.generateStoryAudit({
           chapters,
+          chapterMaps,
           purpose: storyAuditInput.purpose,
           profiles: storyAuditInput.profiles,
           bookJobId: options.jobId,
@@ -2034,6 +2071,7 @@ export class BookAnalysisService {
       analysisDepth?: "outline" | "deep";
       focusScore?: number;
       fallback?: Partial<ChapterMapResult>;
+      storyExtractionAttempted?: boolean;
     },
   ): ChapterMapResult {
     const fallback = options?.fallback;
@@ -2107,7 +2145,119 @@ export class BookAnalysisService {
         "本段结尾留下新的冲突或待揭示信息",
       evidenceSnippets,
       sourceAnchors: this.buildSourceAnchors(chapter, raw, evidenceSnippets),
+      storyExtractionAttempted:
+        options?.storyExtractionAttempted ??
+        fallback?.storyExtractionAttempted ??
+        false,
+      storyEvents: Array.isArray(raw.storyEvents)
+        ? this.mapChapterStoryEvents(chapter, raw.storyEvents)
+        : fallback?.storyEvents,
+      storyFacts: Array.isArray(raw.storyFacts)
+        ? this.mapChapterStoryFacts(chapter, raw.storyFacts)
+        : fallback?.storyFacts,
     };
+  }
+
+  private mapStoryEvidenceAnchors(
+    chapter: ChapterSegment,
+    evidence: RawStoryEvidence | undefined,
+  ): StoryAuditEvidenceAnchor[] {
+    if (!Array.isArray(evidence)) {
+      return [];
+    }
+    return evidence
+      .map((item) => {
+        const quote = asText(item?.quote);
+        const range = quote ? this.locateQuoteRange(chapter.text, quote) : null;
+        if (!range) {
+          return null;
+        }
+        return {
+          quote: chapter.text.slice(range.start, range.end),
+          startOffset: chapter.startOffset + range.start,
+          endOffset: chapter.startOffset + range.end,
+        };
+      })
+      .filter((anchor): anchor is StoryAuditEvidenceAnchor => anchor !== null);
+  }
+
+  private mapChapterStoryEvents(
+    chapter: ChapterSegment,
+    events: RawChapterMapResult["storyEvents"],
+  ): StoryAuditChapterEvent[] | undefined {
+    if (!Array.isArray(events) || events.length === 0) {
+      return undefined;
+    }
+    const mapped = events
+      .map((event, index) => {
+        const summary = asText(event?.summary);
+        if (!summary) {
+          return null;
+        }
+        return {
+          id: asText(event?.id) || `${chapter.id}-event-${index + 1}`,
+          summary,
+          participantIds: asTextList(event?.participantIds),
+          locationIds: asTextList(event?.locationIds),
+          ...(event?.absoluteTime
+            ? { absoluteTime: asText(event.absoluteTime) }
+            : {}),
+          ...(event?.relativeTimeText
+            ? { relativeTimeText: asText(event.relativeTimeText) }
+            : {}),
+          evidence: this.mapStoryEvidenceAnchors(chapter, event?.evidence),
+        };
+      })
+      .filter((event): event is StoryAuditChapterEvent => event !== null);
+    return mapped.length ? mapped : undefined;
+  }
+
+  private mapChapterStoryFacts(
+    chapter: ChapterSegment,
+    facts: RawChapterMapResult["storyFacts"],
+  ): StoryAuditChapterFact[] | undefined {
+    if (!Array.isArray(facts) || facts.length === 0) {
+      return undefined;
+    }
+    const mapped = facts
+      .map((fact, index): StoryAuditChapterFact | null => {
+        const subjectId = asText(fact?.subjectId);
+        const object = asText(fact?.object);
+        if (!subjectId || !object) {
+          return null;
+        }
+        const evidence = this.mapStoryEvidenceAnchors(chapter, fact?.evidence);
+        const rawPriority = fact?.sourcePriority;
+        // A chapter model cannot promote its own output to confirmed author
+        // canon. Canon enters through a separate author-confirmed workflow.
+        const sourcePriority: StoryAuditChapterFact["sourcePriority"] =
+          rawPriority === "explicit-text" ? "explicit-text" : "model-inference";
+        // explicit-text facts MUST carry at least one validated anchor;
+        // otherwise drop the fact rather than trust an unverified claim.
+        if (sourcePriority === "explicit-text" && evidence.length === 0) {
+          return null;
+        }
+        const rawPolarity = fact?.polarity;
+        const polarity: StoryAuditChapterFact["polarity"] =
+          rawPolarity === "asserted" ||
+          rawPolarity === "negated" ||
+          rawPolarity === "uncertain"
+            ? rawPolarity
+            : "uncertain";
+        return {
+          id: asText(fact?.id) || `${chapter.id}-fact-${index + 1}`,
+          subjectId,
+          predicate: asText(fact?.predicate) || "attribute",
+          object,
+          kind: asText(fact?.kind) || "identity",
+          polarity,
+          sourcePriority,
+          confidence: clampNumber(Number(fact?.confidence ?? 0.5), 0, 1, 0.5),
+          evidence,
+        };
+      })
+      .filter((fact): fact is StoryAuditChapterFact => fact !== null);
+    return mapped.length ? mapped : undefined;
   }
 
   private buildSourceAnchors(
@@ -2215,7 +2365,7 @@ export class BookAnalysisService {
           content: this.bookChapterOutlinePrompt(input, chapter),
         },
       ],
-      { maxOutputTokens: 900 },
+      { maxOutputTokens: 1200 },
     );
 
     const raw = (await parseJsonWithRepair(
@@ -2228,6 +2378,7 @@ export class BookAnalysisService {
     return this.normalizeChapterMapResult(chapter, raw, {
       analysisDepth: "outline",
       focusScore: this.scoreOutlinePriority(chapter, raw),
+      storyExtractionAttempted: true,
     });
   }
 
@@ -2264,6 +2415,7 @@ export class BookAnalysisService {
       focusScore:
         fallback?.focusScore ?? this.scoreOutlinePriority(chapter, raw),
       fallback,
+      storyExtractionAttempted: true,
     });
   }
 
@@ -2343,6 +2495,28 @@ Return valid JSON only:
       "label": "证据标签",
       "quote": "原文短摘录，不超过 24 字"
     }
+  ],
+  "storyEvents": [
+    {
+      "summary": "最多 3 个可定位事件之一",
+      "participantIds": ["涉及人物 id 或姓名"],
+      "locationIds": ["涉及地点"],
+      "absoluteTime": "可选，绝对时间或日期",
+      "relativeTimeText": "可选，相对时间描述",
+      "evidence": [{ "quote": "原样短摘录，不超过 24 字" }]
+    }
+  ],
+  "storyFacts": [
+    {
+      "subjectId": "人物或实体 id",
+      "predicate": "age|ability|knowledge|location|relationship|possession|world_rule 等",
+      "object": "事实对象",
+      "kind": "age|ability|knowledge|location|relationship|possession|world_rule|identity|appearance|goal|belief|injury",
+      "polarity": "asserted|negated|uncertain",
+      "sourcePriority": "explicit-text|model-inference",
+      "confidence": 0.8,
+      "evidence": [{ "quote": "explicit-text 必须给出可定位原文" }]
+    }
   ]
 }
 Requirements:
@@ -2351,6 +2525,7 @@ Requirements:
 3. Evidence must come from this chunk exactly.
 4. Prefer indexing signals over long explanation.
 5. Do not output English prose for summary, hook, promise, goal, conflict, timeline, relationship, foreshadowing, payoff, style, or diagnosis fields.
+6. Return at most 3 storyEvents and 5 storyFacts. Never label model output as author-canon.
 `.trim();
   }
 
@@ -2417,6 +2592,28 @@ ${outlineContext}
       "label": "对应 summary / conflict / hook 的证据标签",
       "quote": "原样短摘录，不超过 24 字"
     }
+  ],
+  "storyEvents": [
+    {
+      "summary": "本章中一个可定位的事件",
+      "participantIds": ["涉及人物 id 或姓名"],
+      "locationIds": ["涉及地点"],
+      "absoluteTime": "可选，绝对时间或日期",
+      "relativeTimeText": "可选，相对时间描述",
+      "evidence": [{ "quote": "原样短摘录，不超过 24 字" }]
+    }
+  ],
+  "storyFacts": [
+    {
+      "subjectId": "人物或实体 id",
+      "predicate": "age|ability|knowledge|location|relationship|possession|world_rule 等",
+      "object": "事实对象，例如 三十二岁",
+      "kind": "age|ability|knowledge|location|relationship|possession|world_rule|identity|appearance|goal|belief|injury",
+      "polarity": "asserted|negated|uncertain",
+      "sourcePriority": "explicit-text|model-inference",
+      "confidence": 0.8,
+      "evidence": [{ "quote": "原样短摘录，不超过 24 字；sourcePriority 为 explicit-text 时必须给出可定位原文" }]
+    }
   ]
 }
 要求：
@@ -2425,6 +2622,7 @@ ${outlineContext}
 3. 不要返回 startOffset / endOffset，我会在服务端按摘录回查原文位置。
 4. 所有字段尽量短，优先输出结构化事实卡片，而不是长段解释。
 5. 除 JSON key、枚举值和必要英文专名外，所有面向作者阅读的自然语言字段必须使用简体中文；不要输出英文句子。
+6. storyEvents 最多 5 条，storyFacts 最多 8 条；模型不得把自己的输出标记为 author-canon。
 `.trim();
   }
 
@@ -3179,6 +3377,9 @@ ${JSON.stringify(chapterMaps, null, 2)}
         },
         evidenceSnippets,
       ),
+      storyExtractionAttempted: true,
+      storyEvents: [],
+      storyFacts: [],
     };
   }
 

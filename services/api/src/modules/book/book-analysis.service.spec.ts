@@ -1,6 +1,7 @@
 ﻿import { BadRequestException } from "@nestjs/common";
 import { StoryAuditOrchestratorService } from "@/modules/story-audit/story-audit-orchestrator.service";
 import { BookAnalysisService } from "./book-analysis.service";
+import type { ChapterSegment } from "./text-preprocessor.service";
 
 function createBookService(options?: {
   modelProviders?: { chat: jest.Mock };
@@ -749,6 +750,144 @@ describe("BookAnalysisService", () => {
     it("should treat an unrecognized purpose as reference-study", () => {
       const result = resolve.resolveStoryAuditInput({ purpose: "bogus" });
       expect(result.purpose).toBe("reference-study");
+    });
+  });
+
+  describe("chapter story atom normalization", () => {
+    const service = createBookService() as unknown as {
+      mapChapterStoryEvents: (
+        chapter: ChapterSegment,
+        events: Array<{
+          summary?: string;
+          participantIds?: string[];
+          locationIds?: string[];
+          evidence?: Array<{ quote?: string }>;
+        }>,
+      ) =>
+        | Array<{
+            summary: string;
+            evidence: Array<{
+              quote: string;
+              startOffset: number;
+              endOffset: number;
+            }>;
+          }>
+        | undefined;
+      mapChapterStoryFacts: (
+        chapter: ChapterSegment,
+        facts: Array<{
+          subjectId?: string;
+          predicate?: string;
+          object?: string;
+          kind?: string;
+          polarity?: string;
+          sourcePriority?: string;
+          confidence?: number;
+          evidence?: Array<{ quote?: string }>;
+        }>,
+      ) =>
+        | Array<{
+            object: string;
+            sourcePriority: string;
+            evidence: Array<{
+              quote: string;
+              startOffset: number;
+              endOffset: number;
+            }>;
+          }>
+        | undefined;
+      bookChapterOutlinePrompt: (
+        input: { title: string; genre: string },
+        chapter: ChapterSegment,
+      ) => string;
+    };
+    const text = "他今年三十二岁。\n随后离开。";
+    const chapter: ChapterSegment = {
+      id: "c1",
+      order: 1,
+      title: "第一章",
+      text,
+      splitBy: "heading",
+      charCount: text.length,
+      wordCount: text.length,
+      startOffset: 50,
+      endOffset: 50 + text.length,
+    };
+
+    it("should locate verbatim event evidence with absolute offsets", () => {
+      const events = service.mapChapterStoryEvents(chapter, [
+        {
+          summary: "年龄说明后离开",
+          participantIds: ["主角"],
+          locationIds: [],
+          evidence: [{ quote: "他今年三十二岁。随后" }],
+        },
+      ]);
+
+      expect(events).toHaveLength(1);
+      expect(events![0]!.evidence).toEqual([
+        {
+          quote: "他今年三十二岁。\n随后",
+          startOffset: 50,
+          endOffset: 50 + "他今年三十二岁。\n随后".length,
+        },
+      ]);
+    });
+
+    it("should drop unanchored explicit facts and never accept model-declared author canon", () => {
+      const facts = service.mapChapterStoryFacts(chapter, [
+        {
+          subjectId: "主角",
+          predicate: "age",
+          object: "三十二岁",
+          kind: "age",
+          polarity: "asserted",
+          sourcePriority: "explicit-text",
+          confidence: 0.9,
+          evidence: [{ quote: "三十二岁" }],
+        },
+        {
+          subjectId: "主角",
+          predicate: "ability",
+          object: "会飞",
+          kind: "ability",
+          polarity: "asserted",
+          sourcePriority: "explicit-text",
+          confidence: 0.9,
+          evidence: [{ quote: "正文不存在" }],
+        },
+        {
+          subjectId: "主角",
+          predicate: "identity",
+          object: "作者钦定身份",
+          kind: "identity",
+          polarity: "asserted",
+          sourcePriority: "author-canon",
+          confidence: 1,
+          evidence: [],
+        },
+      ]);
+
+      expect(facts).toHaveLength(2);
+      expect(facts![0]!.evidence[0]).toMatchObject({
+        quote: "三十二岁",
+        startOffset: 53,
+        endOffset: 57,
+      });
+      expect(facts!.map((fact) => fact.object)).not.toContain("会飞");
+      expect(facts![1]!.sourcePriority).toBe("model-inference");
+    });
+
+    it("should request bounded story atoms in the whole-book outline pass", () => {
+      const prompt = service.bookChapterOutlinePrompt(
+        { title: "测试书", genre: "xuanhuan" },
+        chapter,
+      );
+
+      expect(prompt).toContain('"storyEvents"');
+      expect(prompt).toContain('"storyFacts"');
+      expect(prompt).toContain("at most 3 storyEvents and 5 storyFacts");
+      expect(prompt).not.toContain("author-canon|");
     });
   });
 });
