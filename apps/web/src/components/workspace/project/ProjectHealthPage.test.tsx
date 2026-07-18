@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookAnalysisResult } from "@/stores/workspace-store";
 
@@ -237,6 +237,41 @@ const storyAudit = {
 	],
 	findings: [
 		{
+			id: "finding-plot-a",
+			category: "causal_gap",
+			severity: "high",
+			status: "needs_human",
+			title: "追查动作缺少必要因果候选",
+			claim: "主角突然能锁定评审长，但中间缺少线索转接。",
+			evidence: [
+				{
+					anchorId: "plot-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "他发现旧案玉牌。",
+					startOffset: 4,
+					endOffset: 12,
+					source: "text",
+				},
+				{
+					anchorId: "plot-anchor-b",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "玉牌指向评审长。",
+					startOffset: 20,
+					endOffset: 28,
+					source: "text",
+				},
+			],
+			relatedFactIds: ["fact-setup", "fact-payoff"],
+			relatedEventIds: ["event-a", "event-b"],
+			ruleIds: ["causal-gap-double-evidence"],
+			alternativeExplanations: ["可能存在尚未抽取到的中间推理。"],
+			readerImpact: "读者可能不清楚主角为何能跳到新目标。",
+			fixAction: "补一处线索转接或角色推理。",
+			confidence: 0.82,
+		},
+		{
 			id: "finding-a",
 			category: "timeline_conflict",
 			severity: "high",
@@ -268,6 +303,54 @@ const storyAudit = {
 			ruleIds: ["temporal.before-after-cycle"],
 			alternativeExplanations: ["可能是角色转述错误。"],
 			confidence: 0.76,
+		},
+		{
+			id: "finding-setup-a",
+			category: "unresolved_setup",
+			severity: "medium",
+			status: "needs_human",
+			title: "旧案玉牌暂未回收候选",
+			claim: "玉牌作为伏笔出现后，当前范围只看到指向新目标，还需要确认是否已有阶段性兑现。",
+			evidence: [
+				{
+					anchorId: "setup-finding-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "他发现旧案玉牌。",
+					startOffset: 4,
+					endOffset: 12,
+					source: "text",
+				},
+			],
+			relatedFactIds: ["fact-setup"],
+			relatedEventIds: [],
+			ruleIds: ["open-setup-needs-human-review"],
+			alternativeExplanations: ["可能是作者计划后文回收的长线伏笔。"],
+			confidence: 0.68,
+		},
+		{
+			id: "finding-low-a",
+			category: "dialogue_attribution",
+			severity: "low",
+			status: "candidate",
+			title: "第四条低优对白归属候选",
+			claim: "这条用于确认默认顶部不会超过三条。",
+			evidence: [
+				{
+					anchorId: "low-anchor-a",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "他开始追查评审长。",
+					startOffset: 50,
+					endOffset: 58,
+					source: "text",
+				},
+			],
+			relatedFactIds: [],
+			relatedEventIds: [],
+			ruleIds: ["low-priority-hidden-by-default"],
+			alternativeExplanations: ["可能有上下文说话人。"],
+			confidence: 0.3,
 		},
 	],
 	metrics: {
@@ -347,6 +430,11 @@ const bookAnalysisResult = {
 	},
 	storyAudit,
 } as unknown as BookAnalysisResult;
+let renderedBookAnalysisResult = bookAnalysisResult;
+
+afterEach(() => {
+	renderedBookAnalysisResult = bookAnalysisResult;
+});
 
 vi.mock("@/hooks/use-workspace-handlers", () => ({
 	useWorkspaceHandlers: () => ({
@@ -362,7 +450,7 @@ vi.mock("@/hooks/use-workspace-handlers", () => ({
 		projectRevisionSessions: [],
 		projectMethodologyCards: [],
 		providerLabel: "本地演示",
-		bookAnalysisResult,
+		bookAnalysisResult: renderedBookAnalysisResult,
 		bookJob: {
 			id: "book-job-a",
 		},
@@ -381,7 +469,7 @@ vi.mock("@/stores/workspace-store", () => ({
 		}) => T,
 	): T =>
 		selector({
-			bookAnalysisCache: [{ job: { id: "book-job-a" }, result: bookAnalysisResult }],
+			bookAnalysisCache: [{ job: { id: "book-job-a" }, result: renderedBookAnalysisResult }],
 			setBookAnalysisResult: vi.fn(),
 			setBookJob: vi.fn(),
 		}),
@@ -421,6 +509,14 @@ describe("ProjectHealthPage", () => {
 		expect(html).toContain("目标更远");
 		expect(html).toContain("主动性较强");
 		expect(html).toContain("决定保留玉牌继续查");
+		expect(html).toContain("剧情漏洞候选");
+		expect(html).toContain("默认只推顶部 3 个待确认问题");
+		expect(html).toContain("只输出候选、证据和替代解释");
+		expect(html).toContain("追查动作缺少必要因果候选");
+		expect(html).toContain("高优证据达标");
+		expect(html).toContain("至少两个不同位置的证据。");
+		expect(html).toContain("旧案玉牌暂未回收候选");
+		expect(html).not.toContain("第四条低优对白归属候选");
 		expect(html).toContain(
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=anchor-a",
 		);
@@ -430,7 +526,59 @@ describe("ProjectHealthPage", () => {
 		expect(html).toContain(
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=arc-anchor-a",
 		);
+		expect(html).toContain(
+			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=plot-anchor-a",
+		);
 		expect(html).toContain("人工判断不会写入 storyAudit 原始结果");
 		expect(push).not.toHaveBeenCalled();
+	});
+
+	it("hides whole-book missing conclusions when story audit coverage is partial", () => {
+		renderedBookAnalysisResult = {
+			...bookAnalysisResult,
+			storyAudit: {
+				...storyAudit,
+				coverage: {
+					...storyAudit.coverage,
+					isPartial: true,
+					analyzedChapterIds: ["chapter-1"],
+					totalChapterCount: 3,
+				},
+				findings: [
+					{
+						id: "partial-dropped-goal",
+						category: "dropped_goal",
+						severity: "high",
+						status: "candidate",
+						title: "partial 不应展示的目标断线",
+						claim: "未分析完整书时不应输出全书目标断线结论。",
+						evidence: [
+							{
+								anchorId: "partial-anchor-a",
+								chapterId: "chapter-1",
+								chapterOrder: 1,
+								quote: "他发现旧案玉牌。",
+								startOffset: 4,
+								endOffset: 12,
+								source: "text",
+							},
+						],
+						relatedFactIds: [],
+						relatedEventIds: [],
+						ruleIds: ["legacy-partial-dropped-goal"],
+						alternativeExplanations: ["可能在未分析章节继续推进。"],
+						confidence: 0.9,
+					},
+				],
+			},
+		};
+
+		const html = renderToStaticMarkup(<ProjectHealthPage />);
+
+		expect(html).toContain("partial：隐藏全书缺失结论");
+		expect(html).toContain(
+			"partial 输入不会展示 dropped_goal 或 unresolved_setup 这类全书缺失结论。",
+		);
+		expect(html).not.toContain("partial 不应展示的目标断线");
 	});
 });

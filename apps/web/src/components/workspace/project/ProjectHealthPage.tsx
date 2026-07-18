@@ -47,6 +47,21 @@ const reviewOptions: Array<{
 	{ state: "resolved", label: "已解决" },
 ];
 
+const topFindingLimit = 3;
+const plotHoleCategories = new Set<StoryAuditFinding["category"]>([
+	"causal_gap",
+	"dropped_goal",
+	"unresolved_setup",
+	"knowledge_violation",
+	"ability_violation",
+	"motivation_gap",
+	"world_rule_violation",
+]);
+const wholeBookMissingCategories = new Set<StoryAuditFinding["category"]>([
+	"dropped_goal",
+	"unresolved_setup",
+]);
+
 type StructureTemplate = "none" | "three-act" | "hero-journey" | "story-circle";
 type TimelineMode = "narrative" | "story";
 
@@ -247,6 +262,7 @@ export function ProjectHealthPage() {
 							projectId={projectId}
 							result={projectAudit}
 						/>
+						<PlotHoleCandidateView audit={storyAudit} projectId={projectId} />
 						<div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,.9fr)]">
 							<TextStatistics audit={storyAudit} />
 							<FindingInspector
@@ -269,6 +285,101 @@ export function ProjectHealthPage() {
 				)}
 			</main>
 		</RedesignWorkspaceShell>
+	);
+}
+
+function PlotHoleCandidateView({
+	audit,
+	projectId,
+}: {
+	audit: StoryAuditResult;
+	projectId: string;
+}) {
+	const candidates = getDisplayFindings(audit)
+		.filter((finding) => plotHoleCategories.has(finding.category))
+		.slice(0, topFindingLimit);
+
+	return (
+		<section className="rounded-md border border-border bg-card p-4 shadow-sm">
+			<div className="mb-4 flex items-start justify-between gap-4 max-[760px]:block">
+				<div>
+					<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+						<AlertTriangle className="size-4" />
+						剧情漏洞候选
+					</div>
+					<h2 className="mt-1 text-base font-semibold text-card-foreground">
+						默认只推顶部 {topFindingLimit} 个待确认问题
+					</h2>
+					<p className="mt-1 max-w-[780px] text-xs leading-5 text-muted-foreground">
+						只输出候选、证据和替代解释；这里不会自动宣判作品“有硬伤”。
+					</p>
+				</div>
+				<span className="rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground max-[760px]:mt-3">
+					{audit.coverage.isPartial
+						? "partial：隐藏全书缺失结论"
+						: `${candidates.length}/${topFindingLimit} 已展示`}
+				</span>
+			</div>
+
+			{candidates.length ? (
+				<div className="grid gap-3 md:grid-cols-3">
+					{candidates.map((finding) => {
+						const evidenceStatus = evidenceQualificationLabel(finding);
+						return (
+							<article
+								key={finding.id}
+								className="rounded-md border border-border bg-background p-3"
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									<span className="rounded-md bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+										{findingCategoryLabel(finding.category)}
+									</span>
+									<span className="rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+										{finding.severity}
+									</span>
+								</div>
+								<h3 className="mt-2 text-sm font-semibold leading-5">
+									{finding.title}
+								</h3>
+								<p className="mt-1 text-xs leading-5 text-muted-foreground">
+									{finding.claim}
+								</p>
+								<div className="mt-3 rounded-md border border-border bg-card px-3 py-2 text-xs leading-5">
+									<div className="font-semibold text-card-foreground">
+										{evidenceStatus.label}
+									</div>
+									<div className="text-muted-foreground">
+										{evidenceStatus.detail}
+									</div>
+								</div>
+								<EvidenceList evidence={finding.evidence} projectId={projectId} />
+								{finding.alternativeExplanations.length ? (
+									<div className="mt-3 rounded-md bg-muted p-3">
+										<div className="text-xs font-semibold text-muted-foreground">
+											替代解释
+										</div>
+										<ul className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
+											{finding.alternativeExplanations
+												.slice(0, 2)
+												.map((item) => (
+													<li key={item}>{item}</li>
+												))}
+										</ul>
+									</div>
+								) : null}
+							</article>
+						);
+					})}
+				</div>
+			) : (
+				<div className="rounded-md border border-dashed border-border bg-background px-4 py-10 text-center">
+					<div className="text-sm font-semibold">暂无可展示的剧情漏洞候选</div>
+					<p className="mt-1 text-xs text-muted-foreground">
+						partial 输入不会展示 dropped_goal 或 unresolved_setup 这类全书缺失结论。
+					</p>
+				</div>
+			)}
+		</section>
 	);
 }
 
@@ -833,7 +944,8 @@ function SetupPayoffMap({
 }
 
 function HealthOverview({ audit, reviewCount }: { audit: StoryAuditResult; reviewCount: number }) {
-	const findingCounts = countFindings(audit.findings);
+	const displayFindings = getDisplayFindings(audit);
+	const findingCounts = countFindings(displayFindings);
 	return (
 		<section className="grid gap-3 md:grid-cols-4">
 			<MetricTile
@@ -851,7 +963,7 @@ function HealthOverview({ audit, reviewCount }: { audit: StoryAuditResult; revie
 			<MetricTile
 				icon={<AlertTriangle className="size-4" />}
 				label="候选问题"
-				value={`${audit.findings.length}`}
+				value={`${displayFindings.length}`}
 				detail={`${findingCounts.verified} 已复核 / ${findingCounts.candidate} 候选`}
 			/>
 			<MetricTile
@@ -936,14 +1048,15 @@ function FindingInspector({
 		reviewState: StoryAuditFindingReview["reviewState"],
 	) => void;
 }) {
-	const visibleFindings = audit.findings.slice(0, 8);
+	const visibleFindings = getDisplayFindings(audit).slice(0, topFindingLimit);
 
 	return (
 		<section className="rounded-md border border-border bg-card p-4 shadow-sm">
 			<div className="mb-3">
 				<h2 className="text-base font-semibold text-card-foreground">候选 Inspector</h2>
 				<p className="mt-1 text-xs leading-5 text-muted-foreground">
-					每条候选保留证据和替代解释；人工判断不会写入 storyAudit 原始结果。
+					默认只展示顶部 {topFindingLimit}{" "}
+					条；每条候选保留证据和替代解释，人工判断不会写入 storyAudit 原始结果。
 				</p>
 			</div>
 			{visibleFindings.length ? (
@@ -1125,6 +1238,81 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 			<div className="mt-1 text-xl font-semibold text-foreground">{value}</div>
 		</div>
 	);
+}
+
+function getDisplayFindings(audit: StoryAuditResult) {
+	const findings = audit.coverage.isPartial
+		? audit.findings.filter((finding) => !wholeBookMissingCategories.has(finding.category))
+		: audit.findings;
+
+	return [...findings].sort((left, right) => {
+		const leftScore = severityWeight(left.severity) * left.confidence;
+		const rightScore = severityWeight(right.severity) * right.confidence;
+		return rightScore - leftScore;
+	});
+}
+
+function evidenceQualificationLabel(finding: StoryAuditFinding) {
+	const hasTextEvidence = finding.evidence.some((anchor) => anchor.source === "text");
+	const hasCanonEvidence = finding.evidence.some((anchor) => anchor.source === "author-canon");
+	const hasDoubleEvidence = countDistinctEvidencePositions(finding.evidence) >= 2;
+	const qualifies = hasDoubleEvidence || (hasTextEvidence && hasCanonEvidence);
+	if (finding.severity === "high" || finding.severity === "critical") {
+		return qualifies
+			? {
+					label: "高优证据达标",
+					detail: hasDoubleEvidence
+						? "至少两个不同位置的证据。"
+						: "正文证据加作者 canon。",
+				}
+			: {
+					label: "证据不足，需人工复核",
+					detail: "高优候选需要双证据，或正文证据加作者 canon；当前不得自动确认。",
+				};
+	}
+
+	return {
+		label: qualifies ? "证据较完整" : "候选证据",
+		detail: qualifies ? "可进入优先复核。" : "当前只作为候选提示，不是定论。",
+	};
+}
+
+function countDistinctEvidencePositions(evidence: StoryAuditFinding["evidence"]) {
+	return new Set(
+		evidence.map(
+			(anchor) =>
+				`${anchor.source}:${anchor.chapterId}:${anchor.startOffset}:${anchor.endOffset}`,
+		),
+	).size;
+}
+
+function findingCategoryLabel(category: StoryAuditFinding["category"]) {
+	const labels = {
+		timeline_conflict: "时间冲突",
+		location_conflict: "地点冲突",
+		fact_contradiction: "事实矛盾",
+		knowledge_violation: "信息越权",
+		ability_violation: "能力越界",
+		motivation_gap: "动机缺口",
+		relationship_jump: "关系跳变",
+		world_rule_violation: "规则破坏",
+		causal_gap: "因果缺口",
+		dropped_goal: "目标断线",
+		unresolved_setup: "线索未回收",
+		dialogue_attribution: "对白归属",
+		structure_signal: "结构信号",
+	} satisfies Record<typeof category, string>;
+	return labels[category];
+}
+
+function severityWeight(severity: StoryAuditFinding["severity"]) {
+	const weights = {
+		critical: 4,
+		high: 3,
+		medium: 2,
+		low: 1,
+	} satisfies Record<typeof severity, number>;
+	return weights[severity];
 }
 
 function buildCharacterStateRows(

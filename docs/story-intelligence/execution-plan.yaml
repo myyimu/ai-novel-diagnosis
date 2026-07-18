@@ -214,7 +214,7 @@ tasks:
 
   - id: "SIA-011"
     title: "剧情漏洞候选"
-    implementation_status: "priority_next"
+    implementation_status: "completed"
     depends_on:
       - "SIA-007"
       - "SIA-009"
@@ -226,7 +226,7 @@ tasks:
 
   - id: "SIA-012"
     title: "复诊、导出、评测与发布"
-    implementation_status: "not_started"
+    implementation_status: "priority_next"
     depends_on:
       - "SIA-008"
       - "SIA-009"

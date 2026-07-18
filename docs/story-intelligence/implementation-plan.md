@@ -226,6 +226,8 @@ pnpm --filter api build
 
 依赖：SIA-007、SIA-009、SIA-010。只输出候选和证据，不自动判定作品“有硬伤”。
 
+状态：已完成 Web 候选工作台纵切。当前 `/project/health` 增加剧情漏洞候选区，默认只推顶部 3 个 finding；高优候选显式展示双证据或“正文证据 + canon”资格，不达标时只能作为待人工复核；partial 结果会过滤 dropped_goal/unresolved_setup 这类全书缺失结论。
+
 ### SIA-012：复诊、导出、评测与发布
 
 依赖：SIA-008～SIA-011。finding 进入修改计划，保存作者决定、V1/V2、实际采用项和独立复诊；导出 Markdown/JSON storyAudit 分区。
