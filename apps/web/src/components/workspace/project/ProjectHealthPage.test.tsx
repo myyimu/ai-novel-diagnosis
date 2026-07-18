@@ -177,7 +177,64 @@ const storyAudit = {
 			],
 		},
 	],
-	characterStates: [],
+	characterStates: [
+		{
+			characterId: "hero",
+			sceneId: "scene-1",
+			goalDistance: "closer",
+			agency: 0.72,
+			beliefState: "相信旧案可以被追查",
+			relationshipStates: [
+				{
+					targetCharacterId: "judge",
+					trust: 0.1,
+					power: 0.4,
+				},
+			],
+			cost: "暴露自己正在追查旧案",
+			irreversibleChoice: "决定保留玉牌继续查",
+			evidence: [
+				{
+					anchorId: "arc-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "他把玉牌收入袖中。",
+					startOffset: 60,
+					endOffset: 70,
+					source: "text",
+				},
+			],
+		},
+		{
+			characterId: "hero",
+			sceneId: "scene-2",
+			goalDistance: "farther",
+			agency: 0.48,
+			beliefState: "意识到对手藏在评审体系里",
+			relationshipStates: [],
+			cost: "调查范围扩大",
+			irreversibleChoice: "主动追查评审长",
+			evidence: [
+				{
+					anchorId: "arc-anchor-b",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "他开始追查评审长。",
+					startOffset: 50,
+					endOffset: 58,
+					source: "text",
+				},
+			],
+		},
+		{
+			characterId: "hero",
+			sceneId: "scene-missing",
+			goalDistance: "unknown",
+			agency: 0.2,
+			relationshipStates: [],
+			evidence: [],
+		},
+	],
 	findings: [
 		{
 			id: "finding-a",
@@ -281,6 +338,13 @@ const bookAnalysisResult = {
 			reusablePattern: "物证推动主线。",
 		},
 	],
+	relationships: {
+		nodes: [
+			{ id: "hero", label: "主角", type: "protagonist" },
+			{ id: "judge", label: "评审长", type: "antagonist" },
+		],
+		edges: [],
+	},
 	storyAudit,
 } as unknown as BookAnalysisResult;
 
@@ -349,11 +413,22 @@ describe("ProjectHealthPage", () => {
 		expect(html).toContain("旧案玉牌");
 		expect(html).toContain("评审长");
 		expect(html).toContain("未选择模板：仅展示事实结构，不评分。");
+		expect(html).toContain("人物状态账本与弧光变化点");
+		expect(html).toContain("不合成为人物成长总分");
+		expect(html).toContain("合理成长、伪装、情境变化和不可靠叙述");
+		expect(html).toContain("主角");
+		expect(html).toContain("目标更近");
+		expect(html).toContain("目标更远");
+		expect(html).toContain("主动性较强");
+		expect(html).toContain("决定保留玉牌继续查");
 		expect(html).toContain(
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=anchor-a",
 		);
 		expect(html).toContain(
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=fact-anchor-a",
+		);
+		expect(html).toContain(
+			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=arc-anchor-a",
 		);
 		expect(html).toContain("人工判断不会写入 storyAudit 原始结果");
 		expect(push).not.toHaveBeenCalled();

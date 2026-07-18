@@ -220,6 +220,8 @@ pnpm --filter api build
 
 依赖：SIA-005、SIA-008。先做人物账本，再做 goalDistance、agency、belief、relationship、cost/choice 多维序列。
 
+状态：已完成 Web 人物视图纵切。当前 `/project/health` 增加人物状态账本与弧光变化点，只展示同时具备 scene、chapter 和 evidence 的状态点；逐点展示 goalDistance、agency、belief、relationship、cost/choice，不合成为人物成长总分，并明确合理成长、伪装、情境变化和不可靠叙述不在视图中自动判错。
+
 ### SIA-011：剧情漏洞候选
 
 依赖：SIA-007、SIA-009、SIA-010。只输出候选和证据，不自动判定作品“有硬伤”。

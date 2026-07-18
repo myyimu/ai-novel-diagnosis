@@ -203,7 +203,7 @@ tasks:
 
   - id: "SIA-010"
     title: "人物状态与人物弧光"
-    implementation_status: "priority_next"
+    implementation_status: "completed"
     depends_on:
       - "SIA-005"
       - "SIA-008"
@@ -214,7 +214,7 @@ tasks:
 
   - id: "SIA-011"
     title: "剧情漏洞候选"
-    implementation_status: "not_started"
+    implementation_status: "priority_next"
     depends_on:
       - "SIA-007"
       - "SIA-009"

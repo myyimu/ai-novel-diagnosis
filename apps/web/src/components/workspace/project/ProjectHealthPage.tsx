@@ -11,6 +11,7 @@ import {
 	GitBranch,
 	RefreshCcw,
 	ShieldCheck,
+	UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -241,6 +242,11 @@ export function ProjectHealthPage() {
 							projectId={projectId}
 							result={projectAudit}
 						/>
+						<CharacterArcView
+							audit={storyAudit}
+							projectId={projectId}
+							result={projectAudit}
+						/>
 						<div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,.9fr)]">
 							<TextStatistics audit={storyAudit} />
 							<FindingInspector
@@ -263,6 +269,179 @@ export function ProjectHealthPage() {
 				)}
 			</main>
 		</RedesignWorkspaceShell>
+	);
+}
+
+function CharacterArcView({
+	audit,
+	projectId,
+	result,
+}: {
+	audit: StoryAuditResult;
+	projectId: string;
+	result: BookAnalysisResult | null;
+}) {
+	const sceneById = useMemo(
+		() => new Map(audit.scenes.map((scene) => [scene.id, scene])),
+		[audit.scenes],
+	);
+	const characterRows = useMemo(
+		() => buildCharacterStateRows(audit, sceneById),
+		[audit, sceneById],
+	);
+	const visibleRows = characterRows.slice(0, 5);
+	const omittedStateCount = audit.characterStates.filter(
+		(state) => !state.evidence.length || !sceneById.has(state.sceneId),
+	).length;
+
+	return (
+		<section className="rounded-md border border-border bg-card p-4 shadow-sm">
+			<div className="mb-4 flex items-start justify-between gap-4 max-[760px]:block">
+				<div>
+					<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+						<UserRound className="size-4" />
+						人物视图
+					</div>
+					<h2 className="mt-1 text-base font-semibold text-card-foreground">
+						人物状态账本与弧光变化点
+					</h2>
+					<p className="mt-1 max-w-[780px] text-xs leading-5 text-muted-foreground">
+						按场景追踪目标距离、能动性、信念、关系、代价和选择；不合成为人物成长总分。
+					</p>
+				</div>
+				<div className="rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground max-[760px]:mt-3">
+					{audit.characterStates.length} 条状态 · {omittedStateCount} 条缺证据未展示
+				</div>
+			</div>
+
+			<div className="mb-4 rounded-md border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+				合理成长、伪装、情境变化和不可靠叙述先作为可能解释保留；只有证据充分的 finding
+				才进入人工复核，不在这里自动判错。
+			</div>
+
+			{visibleRows.length ? (
+				<div className="grid gap-4">
+					{visibleRows.map((row) => (
+						<div
+							key={row.characterId}
+							className="rounded-md border border-border bg-background p-3"
+						>
+							<div className="flex flex-wrap items-start justify-between gap-3">
+								<div>
+									<h3 className="text-sm font-semibold text-foreground">
+										{resolveCharacterLabel(row.characterId, result)}
+									</h3>
+									<p className="mt-1 text-xs leading-5 text-muted-foreground">
+										展示 {row.points.length} 个有 scene/chapter/evidence
+										的变化点。
+									</p>
+								</div>
+								<span className="rounded-md bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+									{row.points.length} 个变化点
+								</span>
+							</div>
+							<div className="mt-3 grid gap-3 md:grid-cols-2">
+								{row.points.map(({ state, scene }) => (
+									<div
+										key={`${state.characterId}-${state.sceneId}-${state.evidence[0]?.anchorId}`}
+										className="rounded-md border border-border bg-card p-3"
+									>
+										<div className="flex flex-wrap items-center justify-between gap-2">
+											<a
+												href={evidenceHref(
+													projectId,
+													scene.chapterId,
+													state.evidence[0]?.anchorId,
+												)}
+												className="text-xs font-semibold text-primary hover:underline"
+											>
+												第 {chapterLabel(scene.chapterId)} 章 ·{" "}
+												{scene.title}
+											</a>
+											<span className="rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+												{goalDistanceLabel(state.goalDistance)}
+											</span>
+										</div>
+										<div className="mt-3 grid gap-2">
+											<ArcSignal
+												label="能动性"
+												value={agencyLabel(state.agency)}
+											>
+												<div className="h-2 overflow-hidden rounded-full bg-muted">
+													<div
+														className="h-full rounded-full bg-primary"
+														style={{
+															width: `${agencyPercent(state.agency)}%`,
+														}}
+													/>
+												</div>
+											</ArcSignal>
+											{state.beliefState ? (
+												<ArcSignal label="信念" value={state.beliefState} />
+											) : null}
+											{state.cost ? (
+												<ArcSignal label="代价" value={state.cost} />
+											) : null}
+											{state.irreversibleChoice ? (
+												<ArcSignal
+													label="选择"
+													value={state.irreversibleChoice}
+												/>
+											) : null}
+											{state.relationshipStates.length ? (
+												<ArcSignal
+													label="关系变化"
+													value={state.relationshipStates
+														.slice(0, 2)
+														.map((relationship) =>
+															relationshipStateLabel(
+																relationship,
+																result,
+															),
+														)
+														.join("；")}
+												/>
+											) : null}
+										</div>
+										<EvidenceList
+											evidence={state.evidence.slice(0, 2)}
+											projectId={projectId}
+										/>
+									</div>
+								))}
+							</div>
+						</div>
+					))}
+				</div>
+			) : (
+				<div className="rounded-md border border-dashed border-border bg-background px-4 py-10 text-center">
+					<div className="text-sm font-semibold">暂无可展示的人物状态变化点</div>
+					<p className="mt-1 text-xs text-muted-foreground">
+						需要同时具备 scene、chapter 和 evidence，才会进入人物弧光视图。
+					</p>
+				</div>
+			)}
+		</section>
+	);
+}
+
+function ArcSignal({
+	label,
+	value,
+	children,
+}: {
+	label: string;
+	value: string;
+	children?: ReactNode;
+}) {
+	return (
+		<div>
+			<div className="flex items-center justify-between gap-2 text-xs leading-5">
+				<span className="font-semibold text-muted-foreground">{label}</span>
+				<span className="text-right text-card-foreground">{value}</span>
+			</div>
+			{children ? <div className="mt-1">{children}</div> : null}
+		</div>
 	);
 }
 
@@ -946,6 +1125,97 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 			<div className="mt-1 text-xl font-semibold text-foreground">{value}</div>
 		</div>
 	);
+}
+
+function buildCharacterStateRows(
+	audit: StoryAuditResult,
+	sceneById: Map<string, StoryAuditResult["scenes"][number]>,
+) {
+	const rows = new Map<
+		string,
+		Array<{
+			state: StoryAuditResult["characterStates"][number];
+			scene: StoryAuditResult["scenes"][number];
+		}>
+	>();
+
+	for (const state of audit.characterStates) {
+		const scene = sceneById.get(state.sceneId);
+		if (!scene || !state.evidence.length) {
+			continue;
+		}
+
+		const current = rows.get(state.characterId) ?? [];
+		current.push({ state, scene });
+		rows.set(state.characterId, current);
+	}
+
+	return [...rows.entries()]
+		.map(([characterId, points]) => ({
+			characterId,
+			points: points.sort(
+				(left, right) =>
+					left.scene.narrativeOrder - right.scene.narrativeOrder ||
+					left.scene.orderInChapter - right.scene.orderInChapter,
+			),
+		}))
+		.sort((left, right) => right.points.length - left.points.length);
+}
+
+function resolveCharacterLabel(characterId: string, result: BookAnalysisResult | null) {
+	const graphNode = result?.relationships?.nodes.find((node) => node.id === characterId);
+	if (graphNode?.label) {
+		return graphNode.label;
+	}
+
+	const character = result?.characters?.find((item) =>
+		[item.sourceName, ...(item.names ?? [])].includes(characterId),
+	);
+	if (character?.sourceName) {
+		return character.sourceName;
+	}
+
+	return characterId;
+}
+
+function goalDistanceLabel(
+	goalDistance: StoryAuditResult["characterStates"][number]["goalDistance"],
+) {
+	const labels = {
+		closer: "目标更近",
+		neutral: "目标持平",
+		farther: "目标更远",
+		unknown: "目标未知",
+	} satisfies Record<typeof goalDistance, string>;
+	return labels[goalDistance];
+}
+
+function agencyLabel(agency: number) {
+	if (agency >= 0.67) {
+		return "主动性较强";
+	}
+	if (agency >= 0.34) {
+		return "主动性中等";
+	}
+	return "主动性较弱";
+}
+
+function agencyPercent(agency: number) {
+	return Math.round(Math.min(1, Math.max(0, agency)) * 100);
+}
+
+function relationshipStateLabel(
+	relationship: StoryAuditResult["characterStates"][number]["relationshipStates"][number],
+	result: BookAnalysisResult | null,
+) {
+	const target = resolveCharacterLabel(relationship.targetCharacterId, result);
+	const parts = [
+		relationship.trust === undefined ? null : `信任 ${relationship.trust}`,
+		relationship.intimacy === undefined ? null : `亲密 ${relationship.intimacy}`,
+		relationship.power === undefined ? null : `权力 ${relationship.power}`,
+	].filter((item): item is string => Boolean(item));
+
+	return parts.length ? `${target}（${parts.join(" / ")}）` : target;
 }
 
 function buildTimelineEvents(
