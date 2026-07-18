@@ -213,6 +213,18 @@ export interface StoryAuditResult {
     dialogue: DialogueStatistics[];
   };
   views: {
+    temporalGraph: {
+      eventIds: string[];
+      relationEdges: Array<{
+        sourceEventId: string;
+        targetEventId: string;
+        relation: TemporalRelation;
+        confidence: number;
+        evidenceAnchorIds: string[];
+        ruleId: string;
+      }>;
+      conflictCandidateIds: string[];
+    };
     plotlineMatrix: Array<{
       plotlineId: string;
       sceneIds: string[];

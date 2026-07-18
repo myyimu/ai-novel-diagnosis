@@ -196,6 +196,8 @@ pnpm --filter api build
 
 依赖：SIA-005。实现线性时间、倒叙、before/after 环、年龄矛盾、同时异地等候选规则。unknown 时间不得强制日期化。
 
+状态：已完成最小规则纵切。当前由服务端基于已验证事件证据构建 `temporalGraph`，并只输出 `candidate` finding，保留倒叙、梦境、预言、转述、角色撒谎和实体误合并等替代解释。
+
 ### SIA-007：候选复核器
 
 依赖：SIA-006。Verifier 只接收候选、局部上下文和相关 canon，不自由审稿；未知 anchorId 必须被拒绝。

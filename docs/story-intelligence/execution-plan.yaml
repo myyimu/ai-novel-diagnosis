@@ -159,7 +159,7 @@ tasks:
 
   - id: "SIA-006"
     title: "全局时间图与冲突规则"
-    implementation_status: "not_started"
+    implementation_status: "completed"
     depends_on:
       - "SIA-005"
     acceptance:
@@ -169,7 +169,7 @@ tasks:
 
   - id: "SIA-007"
     title: "候选复核器"
-    implementation_status: "not_started"
+    implementation_status: "priority_next"
     depends_on:
       - "SIA-006"
     acceptance:
