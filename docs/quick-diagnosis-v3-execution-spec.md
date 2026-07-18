@@ -39,8 +39,8 @@ pnpm --dir apps/web build
 本文是快速诊断链路的可执行规格，不是讨论稿。
 
 执行者应按本文的优先级、数据契约、提示词规则、文件清单和验收用例实施。若本文与
-[`diagnosis-workflow-implementation-plan.md`](./diagnosis-workflow-implementation-plan.md)
-中的快速诊断描述冲突，以本文为准；原文档继续作为长期工作流演进记录。
+[`product-doctrine.md`](./product-doctrine.md)
+中的产品原则冲突，以产品总原则为准；若本文与故事体检文档冲突，以单章快速诊断和整书故事体检的职责边界为准。
 
 实施前必须阅读根目录 `AGENTS.md`，并遵守各子项目的架构边界、测试、质量门禁和提交规范。
 

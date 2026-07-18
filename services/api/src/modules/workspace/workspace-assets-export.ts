@@ -1,6 +1,7 @@
 import type {
   ProjectMethodologyCardSnapshot,
   RevisionSessionSnapshot,
+  RevisionTextVersionSnapshot,
   WorkspaceProjectSnapshot,
 } from "./workspace-assets.repository";
 import { buildPromptAttribution } from "@ai-novel-diagnosis/ai-core";
@@ -8,6 +9,7 @@ import { buildPromptAttribution } from "@ai-novel-diagnosis/ai-core";
 export function buildWorkspaceProjectMarkdown(input: {
   project: WorkspaceProjectSnapshot;
   revisionSessions: RevisionSessionSnapshot[];
+  revisionVersions?: RevisionTextVersionSnapshot[];
   methodologyCards: ProjectMethodologyCardSnapshot[];
   generatedAt?: string;
 }) {
@@ -23,10 +25,10 @@ export function buildWorkspaceProjectMarkdown(input: {
   const promptCards = cards.filter((card) => card.promptTemplate?.trim());
   const latest = sessions[0];
   const previous = sessions[1];
-  const scoreDelta =
-    latest && previous
-      ? Number((latest.quickScore - previous.quickScore).toFixed(1))
-      : null;
+  const versionsById = new Map(
+    (input.revisionVersions || []).map((version) => [version.id, version]),
+  );
+  const scoreDelta = calculateScoreDelta(latest, previous);
   const promptAttribution = buildPromptAttribution(sessions);
   const commonIssues = countRows(
     sessions.flatMap((session) =>
@@ -43,12 +45,13 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- 项目创建：${formatDateTime(input.project.createdAt)}`,
     `- 最近更新：${formatDateTime(input.project.updatedAt)}`,
     `- 复诊次数：${sessions.length}`,
+    `- 正文版本：${input.revisionVersions?.length || 0}`,
     `- 方法论卡：${cards.length}`,
     `- Prompt 模板：${promptCards.length}`,
     "",
     "## 项目概览",
     "",
-    `- 最新分数：${latest ? `${latest.quickScore}/10` : "暂无"}`,
+    `- 最新分数：${latest ? formatQuickScore(latest.quickScore) : "暂无"}`,
     `- 相对上一版：${formatScoreDelta(scoreDelta)}`,
     `- 最新 Gate：${latest ? formatGate(latest.gateDecision) : "暂无"}`,
     `- Prompt 归因有效率：${formatPromptAttributionRate(promptAttribution)}`,
@@ -68,8 +71,9 @@ export function buildWorkspaceProjectMarkdown(input: {
         `- 时间：${formatDateTime(session.createdAt)}`,
         `- 来源：${formatInputKind(session.inputKind)}`,
         `- 题材：${session.genre}`,
-        `- 分数：${session.quickScore}/10`,
+        `- 分数：${formatQuickScore(session.quickScore)}`,
         `- Gate：${formatGate(session.gateDecision)}`,
+        `- 正文版本：${formatVersionTransition(session, versionsById)}`,
         `- 正文长度：${session.textLength} 字`,
         `- 主要问题：${session.mainProblem}`,
         `- 问题标签：${session.issueTitles.join("、") || "暂无"}`,
@@ -206,6 +210,29 @@ function formatInputKind(value: string) {
   return map[value] || "作者正文";
 }
 
+function formatVersionTransition(
+  session: RevisionSessionSnapshot,
+  versionsById: Map<string, RevisionTextVersionSnapshot>,
+) {
+  const toVersion = session.toVersionId
+    ? versionsById.get(session.toVersionId)
+    : undefined;
+  const fromVersion = session.fromVersionId
+    ? versionsById.get(session.fromVersionId)
+    : undefined;
+  const toLabel = toVersion?.versionLabel || session.toVersionId || "未保存";
+
+  if (session.textChanged === false) {
+    return `${toLabel}（正文未变化）`;
+  }
+
+  if (!fromVersion) {
+    return `${toLabel}（首次保存）`;
+  }
+
+  return `${fromVersion.versionLabel} -> ${toLabel}`;
+}
+
 function formatMethodologyType(type: string) {
   const map: Record<string, string> = {
     opening_rule: "开头规则",
@@ -236,6 +263,36 @@ function formatScoreDelta(value: number | null) {
   if (value === null) return "暂无上一版";
   if (value === 0) return "持平";
   return value > 0 ? `+${value}` : `${value}`;
+}
+
+function calculateScoreDelta(
+  latest:
+    | {
+        quickScore: number | null;
+      }
+    | undefined,
+  previous:
+    | {
+        quickScore: number | null;
+      }
+    | undefined,
+) {
+  if (
+    !isComparableScore(latest?.quickScore) ||
+    !isComparableScore(previous?.quickScore)
+  ) {
+    return null;
+  }
+
+  return Number((latest.quickScore - previous.quickScore).toFixed(1));
+}
+
+function formatQuickScore(value: number | null | undefined) {
+  return isComparableScore(value) ? `${value}/10` : "信息不足，暂不评分";
+}
+
+function isComparableScore(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function formatPromptAttributionRate(value: {

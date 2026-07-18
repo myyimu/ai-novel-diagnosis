@@ -11,8 +11,10 @@ import type {
 	ResearchComparisonResult,
 	ResearchQaResult,
 	RevisionSession,
+	RevisionTextVersion,
 	RubricResult,
 	ScoreResult,
+	StoryAuditFindingReview,
 	WorkspaceProject,
 } from "@/stores/workspace-store";
 
@@ -467,6 +469,7 @@ export function requestPlatformFit({
 export interface WorkspaceAssetsPayload {
 	projects: WorkspaceProject[];
 	revisionSessions: RevisionSession[];
+	revisionVersions: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
 }
 
@@ -483,15 +486,18 @@ export function upsertWorkspaceProject(project: WorkspaceProject) {
 export function upsertRevisionAssets({
 	project,
 	session,
+	revisionVersions,
 	methodologyCards,
 }: {
 	project: WorkspaceProject;
 	session: RevisionSession;
+	revisionVersions: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
 }) {
 	return postJson<WorkspaceAssetsPayload>("/analysis/workspace/revision-assets", {
 		project,
 		session,
+		revisionVersions,
 		methodologyCards,
 	});
 }
@@ -509,6 +515,16 @@ export function updateRevisionSessionNote({
 		note,
 		updatedAt,
 	});
+}
+
+export function readStoryAuditFindingReviews(projectId: string) {
+	return getJson<StoryAuditFindingReview[]>(
+		`/analysis/workspace/story-audit/reviews/${encodeURIComponent(projectId)}`,
+	);
+}
+
+export function upsertStoryAuditFindingReview(review: StoryAuditFindingReview) {
+	return postJson<StoryAuditFindingReview>("/analysis/workspace/story-audit/reviews", review);
 }
 
 export function uploadBookPreview({

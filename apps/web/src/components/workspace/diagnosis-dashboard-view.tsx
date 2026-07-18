@@ -9,7 +9,11 @@ import {
 	TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
-import { buildDiagnosisDashboard } from "@/lib/workspace-iteration";
+import {
+	buildDiagnosisDashboard,
+	formatQuickScore,
+	hasComparableQuickScore,
+} from "@/lib/workspace-iteration";
 import type { ProjectMethodologyCard, RevisionSession } from "@/stores/workspace-store";
 import { Button } from "@/components/ui/button";
 
@@ -66,7 +70,7 @@ export function DiagnosisDashboardView({
 					value={scoreDeltaLabel}
 					detail={
 						dashboard.latest
-							? `${dashboard.latest.quickScore}/10 · ${formatGateLabel(latestGate)}`
+							? `${formatQuickScore(dashboard.latest.quickScore)} · ${formatGateLabel(latestGate)}`
 							: "暂无诊断"
 					}
 				/>
@@ -142,12 +146,15 @@ export function DiagnosisDashboardView({
 									<div
 										className="h-full rounded-full bg-primary"
 										style={{
-											width: `${Math.max(3, Math.min(100, item.score * 10))}%`,
+											width: hasComparableQuickScore(item.score)
+												? `${Math.max(3, Math.min(100, item.score * 10))}%`
+												: "0%",
 										}}
 									/>
 								</div>
 								<p className="text-sm font-medium">
-									{item.score}/10 · {formatGateLabel(item.gateDecision)}
+									{formatQuickScore(item.score)} ·{" "}
+									{formatGateLabel(item.gateDecision)}
 								</p>
 							</div>
 						))}

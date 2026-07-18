@@ -13,8 +13,14 @@ import { ProjectAssetTabs } from "./ProjectAssetTabs";
 
 export function ProjectRevisionsPage() {
 	const router = useRouter();
-	const { activeProject, projectRevisionSessions, projectMethodologyCards, providerLabel } =
-		useWorkspaceHandlers("overview");
+	const {
+		activeProject,
+		projectRevisionSessions,
+		projectRevisionVersions,
+		projectMethodologyCards,
+		providerLabel,
+	} = useWorkspaceHandlers("overview");
+	const versionsById = new Map(projectRevisionVersions.map((version) => [version.id, version]));
 
 	const latestUpdate = projectRevisionSessions.length
 		? new Date(
@@ -60,9 +66,10 @@ export function ProjectRevisionsPage() {
 					</div>
 				</section>
 
-				<section className="mb-4 grid gap-3 md:grid-cols-4">
+				<section className="mb-4 grid gap-3 md:grid-cols-5">
 					<SummaryCard label="当前书籍" value={activeProject?.name || "默认书籍"} />
 					<SummaryCard label="修改记录" value={`${projectRevisionSessions.length} 条`} />
+					<SummaryCard label="正文版本" value={`${projectRevisionVersions.length} 个`} />
 					<SummaryCard label="方法论卡" value={`${projectMethodologyCards.length} 条`} />
 					<SummaryCard label="最近更新" value={latestUpdate} />
 				</section>
@@ -114,6 +121,9 @@ export function ProjectRevisionsPage() {
 													{new Date(session.createdAt).toLocaleString()}
 												</span>
 												<span>{session.textLength} 字</span>
+												<span>
+													{formatVersionTransition(session, versionsById)}
+												</span>
 												<span>来源：快速诊断</span>
 											</div>
 										</div>
@@ -172,6 +182,29 @@ export function ProjectRevisionsPage() {
 			</main>
 		</RedesignWorkspaceShell>
 	);
+}
+
+function formatVersionTransition(
+	session: {
+		fromVersionId?: string;
+		toVersionId?: string;
+		textChanged?: boolean;
+	},
+	versionsById: Map<string, { versionLabel: string }>,
+) {
+	const toVersion = session.toVersionId ? versionsById.get(session.toVersionId) : undefined;
+	const fromVersion = session.fromVersionId ? versionsById.get(session.fromVersionId) : undefined;
+	const toLabel = toVersion?.versionLabel || session.toVersionId || "正文未保存";
+
+	if (session.textChanged === false) {
+		return `${toLabel} · 正文未变化`;
+	}
+
+	if (!fromVersion) {
+		return `${toLabel} · 首次保存`;
+	}
+
+	return `${fromVersion.versionLabel} -> ${toLabel}`;
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {

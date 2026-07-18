@@ -8,7 +8,7 @@ export type PromptAttributionCategory =
 export interface PromptAttributionSession {
   id: string;
   chapterTitle: string;
-  quickScore: number;
+  quickScore: number | null;
   gateDecision?: string;
   issueTitles: string[];
   nextPrompt?: string;
@@ -93,6 +93,9 @@ export function buildPromptAttribution(
     const current = sessions[index];
     const previous = sessions[index + 1];
     if (!previous.nextPrompt) {
+      continue;
+    }
+    if (!hasComparableScore(current.quickScore) || !hasComparableScore(previous.quickScore)) {
       continue;
     }
 
@@ -194,6 +197,10 @@ export function buildPromptAttribution(
     items,
     calibration: buildPromptAttributionCalibration({ items, counts }),
   };
+}
+
+function hasComparableScore(value: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function buildPromptAttributionCalibration({

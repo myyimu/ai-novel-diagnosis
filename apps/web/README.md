@@ -7,7 +7,7 @@
 ## 主要视图
 
 - 诊断工作区：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`，覆盖快速诊断、深度质检、评分报告和证据链。
-- 项目工作区：`/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`，覆盖当前项目、复诊记录、方法论卡片和导出资产。
+- 项目工作区：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export`，覆盖当前项目、故事体检、复诊记录、方法论卡片和导出资产。
 - 研究工作区：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`，覆盖整书拆解、样本对比、套路沉淀和研究资料。
 - 设置工作区：`/settings/provider`、`/settings/dashboard`、`/settings/history`，覆盖模型配置、诊断看板和历史任务。
 
@@ -78,4 +78,5 @@ pnpm --filter web build
 
 - 首屏优先服务新手最短闭环：粘贴章节、诊断、改稿 Prompt、复诊。
 - 高级参数默认后置，避免把新手第一步变成配置表单。
+- 故事体检属于项目工作区的整书事实层，不应在首页包装成质量总分大屏。
 - 组件内尽量只保留状态绑定和事件编排；请求、缓存、进度状态机和展示派生逻辑放在 `src/lib`。

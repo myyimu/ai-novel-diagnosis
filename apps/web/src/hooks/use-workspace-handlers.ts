@@ -56,8 +56,12 @@ import {
 import {
 	buildProjectExportMarkdown,
 	createRevisionSession,
+	createRevisionTextVersion,
+	findPreviousRevisionTextVersion,
+	findRevisionTextVersionForDraft,
 	mergeProjectMethodologyCards,
 	upsertRevisionSession,
+	upsertRevisionTextVersion,
 } from "@/lib/workspace-iteration";
 import {
 	buildBookAnalysisCacheKey as createBookAnalysisCacheKey,
@@ -360,6 +364,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCache,
 		revisionSessions,
 		setRevisionSessions,
+		revisionVersions,
+		setRevisionVersions,
 		methodologyCards,
 		setMethodologyCards,
 		rubricCache,
@@ -429,6 +435,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const projectMethodologyCards = methodologyCards.filter(
 		(card) => (card.projectId || "default-project") === activeProjectId,
 	);
+	const projectRevisionVersions = revisionVersions.filter(
+		(version) => (version.projectId || "default-project") === activeProjectId,
+	);
 
 	/* ──────────── timer effect ──────────── */
 
@@ -483,6 +492,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const hasAssets =
 			assets.projects.length ||
 			assets.revisionSessions.length ||
+			assets.revisionVersions?.length ||
+			0 ||
 			assets.methodologyCards.length;
 		if (!hasAssets) {
 			return;
@@ -490,6 +501,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		setProjects((current) => mergeById(assets.projects, current));
 		setRevisionSessions((current) => mergeById(assets.revisionSessions, current));
+		setRevisionVersions((current) => mergeById(assets.revisionVersions || [], current));
 		setMethodologyCards((current) => mergeMethodologyCards(assets.methodologyCards, current));
 		setActiveProjectId((current) => {
 			const mergedProjects = mergeById(assets.projects, projects);
@@ -624,6 +636,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const content = buildProjectExportMarkdown({
 			project,
 			revisionSessions: projectRevisionSessions,
+			revisionVersions: projectRevisionVersions,
 			methodologyCards: projectMethodologyCards,
 		});
 		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
@@ -958,16 +971,49 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			cards: methodologyCards,
 			cardIds: [],
 		};
+		const existingVersion = findRevisionTextVersionForDraft({
+			versions: projectRevisionVersions,
+			projectId: activeProjectId,
+			chapterTitle,
+			chapterText,
+		});
+		const previousVersion = findPreviousRevisionTextVersion({
+			versions: projectRevisionVersions,
+			projectId: activeProjectId,
+			chapterTitle,
+			chapterText,
+		});
+		const version =
+			existingVersion ??
+			createRevisionTextVersion({
+				projectId: activeProjectId,
+				chapterTitle,
+				chapterText,
+				previousVersion,
+				existingVersions: projectRevisionVersions,
+				now,
+			});
 		const session = createRevisionSession({
 			projectId: activeProjectId,
 			chapterTitle,
 			chapterText,
 			result,
 			methodologyCardIds: mergedCards.cardIds,
+			fromVersionId: version.previousVersionId,
+			toVersionId: version.id,
+			textChanged: !existingVersion,
 			now,
 		});
+		const versionWithSession = existingVersion
+			? existingVersion
+			: { ...version, sourceSessionId: session.id };
 
 		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		if (!existingVersion) {
+			setRevisionVersions((current) =>
+				upsertRevisionTextVersion(current, versionWithSession),
+			);
+		}
 		setProjects((current) =>
 			current.map((project) =>
 				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
@@ -976,6 +1022,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		void upsertRevisionAssets({
 			project,
 			session,
+			revisionVersions: existingVersion ? [] : [versionWithSession],
 			methodologyCards: [],
 		})
 			.then(applyWorkspaceAssets)
@@ -1501,8 +1548,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				setQuickReviewResult(cached.result);
 				setQuickReviewPlatformFit(null);
 				setQuickReviewError(null);
-				rememberQuickReviewIteration(cached.result);
-				setStatus("已使用缓存的问题分析；如需让 AI 重新分析，请点“重新分析”。");
+				setStatus("已使用缓存的问题分析；缓存结果不会保存为新的正文版本或复诊记录。");
 				openQuickReviewChapter();
 				return;
 			}
@@ -1700,6 +1746,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			void upsertRevisionAssets({
 				project,
 				session: updatedSession,
+				revisionVersions: [],
 				methodologyCards: mergedCards.cards.filter(
 					(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
 				),
@@ -2283,6 +2330,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		activeProjectId,
 		activeProject,
 		projectRevisionSessions,
+		projectRevisionVersions,
 		projectMethodologyCards,
 		newProjectName,
 		setNewProjectName,

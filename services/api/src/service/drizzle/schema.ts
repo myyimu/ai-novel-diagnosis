@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -87,6 +88,8 @@ export const modelUsageEvents = pgTable("model_usage_events", {
 export const workspaceProjects = pgTable("workspace_projects", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
+  bookJobId: text("book_job_id"),
+  analysisPurpose: varchar("analysis_purpose", { length: 64 }),
   createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
 });
@@ -101,7 +104,7 @@ export const revisionSessions = pgTable("revision_sessions", {
   inputKind: varchar("input_kind", { length: 64 }).notNull(),
   textHash: text("text_hash").notNull(),
   textLength: integer("text_length").notNull(),
-  quickScore: real("quick_score").notNull(),
+  quickScore: real("quick_score"),
   gateDecision: varchar("gate_decision", { length: 32 }).notNull(),
   mainProblem: text("main_problem").notNull(),
   issueTitles: jsonb("issue_titles").notNull(),
@@ -111,7 +114,24 @@ export const revisionSessions = pgTable("revision_sessions", {
   revisionNoteUpdatedAt: timestamp("revision_note_updated_at", {
     precision: 3,
   }),
+  fromVersionId: text("from_version_id"),
+  toVersionId: text("to_version_id"),
+  textChanged: boolean("text_changed").default(true).notNull(),
+  storyAuditFindingIds: jsonb("story_audit_finding_ids").notNull(),
   methodologyCardIds: jsonb("methodology_card_ids").notNull(),
+});
+
+export const revisionTextVersions = pgTable("revision_text_versions", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  chapterTitle: text("chapter_title").notNull(),
+  versionLabel: varchar("version_label", { length: 32 }).notNull(),
+  textHash: text("text_hash").notNull(),
+  textLength: integer("text_length").notNull(),
+  text: text("text").notNull(),
+  sourceSessionId: text("source_session_id"),
+  previousVersionId: text("previous_version_id"),
 });
 
 export const methodologyCards = pgTable("methodology_cards", {
@@ -133,11 +153,34 @@ export const methodologyCards = pgTable("methodology_cards", {
   usageCount: integer("usage_count").notNull(),
 });
 
+export const storyAuditFindingReviews = pgTable(
+  "story_audit_finding_reviews",
+  {
+    projectId: text("project_id").notNull(),
+    auditId: text("audit_id").notNull(),
+    findingId: text("finding_id").notNull(),
+    reviewState: varchar("review_state", { length: 64 }).notNull(),
+    note: text("note"),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("story_audit_finding_reviews_unique").on(
+      table.projectId,
+      table.auditId,
+      table.findingId,
+    ),
+  ],
+);
+
 export type AnalysisUploadSelect = typeof analysisUploads.$inferSelect;
 export type AnalysisUploadInsert = typeof analysisUploads.$inferInsert;
 export type BookAnalysisJobSelect = typeof bookAnalysisJobs.$inferSelect;
 export type BookAnalysisJobInsert = typeof bookAnalysisJobs.$inferInsert;
 export type WorkspaceProjectSelect = typeof workspaceProjects.$inferSelect;
 export type RevisionSessionSelect = typeof revisionSessions.$inferSelect;
+export type RevisionTextVersionSelect =
+  typeof revisionTextVersions.$inferSelect;
 export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;
+export type StoryAuditFindingReviewSelect =
+  typeof storyAuditFindingReviews.$inferSelect;
 export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;

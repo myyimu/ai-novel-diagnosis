@@ -26,6 +26,9 @@ describe("buildWorkspaceProjectMarkdown", () => {
           issueCategories: ["hook"],
           nextPrompt: "请补强章末代价。",
           revisionNote: "这一版已经补了章末代价。",
+          fromVersionId: "version-1",
+          toVersionId: "version-2",
+          textChanged: true,
           methodologyCardIds: ["method-1"],
         },
         {
@@ -44,6 +47,30 @@ describe("buildWorkspaceProjectMarkdown", () => {
           issueCategories: ["hook"],
           nextPrompt: "请补强章末代价。",
           methodologyCardIds: ["method-1"],
+        },
+      ],
+      revisionVersions: [
+        {
+          id: "version-1",
+          projectId: "project-a",
+          createdAt: "2026-06-24T00:00:00.000Z",
+          chapterTitle: "第一章 退婚",
+          versionLabel: "V1",
+          textHash: "hash-1",
+          textLength: 100,
+          text: "版本一正文",
+        },
+        {
+          id: "version-2",
+          projectId: "project-a",
+          createdAt: "2026-06-24T01:00:00.000Z",
+          chapterTitle: "第一章 退婚",
+          versionLabel: "V2",
+          textHash: "hash-2",
+          textLength: 120,
+          text: "版本二正文",
+          previousVersionId: "version-1",
+          sourceSessionId: "revision-2",
         },
       ],
       methodologyCards: [
@@ -70,7 +97,9 @@ describe("buildWorkspaceProjectMarkdown", () => {
 
     expect(markdown).toContain("AI网文诊断台项目导出");
     expect(markdown).toContain("项目概览");
+    expect(markdown).toContain("正文版本：2");
     expect(markdown).toContain("复诊轨迹");
+    expect(markdown).toContain("正文版本：V1 -> V2");
     expect(markdown).toContain("人工备注");
     expect(markdown).toContain("这一版已经补了章末代价。");
     expect(markdown).toContain("方法论卡");
@@ -83,5 +112,41 @@ describe("buildWorkspaceProjectMarkdown", () => {
     expect(markdown).toContain("置信度");
     expect(markdown).toContain("信号");
     expect(markdown).toContain("请补强章末代价。");
+  });
+
+  it("exports insufficient revision scores without coercing them to zero", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [
+        {
+          id: "revision-insufficient",
+          projectId: "project-a",
+          createdAt: "2026-06-24T01:00:00.000Z",
+          chapterTitle: "材料不足版",
+          genre: "xuanhuan",
+          inputKind: "human-draft",
+          textHash: "hash",
+          textLength: 2,
+          quickScore: null,
+          gateDecision: "insufficient",
+          mainProblem: "输入信息不足",
+          issueTitles: ["输入信息不足"],
+          issueCategories: [],
+          textChanged: true,
+          methodologyCardIds: [],
+        },
+      ],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-06-24T03:00:00.000Z",
+    });
+
+    expect(markdown).toContain("信息不足，暂不评分");
+    expect(markdown).not.toContain("0/10");
   });
 });

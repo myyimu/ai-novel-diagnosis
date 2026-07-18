@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatGateLabel } from "@/components/workspace/quick-experience-panel";
+import { formatQuickScore } from "@/lib/workspace-iteration";
 import type { RevisionSession } from "@/stores/workspace-store";
 
 export interface QuickHistoryDetailProps {
@@ -19,7 +20,7 @@ export function QuickHistoryDetail({ session }: QuickHistoryDetailProps) {
 				<div className="flex flex-wrap gap-2">
 					<Badge variant="secondary">{session.genre || "类型待确认"}</Badge>
 					<Badge variant="outline">{session.inputKind}</Badge>
-					<Badge>{session.quickScore}/10</Badge>
+					<Badge>{formatQuickScore(session.quickScore)}</Badge>
 					<Badge variant="outline">{formatGateLabel(session.gateDecision)}</Badge>
 				</div>
 				<p className="leading-6">{session.mainProblem}</p>

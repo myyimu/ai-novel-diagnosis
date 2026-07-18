@@ -4,7 +4,7 @@ import { CheckCircle2, Clipboard, Loader2, Target, TriangleAlert } from "lucide-
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
-import { summarizeRevisionTrend } from "@/lib/workspace-iteration";
+import { formatQuickScore, summarizeRevisionTrend } from "@/lib/workspace-iteration";
 import type {
 	ProjectMethodologyCard,
 	QuickReviewInputKind,
@@ -601,7 +601,7 @@ export function QuickExperiencePanel({
 									>
 										<p className="text-xs text-muted-foreground">最近诊断</p>
 										<p className="mt-2 text-sm font-semibold">
-											{revisionTrend.latest.quickScore}/10 ·{" "}
+											{formatQuickScore(revisionTrend.latest.quickScore)} ·{" "}
 											{formatGateLabel(revisionTrend.latest.gateDecision)}
 										</p>
 									</button>

@@ -5,9 +5,13 @@ import {
 	buildRevisionComparison,
 	buildRevisionHistory,
 	createRevisionSession,
+	createRevisionTextVersion,
+	findPreviousRevisionTextVersion,
+	findRevisionTextVersionForDraft,
 	mergeProjectMethodologyCards,
 	summarizeRevisionTrend,
 	upsertRevisionSession,
+	upsertRevisionTextVersion,
 } from "./workspace-iteration";
 import type { QuickReviewResult, WorkspaceProject } from "@/stores/workspace-store";
 
@@ -67,6 +71,7 @@ describe("workspace iteration assets", () => {
 			chapterText: "主角被退婚后拿到旧案信物。",
 			result: baseResult,
 			methodologyCardIds: ["method-1"],
+			storyAuditFindingIds: ["finding-1"],
 			now: "2026-06-24T00:00:00.000Z",
 		});
 
@@ -76,7 +81,58 @@ describe("workspace iteration assets", () => {
 		expect(session.gateDecision).toBe("revise");
 		expect(session.issueTitles).toContain("章末钩子没有代价");
 		expect(session.issueCategories).toContain("hook");
+		expect(session.storyAuditFindingIds).toEqual(["finding-1"]);
 		expect(session.methodologyCardIds).toEqual(["method-1"]);
+	});
+
+	it("keeps insufficient quick review sessions unscored instead of coercing to zero", () => {
+		const session = createRevisionSession({
+			chapterTitle: "材料不足版",
+			chapterText: "太短",
+			result: { ...baseResult, quickScore: null, gateDecision: "insufficient" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+
+		expect(session.quickScore).toBeNull();
+		expect(session.gateDecision).toBe("insufficient");
+	});
+
+	it("creates stable text versions and finds changed drafts by chapter hash", () => {
+		const first = createRevisionTextVersion({
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本一正文",
+			existingVersions: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const versions = upsertRevisionTextVersion([], first);
+		const duplicate = findRevisionTextVersionForDraft({
+			versions,
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本一正文",
+		});
+		const previous = findPreviousRevisionTextVersion({
+			versions,
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本二正文",
+		});
+		const second = createRevisionTextVersion({
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本二正文",
+			previousVersion: previous,
+			existingVersions: versions,
+			now: "2026-06-24T01:00:00.000Z",
+		});
+
+		expect(duplicate?.id).toBe(first.id);
+		expect(previous?.id).toBe(first.id);
+		expect(first.versionLabel).toBe("V1");
+		expect(second.versionLabel).toBe("V2");
+		expect(second.previousVersionId).toBe(first.id);
 	});
 
 	it("deduplicates methodology cards and increases occurrence count", () => {
@@ -193,6 +249,38 @@ describe("workspace iteration assets", () => {
 		expect(dashboard.coach.nextActions.join(" ")).toContain("钩子必须绑定代价");
 	});
 
+	it("does not compare or attribute prompt effectiveness when a revision score is unavailable", () => {
+		const first = createRevisionSession({
+			chapterTitle: "第一版",
+			chapterText: "版本一",
+			result: { ...baseResult, quickScore: 5.4, gateDecision: "rebuild" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const second = createRevisionSession({
+			chapterTitle: "补材料版",
+			chapterText: "版本二",
+			result: { ...baseResult, quickScore: null, gateDecision: "insufficient" },
+			methodologyCardIds: [],
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const dashboard = buildDiagnosisDashboard({
+			sessions: [second, first],
+			methodologyCards: [],
+		});
+		const history = buildRevisionHistory({
+			sessions: [first, second],
+			selectedSessionId: second.id,
+		});
+
+		expect(dashboard.scoreDelta).toBeNull();
+		expect(dashboard.promptEffectiveness.comparable).toBe(0);
+		expect(dashboard.promptAttribution.total).toBe(0);
+		expect(dashboard.qualityTrend.at(-1)?.score).toBeNull();
+		expect(history.scoreDelta).toBeNull();
+		expect(history.comparison).toBeNull();
+	});
+
 	it("attributes weak prompt outcomes to execution gaps when issues repeat", () => {
 		const first = createRevisionSession({
 			chapterTitle: "第一版",
@@ -278,12 +366,12 @@ describe("workspace iteration assets", () => {
 
 		const comparison = buildRevisionComparison({ current, previous });
 
-		expect(comparison.scoreDelta).toBe(1.2);
-		expect(comparison.gateChangeLabel).toBe("Gate 改善");
-		expect(comparison.promptOutcome.status).toBe("effective");
-		expect(comparison.resolvedIssues).toContain("章末钩子没有代价");
-		expect(comparison.newIssues).toContain("新章末钩子还不够具体");
-		expect(comparison.nextAction).toContain("方法论卡");
+		expect(comparison?.scoreDelta).toBe(1.2);
+		expect(comparison?.gateChangeLabel).toBe("Gate 改善");
+		expect(comparison?.promptOutcome.status).toBe("effective");
+		expect(comparison?.resolvedIssues).toContain("章末钩子没有代价");
+		expect(comparison?.newIssues).toContain("新章末钩子还不够具体");
+		expect(comparison?.nextAction).toContain("方法论卡");
 	});
 
 	it("builds a project export markdown package", () => {
@@ -301,6 +389,22 @@ describe("workspace iteration assets", () => {
 			methodologyCardIds: ["method-1"],
 			now: "2026-06-24T00:00:00.000Z",
 		});
+		const firstVersion = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本一",
+			sourceSessionId: first.id,
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const secondVersion = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本二",
+			sourceSessionId: "revision-2",
+			previousVersion: firstVersion,
+			existingVersions: [firstVersion],
+			now: "2026-06-24T01:00:00.000Z",
+		});
 		const second = {
 			...createRevisionSession({
 				projectId: project.id,
@@ -311,6 +415,9 @@ describe("workspace iteration assets", () => {
 				now: "2026-06-24T01:00:00.000Z",
 			}),
 			revisionNote: "这一版按 Prompt 补了章末代价。",
+			fromVersionId: firstVersion.id,
+			toVersionId: secondVersion.id,
+			textChanged: true,
 		};
 		const mergedCards = mergeProjectMethodologyCards({
 			projectId: project.id,
@@ -324,6 +431,7 @@ describe("workspace iteration assets", () => {
 		const markdown = buildProjectExportMarkdown({
 			project,
 			revisionSessions: [first, second],
+			revisionVersions: [firstVersion, secondVersion],
 			methodologyCards: mergedCards.cards,
 			generatedAt: "2026-06-24T03:00:00.000Z",
 		});
@@ -334,6 +442,8 @@ describe("workspace iteration assets", () => {
 		expect(markdown).toContain("下一步动作");
 		expect(markdown).toContain("优先处理：章末钩子没有代价");
 		expect(markdown).toContain("复诊轨迹");
+		expect(markdown).toContain("正文版本：2");
+		expect(markdown).toContain("正文版本：V1 -> V2");
 		expect(markdown).toContain("人工备注");
 		expect(markdown).toContain("这一版按 Prompt 补了章末代价。");
 		expect(markdown).toContain("方法论卡");

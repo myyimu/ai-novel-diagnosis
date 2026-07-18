@@ -4,6 +4,9 @@ import {
 	requestMethodologyCards,
 	requestPlatformFit,
 	requestQuickReview,
+	readStoryAuditFindingReviews,
+	upsertRevisionAssets,
+	upsertStoryAuditFindingReview,
 } from "./workspace-analysis-client";
 import type { ProviderForm } from "@/stores/workspace-store";
 
@@ -168,5 +171,134 @@ describe("workspace analysis client", () => {
 				fixAction: "补充受辱反击链条。",
 			},
 		]);
+	});
+
+	it("persists revision assets with real text versions", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+			okJson({
+				projects: [],
+				revisionSessions: [],
+				revisionVersions: [],
+				methodologyCards: [],
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await upsertRevisionAssets({
+			project: {
+				id: "project-a",
+				name: "测试书",
+				bookJobId: "book-job-a",
+				analysisPurpose: "story-audit",
+				createdAt: "2026-06-24T00:00:00.000Z",
+				updatedAt: "2026-06-24T01:00:00.000Z",
+			},
+			session: {
+				id: "revision-1",
+				projectId: "project-a",
+				createdAt: "2026-06-24T01:00:00.000Z",
+				chapterTitle: "第一章",
+				genre: "xuanhuan",
+				inputKind: "human-draft",
+				textHash: "hash-1",
+				textLength: 4,
+				quickScore: 6.4,
+				gateDecision: "revise",
+				mainProblem: "章末钩子弱",
+				issueTitles: ["章末钩子弱"],
+				methodologyCardIds: [],
+				storyAuditFindingIds: ["finding-1"],
+				toVersionId: "version-1",
+				textChanged: true,
+			},
+			revisionVersions: [
+				{
+					id: "version-1",
+					projectId: "project-a",
+					createdAt: "2026-06-24T01:00:00.000Z",
+					chapterTitle: "第一章",
+					versionLabel: "V1",
+					textHash: "hash-1",
+					textLength: 4,
+					text: "正文一",
+					sourceSessionId: "revision-1",
+				},
+			],
+			methodologyCards: [],
+		});
+
+		const [url, init] = fetchMock.mock.calls[0];
+		const body = readJsonBody(init);
+
+		expect(url).toBe("/api/v1/analysis/workspace/revision-assets");
+		expect(body.project).toMatchObject({
+			bookJobId: "book-job-a",
+			analysisPurpose: "story-audit",
+		});
+		expect(body.session).toMatchObject({
+			storyAuditFindingIds: ["finding-1"],
+		});
+		expect(body.revisionVersions).toEqual([
+			expect.objectContaining({
+				id: "version-1",
+				text: "正文一",
+				sourceSessionId: "revision-1",
+			}),
+		]);
+		expect(body.session).toEqual(
+			expect.objectContaining({
+				toVersionId: "version-1",
+				textChanged: true,
+			}),
+		);
+	});
+
+	it("persists story audit finding review state without sending story audit result", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+			okJson({
+				projectId: "project-a",
+				auditId: "audit-a",
+				findingId: "finding-a",
+				reviewState: "confirmed",
+				note: "确认为问题",
+				updatedAt: "2026-07-18T08:00:00.000Z",
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await upsertStoryAuditFindingReview({
+			projectId: "project-a",
+			auditId: "audit-a",
+			findingId: "finding-a",
+			reviewState: "confirmed",
+			note: "确认为问题",
+			updatedAt: "2026-07-18T08:00:00.000Z",
+		});
+
+		const [url, init] = fetchMock.mock.calls[0];
+		const body = readJsonBody(init);
+
+		expect(url).toBe("/api/v1/analysis/workspace/story-audit/reviews");
+		expect(body).toEqual({
+			projectId: "project-a",
+			auditId: "audit-a",
+			findingId: "finding-a",
+			reviewState: "confirmed",
+			note: "确认为问题",
+			updatedAt: "2026-07-18T08:00:00.000Z",
+		});
+		expect(body).not.toHaveProperty("storyAudit");
+		expect(body).not.toHaveProperty("reviewStateByFinding");
+	});
+
+	it("reads story audit finding reviews by project id", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(okJson([]));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await readStoryAuditFindingReviews("project/a");
+
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(
+			"/api/v1/analysis/workspace/story-audit/reviews/project%2Fa",
+		);
 	});
 });

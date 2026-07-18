@@ -13,6 +13,7 @@ import { type Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
 import {
   UpdateRevisionNoteDto,
+  UpsertStoryAuditFindingReviewDto,
   UpsertRevisionAssetsDto,
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
@@ -52,6 +53,7 @@ export class WorkspaceController {
     return this.workspaceAssets.upsertRevisionAssets({
       project: body.project,
       session: body.session,
+      revisionVersions: body.revisionVersions || [],
       methodologyCards: body.methodologyCards,
     });
   }
@@ -68,6 +70,34 @@ export class WorkspaceController {
       sessionId,
       note: body.note,
       updatedAt: body.updatedAt,
+    });
+  }
+
+  @Get("story-audit/reviews/:projectId")
+  @Public()
+  @ApiOperation({
+    summary: "Read persisted human review states for story audit findings",
+  })
+  listStoryAuditFindingReviews(@Param("projectId") projectId: string) {
+    return this.workspaceAssets.listStoryAuditFindingReviews({ projectId });
+  }
+
+  @Post("story-audit/reviews")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Persist one human review state for a story audit finding",
+  })
+  upsertStoryAuditFindingReview(
+    @Body() body: UpsertStoryAuditFindingReviewDto,
+  ) {
+    return this.workspaceAssets.upsertStoryAuditFindingReview({
+      projectId: body.projectId,
+      auditId: body.auditId,
+      findingId: body.findingId,
+      reviewState: body.reviewState,
+      note: body.note,
+      updatedAt: body.updatedAt ?? new Date().toISOString(),
     });
   }
 

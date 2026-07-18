@@ -97,6 +97,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		scoreCache: [],
 		bookAnalysisCache: [],
 		revisionSessions: [],
+		revisionVersions: [],
 		methodologyCards: [],
 		...overrides,
 	};

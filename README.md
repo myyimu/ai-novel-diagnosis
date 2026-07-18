@@ -497,11 +497,10 @@ pnpm run doctor
 - 开源协议：MIT，见 [LICENSE](./LICENSE)。
 - 代码仓库：[github.com/myyimu/ai-novel-diagnosis](https://github.com/myyimu/ai-novel-diagnosis)
 - 联系方式：[xiaoke5211@gmail.com](mailto:xiaoke5211@gmail.com)
-- 产品定位与 AI 生成稿质检方向文档：见 [docs/product-positioning-ai-draft-diagnosis.md](./docs/product-positioning-ai-draft-diagnosis.md)。
-- 诊断工作流化改造计划：见 [docs/diagnosis-workflow-implementation-plan.md](./docs/diagnosis-workflow-implementation-plan.md)。
-- 产品评审与迭代规划：见 [docs/product-review-roadmap.md](./docs/product-review-roadmap.md)。
-- 内容易懂性评审：见 [docs/content-clarity-review.md](./docs/content-clarity-review.md)。
-- 拆书结果可理解性评审：见 [docs/book-disassembly-comprehension-review.md](./docs/book-disassembly-comprehension-review.md)。
+- 文档入口与阅读顺序：见 [docs/README.md](./docs/README.md)。
+- 产品总原则：见 [docs/product-doctrine.md](./docs/product-doctrine.md)。
+- 故事体检与叙事智能：见 [docs/story-intelligence/README.md](./docs/story-intelligence/README.md)。
+- 故事体检实施计划：见 [docs/story-intelligence/implementation-plan.md](./docs/story-intelligence/implementation-plan.md)。
 - 贡献说明：见 [CONTRIBUTING.md](./CONTRIBUTING.md)
 - 安全策略：见 [SECURITY.md](./SECURITY.md)
 - GitHub 社交预览图候选稿：见 [docs/assets/github-social-preview.png](./docs/assets/github-social-preview.png)。

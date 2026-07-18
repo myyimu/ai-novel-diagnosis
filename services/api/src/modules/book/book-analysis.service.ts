@@ -21,6 +21,7 @@ import {
   type BookExportMode,
 } from "./book-export.service";
 import { BookUploadService, type UploadedTxtFile } from "./book-upload.service";
+import { StoryAuditService } from "../story-audit/story-audit.service";
 import {
   BookPreprocessResult,
   ChapterSegment,
@@ -103,6 +104,7 @@ export class BookAnalysisService {
     private readonly modelProviders: ModelProviderService,
     private readonly persistence: AnalysisPersistenceRepository,
     private readonly bookExports: BookExportService,
+    private readonly storyAudit: StoryAuditService,
   ) {}
 
   async analyzeBook(_input: AnalyzeBookDto) {
@@ -150,6 +152,7 @@ export class BookAnalysisService {
               phase: metadata?.phase,
             });
           },
+          { jobId },
         );
         await this.bookJobs.complete(jobId, result);
         return result;
@@ -456,6 +459,7 @@ export class BookAnalysisService {
               phase: metadata?.phase,
             });
           },
+          { jobId },
         );
         await this.bookJobs.complete(jobId, result);
         return result;
@@ -706,9 +710,16 @@ export class BookAnalysisService {
         ? this.mockBookReduce(input, preprocessing, chapterMaps)
         : await this.reduceBookMaps(input, preprocessing, chapterMaps);
     const normalized = this.normalizeBookAnalysisResult(input, reduced);
+    const storyAudit = this.storyAudit.buildStoryAudit({
+      bookJobId: options.jobId ?? "book-analysis-inline",
+      chapters,
+      chapterMaps,
+      totalChapterCount: chapters.length,
+    });
 
     return {
       ...normalized,
+      storyAudit,
       preprocessing: {
         cleaning: preprocessing.cleaning,
         chapters: chapters.map(({ text: _text, ...chapter }) => chapter),
@@ -751,13 +762,7 @@ export class BookAnalysisService {
         preset: "custom",
       },
     };
-    const preprocessing: BookPreprocessResult = {
-      cleaning: job.preprocessing.cleaning,
-      chapters: job.preprocessing.chapters.map((chapter) => ({
-        ...chapter,
-        text: "",
-      })),
-    };
+    const preprocessing = await this.resolvePartialPreprocessing(job);
     const base = this.mockBookReduce(
       input,
       preprocessing,
@@ -773,9 +778,17 @@ export class BookAnalysisService {
       ...base,
       ...partial,
     }) as Record<string, unknown>;
+    const storyAudit = this.storyAudit.buildStoryAudit({
+      bookJobId: job.id,
+      generatedAt: job.partialResult.savedAt,
+      chapters: preprocessing.chapters,
+      chapterMaps,
+      totalChapterCount: job.partialResult.totalChapters,
+    });
 
     return {
       ...normalized,
+      storyAudit,
       preprocessing: {
         cleaning: preprocessing.cleaning,
         chapters: preprocessing.chapters.map(
@@ -804,6 +817,29 @@ export class BookAnalysisService {
         notice: job.partialResult.notice,
         savedAt: job.partialResult.savedAt,
       },
+    };
+  }
+
+  private async resolvePartialPreprocessing(
+    job: BookAnalysisJobSnapshot,
+  ): Promise<BookPreprocessResult> {
+    if (job.uploadId) {
+      const text = await this.bookUploads.readNormalizedText(job.uploadId);
+      return this.textPreprocessor.preprocess(text);
+    }
+
+    return {
+      cleaning: job.preprocessing?.cleaning ?? {
+        rawLength: 0,
+        cleanedLength: 0,
+        paragraphCount: 0,
+        removedNoise: [],
+      },
+      chapters:
+        job.preprocessing?.chapters.map((chapter) => ({
+          ...chapter,
+          text: "",
+        })) ?? [],
     };
   }
 

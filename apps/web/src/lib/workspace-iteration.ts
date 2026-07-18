@@ -3,6 +3,7 @@ import type {
 	ProjectMethodologyCard,
 	QuickReviewResult,
 	RevisionSession,
+	RevisionTextVersion,
 	WorkspaceProject,
 } from "@/stores/workspace-store";
 import { hashString } from "@/lib/workspace-cache";
@@ -14,6 +15,10 @@ export function createRevisionSession({
 	chapterText,
 	result,
 	methodologyCardIds,
+	storyAuditFindingIds,
+	fromVersionId,
+	toVersionId,
+	textChanged,
 	now = new Date().toISOString(),
 }: {
 	projectId?: string;
@@ -21,6 +26,10 @@ export function createRevisionSession({
 	chapterText: string;
 	result: QuickReviewResult;
 	methodologyCardIds: string[];
+	storyAuditFindingIds?: string[];
+	fromVersionId?: string;
+	toVersionId?: string;
+	textChanged?: boolean;
 	now?: string;
 }): RevisionSession {
 	const text = chapterText.trim();
@@ -35,7 +44,7 @@ export function createRevisionSession({
 		inputKind: result.inputKind || "human-draft",
 		textHash,
 		textLength: text.length,
-		quickScore: typeof result.quickScore === "number" ? result.quickScore : 0,
+		quickScore: hasComparableQuickScore(result.quickScore) ? result.quickScore : null,
 		gateDecision: result.gateDecision || "revise",
 		mainProblem: result.mainProblem || "未返回明确问题",
 		issueTitles: Array.isArray(result.issues)
@@ -51,8 +60,111 @@ export function createRevisionSession({
 					.slice(0, 5)
 			: [],
 		nextPrompt: result.nextPrompt?.prompt,
+		fromVersionId,
+		toVersionId,
+		textChanged,
+		storyAuditFindingIds: storyAuditFindingIds || [],
 		methodologyCardIds,
 	};
+}
+
+export function createRevisionTextVersion({
+	projectId = "default-project",
+	chapterTitle,
+	chapterText,
+	sourceSessionId,
+	previousVersion,
+	existingVersions = [],
+	now = new Date().toISOString(),
+}: {
+	projectId?: string;
+	chapterTitle: string;
+	chapterText: string;
+	sourceSessionId?: string;
+	previousVersion?: RevisionTextVersion | null;
+	existingVersions?: RevisionTextVersion[];
+	now?: string;
+}): RevisionTextVersion {
+	const text = chapterText.trim();
+	const title = chapterTitle.trim() || "未命名章节";
+	const textHash = hashString(text);
+	const versionNumber =
+		existingVersions.filter(
+			(version) =>
+				(version.projectId || "default-project") === projectId &&
+				normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title),
+		).length + 1;
+
+	return {
+		id: `version-${hashString([projectId, normalizeChapterTitle(title), textHash].join("|"))}`,
+		projectId,
+		createdAt: now,
+		chapterTitle: title,
+		versionLabel: `V${versionNumber}`,
+		textHash,
+		textLength: text.length,
+		text,
+		sourceSessionId,
+		previousVersionId: previousVersion?.id,
+	};
+}
+
+export function upsertRevisionTextVersion(
+	versions: RevisionTextVersion[],
+	version: RevisionTextVersion,
+	limit = 50,
+) {
+	return [version, ...versions.filter((item) => item.id !== version.id)].slice(0, limit);
+}
+
+export function findRevisionTextVersionForDraft({
+	versions,
+	projectId = "default-project",
+	chapterTitle,
+	chapterText,
+}: {
+	versions: RevisionTextVersion[];
+	projectId?: string;
+	chapterTitle: string;
+	chapterText: string;
+}) {
+	const title = chapterTitle.trim() || "未命名章节";
+	const textHash = hashString(chapterText.trim());
+
+	return versions.find(
+		(version) =>
+			(version.projectId || "default-project") === projectId &&
+			normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title) &&
+			version.textHash === textHash,
+	);
+}
+
+export function findPreviousRevisionTextVersion({
+	versions,
+	projectId = "default-project",
+	chapterTitle,
+	chapterText,
+}: {
+	versions: RevisionTextVersion[];
+	projectId?: string;
+	chapterTitle: string;
+	chapterText: string;
+}) {
+	const title = chapterTitle.trim() || "未命名章节";
+	const textHash = hashString(chapterText.trim());
+
+	return [...versions]
+		.filter(
+			(version) =>
+				(version.projectId || "default-project") === projectId &&
+				normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title) &&
+				version.textHash !== textHash,
+		)
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+}
+
+function normalizeChapterTitle(value: string) {
+	return value.trim().replace(/\s+/g, " ") || "未命名章节";
 }
 
 export function upsertRevisionSession(
@@ -61,6 +173,28 @@ export function upsertRevisionSession(
 	limit = 20,
 ) {
 	return [session, ...sessions.filter((item) => item.id !== session.id)].slice(0, limit);
+}
+
+export function hasComparableQuickScore(value: number | null | undefined): value is number {
+	return typeof value === "number" && Number.isFinite(value);
+}
+
+export function formatQuickScore(value: number | null | undefined) {
+	return hasComparableQuickScore(value) ? `${value}/10` : "信息不足，暂不评分";
+}
+
+function calculateScoreDelta(
+	current: RevisionSession | null | undefined,
+	previous: RevisionSession | null | undefined,
+) {
+	if (
+		!hasComparableQuickScore(current?.quickScore) ||
+		!hasComparableQuickScore(previous?.quickScore)
+	) {
+		return null;
+	}
+
+	return Number((current.quickScore - previous.quickScore).toFixed(1));
 }
 
 export function mergeProjectMethodologyCards({
@@ -137,10 +271,7 @@ export function summarizeRevisionTrend(sessions: RevisionSession[]) {
 
 	const latest = sessions[0];
 	const previous = sessions.find((session) => session.id !== latest.id);
-	const scoreDelta =
-		previous && typeof latest.quickScore === "number" && typeof previous.quickScore === "number"
-			? Number((latest.quickScore - previous.quickScore).toFixed(1))
-			: null;
+	const scoreDelta = calculateScoreDelta(latest, previous);
 	const gateCounts = sessions.reduce<Record<string, number>>((result, session) => {
 		const gate = session.gateDecision || "revise";
 		result[gate] = (result[gate] || 0) + 1;
@@ -170,8 +301,7 @@ export function buildDiagnosisDashboard({
 	);
 	const latest = orderedSessions[0] ?? null;
 	const previous = orderedSessions[1] ?? null;
-	const scoreDelta =
-		latest && previous ? Number((latest.quickScore - previous.quickScore).toFixed(1)) : null;
+	const scoreDelta = calculateScoreDelta(latest, previous);
 	const gateDistribution = buildCountRows(
 		orderedSessions.map((session) => session.gateDecision || "revise"),
 		formatGateLabel,
@@ -308,12 +438,11 @@ export function buildRevisionHistory({
 			? orderedSessions[selectedIndex + 1]
 			: null;
 	const next = selectedIndex > 0 ? orderedSessions[selectedIndex - 1] : null;
-	const scoreDelta =
-		selected && previous
-			? Number((selected.quickScore - previous.quickScore).toFixed(1))
-			: null;
+	const scoreDelta = calculateScoreDelta(selected, previous);
 	const comparison =
-		selected && previous ? buildRevisionComparison({ current: selected, previous }) : null;
+		selected && previous && scoreDelta !== null
+			? buildRevisionComparison({ current: selected, previous })
+			: null;
 
 	return {
 		sessions: orderedSessions,
@@ -332,7 +461,10 @@ export function buildRevisionComparison({
 	current: RevisionSession;
 	previous: RevisionSession;
 }) {
-	const scoreDelta = Number((current.quickScore - previous.quickScore).toFixed(1));
+	const scoreDelta = calculateScoreDelta(current, previous);
+	if (scoreDelta === null) {
+		return null;
+	}
 	const gateDelta = getGateRank(current.gateDecision) - getGateRank(previous.gateDecision);
 	const previousIssues = uniqueTextList(
 		previous.issueTitles.length ? previous.issueTitles : [previous.mainProblem],
@@ -475,15 +607,18 @@ function uniqueTextList(values: string[], limit: number) {
 export function buildProjectExportMarkdown({
 	project,
 	revisionSessions,
+	revisionVersions = [],
 	methodologyCards,
 	generatedAt = new Date().toISOString(),
 }: {
 	project: WorkspaceProject;
 	revisionSessions: RevisionSession[];
+	revisionVersions?: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
 	generatedAt?: string;
 }) {
 	const history = buildRevisionHistory({ sessions: revisionSessions });
+	const versionsById = new Map(revisionVersions.map((version) => [version.id, version]));
 	const orderedCards = [...methodologyCards].sort((a, b) => {
 		if (b.occurrenceCount !== a.occurrenceCount) {
 			return b.occurrenceCount - a.occurrenceCount;
@@ -502,12 +637,13 @@ export function buildProjectExportMarkdown({
 		`- 项目创建：${formatExportDateTime(project.createdAt)}`,
 		`- 最近更新：${formatExportDateTime(project.updatedAt)}`,
 		`- 复诊次数：${history.sessions.length}`,
+		`- 正文版本：${revisionVersions.length}`,
 		`- 方法论卡：${orderedCards.length}`,
 		`- Prompt 模板：${promptCards.length}`,
 		"",
 		"## 项目概览",
 		"",
-		`- 最新分数：${dashboard.latest ? `${dashboard.latest.quickScore}/10` : "暂无"}`,
+		`- 最新分数：${dashboard.latest ? formatQuickScore(dashboard.latest.quickScore) : "暂无"}`,
 		`- 相对上一版：${formatExportScoreDelta(dashboard.scoreDelta)}`,
 		`- 最新 Gate：${dashboard.latest ? formatGateLabel(dashboard.latest.gateDecision) : "暂无"}`,
 		`- 高频 Gate：${dashboard.gateDistribution[0]?.label || "暂无"}`,
@@ -539,8 +675,9 @@ export function buildProjectExportMarkdown({
 				`- 时间：${formatExportDateTime(session.createdAt)}`,
 				`- 来源：${formatInputKindLabel(session.inputKind)}`,
 				`- 题材：${session.genre}`,
-				`- 分数：${session.quickScore}/10`,
+				`- 分数：${formatQuickScore(session.quickScore)}`,
 				`- Gate：${formatGateLabel(session.gateDecision)}`,
+				`- 正文版本：${formatVersionTransition(session, versionsById)}`,
 				`- 正文长度：${session.textLength} 字`,
 				`- 主要问题：${session.mainProblem}`,
 				`- 问题标签：${session.issueTitles.join("、") || "暂无"}`,
@@ -660,8 +797,11 @@ function buildPromptEffectiveness(sessions: RevisionSession[]) {
 			continue;
 		}
 
+		const delta = calculateScoreDelta(current, previous);
+		if (delta === null) {
+			continue;
+		}
 		comparable += 1;
-		const delta = Number((current.quickScore - previous.quickScore).toFixed(1));
 		if (delta >= 0.5) {
 			improved += 1;
 		} else if (delta <= -0.5) {
@@ -737,6 +877,25 @@ function formatInputKindLabel(value: string) {
 	};
 
 	return map[value] || "作者正文";
+}
+
+function formatVersionTransition(
+	session: RevisionSession,
+	versionsById: Map<string, RevisionTextVersion>,
+) {
+	const toVersion = session.toVersionId ? versionsById.get(session.toVersionId) : undefined;
+	const fromVersion = session.fromVersionId ? versionsById.get(session.fromVersionId) : undefined;
+	const toLabel = toVersion?.versionLabel || session.toVersionId || "未保存";
+
+	if (session.textChanged === false) {
+		return `${toLabel}（正文未变化）`;
+	}
+
+	if (!fromVersion) {
+		return `${toLabel}（首次保存）`;
+	}
+
+	return `${fromVersion.versionLabel} -> ${toLabel}`;
 }
 
 function formatMethodologyTypeLabel(type: string) {

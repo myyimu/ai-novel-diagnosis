@@ -10,6 +10,8 @@ import type {
 	RubricMetric,
 	RubricResult,
 	ScoreResult,
+	StoryAuditFindingReview,
+	StoryAuditResult,
 } from "@ai-novel-diagnosis/ai-core";
 
 export type {
@@ -22,6 +24,8 @@ export type {
 	RubricMetric,
 	RubricResult,
 	ScoreResult,
+	StoryAuditFindingReview,
+	StoryAuditResult,
 };
 
 export const defaultQuickReviewDiagnosticFocus = "为什么没人追读";
@@ -174,6 +178,7 @@ function resolveStoreValue<T>(value: T | ((current: T) => T), current: T): T {
 
 export interface BookAnalysisResult {
 	mode: string;
+	storyAudit?: StoryAuditResult;
 	partialAnalysis?: {
 		isPartial: boolean;
 		stage: string;
@@ -721,6 +726,8 @@ export interface CachedBookAnalysis {
 export interface WorkspaceProject {
 	id: string;
 	name: string;
+	bookJobId?: string;
+	analysisPurpose?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -734,7 +741,7 @@ export interface RevisionSession {
 	inputKind: QuickReviewInputKind;
 	textHash: string;
 	textLength: number;
-	quickScore: number;
+	quickScore: number | null;
 	gateDecision: QuickReviewResult["gateDecision"];
 	mainProblem: string;
 	issueTitles: string[];
@@ -742,7 +749,24 @@ export interface RevisionSession {
 	nextPrompt?: string;
 	revisionNote?: string;
 	revisionNoteUpdatedAt?: string;
+	fromVersionId?: string;
+	toVersionId?: string;
+	textChanged?: boolean;
+	storyAuditFindingIds?: string[];
 	methodologyCardIds: string[];
+}
+
+export interface RevisionTextVersion {
+	id: string;
+	projectId?: string;
+	createdAt: string;
+	chapterTitle: string;
+	versionLabel: string;
+	textHash: string;
+	textLength: number;
+	text: string;
+	sourceSessionId?: string;
+	previousVersionId?: string;
 }
 
 export interface ProjectMethodologyCard extends MethodologyCard {
@@ -830,6 +854,7 @@ export interface WorkspaceStoreState {
 	scoreCache: CachedScoreResult[];
 	bookAnalysisCache: CachedBookAnalysis[];
 	revisionSessions: RevisionSession[];
+	revisionVersions: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
 }
 
@@ -908,6 +933,7 @@ interface WorkspaceStoreActions {
 	setScoreCache: StoreSetter<CachedScoreResult[]>;
 	setBookAnalysisCache: StoreSetter<CachedBookAnalysis[]>;
 	setRevisionSessions: StoreSetter<RevisionSession[]>;
+	setRevisionVersions: StoreSetter<RevisionTextVersion[]>;
 	setMethodologyCards: StoreSetter<ProjectMethodologyCard[]>;
 }
 
@@ -995,6 +1021,7 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	scoreCache: [],
 	bookAnalysisCache: [],
 	revisionSessions: [],
+	revisionVersions: [],
 	methodologyCards: [],
 };
 
@@ -1068,6 +1095,7 @@ const persistableWorkspaceKeys = [
 	"scoreCache",
 	"bookAnalysisCache",
 	"revisionSessions",
+	"revisionVersions",
 	"methodologyCards",
 ] as const satisfies Array<keyof WorkspaceStoreState>;
 
@@ -1335,6 +1363,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setScoreCache: makeSetter("scoreCache"),
 				setBookAnalysisCache: makeSetter("bookAnalysisCache"),
 				setRevisionSessions: makeSetter("revisionSessions"),
+				setRevisionVersions: makeSetter("revisionVersions"),
 				setMethodologyCards: makeSetter("methodologyCards"),
 			};
 		},

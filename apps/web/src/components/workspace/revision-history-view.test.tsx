@@ -88,4 +88,26 @@ describe("RevisionHistoryView", () => {
 		expect(html).toContain("这一版已经补了章末代价。");
 		expect(html).toContain("导出项目");
 	});
+
+	it("renders insufficient sessions without a fake zero score or comparison", () => {
+		const html = renderToStaticMarkup(
+			<RevisionHistoryView
+				revisionSessions={[
+					{
+						...sessions[0]!,
+						id: "revision-insufficient",
+						quickScore: null,
+						gateDecision: "insufficient",
+					},
+					sessions[1]!,
+				]}
+				onOpenDiagnosis={vi.fn()}
+				onSaveRevisionNote={vi.fn()}
+			/>,
+		);
+
+		expect(html).toContain("信息不足，暂不评分");
+		expect(html).toContain("暂不计算分数变化和 Prompt");
+		expect(html).not.toContain("0/10");
+	});
 });

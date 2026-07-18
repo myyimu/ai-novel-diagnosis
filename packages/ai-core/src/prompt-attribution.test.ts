@@ -74,6 +74,26 @@ describe("buildPromptAttribution", () => {
     expect(attribution.items[0]?.confidence).toBeLessThan(0.7);
   });
 
+  it("does not attribute prompt effectiveness when either adjacent score is unavailable", () => {
+    const second: PromptAttributionSession = {
+      id: "revision-2",
+      chapterTitle: "第二版",
+      quickScore: null,
+      gateDecision: "insufficient",
+      issueTitles: ["输入信息不足"],
+      revisionNote: "这一版正文太短，只能补充材料后再复诊。",
+    };
+
+    const attribution = buildPromptAttribution([second, first]);
+
+    expect(attribution.total).toBe(0);
+    expect(attribution.rate).toBeNull();
+    expect(attribution.items).toHaveLength(0);
+    expect(attribution.calibration.evidenceGaps).toContain(
+      "可归因复诊少于 3 次，趋势容易被单次改稿波动影响。",
+    );
+  });
+
   it("builds a stable project-level calibration summary from repeated signals", () => {
     const repeatedPrompt = "请在前 300 字必须补出主角目标、失败代价和章末钩子，不要新增无关设定。";
     const sessions: PromptAttributionSession[] = [
