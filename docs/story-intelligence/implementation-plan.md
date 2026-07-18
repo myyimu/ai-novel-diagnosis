@@ -214,6 +214,8 @@ pnpm --filter api build
 
 依赖：SIA-005、SIA-008。复用 plotlines、chronicle、chapterFunctionTable、foreshadowingLedger 和 `book-comprehension.ts`。
 
+状态：已完成 Web 结构视图纵切。当前 `/project/health` 增加剧情线矩阵、叙事顺序/故事内时间切换和伏笔—回收边；证据均来自 `storyAudit` 的场景、事件、事实 anchor，旧拆书资产仅作为章节级参考。结构模板默认未选择，未选择时只展示事实结构且不评分。
+
 ### SIA-010：人物状态与人物弧光
 
 依赖：SIA-005、SIA-008。先做人物账本，再做 goalDistance、agency、belief、relationship、cost/choice 多维序列。

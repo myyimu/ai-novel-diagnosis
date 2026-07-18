@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import {
 	AlertTriangle,
 	BarChart3,
+	CalendarDays,
 	CheckCircle2,
 	FileSearch,
+	GitBranch,
 	RefreshCcw,
 	ShieldCheck,
 } from "lucide-react";
@@ -42,6 +44,19 @@ const reviewOptions: Array<{
 	{ state: "false_positive", label: "误报" },
 	{ state: "planned", label: "计划处理" },
 	{ state: "resolved", label: "已解决" },
+];
+
+type StructureTemplate = "none" | "three-act" | "hero-journey" | "story-circle";
+type TimelineMode = "narrative" | "story";
+
+const structureTemplates: Array<{
+	id: StructureTemplate;
+	label: string;
+}> = [
+	{ id: "none", label: "未选择" },
+	{ id: "three-act", label: "三幕" },
+	{ id: "hero-journey", label: "英雄之旅" },
+	{ id: "story-circle", label: "故事圆环" },
 ];
 
 export function ProjectHealthPage() {
@@ -221,6 +236,11 @@ export function ProjectHealthPage() {
 				{storyAudit ? (
 					<div className="mt-4 grid gap-4">
 						<HealthOverview audit={storyAudit} reviewCount={reviews.length} />
+						<StructureView
+							audit={storyAudit}
+							projectId={projectId}
+							result={projectAudit}
+						/>
 						<div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,.9fr)]">
 							<TextStatistics audit={storyAudit} />
 							<FindingInspector
@@ -243,6 +263,393 @@ export function ProjectHealthPage() {
 				)}
 			</main>
 		</RedesignWorkspaceShell>
+	);
+}
+
+function StructureView({
+	audit,
+	projectId,
+	result,
+}: {
+	audit: StoryAuditResult;
+	projectId: string;
+	result: BookAnalysisResult | null;
+}) {
+	const [timelineMode, setTimelineMode] = useState<TimelineMode>("narrative");
+	const [template, setTemplate] = useState<StructureTemplate>("none");
+	const sceneById = useMemo(
+		() => new Map(audit.scenes.map((scene) => [scene.id, scene])),
+		[audit.scenes],
+	);
+	const eventById = useMemo(
+		() => new Map(audit.events.map((event) => [event.id, event])),
+		[audit.events],
+	);
+	const timelineEvents = useMemo(
+		() => buildTimelineEvents(audit, sceneById, timelineMode),
+		[audit, sceneById, timelineMode],
+	);
+	const setupPayoffEdges = audit.views.setupPayoffEdges.slice(0, 6);
+	const legacyForeshadowing = result?.writingSupport?.foreshadowingLedger ?? [];
+
+	return (
+		<section className="rounded-md border border-border bg-card p-4 shadow-sm">
+			<div className="mb-4 flex items-start justify-between gap-4 max-[760px]:block">
+				<div>
+					<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+						<GitBranch className="size-4" />
+						结构视图
+					</div>
+					<h2 className="mt-1 text-base font-semibold text-card-foreground">
+						剧情线、时间与伏笔回收
+					</h2>
+					<p className="mt-1 max-w-[780px] text-xs leading-5 text-muted-foreground">
+						复用整书体检事实层和现有拆书资产；结构模板只用于对照，不输出质量分。
+					</p>
+				</div>
+				<div className="flex flex-wrap gap-2 max-[760px]:mt-3">
+					{structureTemplates.map((option) => (
+						<button
+							key={option.id}
+							type="button"
+							onClick={() => setTemplate(option.id)}
+							className={`min-h-8 rounded-md border px-3 text-xs font-semibold transition-colors ${
+								template === option.id
+									? "border-primary bg-primary text-primary-foreground"
+									: "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+							}`}
+						>
+							{option.label}
+						</button>
+					))}
+				</div>
+			</div>
+
+			<div className="mb-4 rounded-md border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+				{template === "none"
+					? "未选择模板：仅展示事实结构，不评分。"
+					: `${structureTemplateLabel(template)}：仅作节拍对照，不按模板偏离扣分。`}
+			</div>
+
+			<div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,.9fr)]">
+				<div className="grid gap-4">
+					<PlotlineMatrix
+						audit={audit}
+						projectId={projectId}
+						result={result}
+						sceneById={sceneById}
+					/>
+					<SetupPayoffMap
+						audit={audit}
+						projectId={projectId}
+						result={result}
+						setupPayoffEdges={setupPayoffEdges}
+						legacyForeshadowing={legacyForeshadowing}
+					/>
+				</div>
+				<TimelinePanel
+					audit={audit}
+					eventById={eventById}
+					mode={timelineMode}
+					projectId={projectId}
+					timelineEvents={timelineEvents}
+					onModeChange={setTimelineMode}
+				/>
+			</div>
+		</section>
+	);
+}
+
+function PlotlineMatrix({
+	audit,
+	projectId,
+	result,
+	sceneById,
+}: {
+	audit: StoryAuditResult;
+	projectId: string;
+	result: BookAnalysisResult | null;
+	sceneById: Map<string, StoryAuditResult["scenes"][number]>;
+}) {
+	const rows = audit.views.plotlineMatrix.slice(0, 6);
+
+	return (
+		<div className="rounded-md border border-border bg-background p-3">
+			<div className="mb-3">
+				<h3 className="text-sm font-semibold text-foreground">章节 × 剧情线矩阵</h3>
+				<p className="mt-1 text-xs leading-5 text-muted-foreground">
+					每格来自场景证据；没有场景证据时只保留旧拆书摘要作为参考。
+				</p>
+			</div>
+			{rows.length ? (
+				<div className="grid gap-2">
+					{rows.map((row, index) => {
+						const scenes = row.sceneIds
+							.map((sceneId) => sceneById.get(sceneId))
+							.filter((scene): scene is StoryAuditResult["scenes"][number] =>
+								Boolean(scene),
+							);
+						const evidence = scenes.flatMap((scene) => scene.evidence).slice(0, 2);
+						return (
+							<div
+								key={row.plotlineId}
+								className="rounded-md border border-border bg-card p-3"
+							>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="text-sm font-semibold text-card-foreground">
+										{resolvePlotlineLabel(row.plotlineId, result, index)}
+									</div>
+									<span className="rounded-md bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+										{plotlineStatusLabel(row.status)}
+									</span>
+								</div>
+								<div className="mt-2 flex flex-wrap gap-1.5">
+									{scenes.length ? (
+										scenes.slice(0, 8).map((scene) => (
+											<a
+												key={scene.id}
+												href={evidenceHref(
+													projectId,
+													scene.chapterId,
+													scene.evidence[0]?.anchorId,
+												)}
+												className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+											>
+												第 {chapterLabel(scene.chapterId)} 章 ·{" "}
+												{scene.title}
+											</a>
+										))
+									) : (
+										<span className="text-xs text-muted-foreground">
+											暂无可定位场景
+										</span>
+									)}
+								</div>
+								<EvidenceList evidence={evidence} projectId={projectId} />
+							</div>
+						);
+					})}
+				</div>
+			) : (
+				<div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+					暂无 storyAudit 剧情线矩阵；下方仍可查看旧拆书结构资产。
+				</div>
+			)}
+			{result?.plotlines?.length ? (
+				<div className="mt-3 grid gap-2">
+					<div className="text-xs font-semibold text-muted-foreground">
+						旧拆书剧情线参考
+					</div>
+					{result.plotlines.slice(0, 3).map((line) => (
+						<div
+							key={line.name}
+							className="rounded-md bg-muted px-3 py-2 text-xs leading-5"
+						>
+							<span className="font-semibold text-foreground">{line.name}</span>
+							<span className="text-muted-foreground">：{line.start}</span>
+						</div>
+					))}
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function TimelinePanel({
+	audit,
+	eventById,
+	mode,
+	projectId,
+	timelineEvents,
+	onModeChange,
+}: {
+	audit: StoryAuditResult;
+	eventById: Map<string, StoryAuditResult["events"][number]>;
+	mode: TimelineMode;
+	projectId: string;
+	timelineEvents: StoryAuditResult["events"];
+	onModeChange: (mode: TimelineMode) => void;
+}) {
+	return (
+		<div className="rounded-md border border-border bg-background p-3">
+			<div className="mb-3 flex items-start justify-between gap-3">
+				<div>
+					<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+						<CalendarDays className="size-4" />
+						时间切换
+					</div>
+					<h3 className="mt-1 text-sm font-semibold text-foreground">
+						{mode === "narrative" ? "叙事顺序" : "故事内时间"}
+					</h3>
+				</div>
+				<div className="flex rounded-md border border-border bg-card p-1">
+					{[
+						{ id: "narrative", label: "叙事顺序" },
+						{ id: "story", label: "故事内时间" },
+					].map((item) => (
+						<button
+							key={item.id}
+							type="button"
+							onClick={() => onModeChange(item.id as TimelineMode)}
+							className={`min-h-7 rounded px-2 text-xs font-semibold ${
+								mode === item.id
+									? "bg-primary text-primary-foreground"
+									: "text-muted-foreground hover:bg-muted hover:text-foreground"
+							}`}
+						>
+							{item.label}
+						</button>
+					))}
+				</div>
+			</div>
+			<p className="mb-3 text-xs leading-5 text-muted-foreground">
+				故事内时间只按已抽取的明确时间线索排序；unknown 不会被强制日期化。
+			</p>
+			{timelineEvents.length ? (
+				<div className="grid gap-2">
+					{timelineEvents.slice(0, 8).map((event) => (
+						<div key={event.id} className="rounded-md border border-border bg-card p-3">
+							<div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+								<span>
+									{event.absoluteTime || event.relativeTimeText || "unknown"}
+								</span>
+								<span>·</span>
+								<span>{event.sceneId}</span>
+							</div>
+							<div className="mt-1 text-sm font-semibold text-card-foreground">
+								{event.summary}
+							</div>
+							<EvidenceList
+								evidence={event.evidence.slice(0, 2)}
+								projectId={projectId}
+							/>
+						</div>
+					))}
+				</div>
+			) : (
+				<div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+					暂无可排序事件。
+				</div>
+			)}
+			{audit.views.temporalGraph.relationEdges.length ? (
+				<div className="mt-3 grid gap-2">
+					<div className="text-xs font-semibold text-muted-foreground">时间关系证据</div>
+					{audit.views.temporalGraph.relationEdges.slice(0, 4).map((edge) => {
+						const source = eventById.get(edge.sourceEventId);
+						const target = eventById.get(edge.targetEventId);
+						const evidence = resolveTemporalEdgeEvidence(edge, source, target);
+						return (
+							<div
+								key={`${edge.sourceEventId}-${edge.targetEventId}-${edge.ruleId}`}
+								className="rounded-md bg-muted p-3 text-xs leading-5"
+							>
+								<div className="font-semibold text-foreground">
+									{source?.summary || edge.sourceEventId}{" "}
+									{temporalRelationLabel(edge.relation)}{" "}
+									{target?.summary || edge.targetEventId}
+								</div>
+								<EvidenceList
+									evidence={evidence.slice(0, 2)}
+									projectId={projectId}
+								/>
+							</div>
+						);
+					})}
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function SetupPayoffMap({
+	audit,
+	projectId,
+	result,
+	setupPayoffEdges,
+	legacyForeshadowing,
+}: {
+	audit: StoryAuditResult;
+	projectId: string;
+	result: BookAnalysisResult | null;
+	setupPayoffEdges: StoryAuditResult["views"]["setupPayoffEdges"];
+	legacyForeshadowing: NonNullable<BookAnalysisResult["writingSupport"]>["foreshadowingLedger"];
+}) {
+	const factById = new Map(audit.facts.map((fact) => [fact.id, fact]));
+	const legacyRows = legacyForeshadowing.slice(0, Math.max(0, 4 - setupPayoffEdges.length));
+
+	return (
+		<div className="rounded-md border border-border bg-background p-3">
+			<div className="mb-3">
+				<h3 className="text-sm font-semibold text-foreground">伏笔—回收边</h3>
+				<p className="mt-1 text-xs leading-5 text-muted-foreground">
+					setup、reminder、payoff、unknown 都按证据边展示；partial 不宣判全书未回收。
+				</p>
+			</div>
+			{setupPayoffEdges.length || legacyRows.length ? (
+				<div className="grid gap-2">
+					{setupPayoffEdges.map((edge) => {
+						const setup = factById.get(edge.setupFactId);
+						const payoff = edge.payoffFactId
+							? factById.get(edge.payoffFactId)
+							: undefined;
+						const evidence = [...(setup?.evidence ?? []), ...(payoff?.evidence ?? [])];
+						return (
+							<div
+								key={`${edge.setupFactId}-${edge.payoffFactId ?? edge.status}`}
+								className="rounded-md border border-border bg-card p-3"
+							>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="text-sm font-semibold text-card-foreground">
+										{setup?.object || setup?.predicate || edge.setupFactId}
+									</div>
+									<span className="rounded-md bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+										{setupPayoffStatusLabel(edge.status)}
+									</span>
+								</div>
+								{payoff ? (
+									<p className="mt-1 text-xs leading-5 text-muted-foreground">
+										回收：{payoff.object || payoff.predicate}
+									</p>
+								) : null}
+								<EvidenceList
+									evidence={evidence.slice(0, 3)}
+									projectId={projectId}
+								/>
+							</div>
+						);
+					})}
+					{legacyRows.map((item) => {
+						const evidence = resolveLegacyForeshadowingEvidence(
+							item.setupChapter,
+							result,
+						);
+						return (
+							<div
+								key={`${item.setupChapter}-${item.setup}`}
+								className="rounded-md border border-dashed border-border bg-card p-3"
+							>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="text-sm font-semibold text-card-foreground">
+										{item.setup}
+									</div>
+									<span className="rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+										章节级参考 · {item.status}
+									</span>
+								</div>
+								<p className="mt-1 text-xs leading-5 text-muted-foreground">
+									回收：{item.payoff || "待确认"}；风险：{item.risk || "未标注"}
+								</p>
+								<EvidenceList evidence={evidence} projectId={projectId} />
+							</div>
+						);
+					})}
+				</div>
+			) : (
+				<div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+					暂无伏笔回收边。
+				</div>
+			)}
+		</div>
 	);
 }
 
@@ -453,9 +860,7 @@ function EvidenceList({
 			{evidence.slice(0, 3).map((anchor) => (
 				<a
 					key={anchor.anchorId}
-					href={`/project/current?id=${encodeURIComponent(projectId)}&chapter=${encodeURIComponent(
-						anchor.chapterId,
-					)}&anchor=${encodeURIComponent(anchor.anchorId)}`}
+					href={evidenceHref(projectId, anchor.chapterId, anchor.anchorId)}
 					className="block rounded-md border border-border bg-card px-3 py-2 text-xs leading-5 text-card-foreground hover:bg-muted"
 				>
 					<span className="font-semibold">
@@ -541,6 +946,155 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 			<div className="mt-1 text-xl font-semibold text-foreground">{value}</div>
 		</div>
 	);
+}
+
+function buildTimelineEvents(
+	audit: StoryAuditResult,
+	sceneById: Map<string, StoryAuditResult["scenes"][number]>,
+	mode: TimelineMode,
+) {
+	const sourceEvents = audit.views.temporalGraph.eventIds.length
+		? audit.views.temporalGraph.eventIds
+				.map((eventId) => audit.events.find((event) => event.id === eventId))
+				.filter((event): event is StoryAuditResult["events"][number] => Boolean(event))
+		: audit.events;
+	const scoredEvents = sourceEvents.map((event, index) => ({
+		event,
+		index,
+		narrativeOrder: sceneById.get(event.sceneId)?.narrativeOrder ?? index,
+		storyOrderKey: event.absoluteTime || event.relativeTimeText || "unknown",
+	}));
+
+	return scoredEvents
+		.sort((left, right) => {
+			if (mode === "narrative") {
+				return left.narrativeOrder - right.narrativeOrder || left.index - right.index;
+			}
+
+			if (left.storyOrderKey === "unknown" && right.storyOrderKey !== "unknown") {
+				return 1;
+			}
+			if (left.storyOrderKey !== "unknown" && right.storyOrderKey === "unknown") {
+				return -1;
+			}
+			return (
+				left.storyOrderKey.localeCompare(right.storyOrderKey) || left.index - right.index
+			);
+		})
+		.map((item) => item.event);
+}
+
+function resolveTemporalEdgeEvidence(
+	edge: StoryAuditResult["views"]["temporalGraph"]["relationEdges"][number],
+	source?: StoryAuditResult["events"][number],
+	target?: StoryAuditResult["events"][number],
+) {
+	const sourceEvidence = source?.evidence ?? [];
+	const targetEvidence = target?.evidence ?? [];
+	if (!edge.evidenceAnchorIds.length) {
+		return [...sourceEvidence, ...targetEvidence];
+	}
+
+	const evidenceById = new Map(
+		[...sourceEvidence, ...targetEvidence].map((anchor) => [anchor.anchorId, anchor]),
+	);
+	return edge.evidenceAnchorIds
+		.map((anchorId) => evidenceById.get(anchorId))
+		.filter((anchor): anchor is StoryAuditFinding["evidence"][number] => Boolean(anchor));
+}
+
+function resolveLegacyForeshadowingEvidence(
+	setupChapter: number,
+	result: BookAnalysisResult | null,
+) {
+	const chapter =
+		result?.mapReduce?.chunkEvidenceIndex?.find((item) => item.order === setupChapter) ??
+		result?.mapReduce?.chapterMaps.find((item) => item.order === setupChapter);
+	const anchor = chapter?.sourceAnchors?.[0];
+	if (!chapter || !anchor) {
+		return [];
+	}
+
+	return [
+		{
+			anchorId: anchor.anchorId,
+			chapterId: chapter.chapterId,
+			chapterOrder: chapter.order,
+			quote: anchor.quote,
+			startOffset: anchor.startOffset,
+			endOffset: anchor.endOffset,
+			source: "text" as const,
+		},
+	];
+}
+
+function evidenceHref(projectId: string, chapterId: string, anchorId?: string) {
+	const params = new URLSearchParams({
+		id: projectId,
+		chapter: chapterId,
+	});
+	if (anchorId) {
+		params.set("anchor", anchorId);
+	}
+
+	return `/project/current?${params.toString()}`;
+}
+
+function resolvePlotlineLabel(
+	plotlineId: string,
+	result: BookAnalysisResult | null,
+	index: number,
+) {
+	return result?.plotlines?.[index]?.name || plotlineId;
+}
+
+function chapterLabel(chapterId: string) {
+	const match = chapterId.match(/(\d+)$/);
+	return match?.[1] ?? chapterId;
+}
+
+function structureTemplateLabel(template: Exclude<StructureTemplate, "none">) {
+	const label = structureTemplates.find((item) => item.id === template)?.label;
+	return label || template;
+}
+
+function plotlineStatusLabel(
+	status: StoryAuditResult["views"]["plotlineMatrix"][number]["status"],
+) {
+	const labels = {
+		active: "推进中",
+		quiet: "静默",
+		resolved: "已回收",
+		unknown: "待确认",
+	} satisfies Record<typeof status, string>;
+	return labels[status];
+}
+
+function setupPayoffStatusLabel(
+	status: StoryAuditResult["views"]["setupPayoffEdges"][number]["status"],
+) {
+	const labels = {
+		open: "打开",
+		reminded: "提醒",
+		paid: "已回收",
+		abandoned: "可能断线",
+		unknown: "待确认",
+	} satisfies Record<typeof status, string>;
+	return labels[status];
+}
+
+function temporalRelationLabel(
+	relation: StoryAuditResult["events"][number]["relations"][number]["relation"],
+) {
+	const labels = {
+		before: "早于",
+		after: "晚于",
+		overlaps: "重叠",
+		during: "处于",
+		same_time: "同时",
+		unknown: "关系未知",
+	} satisfies Record<typeof relation, string>;
+	return labels[relation];
 }
 
 function resolveProjectStoryAudit(input: {

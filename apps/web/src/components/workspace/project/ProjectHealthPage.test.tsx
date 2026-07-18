@@ -52,11 +52,131 @@ const storyAudit = {
 			title: "相遇",
 			locationIds: [],
 			participantIds: ["hero"],
-			evidence: [],
+			evidence: [
+				{
+					anchorId: "scene-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "他发现旧案玉牌。",
+					startOffset: 4,
+					endOffset: 12,
+					source: "text",
+				},
+			],
+		},
+		{
+			id: "scene-2",
+			chapterId: "chapter-2",
+			orderInChapter: 1,
+			narrativeOrder: 2,
+			title: "追查",
+			locationIds: [],
+			participantIds: ["hero"],
+			evidence: [
+				{
+					anchorId: "scene-anchor-b",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "玉牌指向评审长。",
+					startOffset: 20,
+					endOffset: 28,
+					source: "text",
+				},
+			],
 		},
 	],
-	events: [],
-	facts: [],
+	events: [
+		{
+			id: "event-a",
+			sceneId: "scene-1",
+			summary: "主角发现旧案玉牌",
+			participantIds: ["hero"],
+			locationIds: [],
+			relativeTimeText: "子夜后",
+			relations: [
+				{
+					targetEventId: "event-b",
+					relation: "before",
+					confidence: 0.8,
+				},
+			],
+			evidence: [
+				{
+					anchorId: "event-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "钟声刚过子夜。",
+					startOffset: 12,
+					endOffset: 19,
+					source: "text",
+				},
+			],
+		},
+		{
+			id: "event-b",
+			sceneId: "scene-2",
+			summary: "主角追查评审长",
+			participantIds: ["hero"],
+			locationIds: [],
+			relativeTimeText: "第二天",
+			relations: [],
+			evidence: [
+				{
+					anchorId: "event-anchor-b",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "第二天，他开始追查评审长。",
+					startOffset: 44,
+					endOffset: 58,
+					source: "text",
+				},
+			],
+		},
+	],
+	facts: [
+		{
+			id: "fact-setup",
+			subjectId: "hero",
+			predicate: "发现",
+			object: "旧案玉牌",
+			kind: "possession",
+			polarity: "asserted",
+			sourcePriority: "explicit-text",
+			confidence: 0.88,
+			evidence: [
+				{
+					anchorId: "fact-anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "他发现旧案玉牌。",
+					startOffset: 4,
+					endOffset: 12,
+					source: "text",
+				},
+			],
+		},
+		{
+			id: "fact-payoff",
+			subjectId: "hero",
+			predicate: "指向",
+			object: "评审长",
+			kind: "knowledge",
+			polarity: "asserted",
+			sourcePriority: "explicit-text",
+			confidence: 0.82,
+			evidence: [
+				{
+					anchorId: "fact-anchor-b",
+					chapterId: "chapter-2",
+					chapterOrder: 2,
+					quote: "玉牌指向评审长。",
+					startOffset: 20,
+					endOffset: 28,
+					source: "text",
+				},
+			],
+		},
+	],
 	characterStates: [],
 	findings: [
 		{
@@ -112,12 +232,33 @@ const storyAudit = {
 	},
 	views: {
 		temporalGraph: {
-			eventIds: [],
-			relationEdges: [],
+			eventIds: ["event-a", "event-b"],
+			relationEdges: [
+				{
+					sourceEventId: "event-a",
+					targetEventId: "event-b",
+					relation: "before",
+					confidence: 0.8,
+					evidenceAnchorIds: ["event-anchor-a", "event-anchor-b"],
+					ruleId: "temporal.explicit-order",
+				},
+			],
 			conflictCandidateIds: [],
 		},
-		plotlineMatrix: [],
-		setupPayoffEdges: [],
+		plotlineMatrix: [
+			{
+				plotlineId: "plot-main",
+				sceneIds: ["scene-1", "scene-2"],
+				status: "active",
+			},
+		],
+		setupPayoffEdges: [
+			{
+				setupFactId: "fact-setup",
+				payoffFactId: "fact-payoff",
+				status: "paid",
+			},
+		],
 	},
 } satisfies NonNullable<BookAnalysisResult["storyAudit"]>;
 
@@ -130,6 +271,16 @@ const bookAnalysisResult = {
 		oneSentencePremise: "主角追查旧案。",
 		coreAppeal: ["悬念"],
 	},
+	plotlines: [
+		{
+			name: "主线追案",
+			type: "main",
+			start: "玉牌暴露旧案。",
+			turningPoints: ["评审长浮出水面。"],
+			payoff: "旧案真相逼近。",
+			reusablePattern: "物证推动主线。",
+		},
+	],
 	storyAudit,
 } as unknown as BookAnalysisResult;
 
@@ -189,8 +340,20 @@ describe("ProjectHealthPage", () => {
 		expect(html).toContain("27%");
 		expect(html).toContain("同一夜晚出现时间冲突");
 		expect(html).toContain("可能是角色转述错误。");
+		expect(html).toContain("章节 × 剧情线矩阵");
+		expect(html).toContain("主线追案");
+		expect(html).toContain("时间切换");
+		expect(html).toContain("叙事顺序");
+		expect(html).toContain("故事内时间");
+		expect(html).toContain("伏笔—回收边");
+		expect(html).toContain("旧案玉牌");
+		expect(html).toContain("评审长");
+		expect(html).toContain("未选择模板：仅展示事实结构，不评分。");
 		expect(html).toContain(
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=anchor-a",
+		);
+		expect(html).toContain(
+			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=fact-anchor-a",
 		);
 		expect(html).toContain("人工判断不会写入 storyAudit 原始结果");
 		expect(push).not.toHaveBeenCalled();
