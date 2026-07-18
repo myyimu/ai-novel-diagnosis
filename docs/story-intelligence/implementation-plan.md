@@ -202,6 +202,8 @@ pnpm --filter api build
 
 依赖：SIA-006。Verifier 只接收候选、局部上下文和相关 canon，不自由审稿；未知 anchorId 必须被拒绝。
 
+状态：已完成服务端复核护栏。当前复核器限制每本最多 20 个候选，只发送候选、证据、相关事实/事件和时间图邻居；未知 anchorId 或 finding 不匹配会拒绝复核结论，证据不足或置信度不足不得升级为 `verified`，模型不可用时保留 `candidate` 并标记未独立复核。
+
 ### SIA-008：首个可发布 Web 纵切
 
 依赖：SIA-003、SIA-004、SIA-007。新增 `/project/health`，支持总览、一致性、文本统计、finding inspector 和人工复核。
