@@ -180,7 +180,7 @@ tasks:
 
   - id: "SIA-008"
     title: "首个可发布 Web 纵切"
-    implementation_status: "priority_next"
+    implementation_status: "completed"
     depends_on:
       - "SIA-003"
       - "SIA-004"
@@ -193,7 +193,7 @@ tasks:
 
   - id: "SIA-009"
     title: "剧情结构视图"
-    implementation_status: "not_started"
+    implementation_status: "priority_next"
     depends_on:
       - "SIA-005"
       - "SIA-008"

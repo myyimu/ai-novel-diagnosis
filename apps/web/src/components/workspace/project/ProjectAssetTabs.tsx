@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-type ProjectAssetTabKey = "current" | "revisions" | "methodology" | "export";
+type ProjectAssetTabKey = "current" | "health" | "revisions" | "methodology" | "export";
 
 interface ProjectAssetTabsProps {
 	active: ProjectAssetTabKey;
@@ -22,6 +22,12 @@ const tabs: Array<{
 		label: "当前书籍",
 		description: "章节、问题和改稿计划",
 		href: "/project/current",
+	},
+	{
+		key: "health",
+		label: "故事体检",
+		description: "证据、统计和人工复核",
+		href: "/project/health",
 	},
 	{
 		key: "revisions",
@@ -55,7 +61,7 @@ export function ProjectAssetTabs({
 	return (
 		<nav
 			aria-label="书籍资产导航"
-			className="grid gap-2 rounded-[14px] border border-[#e6e8eb] bg-white p-2 shadow-[0_6px_20px_rgba(22,27,34,.055)] md:grid-cols-4"
+			className="grid gap-2 rounded-md border border-border bg-card p-2 shadow-sm md:grid-cols-5"
 		>
 			{tabs.map((tab) => {
 				const isActive = tab.key === active;
@@ -72,10 +78,10 @@ export function ProjectAssetTabs({
 						type="button"
 						onClick={() => router.push(tab.href)}
 						aria-current={isActive ? "page" : undefined}
-						className={`min-h-[64px] rounded-[10px] px-3 py-2.5 text-left font-semibold transition-colors ${
+						className={`min-h-[64px] rounded-md px-3 py-2.5 text-left font-semibold transition-colors ${
 							isActive
-								? "bg-[#fff2ec] text-[#d94710]"
-								: "text-[#454b55] hover:bg-[#f4f5f7] hover:text-[#1f2329]"
+								? "bg-primary text-primary-foreground"
+								: "text-muted-foreground hover:bg-muted hover:text-foreground"
 						}`}
 					>
 						<span className="flex items-center justify-between gap-2">
@@ -84,15 +90,19 @@ export function ProjectAssetTabs({
 								<span
 									className={`rounded-full px-2 py-0.5 text-[11px] ${
 										isActive
-											? "bg-white text-[#b64215]"
-											: "bg-[#eef0f3] text-[#69707d]"
+											? "bg-primary-foreground text-primary"
+											: "bg-muted text-muted-foreground"
 									}`}
 								>
 									{count}
 								</span>
 							) : null}
 						</span>
-						<span className="mt-1 block text-[10px] font-medium leading-snug text-[#69707d]">
+						<span
+							className={`mt-1 block text-[10px] font-medium leading-snug ${
+								isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+							}`}
+						>
 							{tab.description}
 						</span>
 					</button>

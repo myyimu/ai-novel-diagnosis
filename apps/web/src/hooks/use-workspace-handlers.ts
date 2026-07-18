@@ -573,6 +573,48 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		});
 	}
 
+	function syncActiveProjectBookJob(job: BookAnalysisJob) {
+		if (!job.result?.storyAudit) {
+			return;
+		}
+
+		const now = new Date().toISOString();
+		const projectId =
+			activeProjectId || job.result.storyAudit.projectId || defaultWorkspaceProject.id;
+		const project: WorkspaceProject = activeProject
+			? {
+					...activeProject,
+					id: projectId,
+					bookJobId: job.id,
+					analysisPurpose: "story-audit",
+					updatedAt: now,
+				}
+			: {
+					...defaultWorkspaceProject,
+					id: projectId,
+					name:
+						job.result.book.title ||
+						job.inputSummary.title ||
+						defaultWorkspaceProject.name,
+					bookJobId: job.id,
+					analysisPurpose: "story-audit",
+					updatedAt: now,
+				};
+
+		setProjects((current) => {
+			const exists = current.some((item) => item.id === projectId);
+			if (!exists) {
+				return [project, ...current];
+			}
+
+			return current.map((item) => (item.id === projectId ? project : item));
+		});
+		setActiveProjectId(projectId);
+		void upsertWorkspaceProject(project).catch(() => {
+			setStatus("整书任务已本地关联；后端项目状态暂时未同步成功。");
+		});
+	}
+
 	function saveRevisionNote(sessionId: string, note: string) {
 		const now = new Date().toISOString();
 		setRevisionSessions((current) =>
@@ -1932,6 +1974,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 						latestJob.result = completedJob.result;
 						setBookAnalysisResult(completedJob.result);
 						updateBookAnalysisCacheByJobId(jobId, completedJob);
+						syncActiveProjectBookJob(completedJob);
 						if (!options?.silent) {
 							setStatus(
 								`整本分析完成：${latestJob.result.characters.length} 张角色卡，已分析 ${latestJob.result.mapReduce?.mapCount ?? 0} 个章节片段`,
@@ -2171,6 +2214,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			syncActiveBookName(job.result?.book.title || job.inputSummary.title);
 			if (job.result) {
 				setBookAnalysisResult(job.result);
+				syncActiveProjectBookJob(job);
 			}
 			if (bookText.trim() || bookFile) {
 				rememberBookAnalysis(buildBookAnalysisCacheKey(), job, job.result ?? null);

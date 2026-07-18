@@ -208,6 +208,8 @@ pnpm --filter api build
 
 依赖：SIA-003、SIA-004、SIA-007。新增 `/project/health`，支持总览、一致性、文本统计、finding inspector 和人工复核。
 
+状态：已完成首个可发布 Web 纵切。当前“我的书籍”资产导航新增 `/project/health`，整书任务完成或打开历史任务后会把 `BookAnalysisResult.storyAudit` 绑定到当前项目；体检页展示覆盖率、证据校验、确定性对话统计、finding 证据与替代解释，并通过独立 review API 保存人工复核状态。
+
 ### SIA-009：剧情结构视图
 
 依赖：SIA-005、SIA-008。复用 plotlines、chronicle、chapterFunctionTable、foreshadowingLedger 和 `book-comprehension.ts`。
