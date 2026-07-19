@@ -348,6 +348,7 @@ function ProjectChapterWorkspace({
 			? selectedIssueId
 			: issues[0]?.id;
 	const annotatedParagraphs = buildAnnotatedParagraphs(chapterText, issues);
+	const annotatedIssueIds = getAnnotatedIssueIds(annotatedParagraphs);
 	const workspaceGridRef = useRef<HTMLElement | null>(null);
 	const contentScrollRef = useRef<HTMLDivElement | null>(null);
 	const pendingTextScrollIssueIdRef = useRef<string | null>(null);
@@ -711,7 +712,11 @@ function ProjectChapterWorkspace({
 						<div className="mx-auto w-[min(1040px,100%)]">
 							<nav className="sticky top-0 z-10 mb-2 flex items-center gap-1 overflow-x-auto rounded-[11px] border border-[#e8ebef] bg-white/95 p-1 shadow-[0_6px_18px_rgba(20,25,35,.045)] backdrop-blur">
 								{[
-									{ id: "annotation", label: "正文批注", count: issues.length },
+									{
+										id: "annotation",
+										label: "正文批注",
+										count: annotatedIssueIds.size,
+									},
 									{ id: "diagnosis", label: "诊断总览", count: result ? 1 : 0 },
 									{ id: "rewrite", label: "修改方案", count: acceptedCount },
 									{ id: "retest", label: "修改效果", count: resolvedCount },
@@ -960,6 +965,11 @@ function ProjectChapterWorkspace({
 													证据：{issue.evidence[0].quote}
 												</div>
 											) : null}
+											{annotatedIssueIds.has(issue.id) ? null : (
+												<div className="mt-2 inline-flex rounded-full border border-[#e6e8eb] bg-[#f7f8fa] px-2 py-1 text-[9px] font-bold text-[#69707d]">
+													未定位到原文
+												</div>
+											)}
 											{issue.fixAction ? (
 												<div className="mt-2 line-clamp-2 rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
 													{issue.fixAction}
@@ -1573,7 +1583,7 @@ function AnnotatedParagraph({
 	);
 }
 
-function buildAnnotatedParagraphs(
+export function buildAnnotatedParagraphs(
 	chapterText: string,
 	issues: QuickReviewIssue[],
 ): ParagraphAnnotation[] {
@@ -1602,6 +1612,16 @@ function buildAnnotatedParagraphs(
 	});
 
 	return annotations;
+}
+
+export function getAnnotatedIssueIds(annotations: ParagraphAnnotation[]) {
+	return new Set(
+		annotations.flatMap((annotation) =>
+			annotation.markers
+				.filter((marker) => marker.start !== undefined && marker.end !== undefined)
+				.map((marker) => marker.issue.id),
+		),
+	);
 }
 
 function splitChapterParagraphs(chapterText: string) {
@@ -1667,7 +1687,7 @@ function findIssueParagraphMatch(
 	paragraphIndex: ReturnType<typeof buildParagraphIndex>,
 	issueIndex: number,
 	issueCount: number,
-): ParagraphMatch {
+): ParagraphMatch | null {
 	const { fullText } = paragraphIndex;
 	const quotes = getEvidenceQuotes(issue);
 	for (const quote of quotes) {
@@ -1688,9 +1708,7 @@ function findIssueParagraphMatch(
 		}
 	}
 
-	return {
-		paragraphIndex: Math.min(issueIndex, paragraphIndex.paragraphs.length - 1),
-	};
+	return null;
 }
 
 function mapTextPositionToParagraph(
@@ -1749,15 +1767,15 @@ function getEvidenceQuotes(issue: QuickReviewIssue) {
 function getAnchorClass(severity: QuickReviewIssue["severity"], active: boolean) {
 	const colorClass =
 		severity === "critical"
-			? "bg-[linear-gradient(transparent_58%,rgba(216,59,59,.23)_58%)]"
+			? "bg-[#fff0ee] shadow-[inset_0_-2px_0_rgba(216,59,59,.45)]"
 			: severity === "high"
-				? "bg-[linear-gradient(transparent_58%,rgba(239,152,9,.25)_58%)]"
-				: "bg-[linear-gradient(transparent_58%,rgba(57,112,232,.2)_58%)]";
+				? "bg-[#fff7e6] shadow-[inset_0_-2px_0_rgba(239,152,9,.45)]"
+				: "bg-[#eef4ff] shadow-[inset_0_-2px_0_rgba(57,112,232,.35)]";
 	const activeClass = active
-		? "outline outline-2 outline-[rgba(255,90,31,.4)] bg-[#fff0e8]"
+		? "outline outline-2 outline-[rgba(255,90,31,.4)] ring-2 ring-[rgba(255,90,31,.13)]"
 		: "hover:outline hover:outline-2 hover:outline-[rgba(255,90,31,.22)]";
 
-	return `inline rounded px-0.5 text-left transition ${colorClass} ${activeClass}`;
+	return `inline rounded px-1 py-0.5 text-left transition box-decoration-clone ${colorClass} ${activeClass}`;
 }
 
 function getIssueBeforeClass(severity: QuickReviewIssue["severity"]) {
