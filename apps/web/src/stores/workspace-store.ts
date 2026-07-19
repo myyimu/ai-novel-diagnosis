@@ -828,6 +828,7 @@ export interface WorkspaceStoreState {
 	quickReviewCoreSellingPoint: string;
 	quickReviewMustKeepMechanisms: string;
 	quickReviewTargetReaderPleasures: string;
+	quickReviewStoryAuditFindingIds: string[];
 	saveQuickReviewMethodology: boolean;
 	rubricResult: RubricResult | null;
 	scoreResult: ScoreResult | null;
@@ -907,6 +908,7 @@ interface WorkspaceStoreActions {
 	setQuickReviewCoreSellingPoint: StoreSetter<string>;
 	setQuickReviewMustKeepMechanisms: StoreSetter<string>;
 	setQuickReviewTargetReaderPleasures: StoreSetter<string>;
+	setQuickReviewStoryAuditFindingIds: StoreSetter<string[]>;
 	setSaveQuickReviewMethodology: StoreSetter<boolean>;
 	setRubricResult: StoreSetter<RubricResult | null>;
 	setScoreResult: StoreSetter<ScoreResult | null>;
@@ -995,6 +997,7 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	quickReviewCoreSellingPoint: "",
 	quickReviewMustKeepMechanisms: "",
 	quickReviewTargetReaderPleasures: "",
+	quickReviewStoryAuditFindingIds: [],
 	saveQuickReviewMethodology: false,
 	rubricResult: null,
 	scoreResult: null,
@@ -1075,6 +1078,7 @@ const persistableWorkspaceKeys = [
 	"quickReviewCoreSellingPoint",
 	"quickReviewMustKeepMechanisms",
 	"quickReviewTargetReaderPleasures",
+	"quickReviewStoryAuditFindingIds",
 	"saveQuickReviewMethodology",
 	"providerConfigHistory",
 	"rubricResult",
@@ -1270,6 +1274,9 @@ export function mergeWorkspaceState(
 			persisted.quickReviewDiagnosticFocus || defaultQuickReviewDiagnosticFocus,
 		quickReviewMustKeepMechanisms: persisted.quickReviewMustKeepMechanisms || "",
 		quickReviewTargetReaderPleasures: persisted.quickReviewTargetReaderPleasures || "",
+		quickReviewStoryAuditFindingIds: Array.isArray(persisted.quickReviewStoryAuditFindingIds)
+			? persisted.quickReviewStoryAuditFindingIds.filter(Boolean)
+			: [],
 		saveQuickReviewMethodology: Boolean(persisted.saveQuickReviewMethodology),
 		bookFile: null,
 	};
@@ -1337,6 +1344,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				setQuickReviewCoreSellingPoint: makeSetter("quickReviewCoreSellingPoint"),
 				setQuickReviewMustKeepMechanisms: makeSetter("quickReviewMustKeepMechanisms"),
 				setQuickReviewTargetReaderPleasures: makeSetter("quickReviewTargetReaderPleasures"),
+				setQuickReviewStoryAuditFindingIds: makeSetter("quickReviewStoryAuditFindingIds"),
 				setSaveQuickReviewMethodology: makeSetter("saveQuickReviewMethodology"),
 				setRubricResult: makeSetter("rubricResult"),
 				setScoreResult: makeSetter("scoreResult"),

@@ -323,6 +323,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCoreSellingPoint,
 		quickReviewMustKeepMechanisms,
 		setQuickReviewMustKeepMechanisms,
+		quickReviewStoryAuditFindingIds,
+		setQuickReviewStoryAuditFindingIds,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
 		saveQuickReviewMethodology,
@@ -1069,6 +1071,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	function rememberQuickReviewIteration(result: QuickReviewResult) {
 		const now = new Date().toISOString();
+		const storyAuditFindingIds = Array.from(
+			new Set(quickReviewStoryAuditFindingIds.map((id) => id.trim()).filter(Boolean)),
+		).slice(0, 10);
 		const project: WorkspaceProject = activeProject
 			? { ...activeProject, updatedAt: now }
 			: { ...defaultWorkspaceProject, updatedAt: now };
@@ -1104,6 +1109,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			chapterText,
 			result,
 			methodologyCardIds: mergedCards.cardIds,
+			storyAuditFindingIds,
 			fromVersionId: version.previousVersionId,
 			toVersionId: version.id,
 			textChanged: !existingVersion,
@@ -1130,7 +1136,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			revisionVersions: existingVersion ? [] : [versionWithSession],
 			methodologyCards: [],
 		})
-			.then(applyWorkspaceAssets)
+			.then((assets) => {
+				applyWorkspaceAssets(assets);
+				if (storyAuditFindingIds.length) {
+					setQuickReviewStoryAuditFindingIds([]);
+				}
+			})
 			.catch(() => {
 				setStatus("修改效果已本地保存；后端暂时未同步成功。");
 			});
@@ -1824,6 +1835,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				chapterTitle,
 				now,
 			});
+			const storyAuditFindingIds = Array.from(
+				new Set(quickReviewStoryAuditFindingIds.map((id) => id.trim()).filter(Boolean)),
+			).slice(0, 10);
 			const session =
 				latestSession ??
 				createRevisionSession({
@@ -1832,12 +1846,16 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					chapterText,
 					result: quickReviewResult,
 					methodologyCardIds: [],
+					storyAuditFindingIds,
 					now,
 				});
 			const updatedSession = {
 				...session,
 				methodologyCardIds: Array.from(
 					new Set([...(session.methodologyCardIds || []), ...mergedCards.cardIds]),
+				),
+				storyAuditFindingIds: Array.from(
+					new Set([...(session.storyAuditFindingIds || []), ...storyAuditFindingIds]),
 				),
 			};
 
@@ -1856,7 +1874,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
 				),
 			})
-				.then(applyWorkspaceAssets)
+				.then((assets) => {
+					applyWorkspaceAssets(assets);
+					if (storyAuditFindingIds.length) {
+						setQuickReviewStoryAuditFindingIds([]);
+					}
+				})
 				.catch(() => {
 					setStatus("方法论卡已本地保存；后端暂时未同步成功。");
 				});
@@ -2534,6 +2557,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCoreSellingPoint,
 		quickReviewMustKeepMechanisms,
 		setQuickReviewMustKeepMechanisms,
+		quickReviewStoryAuditFindingIds,
+		setQuickReviewStoryAuditFindingIds,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
 		saveQuickReviewMethodology,

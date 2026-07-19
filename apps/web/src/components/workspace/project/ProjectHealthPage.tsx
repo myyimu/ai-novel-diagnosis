@@ -91,6 +91,7 @@ export function ProjectHealthPage() {
 		setQuickReviewDiagnosticFocus,
 		setQuickReviewInputKind,
 		setQuickReviewMustKeepMechanisms,
+		setQuickReviewStoryAuditFindingIds,
 		setQuickReviewTargetReaderPleasures,
 	} = useWorkspaceHandlers("overview");
 	const bookAnalysisCache = useWorkspaceStore((state) => state.bookAnalysisCache);
@@ -205,6 +206,9 @@ export function ProjectHealthPage() {
 		setQuickReviewDiagnosticFocus(seed.diagnosticFocus);
 		setQuickReviewMustKeepMechanisms(seed.mustKeepMechanisms);
 		setQuickReviewTargetReaderPleasures(seed.targetReaderPleasures);
+		setQuickReviewStoryAuditFindingIds((current) =>
+			Array.from(new Set([...current, finding.id])),
+		);
 		if (seed.chapterTitle) {
 			setChapterTitle(seed.chapterTitle);
 		}
