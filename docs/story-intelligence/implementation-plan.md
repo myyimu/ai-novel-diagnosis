@@ -232,7 +232,7 @@ pnpm --filter api build
 
 依赖：SIA-008～SIA-011。finding 进入修改计划，保存作者决定、V1/V2、实际采用项和独立复诊；导出 Markdown/JSON storyAudit 分区。
 
-状态：已完成导出契约、finding 计划入口和 precision report 工程闭环，precision 验证待独立编辑集。项目 Markdown/JSON 导出新增 `storyAudit` 摘要分区，只输出 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊；JSON 导出移除正文版本 `text`，后端 Markdown 导出从现有 `BookAnalysisResult.storyAudit` 读取摘要并合并独立持久化的人工 review。体检页 finding 可保存为 `planned`，并把候选判断、证据短引文、替代解释和修改动作带入快速诊断上下文；真实章节正文和 V1/V2 仍由快速诊断复诊流程保存，保存 revision session 时会关联 pending `storyAuditFindingIds`。后端评测入口按高优时间冲突 `>= 0.85` 与高优人物/剧情漏洞 `>= 0.70` 分桶生成报告，只有 `independent_editor_set` 且标注桶充足时才可声明验收通过。`check/test/build` 已通过；`one:doctor` 使用 `/Users/yimu/Downloads/one-cli_darwin_arm64` 加入 PATH 后通过，仅剩 deploy profile warning。precision 门槛仍需真实独立编辑标注集验证，不能用工程 fixture 宣称产品有效性。
+状态：已完成导出契约、finding 计划入口和 precision report 工程闭环，precision 验证待独立编辑集。项目 Markdown/JSON 导出新增 `storyAudit` 摘要分区，只输出 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊；JSON 导出移除正文版本 `text`，后端 Markdown 导出从现有 `BookAnalysisResult.storyAudit` 读取摘要并合并独立持久化的人工 review。体检页 finding 可保存为 `planned`，并把候选判断、证据短引文、替代解释和修改动作带入快速诊断上下文；真实章节正文和 V1/V2 仍由快速诊断复诊流程保存，保存 revision session 时会关联 pending `storyAuditFindingIds`。后端评测入口按高优时间冲突 `>= 0.85` 与高优人物/剧情漏洞 `>= 0.70` 分桶生成报告，并支持 `story-audit-evaluation-suite/v1` JSON 导入边界；该导入只接收 finding id/category/severity 与人工标签，不保存正文、全文索引或人工 reviewState。只有 `independent_editor_set` 且标注桶充足时才可声明验收通过。`check/test/build` 已通过；`one:doctor` 使用 `/Users/yimu/Downloads/one-cli_darwin_arm64` 加入 PATH 后通过，仅剩 deploy profile warning。precision 门槛仍需真实独立编辑标注集验证，不能用工程 fixture 宣称产品有效性。
 
 ## 7. 每个 AI 的执行协议
 

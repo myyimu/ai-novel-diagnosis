@@ -425,6 +425,12 @@ promptVersion
 
 每个 finding fixture 必须标注期望 category、status、证据 anchor 和允许的替代解释。
 
+SIA-012 precision 验收集使用单独的 `story-audit-evaluation-suite/v1` JSON
+导入契约，只包含 `datasetId`、`source`、`minimumLabeledCasesPerBucket` 和
+`cases[].finding.{id,category,severity}` + `cases[].label`。该契约不保存正文、
+全文索引或人工 reviewState；`source` 只有为 `independent_editor_set` 且每个
+precision 桶标注量充足时，评测报告才允许声明可用于验收。
+
 ## 10. 完成定义
 
 - 共享类型、API 和 Web 使用同一 schema version。

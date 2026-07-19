@@ -5,6 +5,8 @@ import type {
 import {
   evaluateStoryAuditAcceptance,
   evaluateStoryAuditFindingPrecision,
+  parseStoryAuditEvaluationSuiteJson,
+  parseStoryAuditEvaluationSuiteJsonText,
 } from "./story-audit-evaluation";
 
 describe("evaluateStoryAuditFindingPrecision", () => {
@@ -208,6 +210,138 @@ describe("evaluateStoryAuditAcceptance", () => {
     expect(result.warnings).toContainEqual(
       expect.stringContaining("character_or_plot_high_priority"),
     );
+  });
+});
+
+describe("parseStoryAuditEvaluationSuiteJson", () => {
+  it("should parse an independent editor JSON suite for the SIA-012 report", () => {
+    const suite = parseStoryAuditEvaluationSuiteJsonText(
+      JSON.stringify({
+        schemaVersion: "story-audit-evaluation-suite/v1",
+        datasetId: "editor-set-2026-07",
+        source: "independent_editor_set",
+        minimumLabeledCasesPerBucket: 1,
+        cases: [
+          {
+            finding: {
+              id: "timeline-1",
+              category: "timeline_conflict",
+              severity: "high",
+            },
+            label: "true_positive",
+          },
+          {
+            finding: {
+              id: "plot-1",
+              category: "causal_gap",
+              severity: "critical",
+            },
+            label: "false_positive",
+          },
+        ],
+      }),
+    );
+
+    const report = evaluateStoryAuditAcceptance(suite);
+
+    expect(suite).toEqual({
+      datasetId: "editor-set-2026-07",
+      source: "independent_editor_set",
+      minimumLabeledCasesPerBucket: 1,
+      cases: [
+        {
+          finding: {
+            id: "timeline-1",
+            category: "timeline_conflict",
+            severity: "high",
+          },
+          label: "true_positive",
+        },
+        {
+          finding: {
+            id: "plot-1",
+            category: "causal_gap",
+            severity: "critical",
+          },
+          label: "false_positive",
+        },
+      ],
+    });
+    expect(report.sampleSize).toBe(2);
+    expect(report.eligibleForAcceptance).toBe(true);
+  });
+
+  it("should reject suites without the v1 schema marker", () => {
+    expect(() =>
+      parseStoryAuditEvaluationSuiteJson({
+        schemaVersion: "story-audit-evaluation-suite/v0",
+        datasetId: "editor-set-2026-07",
+        source: "independent_editor_set",
+        cases: [],
+      }),
+    ).toThrow("Unsupported story-audit evaluation suite schemaVersion");
+  });
+
+  it("should reject malformed JSON text with a contract error", () => {
+    expect(() => parseStoryAuditEvaluationSuiteJsonText("{")).toThrow(
+      "Evaluation suite JSON text is invalid.",
+    );
+  });
+
+  it("should reject unknown labels and finding dimensions at import time", () => {
+    expect(() =>
+      parseStoryAuditEvaluationSuiteJson({
+        schemaVersion: "story-audit-evaluation-suite/v1",
+        datasetId: "editor-set-2026-07",
+        source: "independent_editor_set",
+        cases: [
+          {
+            finding: {
+              id: "timeline-1",
+              category: "timeline_conflict",
+              severity: "urgent",
+            },
+            label: "true_positive",
+          },
+        ],
+      }),
+    ).toThrow("cases[0].finding.severity");
+
+    expect(() =>
+      parseStoryAuditEvaluationSuiteJson({
+        schemaVersion: "story-audit-evaluation-suite/v1",
+        datasetId: "editor-set-2026-07",
+        source: "independent_editor_set",
+        cases: [
+          {
+            finding: {
+              id: "timeline-1",
+              category: "voice_style",
+              severity: "high",
+            },
+            label: "true_positive",
+          },
+        ],
+      }),
+    ).toThrow("cases[0].finding.category");
+
+    expect(() =>
+      parseStoryAuditEvaluationSuiteJson({
+        schemaVersion: "story-audit-evaluation-suite/v1",
+        datasetId: "editor-set-2026-07",
+        source: "independent_editor_set",
+        cases: [
+          {
+            finding: {
+              id: "timeline-1",
+              category: "timeline_conflict",
+              severity: "high",
+            },
+            label: "maybe",
+          },
+        ],
+      }),
+    ).toThrow("cases[0].label");
   });
 });
 

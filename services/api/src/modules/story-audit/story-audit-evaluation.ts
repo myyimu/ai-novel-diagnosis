@@ -1,4 +1,44 @@
 import type { StoryAuditFinding } from "@ai-novel-diagnosis/ai-core";
+import { ErrorCode } from "../../core/constants/error-code";
+import { BusinessException } from "../../core/exceptions";
+
+export const STORY_AUDIT_EVALUATION_SUITE_SCHEMA_VERSION =
+  "story-audit-evaluation-suite/v1";
+
+const STORY_AUDIT_FINDING_CATEGORIES = [
+  "timeline_conflict",
+  "location_conflict",
+  "fact_contradiction",
+  "knowledge_violation",
+  "ability_violation",
+  "motivation_gap",
+  "relationship_jump",
+  "world_rule_violation",
+  "causal_gap",
+  "dropped_goal",
+  "unresolved_setup",
+  "dialogue_attribution",
+  "structure_signal",
+] as const satisfies readonly StoryAuditFinding["category"][];
+
+const STORY_AUDIT_FINDING_SEVERITIES = [
+  "critical",
+  "high",
+  "medium",
+  "low",
+] as const satisfies readonly StoryAuditFinding["severity"][];
+
+const STORY_AUDIT_EVALUATION_LABELS = [
+  "true_positive",
+  "false_positive",
+  "unknown",
+] as const satisfies readonly StoryAuditFindingEvaluationLabel[];
+
+const STORY_AUDIT_EVALUATION_DATASET_SOURCES = [
+  "independent_editor_set",
+  "engineering_fixture",
+  "ad_hoc_review",
+] as const satisfies readonly StoryAuditEvaluationDatasetSource[];
 
 export type StoryAuditFindingEvaluationLabel =
   | "true_positive"
@@ -64,6 +104,14 @@ export interface StoryAuditAcceptanceEvaluationReport {
   note: string;
 }
 
+export interface StoryAuditEvaluationSuiteJson {
+  schemaVersion: typeof STORY_AUDIT_EVALUATION_SUITE_SCHEMA_VERSION;
+  datasetId: string;
+  source: StoryAuditEvaluationDatasetSource;
+  cases: StoryAuditFindingEvaluationCase[];
+  minimumLabeledCasesPerBucket?: number;
+}
+
 export const STORY_AUDIT_PRECISION_BUCKETS: readonly StoryAuditPrecisionBucketDefinition[] =
   [
     {
@@ -93,6 +141,61 @@ export const STORY_AUDIT_PRECISION_BUCKETS: readonly StoryAuditPrecisionBucketDe
       threshold: 0.7,
     },
   ];
+
+/** Parse the JSON import format for SIA-012 editor-labeled precision sets. */
+export function parseStoryAuditEvaluationSuiteJson(
+  input: unknown,
+): StoryAuditEvaluationSuite {
+  const value = assertRecord(input, "evaluation suite");
+  const schemaVersion = value.schemaVersion;
+
+  if (schemaVersion !== STORY_AUDIT_EVALUATION_SUITE_SCHEMA_VERSION) {
+    throw invalidEvaluationSuite(
+      `Unsupported story-audit evaluation suite schemaVersion: ${String(
+        schemaVersion,
+      )}`,
+    );
+  }
+
+  const datasetId = assertNonEmptyString(value.datasetId, "datasetId");
+  const source = assertOneOf(
+    value.source,
+    STORY_AUDIT_EVALUATION_DATASET_SOURCES,
+    "source",
+  );
+  const cases = assertArray(value.cases, "cases").map((item, index) =>
+    parseEvaluationCase(item, index),
+  );
+  const minimumLabeledCasesPerBucket =
+    value.minimumLabeledCasesPerBucket === undefined
+      ? undefined
+      : assertPositiveInteger(
+          value.minimumLabeledCasesPerBucket,
+          "minimumLabeledCasesPerBucket",
+        );
+
+  return {
+    datasetId,
+    source,
+    cases,
+    minimumLabeledCasesPerBucket,
+  };
+}
+
+/** Parse a JSON string into the SIA-012 editor-labeled precision set contract. */
+export function parseStoryAuditEvaluationSuiteJsonText(
+  jsonText: string,
+): StoryAuditEvaluationSuite {
+  try {
+    return parseStoryAuditEvaluationSuiteJson(JSON.parse(jsonText) as unknown);
+  } catch (error) {
+    if (error instanceof BusinessException) {
+      throw error;
+    }
+
+    throw invalidEvaluationSuite("Evaluation suite JSON text is invalid.");
+  }
+}
 
 /** Evaluate candidate precision against a human-labeled sample.
  *
@@ -222,4 +325,86 @@ function buildAcceptanceWarnings(
   }
 
   return warnings;
+}
+
+function parseEvaluationCase(
+  input: unknown,
+  index: number,
+): StoryAuditFindingEvaluationCase {
+  const value = assertRecord(input, `cases[${index}]`);
+  const finding = assertRecord(value.finding, `cases[${index}].finding`);
+
+  return {
+    finding: {
+      id: assertNonEmptyString(finding.id, `cases[${index}].finding.id`),
+      category: assertOneOf(
+        finding.category,
+        STORY_AUDIT_FINDING_CATEGORIES,
+        `cases[${index}].finding.category`,
+      ),
+      severity: assertOneOf(
+        finding.severity,
+        STORY_AUDIT_FINDING_SEVERITIES,
+        `cases[${index}].finding.severity`,
+      ),
+    },
+    label: assertOneOf(
+      value.label,
+      STORY_AUDIT_EVALUATION_LABELS,
+      `cases[${index}].label`,
+    ),
+  };
+}
+
+function assertRecord(
+  input: unknown,
+  fieldName: string,
+): Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw invalidEvaluationSuite(`${fieldName} must be an object.`);
+  }
+
+  return input as Record<string, unknown>;
+}
+
+function assertArray(input: unknown, fieldName: string): unknown[] {
+  if (!Array.isArray(input)) {
+    throw invalidEvaluationSuite(`${fieldName} must be an array.`);
+  }
+
+  return input;
+}
+
+function assertNonEmptyString(input: unknown, fieldName: string): string {
+  if (typeof input !== "string" || input.trim().length === 0) {
+    throw invalidEvaluationSuite(`${fieldName} must be a non-empty string.`);
+  }
+
+  return input;
+}
+
+function assertPositiveInteger(input: unknown, fieldName: string): number {
+  if (typeof input !== "number" || !Number.isInteger(input) || input < 1) {
+    throw invalidEvaluationSuite(`${fieldName} must be a positive integer.`);
+  }
+
+  return input;
+}
+
+function assertOneOf<const T extends string>(
+  input: unknown,
+  allowedValues: readonly T[],
+  fieldName: string,
+): T {
+  if (typeof input !== "string" || !allowedValues.includes(input as T)) {
+    throw invalidEvaluationSuite(
+      `${fieldName} must be one of: ${allowedValues.join(", ")}.`,
+    );
+  }
+
+  return input as T;
+}
+
+function invalidEvaluationSuite(message: string): BusinessException {
+  return BusinessException.badRequest(ErrorCode.INVALID_PARAMS, message);
 }
