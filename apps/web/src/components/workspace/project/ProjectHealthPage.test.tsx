@@ -481,7 +481,7 @@ vi.mock("@/lib/workspace-analysis-client", () => ({
 	upsertStoryAuditFindingReview: vi.fn(),
 }));
 
-import { ProjectHealthPage } from "./ProjectHealthPage";
+import { buildStoryAuditRevisionSeed, ProjectHealthPage } from "./ProjectHealthPage";
 
 describe("ProjectHealthPage", () => {
 	it("renders story audit evidence, deterministic statistics, and project-aware evidence links", () => {
@@ -530,7 +530,22 @@ describe("ProjectHealthPage", () => {
 			"/project/current?id=project-a&amp;chapter=chapter-1&amp;anchor=plot-anchor-a",
 		);
 		expect(html).toContain("人工判断不会写入 storyAudit 原始结果");
+		expect(html).toContain("加入改稿计划");
 		expect(push).not.toHaveBeenCalled();
+	});
+
+	it("builds a quick-diagnosis seed from a story audit finding without carrying whole-book verdicts", () => {
+		const finding = storyAudit.findings[0]!;
+		const seed = buildStoryAuditRevisionSeed(finding);
+
+		expect(seed.chapterTitle).toBe("第1章 · 追查动作缺少必要因果候选");
+		expect(seed.chapterPosition).toBe("first");
+		expect(seed.diagnosticFocus).toContain("整书体检候选：追查动作缺少必要因果候选");
+		expect(seed.diagnosticFocus.length).toBeLessThanOrEqual(100);
+		expect(seed.mustKeepMechanisms).toContain("优先验证修改动作：补一处线索转接或角色推理。");
+		expect(seed.mustKeepMechanisms).toContain("第1章「他发现旧案玉牌。」");
+		expect(seed.mustKeepMechanisms).toContain("保留替代解释：可能存在尚未抽取到的中间推理。");
+		expect(seed.targetReaderPleasures).toBe("读者可能不清楚主角为何能跳到新目标。");
 	});
 
 	it("hides whole-book missing conclusions when story audit coverage is partial", () => {

@@ -240,6 +240,7 @@ tasks:
     implementation_notes:
       - "项目导出新增 storyAudit 摘要分区，包含 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊。"
       - "JSON 导出移除正文版本 text，仅保留版本元数据；Markdown 导出不输出正文全文。"
+      - "体检页 finding 可保存为 planned，并把候选判断、证据短引文、替代解释和修改动作带入快速诊断上下文；真实章节正文和 V1/V2 仍由快速诊断复诊流程保存。"
       - "工程 fixture 只验证导出契约；precision 门槛仍需独立编辑标注集验证。"
       - "check/test/build 已通过；one:doctor 在当前环境因 One CLI 不在 PATH 失败，需安装或暴露 one 后复跑。"
 

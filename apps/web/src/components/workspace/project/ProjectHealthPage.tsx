@@ -29,6 +29,7 @@ import {
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type {
 	BookAnalysisResult,
+	ChapterPosition,
 	StoryAuditFindingReview,
 	StoryAuditResult,
 } from "@/stores/workspace-store";
@@ -85,6 +86,12 @@ export function ProjectHealthPage() {
 		providerLabel,
 		bookAnalysisResult,
 		bookJob,
+		setChapterTitle,
+		setQuickReviewChapterPosition,
+		setQuickReviewDiagnosticFocus,
+		setQuickReviewInputKind,
+		setQuickReviewMustKeepMechanisms,
+		setQuickReviewTargetReaderPleasures,
 	} = useWorkspaceHandlers("overview");
 	const bookAnalysisCache = useWorkspaceStore((state) => state.bookAnalysisCache);
 	const setBookAnalysisResult = useWorkspaceStore((state) => state.setBookAnalysisResult);
@@ -190,6 +197,23 @@ export function ProjectHealthPage() {
 		}
 	}
 
+	async function planFindingRevision(finding: StoryAuditFinding) {
+		const seed = buildStoryAuditRevisionSeed(finding);
+		await saveReview(finding, "planned");
+		setQuickReviewInputKind("human-draft");
+		setQuickReviewChapterPosition(seed.chapterPosition);
+		setQuickReviewDiagnosticFocus(seed.diagnosticFocus);
+		setQuickReviewMustKeepMechanisms(seed.mustKeepMechanisms);
+		setQuickReviewTargetReaderPleasures(seed.targetReaderPleasures);
+		if (seed.chapterTitle) {
+			setChapterTitle(seed.chapterTitle);
+		}
+		toast.success("已加入改稿计划", {
+			description: "已把候选证据写入快速诊断上下文，请粘贴真实章节正文后复诊。",
+		});
+		router.push("/diagnose/quick");
+	}
+
 	return (
 		<RedesignWorkspaceShell
 			active="history"
@@ -271,6 +295,7 @@ export function ProjectHealthPage() {
 								reviewByFindingId={reviewByFindingId}
 								reviewLoading={reviewLoading}
 								onSaveReview={saveReview}
+								onPlanRevision={planFindingRevision}
 							/>
 						</div>
 					</div>
@@ -1038,6 +1063,7 @@ function FindingInspector({
 	reviewByFindingId,
 	reviewLoading,
 	onSaveReview,
+	onPlanRevision,
 }: {
 	audit: StoryAuditResult;
 	projectId: string;
@@ -1047,6 +1073,7 @@ function FindingInspector({
 		finding: StoryAuditFinding,
 		reviewState: StoryAuditFindingReview["reviewState"],
 	) => void;
+	onPlanRevision: (finding: StoryAuditFinding) => void;
 }) {
 	const visibleFindings = getDisplayFindings(audit).slice(0, topFindingLimit);
 
@@ -1107,6 +1134,15 @@ function FindingInspector({
 									</div>
 								) : null}
 								<div className="mt-3 flex flex-wrap gap-2">
+									<Button
+										type="button"
+										onClick={() => onPlanRevision(finding)}
+										disabled={reviewLoading}
+										className="min-h-8 rounded-md px-2.5 text-xs"
+									>
+										<GitBranch className="mr-1.5 size-3.5" />
+										加入改稿计划
+									</Button>
 									{reviewOptions.map((option) => (
 										<Button
 											key={option.state}
@@ -1284,6 +1320,60 @@ function countDistinctEvidencePositions(evidence: StoryAuditFinding["evidence"])
 				`${anchor.source}:${anchor.chapterId}:${anchor.startOffset}:${anchor.endOffset}`,
 		),
 	).size;
+}
+
+export function buildStoryAuditRevisionSeed(finding: StoryAuditFinding): {
+	chapterTitle: string;
+	chapterPosition: ChapterPosition;
+	diagnosticFocus: string;
+	mustKeepMechanisms: string;
+	targetReaderPleasures: string;
+} {
+	const firstEvidence = finding.evidence[0];
+	const evidenceQuotes = finding.evidence
+		.slice(0, 3)
+		.map((anchor) => `第${anchor.chapterOrder}章「${anchor.quote}」`);
+	const alternatives = finding.alternativeExplanations.slice(0, 2);
+	const chapterTitle = firstEvidence
+		? `第${firstEvidence.chapterOrder}章 · ${finding.title}`
+		: finding.title;
+
+	return {
+		chapterTitle: truncatePlainText(chapterTitle, 60),
+		chapterPosition: inferChapterPosition(firstEvidence?.chapterOrder),
+		diagnosticFocus: truncatePlainText(`整书体检候选：${finding.title}。${finding.claim}`, 100),
+		mustKeepMechanisms: [
+			finding.fixAction ? `优先验证修改动作：${finding.fixAction}` : "",
+			evidenceQuotes.length ? `证据短引文：${evidenceQuotes.join("；")}` : "",
+			alternatives.length ? `保留替代解释：${alternatives.join("；")}` : "",
+		]
+			.filter(Boolean)
+			.join("；"),
+		targetReaderPleasures:
+			finding.readerImpact ||
+			"降低读者理解成本；修正前先确认这不是作者有意保留的误导或悬念。",
+	};
+}
+
+function inferChapterPosition(chapterOrder: number | undefined): ChapterPosition {
+	if (!chapterOrder || chapterOrder < 1) {
+		return "unknown";
+	}
+	if (chapterOrder === 1) {
+		return "first";
+	}
+	if (chapterOrder <= 3) {
+		return "early";
+	}
+	return "middle";
+}
+
+function truncatePlainText(value: string, maxLength: number) {
+	const normalized = value.replace(/\s+/g, " ").trim();
+	if (normalized.length <= maxLength) {
+		return normalized;
+	}
+	return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
 }
 
 function findingCategoryLabel(category: StoryAuditFinding["category"]) {
