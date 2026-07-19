@@ -1,4 +1,11 @@
-import { evaluateStoryAuditFindingPrecision } from "./story-audit-evaluation";
+import type {
+  StoryAuditAcceptanceEvaluationReport,
+  StoryAuditPrecisionBucketId,
+} from "./story-audit-evaluation";
+import {
+  evaluateStoryAuditAcceptance,
+  evaluateStoryAuditFindingPrecision,
+} from "./story-audit-evaluation";
 
 describe("evaluateStoryAuditFindingPrecision", () => {
   it("should calculate precision only from human-labeled cases", () => {
@@ -61,3 +68,182 @@ describe("evaluateStoryAuditFindingPrecision", () => {
     expect(result.passesThreshold).toBe(false);
   });
 });
+
+describe("evaluateStoryAuditAcceptance", () => {
+  it("should evaluate SIA-012 high-priority precision buckets from an independent editor set", () => {
+    const result = evaluateStoryAuditAcceptance({
+      datasetId: "editor-set-2026-07",
+      source: "independent_editor_set",
+      cases: [
+        ...repeatCases(6, {
+          category: "timeline_conflict",
+          severity: "high",
+          label: "true_positive",
+        }),
+        {
+          finding: {
+            id: "timeline-false-positive",
+            category: "timeline_conflict",
+            severity: "critical",
+          },
+          label: "false_positive",
+        },
+        {
+          finding: {
+            id: "timeline-medium-is-not-high-priority",
+            category: "timeline_conflict",
+            severity: "medium",
+          },
+          label: "false_positive",
+        },
+        ...repeatCases(7, {
+          category: "causal_gap",
+          severity: "high",
+          label: "true_positive",
+        }),
+        ...repeatCases(3, {
+          category: "motivation_gap",
+          severity: "critical",
+          label: "false_positive",
+        }),
+        {
+          finding: {
+            id: "structure-is-not-character-or-plot",
+            category: "structure_signal",
+            severity: "high",
+          },
+          label: "false_positive",
+        },
+      ],
+      minimumLabeledCasesPerBucket: 1,
+    });
+
+    const timeline = requireBucket(result, "timeline_high_priority");
+    const characterOrPlot = requireBucket(
+      result,
+      "character_or_plot_high_priority",
+    );
+
+    expect(result.eligibleForAcceptance).toBe(true);
+    expect(result.passesAcceptance).toBe(true);
+    expect(result.warnings).toEqual([]);
+    expect(timeline).toMatchObject({
+      eligibleFindingCount: 7,
+      precision: 0.8571,
+      threshold: 0.85,
+      passesThreshold: true,
+    });
+    expect(characterOrPlot).toMatchObject({
+      eligibleFindingCount: 10,
+      precision: 0.7,
+      threshold: 0.7,
+      passesThreshold: true,
+    });
+  });
+
+  it("should keep engineering fixtures out of product acceptance claims", () => {
+    const result = evaluateStoryAuditAcceptance({
+      datasetId: "engineering-fixture",
+      source: "engineering_fixture",
+      cases: [
+        {
+          finding: {
+            id: "timeline-true-positive",
+            category: "timeline_conflict",
+            severity: "high",
+          },
+          label: "true_positive",
+        },
+        {
+          finding: {
+            id: "plot-true-positive",
+            category: "causal_gap",
+            severity: "high",
+          },
+          label: "true_positive",
+        },
+      ],
+    });
+
+    expect(result.eligibleForAcceptance).toBe(false);
+    expect(result.passesAcceptance).toBe(false);
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining("not an independent editor-labeled set"),
+    );
+  });
+
+  it("should not claim acceptance when a required bucket has too few labeled cases", () => {
+    const result = evaluateStoryAuditAcceptance({
+      datasetId: "editor-set-incomplete",
+      source: "independent_editor_set",
+      cases: [
+        {
+          finding: {
+            id: "timeline-true-positive",
+            category: "timeline_conflict",
+            severity: "high",
+          },
+          label: "true_positive",
+        },
+        {
+          finding: {
+            id: "plot-unlabeled",
+            category: "causal_gap",
+            severity: "high",
+          },
+          label: "unknown",
+        },
+      ],
+      minimumLabeledCasesPerBucket: 1,
+    });
+
+    const characterOrPlot = requireBucket(
+      result,
+      "character_or_plot_high_priority",
+    );
+
+    expect(characterOrPlot.labeledSize).toBe(0);
+    expect(result.eligibleForAcceptance).toBe(false);
+    expect(result.passesAcceptance).toBe(false);
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining("character_or_plot_high_priority"),
+    );
+  });
+});
+
+function requireBucket(
+  report: StoryAuditAcceptanceEvaluationReport,
+  bucketId: StoryAuditPrecisionBucketId,
+) {
+  const bucket = report.buckets.find((item) => item.bucketId === bucketId);
+
+  if (!bucket) {
+    throw new Error(`Missing precision bucket: ${bucketId}`);
+  }
+
+  return bucket;
+}
+
+function repeatCases(
+  count: number,
+  input: {
+    category: Parameters<
+      typeof evaluateStoryAuditFindingPrecision
+    >[0][number]["finding"]["category"];
+    severity: Parameters<
+      typeof evaluateStoryAuditFindingPrecision
+    >[0][number]["finding"]["severity"];
+    label: Parameters<
+      typeof evaluateStoryAuditFindingPrecision
+    >[0][number]["label"];
+  },
+) {
+  return Array.from({ length: count }, (_, index) => ({
+    finding: {
+      id: `${input.category}-${input.severity}-${input.label}-${index}`,
+      category: input.category,
+      severity: input.severity,
+    },
+    label: input.label,
+  }));
+}
