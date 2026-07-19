@@ -11,6 +11,7 @@ import {
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { type Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
+import { BookAnalysisService } from "@/modules/book/book-analysis.service";
 import {
   UpdateRevisionNoteDto,
   UpsertStoryAuditFindingReviewDto,
@@ -19,11 +20,15 @@ import {
 } from "./dto/workspace-assets.dto";
 import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
 import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
+import type { StoryAuditResult } from "@ai-novel-diagnosis/ai-core";
 
 @ApiTags("analysis")
 @Controller("analysis/workspace")
 export class WorkspaceController {
-  constructor(private readonly workspaceAssets: WorkspaceAssetsRepository) {}
+  constructor(
+    private readonly workspaceAssets: WorkspaceAssetsRepository,
+    private readonly bookAnalysis: BookAnalysisService,
+  ) {}
 
   @Get("assets")
   @Public()
@@ -110,7 +115,27 @@ export class WorkspaceController {
   ) {
     const projectPackage =
       await this.workspaceAssets.readProjectPackage(projectId);
-    const content = buildWorkspaceProjectMarkdown(projectPackage);
+    const storyAudit = projectPackage.project.bookJobId
+      ? ((
+          (
+            await this.bookAnalysis.getBookAnalysisJob(
+              projectPackage.project.bookJobId,
+              { includeResult: true },
+            )
+          ).result as { storyAudit?: StoryAuditResult } | null
+        )?.storyAudit ?? null)
+      : null;
+    const storyAuditFindingReviews = storyAudit
+      ? await this.workspaceAssets.listStoryAuditFindingReviews({
+          projectId: projectPackage.project.id,
+          auditId: storyAudit.auditId,
+        })
+      : [];
+    const content = buildWorkspaceProjectMarkdown({
+      ...projectPackage,
+      storyAudit,
+      storyAuditFindingReviews,
+    });
     const filename = `ai-novel-diagnosis-${projectPackage.project.name}-${new Date()
       .toISOString()
       .slice(0, 10)}.md`;

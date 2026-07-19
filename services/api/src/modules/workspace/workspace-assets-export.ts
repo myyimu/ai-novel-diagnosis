@@ -1,16 +1,66 @@
 import type {
   ProjectMethodologyCardSnapshot,
   RevisionSessionSnapshot,
+  StoryAuditFindingReviewSnapshot,
   RevisionTextVersionSnapshot,
   WorkspaceProjectSnapshot,
 } from "./workspace-assets.repository";
-import { buildPromptAttribution } from "@ai-novel-diagnosis/ai-core";
+import {
+  buildPromptAttribution,
+  type StoryAuditResult,
+} from "@ai-novel-diagnosis/ai-core";
+
+interface StoryAuditExportSnapshot {
+  schemaVersion: string;
+  auditId: string;
+  bookJobId: string;
+  generatedAt: string;
+  coverage: StoryAuditResult["coverage"];
+  dialogue: Array<{
+    scopeId: string;
+    dialogueCharacterRatio: number;
+    dialogueTurnCount: number;
+    parserWarningCount: number;
+  }>;
+  findings: Array<{
+    id: string;
+    category: string;
+    severity: string;
+    status: string;
+    title: string;
+    claim: string;
+    confidence: number;
+    evidence: Array<{
+      anchorId: string;
+      chapterId: string;
+      chapterOrder: number;
+      quote: string;
+      source: string;
+    }>;
+    alternativeExplanations: string[];
+    readerImpact?: string;
+    fixAction?: string;
+    humanReviewState?: StoryAuditFindingReviewSnapshot["reviewState"];
+    linkedRevisionSessionIds: string[];
+  }>;
+  views: {
+    sceneCount: number;
+    eventCount: number;
+    factCount: number;
+    characterStateCount: number;
+    plotlineCount: number;
+    setupPayoffEdgeCount: number;
+    temporalEdgeCount: number;
+  };
+}
 
 export function buildWorkspaceProjectMarkdown(input: {
   project: WorkspaceProjectSnapshot;
   revisionSessions: RevisionSessionSnapshot[];
   revisionVersions?: RevisionTextVersionSnapshot[];
   methodologyCards: ProjectMethodologyCardSnapshot[];
+  storyAudit?: StoryAuditResult | null;
+  storyAuditFindingReviews?: StoryAuditFindingReviewSnapshot[];
   generatedAt?: string;
 }) {
   const sessions = [...input.revisionSessions].sort(
@@ -28,6 +78,13 @@ export function buildWorkspaceProjectMarkdown(input: {
   const versionsById = new Map(
     (input.revisionVersions || []).map((version) => [version.id, version]),
   );
+  const storyAuditExport = input.storyAudit
+    ? buildStoryAuditExportSnapshot({
+        storyAudit: input.storyAudit,
+        revisionSessions: sessions,
+        reviews: input.storyAuditFindingReviews || [],
+      })
+    : null;
   const scoreDelta = calculateScoreDelta(latest, previous);
   const promptAttribution = buildPromptAttribution(sessions);
   const commonIssues = countRows(
@@ -48,6 +105,7 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- 正文版本：${input.revisionVersions?.length || 0}`,
     `- 方法论卡：${cards.length}`,
     `- Prompt 模板：${promptCards.length}`,
+    `- 故事体检：${storyAuditExport ? "已包含摘要" : "暂无"}`,
     "",
     "## 项目概览",
     "",
@@ -57,9 +115,11 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- Prompt 归因有效率：${formatPromptAttributionRate(promptAttribution)}`,
     `- 常见问题：${commonIssues.join("、") || "暂无"}`,
     "",
-    "## 复诊轨迹",
-    "",
   ];
+
+  appendStoryAuditMarkdown(lines, storyAuditExport);
+
+  lines.push("## 复诊轨迹", "");
 
   if (!sessions.length) {
     lines.push("暂无复诊记录。", "");
@@ -174,6 +234,149 @@ export function buildWorkspaceProjectMarkdown(input: {
   }
 
   return `${lines.join("\n").trim()}\n`;
+}
+
+function buildStoryAuditExportSnapshot({
+  storyAudit,
+  revisionSessions,
+  reviews,
+}: {
+  storyAudit: StoryAuditResult;
+  revisionSessions: RevisionSessionSnapshot[];
+  reviews: StoryAuditFindingReviewSnapshot[];
+}): StoryAuditExportSnapshot {
+  const reviewByFindingId = new Map(
+    reviews.map((review) => [review.findingId, review]),
+  );
+  const revisionIdsByFindingId = new Map<string, string[]>();
+
+  revisionSessions.forEach((session) => {
+    (session.storyAuditFindingIds || []).forEach((findingId) => {
+      const current = revisionIdsByFindingId.get(findingId) || [];
+      current.push(session.id);
+      revisionIdsByFindingId.set(findingId, current);
+    });
+  });
+
+  return {
+    schemaVersion: storyAudit.schemaVersion,
+    auditId: storyAudit.auditId,
+    bookJobId: storyAudit.bookJobId,
+    generatedAt: storyAudit.generatedAt,
+    coverage: storyAudit.coverage,
+    dialogue: storyAudit.metrics.dialogue.map((item) => ({
+      scopeId: item.scopeId,
+      dialogueCharacterRatio: item.dialogueCharacterRatio,
+      dialogueTurnCount: item.dialogueTurnCount,
+      parserWarningCount: item.parserWarnings.length,
+    })),
+    findings: storyAudit.findings.map((finding) => ({
+      id: finding.id,
+      category: finding.category,
+      severity: finding.severity,
+      status: finding.status,
+      title: finding.title,
+      claim: finding.claim,
+      confidence: finding.confidence,
+      evidence: finding.evidence.map((anchor) => ({
+        anchorId: anchor.anchorId,
+        chapterId: anchor.chapterId,
+        chapterOrder: anchor.chapterOrder,
+        quote: anchor.quote,
+        source: anchor.source,
+      })),
+      alternativeExplanations: finding.alternativeExplanations,
+      readerImpact: finding.readerImpact,
+      fixAction: finding.fixAction,
+      humanReviewState: reviewByFindingId.get(finding.id)?.reviewState,
+      linkedRevisionSessionIds: revisionIdsByFindingId.get(finding.id) || [],
+    })),
+    views: {
+      sceneCount: storyAudit.scenes.length,
+      eventCount: storyAudit.events.length,
+      factCount: storyAudit.facts.length,
+      characterStateCount: storyAudit.characterStates.length,
+      plotlineCount: storyAudit.views.plotlineMatrix.length,
+      setupPayoffEdgeCount: storyAudit.views.setupPayoffEdges.length,
+      temporalEdgeCount: storyAudit.views.temporalGraph.relationEdges.length,
+    },
+  };
+}
+
+function appendStoryAuditMarkdown(
+  lines: string[],
+  storyAuditExport: StoryAuditExportSnapshot | null,
+) {
+  lines.push("## 故事体检 storyAudit", "");
+
+  if (!storyAuditExport) {
+    lines.push("暂无 storyAudit 摘要。", "");
+    return;
+  }
+
+  lines.push(
+    `- auditId：${storyAuditExport.auditId}`,
+    `- bookJobId：${storyAuditExport.bookJobId}`,
+    `- 生成时间：${formatDateTime(storyAuditExport.generatedAt)}`,
+    `- 覆盖章节：${storyAuditExport.coverage.analyzedChapterIds.length}/${storyAuditExport.coverage.totalChapterCount}`,
+    `- partial：${storyAuditExport.coverage.isPartial ? "是，仅导出已分析范围" : "否"}`,
+    `- 场景抽取率：${formatPercent(storyAuditExport.coverage.sceneExtractionRate)}`,
+    `- 证据校验率：${formatPercent(storyAuditExport.coverage.evidenceValidationRate)}`,
+    `- 结构摘要：场景 ${storyAuditExport.views.sceneCount}，事件 ${storyAuditExport.views.eventCount}，事实 ${storyAuditExport.views.factCount}，人物状态 ${storyAuditExport.views.characterStateCount}`,
+    `- 图谱摘要：剧情线 ${storyAuditExport.views.plotlineCount}，伏笔兑现 ${storyAuditExport.views.setupPayoffEdgeCount}，时间关系 ${storyAuditExport.views.temporalEdgeCount}`,
+    "",
+    "### 文本统计",
+    "",
+  );
+
+  const dialogue = storyAuditExport.dialogue.slice(0, 6);
+  if (!dialogue.length) {
+    lines.push("暂无对话统计。", "");
+  } else {
+    dialogue.forEach((item) => {
+      lines.push(
+        `- ${item.scopeId}：对话字占比 ${formatPercent(item.dialogueCharacterRatio)}，对话轮次 ${item.dialogueTurnCount}，解析警告 ${item.parserWarningCount}`,
+      );
+    });
+    lines.push("");
+  }
+
+  lines.push("### Finding 摘要", "");
+  if (!storyAuditExport.findings.length) {
+    lines.push("暂无候选 finding。", "");
+    return;
+  }
+
+  storyAuditExport.findings.slice(0, 10).forEach((finding, index) => {
+    lines.push(
+      `#### ${index + 1}. ${escapeMarkdown(finding.title)}`,
+      "",
+      `- 类型：${finding.category}`,
+      `- 严重度：${finding.severity}`,
+      `- 状态：${finding.status}`,
+      `- 置信度：${formatPercent(finding.confidence)}`,
+      `- 人工复核：${finding.humanReviewState || "unreviewed"}`,
+      `- 关联复诊：${finding.linkedRevisionSessionIds.join("、") || "暂无"}`,
+      `- 候选判断：${finding.claim}`,
+      `- 替代解释：${finding.alternativeExplanations.join("；") || "暂无"}`,
+      `- 读者影响：${finding.readerImpact || "暂无"}`,
+      `- 修改动作：${finding.fixAction || "暂无"}`,
+      "",
+    );
+
+    if (!finding.evidence.length) {
+      lines.push("证据：暂无。", "");
+      return;
+    }
+
+    lines.push("证据：", "");
+    finding.evidence.slice(0, 3).forEach((anchor) => {
+      lines.push(
+        `- ${anchor.chapterId}#${anchor.chapterOrder} ${anchor.source}：${escapeMarkdown(anchor.quote)}`,
+      );
+    });
+    lines.push("");
+  });
 }
 
 function countRows(values: string[]) {
@@ -307,6 +510,13 @@ function formatPromptAttributionRate(value: {
 }
 
 function formatAttributionConfidence(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "暂无";
+  }
   return `${Math.round(value * 100)}%`;
 }
 

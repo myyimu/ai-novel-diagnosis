@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildDiagnosisDashboard,
+	buildProjectExportJson,
 	buildProjectExportMarkdown,
 	buildRevisionComparison,
 	buildRevisionHistory,
@@ -13,7 +14,12 @@ import {
 	upsertRevisionSession,
 	upsertRevisionTextVersion,
 } from "./workspace-iteration";
-import type { QuickReviewResult, WorkspaceProject } from "@/stores/workspace-store";
+import type {
+	QuickReviewResult,
+	StoryAuditFindingReview,
+	StoryAuditResult,
+	WorkspaceProject,
+} from "@/stores/workspace-store";
 
 const baseResult: QuickReviewResult = {
 	title: "第一章 退婚",
@@ -61,6 +67,109 @@ const baseResult: QuickReviewResult = {
 			promptTemplate: "请补强章末代价。",
 		},
 	],
+};
+
+const baseStoryAudit: StoryAuditResult = {
+	schemaVersion: "story-audit.v1",
+	auditId: "audit-a",
+	projectId: "project-a",
+	bookJobId: "book-job-a",
+	generatedAt: "2026-06-24T02:30:00.000Z",
+	coverage: {
+		analyzedChapterIds: ["chapter-1"],
+		totalChapterCount: 2,
+		isPartial: true,
+		sceneExtractionRate: 0.8,
+		evidenceValidationRate: 1,
+	},
+	scenes: [
+		{
+			id: "scene-1",
+			chapterId: "chapter-1",
+			orderInChapter: 1,
+			narrativeOrder: 1,
+			title: "退婚现场",
+			locationIds: ["hall"],
+			participantIds: ["hero"],
+			evidence: [],
+		},
+	],
+	events: [
+		{
+			id: "event-1",
+			sceneId: "scene-1",
+			summary: "主角被当众退婚",
+			participantIds: ["hero"],
+			locationIds: ["hall"],
+			relations: [],
+			evidence: [],
+		},
+	],
+	facts: [],
+	characterStates: [],
+	findings: [
+		{
+			id: "finding-a",
+			category: "timeline_conflict",
+			severity: "high",
+			status: "candidate",
+			title: "时间线候选冲突",
+			claim: "第二章回忆与第一章公开退婚的先后顺序需要复核。",
+			evidence: [
+				{
+					anchorId: "anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "长老当众宣布取消他的试炼资格。",
+					startOffset: 3,
+					endOffset: 18,
+					source: "text",
+				},
+			],
+			relatedFactIds: [],
+			relatedEventIds: ["event-1"],
+			ruleIds: ["rule-a"],
+			alternativeExplanations: ["可能是角色记忆偏差，需要作者确认。"],
+			readerImpact: "读者可能误解公开退婚发生的时间。",
+			fixAction: "补一句明确时间锚点。",
+			confidence: 0.87,
+		},
+	],
+	metrics: {
+		dialogue: [
+			{
+				scopeId: "chapter-1",
+				effectiveCharacterCount: 100,
+				dialogueCharacterCount: 20,
+				dialogueCharacterRatio: 0.2,
+				paragraphCount: 5,
+				dialogueParagraphCount: 1,
+				dialogueParagraphRatio: 0.2,
+				dialogueTurnCount: 2,
+				dialogueTagCount: 1,
+				unattributedTurnCandidateCount: 0,
+				parserWarnings: [],
+			},
+		],
+	},
+	views: {
+		temporalGraph: {
+			eventIds: ["event-1"],
+			relationEdges: [],
+			conflictCandidateIds: ["finding-a"],
+		},
+		plotlineMatrix: [],
+		setupPayoffEdges: [],
+	},
+};
+
+const baseStoryAuditReview: StoryAuditFindingReview = {
+	projectId: "project-a",
+	auditId: "audit-a",
+	findingId: "finding-a",
+	reviewState: "confirmed",
+	note: "确认为需要改的时间线问题。",
+	updatedAt: "2026-06-24T02:40:00.000Z",
 };
 
 describe("workspace iteration assets", () => {
@@ -412,6 +521,7 @@ describe("workspace iteration assets", () => {
 				chapterText: "版本二",
 				result: { ...baseResult, quickScore: 6.4, gateDecision: "revise" },
 				methodologyCardIds: ["method-1"],
+				storyAuditFindingIds: ["finding-a"],
 				now: "2026-06-24T01:00:00.000Z",
 			}),
 			revisionNote: "这一版按 Prompt 补了章末代价。",
@@ -433,6 +543,8 @@ describe("workspace iteration assets", () => {
 			revisionSessions: [first, second],
 			revisionVersions: [firstVersion, secondVersion],
 			methodologyCards: mergedCards.cards,
+			storyAudit: baseStoryAudit,
+			storyAuditFindingReviews: [baseStoryAuditReview],
 			generatedAt: "2026-06-24T03:00:00.000Z",
 		});
 
@@ -455,5 +567,67 @@ describe("workspace iteration assets", () => {
 		expect(markdown).toContain("诊断理由");
 		expect(markdown).toContain("置信度");
 		expect(markdown).toContain("请补强章末代价。");
+		expect(markdown).toContain("故事体检 storyAudit");
+		expect(markdown).toContain("partial：是，仅导出已分析范围");
+		expect(markdown).toContain("Finding 摘要");
+		expect(markdown).toContain("人工复核：confirmed");
+		expect(markdown).toContain("关联复诊：");
+		expect(markdown).toContain(second.id);
+		expect(markdown).toContain("长老当众宣布取消他的试炼资格。");
+		expect(markdown).toContain("可能是角色记忆偏差，需要作者确认。");
+		expect(markdown).not.toContain("版本一正文");
+		expect(markdown).not.toContain("版本二正文");
+	});
+
+	it("builds a project export JSON package without revision full text", () => {
+		const project: WorkspaceProject = {
+			id: "project-a",
+			name: "退婚流测试项目",
+			createdAt: "2026-06-24T00:00:00.000Z",
+			updatedAt: "2026-06-24T02:00:00.000Z",
+		};
+		const session = createRevisionSession({
+			projectId: project.id,
+			chapterTitle: "第二版",
+			chapterText: "版本二正文",
+			result: baseResult,
+			methodologyCardIds: [],
+			storyAuditFindingIds: ["finding-a"],
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const version = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本二正文",
+			sourceSessionId: session.id,
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const json = buildProjectExportJson({
+			project,
+			revisionSessions: [session],
+			revisionVersions: [version],
+			methodologyCards: [],
+			storyAudit: baseStoryAudit,
+			storyAuditFindingReviews: [baseStoryAuditReview],
+			generatedAt: "2026-06-24T03:00:00.000Z",
+		});
+		const parsed = JSON.parse(json) as {
+			revisionVersions: Array<{ text?: unknown }>;
+			storyAudit: {
+				findings: Array<{
+					evidence: Array<{ quote: string }>;
+					humanReviewState?: string;
+					linkedRevisionSessionIds: string[];
+				}>;
+			};
+		};
+
+		expect(json).not.toContain("版本二正文");
+		expect(parsed.revisionVersions[0]?.text).toBeUndefined();
+		expect(parsed.storyAudit.findings[0]?.evidence[0]?.quote).toBe(
+			"长老当众宣布取消他的试炼资格。",
+		);
+		expect(parsed.storyAudit.findings[0]?.humanReviewState).toBe("confirmed");
+		expect(parsed.storyAudit.findings[0]?.linkedRevisionSessionIds).toEqual([session.id]);
 	});
 });

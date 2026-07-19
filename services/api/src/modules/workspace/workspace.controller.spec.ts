@@ -5,7 +5,10 @@ describe("WorkspaceController", () => {
     const repository = {
       upsertStoryAuditFindingReview: jest.fn(async (input) => input),
     };
-    const controller = new WorkspaceController(repository as never);
+    const controller = new WorkspaceController(
+      repository as never,
+      {} as never,
+    );
 
     await expect(
       controller.upsertStoryAuditFindingReview({

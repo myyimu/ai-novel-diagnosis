@@ -1,7 +1,7 @@
 schema_version: "agent-execution-plan.v2"
 document_version: "1.2.0"
 status: "in-progress"
-last_updated: "2026-07-18"
+last_updated: "2026-07-19"
 project_root: "/Users/yimu/work/ai-novel-diagnosis"
 objective: "复用现有整书 Map-Reduce 和证据索引，把整书编辑方法蒸馏成作者可确认、可改稿、可保存真实版本并可独立复诊的故事体检。"
 authoritative_plan: "docs/story-intelligence/implementation-plan.md"
@@ -226,7 +226,7 @@ tasks:
 
   - id: "SIA-012"
     title: "复诊、导出、评测与发布"
-    implementation_status: "priority_next"
+    implementation_status: "partial"
     depends_on:
       - "SIA-008"
       - "SIA-009"
@@ -237,6 +237,11 @@ tasks:
       - "人物/剧情漏洞高优 precision >= 0.70。"
       - "Markdown/JSON 导出不包含全文。"
       - "全仓 check/test/build 和 one:doctor 通过。"
+    implementation_notes:
+      - "项目导出新增 storyAudit 摘要分区，包含 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊。"
+      - "JSON 导出移除正文版本 text，仅保留版本元数据；Markdown 导出不输出正文全文。"
+      - "工程 fixture 只验证导出契约；precision 门槛仍需独立编辑标注集验证。"
+      - "check/test/build 已通过；one:doctor 在当前环境因 One CLI 不在 PATH 失败，需安装或暴露 one 后复跑。"
 
 recommended_delivery_order:
   - "SIA-001"

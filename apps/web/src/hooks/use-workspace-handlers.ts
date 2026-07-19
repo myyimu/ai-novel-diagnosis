@@ -21,6 +21,7 @@ import {
 	listBookHistory,
 	listProviderModels,
 	readBookAnalysisJob,
+	readStoryAuditFindingReviews,
 	readResearchLibrary,
 	readWorkspaceAssets,
 	requestMethodologyCards,
@@ -54,6 +55,7 @@ import {
 	getWorkspaceViewMeta,
 } from "@/lib/workspace-view-model";
 import {
+	buildProjectExportJson,
 	buildProjectExportMarkdown,
 	createRevisionSession,
 	createRevisionTextVersion,
@@ -643,36 +645,71 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		});
 	}
 
-	async function exportProjectMarkdown() {
-		if (!projectRevisionSessions.length && !projectMethodologyCards.length) {
-			setStatus("当前书籍还没有可导出的修改效果记录或方法论卡。");
-			return;
+	function resolveProjectStoryAuditResult() {
+		const targetJobId = activeProject?.bookJobId || bookJob?.id;
+		if (bookAnalysisResult?.storyAudit && (!targetJobId || bookJob?.id === targetJobId)) {
+			return bookAnalysisResult.storyAudit;
+		}
+
+		if (targetJobId) {
+			const cached = bookAnalysisCache.find(
+				(item) => item.job.id === targetJobId && item.result?.storyAudit,
+			);
+			return cached?.result?.storyAudit ?? null;
+		}
+
+		return bookAnalysisResult?.storyAudit ?? null;
+	}
+
+	async function readProjectStoryAuditFindingReviews() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!storyAudit) {
+			return [];
 		}
 
 		const project = activeProject ?? defaultWorkspaceProject;
 		try {
-			const response = await fetch(
-				apiUrl(`/analysis/workspace/projects/${encodeURIComponent(project.id)}/export`),
-			);
-			if (response.ok) {
-				const content = await response.text();
-				const disposition = response.headers.get("content-disposition") || "";
-				const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
-				const filename = filenameMatch
-					? decodeURIComponent(filenameMatch[1])
-					: `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
-							.toISOString()
-							.slice(0, 10)}.md`;
-				downloadText(
-					filename,
-					content,
-					response.headers.get("content-type") || "text/markdown;charset=utf-8",
-				);
-				setStatus(`书籍资产导出完成：${filename}`);
-				return;
-			}
+			return await readStoryAuditFindingReviews(project.id);
 		} catch {
-			// Fall back to browser-local export below.
+			setStatus("故事体检复核状态暂时读取失败；导出将只包含候选摘要。");
+			return [];
+		}
+	}
+
+	async function exportProjectMarkdown() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
+			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
+			return;
+		}
+
+		const project = activeProject ?? defaultWorkspaceProject;
+		const storyAuditFindingReviews = await readProjectStoryAuditFindingReviews();
+		if (!storyAudit) {
+			try {
+				const response = await fetch(
+					apiUrl(`/analysis/workspace/projects/${encodeURIComponent(project.id)}/export`),
+				);
+				if (response.ok) {
+					const content = await response.text();
+					const disposition = response.headers.get("content-disposition") || "";
+					const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
+					const filename = filenameMatch
+						? decodeURIComponent(filenameMatch[1])
+						: `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+								.toISOString()
+								.slice(0, 10)}.md`;
+					downloadText(
+						filename,
+						content,
+						response.headers.get("content-type") || "text/markdown;charset=utf-8",
+					);
+					setStatus(`书籍资产导出完成：${filename}`);
+					return;
+				}
+			} catch {
+				// Fall back to browser-local export below.
+			}
 		}
 
 		const content = buildProjectExportMarkdown({
@@ -680,12 +717,38 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			revisionSessions: projectRevisionSessions,
 			revisionVersions: projectRevisionVersions,
 			methodologyCards: projectMethodologyCards,
+			storyAudit,
+			storyAuditFindingReviews,
 		});
 		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
 			.toISOString()
 			.slice(0, 10)}.md`;
 		downloadText(filename, content, "text/markdown;charset=utf-8");
 		setStatus(`书籍资产导出完成：${filename}`);
+	}
+
+	async function exportProjectJson() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
+			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
+			return;
+		}
+
+		const project = activeProject ?? defaultWorkspaceProject;
+		const storyAuditFindingReviews = await readProjectStoryAuditFindingReviews();
+		const content = buildProjectExportJson({
+			project,
+			revisionSessions: projectRevisionSessions,
+			revisionVersions: projectRevisionVersions,
+			methodologyCards: projectMethodologyCards,
+			storyAudit,
+			storyAuditFindingReviews,
+		});
+		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+			.toISOString()
+			.slice(0, 10)}.json`;
+		downloadText(filename, content, "application/json;charset=utf-8");
+		setStatus(`书籍资产 JSON 导出完成：${filename}`);
 	}
 
 	/* ──────────── nav items ──────────── */
@@ -2376,6 +2439,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		projectRevisionSessions,
 		projectRevisionVersions,
 		projectMethodologyCards,
+		projectStoryAuditResult: resolveProjectStoryAuditResult(),
 		newProjectName,
 		setNewProjectName,
 
@@ -2532,6 +2596,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		createProject,
 		saveRevisionNote,
 		exportProjectMarkdown,
+		exportProjectJson,
 		testProvider,
 		loadProviderModelOptions,
 		applyProviderPreset,

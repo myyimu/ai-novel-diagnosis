@@ -232,6 +232,8 @@ pnpm --filter api build
 
 依赖：SIA-008～SIA-011。finding 进入修改计划，保存作者决定、V1/V2、实际采用项和独立复诊；导出 Markdown/JSON storyAudit 分区。
 
+状态：已完成导出契约工程闭环，发布门禁待环境复跑。项目 Markdown/JSON 导出新增 `storyAudit` 摘要分区，只输出 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊；JSON 导出移除正文版本 `text`，后端 Markdown 导出从现有 `BookAnalysisResult.storyAudit` 读取摘要并合并独立持久化的人工 review。`check/test/build` 已通过；`one:doctor` 因当前环境 One CLI 不在 PATH 失败。precision 门槛仍需独立编辑标注集验证，不能用工程 fixture 宣称产品有效性。
+
 ## 7. 每个 AI 的执行协议
 
 每个任务完成后必须交接：

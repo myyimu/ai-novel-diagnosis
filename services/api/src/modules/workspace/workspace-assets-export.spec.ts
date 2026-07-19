@@ -1,4 +1,99 @@
 import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
+import type { StoryAuditResult } from "@ai-novel-diagnosis/ai-core";
+
+const baseStoryAudit: StoryAuditResult = {
+  schemaVersion: "story-audit.v1",
+  auditId: "audit-a",
+  projectId: "project-a",
+  bookJobId: "book-job-a",
+  generatedAt: "2026-06-24T02:30:00.000Z",
+  coverage: {
+    analyzedChapterIds: ["chapter-1"],
+    totalChapterCount: 2,
+    isPartial: true,
+    sceneExtractionRate: 0.8,
+    evidenceValidationRate: 1,
+  },
+  scenes: [
+    {
+      id: "scene-1",
+      chapterId: "chapter-1",
+      orderInChapter: 1,
+      narrativeOrder: 1,
+      title: "退婚现场",
+      locationIds: ["hall"],
+      participantIds: ["hero"],
+      evidence: [],
+    },
+  ],
+  events: [
+    {
+      id: "event-1",
+      sceneId: "scene-1",
+      summary: "主角被当众退婚",
+      participantIds: ["hero"],
+      locationIds: ["hall"],
+      relations: [],
+      evidence: [],
+    },
+  ],
+  facts: [],
+  characterStates: [],
+  findings: [
+    {
+      id: "finding-a",
+      category: "timeline_conflict",
+      severity: "high",
+      status: "candidate",
+      title: "时间线候选冲突",
+      claim: "第二章回忆与第一章公开退婚的先后顺序需要复核。",
+      evidence: [
+        {
+          anchorId: "anchor-a",
+          chapterId: "chapter-1",
+          chapterOrder: 1,
+          quote: "长老当众宣布取消他的试炼资格。",
+          startOffset: 3,
+          endOffset: 18,
+          source: "text",
+        },
+      ],
+      relatedFactIds: [],
+      relatedEventIds: ["event-1"],
+      ruleIds: ["rule-a"],
+      alternativeExplanations: ["可能是角色记忆偏差，需要作者确认。"],
+      readerImpact: "读者可能误解公开退婚发生的时间。",
+      fixAction: "补一句明确时间锚点。",
+      confidence: 0.87,
+    },
+  ],
+  metrics: {
+    dialogue: [
+      {
+        scopeId: "chapter-1",
+        effectiveCharacterCount: 100,
+        dialogueCharacterCount: 20,
+        dialogueCharacterRatio: 0.2,
+        paragraphCount: 5,
+        dialogueParagraphCount: 1,
+        dialogueParagraphRatio: 0.2,
+        dialogueTurnCount: 2,
+        dialogueTagCount: 1,
+        unattributedTurnCandidateCount: 0,
+        parserWarnings: [],
+      },
+    ],
+  },
+  views: {
+    temporalGraph: {
+      eventIds: ["event-1"],
+      relationEdges: [],
+      conflictCandidateIds: ["finding-a"],
+    },
+    plotlineMatrix: [],
+    setupPayoffEdges: [],
+  },
+};
 
 describe("buildWorkspaceProjectMarkdown", () => {
   it("exports revision notes and prompt templates for a persisted project", () => {
@@ -29,6 +124,7 @@ describe("buildWorkspaceProjectMarkdown", () => {
           fromVersionId: "version-1",
           toVersionId: "version-2",
           textChanged: true,
+          storyAuditFindingIds: ["finding-a"],
           methodologyCardIds: ["method-1"],
         },
         {
@@ -92,6 +188,17 @@ describe("buildWorkspaceProjectMarkdown", () => {
           occurrenceCount: 2,
         },
       ],
+      storyAudit: baseStoryAudit,
+      storyAuditFindingReviews: [
+        {
+          projectId: "project-a",
+          auditId: "audit-a",
+          findingId: "finding-a",
+          reviewState: "confirmed",
+          note: "确认为需要改的时间线问题。",
+          updatedAt: "2026-06-24T02:40:00.000Z",
+        },
+      ],
       generatedAt: "2026-06-24T03:00:00.000Z",
     });
 
@@ -112,6 +219,15 @@ describe("buildWorkspaceProjectMarkdown", () => {
     expect(markdown).toContain("置信度");
     expect(markdown).toContain("信号");
     expect(markdown).toContain("请补强章末代价。");
+    expect(markdown).toContain("故事体检 storyAudit");
+    expect(markdown).toContain("partial：是，仅导出已分析范围");
+    expect(markdown).toContain("Finding 摘要");
+    expect(markdown).toContain("人工复核：confirmed");
+    expect(markdown).toContain("关联复诊：revision-2");
+    expect(markdown).toContain("长老当众宣布取消他的试炼资格。");
+    expect(markdown).toContain("可能是角色记忆偏差，需要作者确认。");
+    expect(markdown).not.toContain("版本一正文");
+    expect(markdown).not.toContain("版本二正文");
   });
 
   it("exports insufficient revision scores without coercing them to zero", () => {
