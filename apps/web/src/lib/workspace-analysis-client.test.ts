@@ -5,6 +5,7 @@ import {
 	requestPlatformFit,
 	requestQuickReview,
 	readStoryAuditFindingReviews,
+	testProviderConnection,
 	upsertRevisionAssets,
 	upsertStoryAuditFindingReview,
 } from "./workspace-analysis-client";
@@ -299,6 +300,15 @@ describe("workspace analysis client", () => {
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"/api/v1/analysis/workspace/story-audit/reviews/project%2Fa",
+		);
+	});
+
+	it("explains local API network failures when testing provider connection", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch"));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(testProviderConnection(provider)).rejects.toThrow(
+			"无法连接本地 API 服务（/api/v1）",
 		);
 	});
 });
