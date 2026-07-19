@@ -335,9 +335,7 @@ function ProjectChapterWorkspace({
 	const previewAcceptedCount = acceptedIssues.filter(
 		(issue) => previewDecisions[issue.id] !== "rejected",
 	).length;
-	const visibleIssueEntries = issues
-		.map((issue, index) => ({ issue, index }))
-		.filter(({ issue }) => matchesIssueFilter(issue, getIssueState(issue.id), issueFilter));
+	const visibleIssueEntries = buildVisibleIssueEntries(issues, getIssueState, issueFilter);
 	const workflow = buildChapterWorkflow({
 		hasResult: Boolean(result),
 		acceptedCount,
@@ -922,7 +920,7 @@ function ProjectChapterWorkspace({
 
 						<div className="grid gap-2">
 							{visibleIssueEntries.length ? (
-								visibleIssueEntries.slice(0, 6).map(({ issue, index }) => {
+								visibleIssueEntries.map(({ issue, index }) => {
 									const state = getIssueState(issue.id);
 									return (
 										<article
@@ -957,11 +955,11 @@ function ProjectChapterWorkspace({
 											<h3 className="mb-1 mt-2 text-xs font-bold leading-snug">
 												{issue.title}
 											</h3>
-											<p className="line-clamp-2 text-[10px] leading-[18px] text-[#606873]">
+											<p className="whitespace-pre-wrap text-[10px] leading-[18px] text-[#606873]">
 												{issue.description || issue.readerImpact}
 											</p>
 											{issue.evidence?.[0]?.quote ? (
-												<div className="mt-2 line-clamp-2 rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
+												<div className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
 													证据：{issue.evidence[0].quote}
 												</div>
 											) : null}
@@ -971,7 +969,7 @@ function ProjectChapterWorkspace({
 												</div>
 											)}
 											{issue.fixAction ? (
-												<div className="mt-2 line-clamp-2 rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
+												<div className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
 													{issue.fixAction}
 												</div>
 											) : null}
@@ -1847,6 +1845,16 @@ function buildChapterWorkflow({
 		description: "从右侧选择 1-3 个最重要的问题加入本轮改稿计划。",
 		action: "选择本轮问题",
 	};
+}
+
+export function buildVisibleIssueEntries(
+	issues: QuickReviewIssue[],
+	getIssueState: (issueId: string) => IssueState,
+	issueFilter: IssueFilter,
+) {
+	return issues
+		.map((issue, index) => ({ issue, index }))
+		.filter(({ issue }) => matchesIssueFilter(issue, getIssueState(issue.id), issueFilter));
 }
 
 function getIssueStateLabel(state: IssueState) {

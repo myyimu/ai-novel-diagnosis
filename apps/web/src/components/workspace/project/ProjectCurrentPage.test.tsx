@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { QuickReviewResult } from "@/stores/workspace-store";
-import { buildAnnotatedParagraphs, getAnnotatedIssueIds } from "./ProjectCurrentPage";
+import {
+	buildAnnotatedParagraphs,
+	buildVisibleIssueEntries,
+	getAnnotatedIssueIds,
+} from "./ProjectCurrentPage";
 
 type QuickReviewIssue = NonNullable<QuickReviewResult["issues"]>[number];
 
@@ -55,5 +59,30 @@ describe("buildAnnotatedParagraphs", () => {
 
 		expect(annotations.flatMap((annotation) => annotation.markers)).toHaveLength(0);
 		expect(getAnnotatedIssueIds(annotations).size).toBe(0);
+	});
+});
+
+describe("buildVisibleIssueEntries", () => {
+	it("should keep every pending issue visible instead of truncating the list", () => {
+		const issues = Array.from({ length: 8 }, (_, index) =>
+			buildIssue(`issue-${index + 1}`, `证据 ${index + 1}`),
+		);
+
+		const entries = buildVisibleIssueEntries(issues, () => "pending", "all");
+
+		expect(entries).toHaveLength(8);
+		expect(entries.at(-1)?.issue.id).toBe("issue-8");
+	});
+
+	it("should preserve original issue numbers after filtering", () => {
+		const issues = [
+			buildIssue("issue-1", "证据 1", { severity: "high" }),
+			buildIssue("issue-2", "证据 2", { severity: "critical" }),
+			buildIssue("issue-3", "证据 3", { severity: "critical" }),
+		];
+
+		const entries = buildVisibleIssueEntries(issues, () => "pending", "must");
+
+		expect(entries.map((entry) => entry.index)).toEqual([1, 2]);
 	});
 });
