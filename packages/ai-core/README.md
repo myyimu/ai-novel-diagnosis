@@ -2,7 +2,7 @@
 
 `packages/ai-core` 是前端和 API 共享的分析契约包。
 
-它不负责调用模型，也不负责 UI；它提供第一章急诊、深度质检、整书资产和关系图谱复核所需的共享类型，避免 Web 与 API 各自维护一套不一致的字段。
+它不负责调用模型，也不负责 UI；它提供编辑标准、事实、issue、证据、作者决定、版本复诊、故事体检和兼容评分所需的共享类型，避免 Web 与 API 各自维护一套不一致的语义。公共契约服从 [`../../docs/product-doctrine.md`](../../docs/product-doctrine.md)。
 
 ## 当前职责
 
@@ -14,6 +14,7 @@
 - `QuickReviewResult`：章节急诊结果。
 - `RubricResult`：成熟样本拆出的评分标准。
 - `ScoreResult`：章节质检评分报告。
+- `StoryAuditResult`：整书事实、候选、复核和覆盖率协议；人工决定必须与不可变分析结果分离。
 - 推荐平台、评分指标、改稿提示词等共享结构。
 
 `createPreviewReport` 是本地预览能力，不等同于真实 LLM 语义诊断。真实的证据抽取、prompt 编排和模型调用由 `services/api` 负责。
@@ -73,6 +74,12 @@ console.log(provider.model, report.totalScore, prompt.id);
 - `services/api` 负责 prompt、LLM provider、JSON 修复、证据抽取和真实诊断流程。
 - `apps/web` 负责展示、交互、缓存和用户工作流。
 
+边界要求：
+
+- `quickScore` 只代表严重度兼容摘要，`confidence` 只代表证据/上下文充分度，类型注释不得称为作品质量或正确概率。
+- 事实、规则候选、模型复核、作者决定和正文版本使用不同类型，禁止一个可变 `status` 混装所有语义。
+- 纯函数和 fixture 通过只证明契约/规则稳定，不证明编辑诊断有效。
+
 ## 使用方
 
 - `apps/web`：用于类型约束、渲染第一章急诊、深度质检、整书资产和图谱复核数据。
@@ -90,4 +97,4 @@ pnpm --filter @ai-novel-diagnosis/ai-core build
 
 - 这里放稳定的跨端契约，不放只属于某个页面的视图模型。
 - 新增字段时同时检查 Web 展示、API mock fallback 和相关测试。
-- 模型输出结构要优先服务“第一章急诊 -> 深度质检 -> 整书资产 -> 图谱复核”的产品路径。
+- 模型输出结构要优先服务“编辑标准 -> issue/证据 -> 作者决定 -> 修改计划 -> 真实版本 -> 独立复诊 -> 方法沉淀”的产品路径。

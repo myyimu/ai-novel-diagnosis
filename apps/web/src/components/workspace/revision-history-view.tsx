@@ -3,7 +3,7 @@
 import { Clipboard, Download, History, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { buildRevisionHistory } from "@/lib/workspace-iteration";
+import { buildRevisionHistory, formatQuickScore } from "@/lib/workspace-iteration";
 import type { RevisionSession } from "@/stores/workspace-store";
 
 export function RevisionHistoryView({
@@ -90,7 +90,7 @@ export function RevisionHistoryView({
 										第 {history.sessions.length - index} 次复诊
 									</p>
 									<span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
-										{session.quickScore}/10
+										{formatQuickScore(session.quickScore)}
 									</span>
 								</div>
 								<p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
@@ -122,7 +122,10 @@ export function RevisionHistoryView({
 							</span>
 						</div>
 						<div className="mt-5 grid gap-3 md:grid-cols-3">
-							<DetailStat label="急诊分" value={`${selected.quickScore}/10`} />
+							<DetailStat
+								label="急诊分"
+								value={formatQuickScore(selected.quickScore)}
+							/>
 							<DetailStat
 								label="相对上一版"
 								value={formatScoreDelta(history.scoreDelta)}
@@ -188,7 +191,11 @@ export function RevisionHistoryView({
 										</p>
 									</div>
 								</div>
-							) : null}
+							) : (
+								<p className="mt-4 rounded-md border border-border bg-background p-3 text-sm leading-6 text-muted-foreground">
+									上一版或当前版为“信息不足”，暂不计算分数变化和 Prompt 有效性。
+								</p>
+							)}
 							<div className="mt-4 grid gap-3 md:grid-cols-2">
 								<CompareBlock
 									label="上一版问题"

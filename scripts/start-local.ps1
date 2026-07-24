@@ -887,7 +887,7 @@ if (-not $webSelection.Reuse) {
 	}
 	$WebCommand = @"
 ${ChildEncodingSetup}
-	`$env:NEXT_PUBLIC_API_BASE_URL="$ApiBaseUrl"
+`$env:NEXT_PUBLIC_API_BASE_URL="/api/v1"
 `$env:API_INTERNAL_BASE_URL="$ApiBaseUrl"
 `$LogFile="$WebLog"
 $webPnpmCommand 2>&1 | ForEach-Object { Write-Utf8LogLine `$LogFile `$_ }

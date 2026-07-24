@@ -39,6 +39,17 @@ function formatTimeoutError(timeoutMs: number) {
 	return `请求超时 (${timeoutMs}ms)，请检查模型服务或网络后重试`;
 }
 
+function formatNetworkError(error: Error) {
+	if (
+		error instanceof TypeError &&
+		(error.message === "Failed to fetch" || error.message === "Load failed")
+	) {
+		return `无法连接本地 API 服务（${API_BASE_URL}）。请确认 API 服务已启动，或重新运行本地启动脚本后再测试模型连接。`;
+	}
+
+	return error.message;
+}
+
 export function apiUrl(path: string) {
 	return `${API_BASE_URL}${path}`;
 }
@@ -85,7 +96,9 @@ async function requestJson<T>(
 		if (isAbortError(error)) {
 			throw new Error(formatTimeoutError(options.timeoutMs ?? 0));
 		}
-		throw error instanceof Error ? error : new Error(`Request failed: ${requestInit.method}`);
+		throw error instanceof Error
+			? new Error(formatNetworkError(error))
+			: new Error(`Request failed: ${requestInit.method}`);
 	}
 
 	timeoutHandle?.clear();
@@ -150,7 +163,9 @@ export async function postForm<T>(
 		if (isAbortError(error)) {
 			throw new Error(formatTimeoutError(options.timeoutMs ?? 0));
 		}
-		throw error instanceof Error ? error : new Error("Request failed");
+		throw error instanceof Error
+			? new Error(formatNetworkError(error))
+			: new Error("Request failed");
 	}
 
 	timeoutHandle?.clear();

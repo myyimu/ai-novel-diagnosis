@@ -1,22 +1,59 @@
 ﻿import { BadRequestException } from "@nestjs/common";
+import { StoryAuditService } from "../story-audit/story-audit.service";
 import { BookAnalysisService } from "./book-analysis.service";
 
 function createBookService(options?: {
   modelProviders?: { chat: jest.Mock };
   persistence?: { listJobs?: jest.Mock };
-  bookJobs?: { delete?: jest.Mock; get?: jest.Mock };
+  bookJobs?: {
+    delete?: jest.Mock;
+    get?: jest.Mock;
+    readChapterMaps?: jest.Mock;
+  };
+  bookUploads?: { readNormalizedText?: jest.Mock };
+  textPreprocessor?: { preprocess: jest.Mock };
 }) {
   return new BookAnalysisService(
-    {} as never,
+    (options?.textPreprocessor ?? {}) as never,
     (options?.bookJobs ?? {}) as never,
-    {} as never,
+    (options?.bookUploads ?? {}) as never,
     (options?.modelProviders ?? { chat: jest.fn() }) as never,
     (options?.persistence ?? {}) as never,
     {} as never,
+    new StoryAuditService(),
   );
 }
 
 describe("BookAnalysisService", () => {
+  describe("resolveStoryAuditInput", () => {
+    const resolve = createBookService() as unknown as {
+      resolveStoryAuditInput: (input: {
+        purpose?: string;
+        profiles?: string[];
+      }) => { purpose: "own-draft" | "reference-study"; profiles: string[] };
+    };
+
+    it("should apply the own-draft defaults only to an own draft", () => {
+      expect(resolve.resolveStoryAuditInput({ purpose: "own-draft" })).toEqual({
+        purpose: "own-draft",
+        profiles: ["statistics", "continuity", "structure", "character"],
+      });
+      expect(resolve.resolveStoryAuditInput({})).toEqual({
+        purpose: "reference-study",
+        profiles: [],
+      });
+    });
+
+    it("should retain valid requested profiles and discard invalid values", () => {
+      expect(
+        resolve.resolveStoryAuditInput({
+          purpose: "own-draft",
+          profiles: ["statistics", "not-a-profile"],
+        }),
+      ).toEqual({ purpose: "own-draft", profiles: ["statistics"] });
+    });
+  });
+
   it("should reject the legacy synchronous full-book endpoint", async () => {
     const service = createBookService();
 
@@ -87,6 +124,7 @@ describe("BookAnalysisService", () => {
       { chat: jest.fn() } as never,
       {} as never,
       {} as never,
+      new StoryAuditService(),
     );
 
     await service.getBookAnalysisJob("job-1", { includeResult: false });
@@ -545,6 +583,7 @@ describe("BookAnalysisService", () => {
       { chat: jest.fn() } as never,
       {} as never,
       {} as never,
+      new StoryAuditService(),
     );
 
     const job = await service.createBookAnalysisJob({
@@ -552,6 +591,7 @@ describe("BookAnalysisService", () => {
       title: "测试书",
       genre: "xuanhuan",
       text: "主角进入考场...",
+      purpose: "own-draft",
     });
 
     expect(job.id).toBe("job-mock-1");
@@ -563,6 +603,165 @@ describe("BookAnalysisService", () => {
     expect(completedResult.mapReduce).toHaveProperty("chapterMaps");
     expect(completedResult.mapReduce.chapterMaps).toHaveLength(2);
     expect(completedResult.mapReduce.strategy).toContain("preprocess");
+    expect(completedResult.storyAudit).toEqual(
+      expect.objectContaining({
+        schemaVersion: "story-audit.v1",
+        auditId: "job-mock-1:story-audit.v1",
+        coverage: expect.objectContaining({
+          analyzedChapterIds: ["ch-1", "ch-2"],
+          totalChapterCount: 2,
+          isPartial: false,
+        }),
+      }),
+    );
+    expect(completedResult.storyAudit.metrics.dialogue[0]).toEqual(
+      expect.objectContaining({
+        scopeId: "book",
+      }),
+    );
+  });
+
+  it("should derive partial story audit from uploaded text after a failed map-reduce job", async () => {
+    const chapterMaps = [
+      {
+        chapterId: "ch-1",
+        order: 1,
+        title: "第一章",
+        analysisDepth: "outline",
+        chunkStartOffset: 0,
+        chunkEndOffset: 20,
+        splitBy: "heading",
+        summary: "第一章摘要",
+        plotFunction: "开局",
+        characterSignals: [],
+        worldbuildingSignals: [],
+        relationshipSignals: [],
+        timelineEvents: [],
+        sourceRiskSignals: [],
+        originalizationSeeds: [],
+        hook: "留下疑问",
+        evidenceSnippets: ["她说：“继续查。”"],
+        sourceAnchors: [
+          {
+            anchorId: "a-1",
+            label: "证据",
+            quote: "继续查",
+            startOffset: 3,
+            endOffset: 6,
+          },
+        ],
+      },
+    ];
+    const bookJobs = {
+      get: jest.fn(async () => ({
+        id: "job-failed-1",
+        type: "book-map-reduce-analysis",
+        status: "failed",
+        inputSummary: {
+          title: "测试书",
+          genre: "xuanhuan",
+          textLength: 1200,
+          purpose: "own-draft",
+          profiles: ["statistics"],
+        },
+        preprocessing: {
+          cleaning: {
+            rawLength: 1200,
+            cleanedLength: 1180,
+            paragraphCount: 3,
+            removedNoise: [],
+          },
+          chapters: [{ id: "ch-1", order: 1, title: "第一章" }],
+        },
+        partialResult: {
+          partial: true,
+          type: "book-map-reduce-partial",
+          stage: "failed",
+          savedAt: "2026-07-18T00:00:00.000Z",
+          mapCount: 1,
+          totalChapters: 3,
+          artifactDir: "/tmp/job-failed-1",
+          notice: "partial",
+        },
+        uploadId: "upload-1",
+      })),
+      readChapterMaps: jest.fn(async () => chapterMaps),
+    };
+    const bookUploads = {
+      readNormalizedText: jest.fn(
+        async () => "第一章\n她说：“继续查。”\n\n第二章\n他离开。",
+      ),
+    };
+    const textPreprocessor = {
+      preprocess: jest.fn(() => ({
+        cleaning: {
+          rawLength: 30,
+          cleanedLength: 30,
+          removedNoise: [],
+          paragraphCount: 2,
+        },
+        chapters: [
+          {
+            id: "ch-1",
+            order: 1,
+            title: "第一章",
+            text: "她说：“继续查。”",
+            splitBy: "heading",
+            charCount: 8,
+            wordCount: 8,
+            startOffset: 0,
+            endOffset: 8,
+          },
+          {
+            id: "ch-2",
+            order: 2,
+            title: "第二章",
+            text: "他离开。",
+            splitBy: "heading",
+            charCount: 4,
+            wordCount: 4,
+            startOffset: 10,
+            endOffset: 14,
+          },
+        ],
+      })),
+    };
+    const service = createBookService({
+      bookJobs,
+      bookUploads,
+      textPreprocessor,
+    });
+
+    const job = await service.getBookAnalysisJob("job-failed-1");
+    const result = job.result as {
+      storyAudit: {
+        coverage: {
+          isPartial: boolean;
+          analyzedChapterIds: string[];
+          totalChapterCount: number;
+        };
+        metrics: {
+          dialogue: Array<{ scopeId: string; dialogueTurnCount: number }>;
+        };
+        findings: unknown[];
+      };
+    };
+
+    expect(bookUploads.readNormalizedText).toHaveBeenCalledWith("upload-1");
+    expect(result.storyAudit.coverage).toEqual(
+      expect.objectContaining({
+        analyzedChapterIds: ["ch-1"],
+        totalChapterCount: 3,
+        isPartial: true,
+      }),
+    );
+    expect(result.storyAudit.metrics.dialogue[0]).toEqual(
+      expect.objectContaining({
+        scopeId: "book",
+        dialogueTurnCount: 1,
+      }),
+    );
+    expect(result.storyAudit.findings).toEqual([]);
   });
 
   describe("distillBookSkill", () => {
@@ -617,6 +816,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         bookExports as never,
+        new StoryAuditService(),
       );
 
       const result = await service.distillBookSkill({
@@ -647,6 +847,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         {} as never,
+        new StoryAuditService(),
       );
 
       await expect(
@@ -687,6 +888,7 @@ describe("BookAnalysisService", () => {
         { chat: jest.fn() } as never,
         {} as never,
         {} as never,
+        new StoryAuditService(),
       );
 
       await expect(

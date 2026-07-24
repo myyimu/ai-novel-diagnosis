@@ -10,19 +10,23 @@ import type { TaskNavItem } from "@/components/workspace/TaskNav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText, Lightbulb, CheckCircle2 } from "lucide-react";
+import { Download, FileJson, FileText, HeartPulse, Lightbulb, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function ProjectExportPage() {
 	const router = useRouter();
 	const [isExporting, setIsExporting] = useState(false);
+	const [isJsonExporting, setIsJsonExporting] = useState(false);
 
 	const {
 		activeProject,
 		projectRevisionSessions,
 		projectMethodologyCards,
+		projectStoryAuditResult,
 		exportProjectMarkdown,
+		exportProjectJson,
 	} = useWorkspaceHandlers("overview");
+	const hasStoryAudit = Boolean(projectStoryAuditResult);
 
 	const taskNavItems: TaskNavItem[] = useMemo(
 		() => [
@@ -66,6 +70,11 @@ export function ProjectExportPage() {
 						tone: projectRevisionSessions.length > 0 ? "secondary" : "outline",
 					},
 					{
+						label: "故事体检",
+						value: hasStoryAudit ? "已生成" : "暂无",
+						tone: hasStoryAudit ? "secondary" : "outline",
+					},
+					{
 						label: "方法论卡",
 						value: `${projectMethodologyCards.length} 条`,
 						tone: projectMethodologyCards.length > 0 ? "secondary" : "outline",
@@ -78,13 +87,13 @@ export function ProjectExportPage() {
 				fields: [
 					{
 						label: "文件格式",
-						value: "Markdown (.md)",
+						value: "Markdown / JSON",
 						tone: "secondary",
 					},
 					{
 						label: "包含内容",
-						value: "书籍信息 + 修改效果 + 方法论卡",
-						hint: "按时间顺序组织所有内容",
+						value: "书籍信息 + 修改效果 + 故事体检摘要 + 方法论卡",
+						hint: "不导出正文全文",
 					},
 				],
 			},
@@ -105,7 +114,7 @@ export function ProjectExportPage() {
 				],
 			},
 		],
-		[projectRevisionSessions.length, projectMethodologyCards.length],
+		[hasStoryAudit, projectRevisionSessions.length, projectMethodologyCards.length],
 	);
 
 	const handleNavChange = (id: string) => {
@@ -119,14 +128,18 @@ export function ProjectExportPage() {
 	};
 
 	const handleExport = async () => {
-		if (projectRevisionSessions.length === 0 && projectMethodologyCards.length === 0) {
+		if (
+			projectRevisionSessions.length === 0 &&
+			projectMethodologyCards.length === 0 &&
+			!hasStoryAudit
+		) {
 			toast.error("当前书籍没有可导出的内容");
 			return;
 		}
 
 		setIsExporting(true);
 		try {
-			exportProjectMarkdown();
+			await exportProjectMarkdown();
 			toast.success("导出成功", {
 				description: "书籍资产已导出为 Markdown 文件",
 			});
@@ -139,12 +152,38 @@ export function ProjectExportPage() {
 		}
 	};
 
-	const canExport = projectRevisionSessions.length > 0 || projectMethodologyCards.length > 0;
+	const handleJsonExport = async () => {
+		if (
+			projectRevisionSessions.length === 0 &&
+			projectMethodologyCards.length === 0 &&
+			!hasStoryAudit
+		) {
+			toast.error("当前书籍没有可导出的内容");
+			return;
+		}
+
+		setIsJsonExporting(true);
+		try {
+			await exportProjectJson();
+			toast.success("导出成功", {
+				description: "书籍资产已导出为 JSON 文件",
+			});
+		} catch (error) {
+			toast.error("导出失败", {
+				description: error instanceof Error ? error.message : "未知错误",
+			});
+		} finally {
+			setIsJsonExporting(false);
+		}
+	};
+
+	const canExport =
+		projectRevisionSessions.length > 0 || projectMethodologyCards.length > 0 || hasStoryAudit;
 
 	return (
 		<WorkspaceTaskFrame
 			title="书籍资产导出"
-			description="导出书籍资产的修改效果和方法论为 Markdown 文件"
+			description="导出修改效果、故事体检摘要和方法论"
 			status={canExport ? "可导出" : "无内容"}
 			taskNav={{
 				items: taskNavItems,
@@ -181,7 +220,7 @@ export function ProjectExportPage() {
 								<FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
 								<h3 className="text-lg font-semibold mb-2">暂无可导出内容</h3>
 								<p className="text-sm text-muted-foreground mb-4">
-									当前书籍还没有修改效果或方法论卡，请先完成快速诊断
+									当前书籍还没有修改效果、故事体检摘要或方法论卡
 								</p>
 								<Button
 									variant="outline"
@@ -218,6 +257,19 @@ export function ProjectExportPage() {
 											{projectMethodologyCards.length}
 										</Badge>
 									</div>
+
+									<div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
+										<HeartPulse className="w-5 h-5 text-primary mt-0.5" />
+										<div className="flex-1">
+											<h4 className="font-semibold mb-1">故事体检</h4>
+											<p className="text-sm text-muted-foreground">
+												{hasStoryAudit ? "已生成体检摘要" : "暂无体检结果"}
+											</p>
+										</div>
+										<Badge variant={hasStoryAudit ? "secondary" : "outline"}>
+											{hasStoryAudit ? "已生成" : "暂无"}
+										</Badge>
+									</div>
 								</div>
 
 								<div className="border-t pt-4">
@@ -228,7 +280,15 @@ export function ProjectExportPage() {
 										</div>
 										<div className="flex items-center gap-2 text-sm">
 											<CheckCircle2 className="w-4 h-4 text-success" />
-											<span>包含完整的书籍信息、修改效果和方法论</span>
+											<span>
+												包含书籍信息、修改效果、故事体检摘要和方法论
+											</span>
+										</div>
+										<div className="flex items-center gap-2 text-sm">
+											<CheckCircle2 className="w-4 h-4 text-success" />
+											<span>
+												不包含正文全文，仅保留证据短引文和版本元数据
+											</span>
 										</div>
 										<div className="flex items-center gap-2 text-sm">
 											<CheckCircle2 className="w-4 h-4 text-success" />
@@ -243,19 +303,38 @@ export function ProjectExportPage() {
 											{activeProject?.name || "默认书籍"}
 										</p>
 										<p className="text-xs text-muted-foreground">
-											导出为 .md 文件
+											导出为 .md 或 .json 文件
 										</p>
 									</div>
-									<Button onClick={handleExport} disabled={isExporting}>
-										{isExporting ? (
-											"导出中..."
-										) : (
-											<>
-												<Download className="w-4 h-4 mr-2" />
-												导出书籍资产
-											</>
-										)}
-									</Button>
+									<div className="flex flex-wrap justify-end gap-2">
+										<Button
+											variant="outline"
+											onClick={handleJsonExport}
+											disabled={isJsonExporting || isExporting}
+										>
+											{isJsonExporting ? (
+												"导出中..."
+											) : (
+												<>
+													<FileJson className="w-4 h-4 mr-2" />
+													导出 JSON
+												</>
+											)}
+										</Button>
+										<Button
+											onClick={handleExport}
+											disabled={isExporting || isJsonExporting}
+										>
+											{isExporting ? (
+												"导出中..."
+											) : (
+												<>
+													<Download className="w-4 h-4 mr-2" />
+													导出书籍资产
+												</>
+											)}
+										</Button>
+									</div>
 								</div>
 							</div>
 						)}
@@ -267,8 +346,9 @@ export function ProjectExportPage() {
 						<CardTitle className="text-sm">导出说明</CardTitle>
 					</CardHeader>
 					<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-						<p>• 导出的 Markdown 文件包含完整的书籍信息</p>
+						<p>• 导出的 Markdown / JSON 文件包含书籍信息和诊断资产</p>
 						<p>• 修改效果按时间顺序排列，包含所有修改建议</p>
+						<p>• 故事体检只导出摘要、证据短引文和人工复核状态</p>
 						<p>• 方法论卡包含提炼的修改套路和支持证据</p>
 						<p>• 导出的文件可用于备份、分享或进一步编辑</p>
 					</CardContent>

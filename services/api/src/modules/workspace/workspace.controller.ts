@@ -11,18 +11,24 @@ import {
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { type Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
+import { BookAnalysisService } from "@/modules/book/book-analysis.service";
 import {
   UpdateRevisionNoteDto,
+  UpsertStoryAuditFindingReviewDto,
   UpsertRevisionAssetsDto,
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
 import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
 import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
+import type { StoryAuditResult } from "@ai-novel-diagnosis/ai-core";
 
 @ApiTags("analysis")
 @Controller("analysis/workspace")
 export class WorkspaceController {
-  constructor(private readonly workspaceAssets: WorkspaceAssetsRepository) {}
+  constructor(
+    private readonly workspaceAssets: WorkspaceAssetsRepository,
+    private readonly bookAnalysis: BookAnalysisService,
+  ) {}
 
   @Get("assets")
   @Public()
@@ -52,6 +58,7 @@ export class WorkspaceController {
     return this.workspaceAssets.upsertRevisionAssets({
       project: body.project,
       session: body.session,
+      revisionVersions: body.revisionVersions || [],
       methodologyCards: body.methodologyCards,
     });
   }
@@ -71,6 +78,34 @@ export class WorkspaceController {
     });
   }
 
+  @Get("story-audit/reviews/:projectId")
+  @Public()
+  @ApiOperation({
+    summary: "Read persisted human review states for story audit findings",
+  })
+  listStoryAuditFindingReviews(@Param("projectId") projectId: string) {
+    return this.workspaceAssets.listStoryAuditFindingReviews({ projectId });
+  }
+
+  @Post("story-audit/reviews")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Persist one human review state for a story audit finding",
+  })
+  upsertStoryAuditFindingReview(
+    @Body() body: UpsertStoryAuditFindingReviewDto,
+  ) {
+    return this.workspaceAssets.upsertStoryAuditFindingReview({
+      projectId: body.projectId,
+      auditId: body.auditId,
+      findingId: body.findingId,
+      reviewState: body.reviewState,
+      note: body.note,
+      updatedAt: body.updatedAt ?? new Date().toISOString(),
+    });
+  }
+
   @Get("projects/:projectId/export")
   @Public()
   @ApiOperation({ summary: "Export a persisted workspace project as Markdown" })
@@ -80,7 +115,27 @@ export class WorkspaceController {
   ) {
     const projectPackage =
       await this.workspaceAssets.readProjectPackage(projectId);
-    const content = buildWorkspaceProjectMarkdown(projectPackage);
+    const storyAudit = projectPackage.project.bookJobId
+      ? ((
+          (
+            await this.bookAnalysis.getBookAnalysisJob(
+              projectPackage.project.bookJobId,
+              { includeResult: true },
+            )
+          ).result as { storyAudit?: StoryAuditResult } | null
+        )?.storyAudit ?? null)
+      : null;
+    const storyAuditFindingReviews = storyAudit
+      ? await this.workspaceAssets.listStoryAuditFindingReviews({
+          projectId: projectPackage.project.id,
+          auditId: storyAudit.auditId,
+        })
+      : [];
+    const content = buildWorkspaceProjectMarkdown({
+      ...projectPackage,
+      storyAudit,
+      storyAuditFindingReviews,
+    });
     const filename = `ai-novel-diagnosis-${projectPackage.project.name}-${new Date()
       .toISOString()
       .slice(0, 10)}.md`;

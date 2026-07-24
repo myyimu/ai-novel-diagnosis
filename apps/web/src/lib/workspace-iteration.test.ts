@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildDiagnosisDashboard,
+	buildProjectExportJson,
 	buildProjectExportMarkdown,
 	buildRevisionComparison,
 	buildRevisionHistory,
 	createRevisionSession,
+	createRevisionTextVersion,
+	findPreviousRevisionTextVersion,
+	findRevisionTextVersionForDraft,
 	mergeProjectMethodologyCards,
 	summarizeRevisionTrend,
 	upsertRevisionSession,
+	upsertRevisionTextVersion,
 } from "./workspace-iteration";
-import type { QuickReviewResult, WorkspaceProject } from "@/stores/workspace-store";
+import type {
+	QuickReviewResult,
+	StoryAuditFindingReview,
+	StoryAuditResult,
+	WorkspaceProject,
+} from "@/stores/workspace-store";
 
 const baseResult: QuickReviewResult = {
 	title: "第一章 退婚",
@@ -59,6 +69,109 @@ const baseResult: QuickReviewResult = {
 	],
 };
 
+const baseStoryAudit: StoryAuditResult = {
+	schemaVersion: "story-audit.v1",
+	auditId: "audit-a",
+	projectId: "project-a",
+	bookJobId: "book-job-a",
+	generatedAt: "2026-06-24T02:30:00.000Z",
+	coverage: {
+		analyzedChapterIds: ["chapter-1"],
+		totalChapterCount: 2,
+		isPartial: true,
+		sceneExtractionRate: 0.8,
+		evidenceValidationRate: 1,
+	},
+	scenes: [
+		{
+			id: "scene-1",
+			chapterId: "chapter-1",
+			orderInChapter: 1,
+			narrativeOrder: 1,
+			title: "退婚现场",
+			locationIds: ["hall"],
+			participantIds: ["hero"],
+			evidence: [],
+		},
+	],
+	events: [
+		{
+			id: "event-1",
+			sceneId: "scene-1",
+			summary: "主角被当众退婚",
+			participantIds: ["hero"],
+			locationIds: ["hall"],
+			relations: [],
+			evidence: [],
+		},
+	],
+	facts: [],
+	characterStates: [],
+	findings: [
+		{
+			id: "finding-a",
+			category: "timeline_conflict",
+			severity: "high",
+			status: "candidate",
+			title: "时间线候选冲突",
+			claim: "第二章回忆与第一章公开退婚的先后顺序需要复核。",
+			evidence: [
+				{
+					anchorId: "anchor-a",
+					chapterId: "chapter-1",
+					chapterOrder: 1,
+					quote: "长老当众宣布取消他的试炼资格。",
+					startOffset: 3,
+					endOffset: 18,
+					source: "text",
+				},
+			],
+			relatedFactIds: [],
+			relatedEventIds: ["event-1"],
+			ruleIds: ["rule-a"],
+			alternativeExplanations: ["可能是角色记忆偏差，需要作者确认。"],
+			readerImpact: "读者可能误解公开退婚发生的时间。",
+			fixAction: "补一句明确时间锚点。",
+			confidence: 0.87,
+		},
+	],
+	metrics: {
+		dialogue: [
+			{
+				scopeId: "chapter-1",
+				effectiveCharacterCount: 100,
+				dialogueCharacterCount: 20,
+				dialogueCharacterRatio: 0.2,
+				paragraphCount: 5,
+				dialogueParagraphCount: 1,
+				dialogueParagraphRatio: 0.2,
+				dialogueTurnCount: 2,
+				dialogueTagCount: 1,
+				unattributedTurnCandidateCount: 0,
+				parserWarnings: [],
+			},
+		],
+	},
+	views: {
+		temporalGraph: {
+			eventIds: ["event-1"],
+			relationEdges: [],
+			conflictCandidateIds: ["finding-a"],
+		},
+		plotlineMatrix: [],
+		setupPayoffEdges: [],
+	},
+};
+
+const baseStoryAuditReview: StoryAuditFindingReview = {
+	projectId: "project-a",
+	auditId: "audit-a",
+	findingId: "finding-a",
+	reviewState: "confirmed",
+	note: "确认为需要改的时间线问题。",
+	updatedAt: "2026-06-24T02:40:00.000Z",
+};
+
 describe("workspace iteration assets", () => {
 	it("creates a revision session from quick review result", () => {
 		const session = createRevisionSession({
@@ -67,6 +180,7 @@ describe("workspace iteration assets", () => {
 			chapterText: "主角被退婚后拿到旧案信物。",
 			result: baseResult,
 			methodologyCardIds: ["method-1"],
+			storyAuditFindingIds: ["finding-1"],
 			now: "2026-06-24T00:00:00.000Z",
 		});
 
@@ -76,7 +190,58 @@ describe("workspace iteration assets", () => {
 		expect(session.gateDecision).toBe("revise");
 		expect(session.issueTitles).toContain("章末钩子没有代价");
 		expect(session.issueCategories).toContain("hook");
+		expect(session.storyAuditFindingIds).toEqual(["finding-1"]);
 		expect(session.methodologyCardIds).toEqual(["method-1"]);
+	});
+
+	it("keeps insufficient quick review sessions unscored instead of coercing to zero", () => {
+		const session = createRevisionSession({
+			chapterTitle: "材料不足版",
+			chapterText: "太短",
+			result: { ...baseResult, quickScore: null, gateDecision: "insufficient" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+
+		expect(session.quickScore).toBeNull();
+		expect(session.gateDecision).toBe("insufficient");
+	});
+
+	it("creates stable text versions and finds changed drafts by chapter hash", () => {
+		const first = createRevisionTextVersion({
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本一正文",
+			existingVersions: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const versions = upsertRevisionTextVersion([], first);
+		const duplicate = findRevisionTextVersionForDraft({
+			versions,
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本一正文",
+		});
+		const previous = findPreviousRevisionTextVersion({
+			versions,
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本二正文",
+		});
+		const second = createRevisionTextVersion({
+			projectId: "project-a",
+			chapterTitle: "第一章",
+			chapterText: "版本二正文",
+			previousVersion: previous,
+			existingVersions: versions,
+			now: "2026-06-24T01:00:00.000Z",
+		});
+
+		expect(duplicate?.id).toBe(first.id);
+		expect(previous?.id).toBe(first.id);
+		expect(first.versionLabel).toBe("V1");
+		expect(second.versionLabel).toBe("V2");
+		expect(second.previousVersionId).toBe(first.id);
 	});
 
 	it("deduplicates methodology cards and increases occurrence count", () => {
@@ -193,6 +358,38 @@ describe("workspace iteration assets", () => {
 		expect(dashboard.coach.nextActions.join(" ")).toContain("钩子必须绑定代价");
 	});
 
+	it("does not compare or attribute prompt effectiveness when a revision score is unavailable", () => {
+		const first = createRevisionSession({
+			chapterTitle: "第一版",
+			chapterText: "版本一",
+			result: { ...baseResult, quickScore: 5.4, gateDecision: "rebuild" },
+			methodologyCardIds: [],
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const second = createRevisionSession({
+			chapterTitle: "补材料版",
+			chapterText: "版本二",
+			result: { ...baseResult, quickScore: null, gateDecision: "insufficient" },
+			methodologyCardIds: [],
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const dashboard = buildDiagnosisDashboard({
+			sessions: [second, first],
+			methodologyCards: [],
+		});
+		const history = buildRevisionHistory({
+			sessions: [first, second],
+			selectedSessionId: second.id,
+		});
+
+		expect(dashboard.scoreDelta).toBeNull();
+		expect(dashboard.promptEffectiveness.comparable).toBe(0);
+		expect(dashboard.promptAttribution.total).toBe(0);
+		expect(dashboard.qualityTrend.at(-1)?.score).toBeNull();
+		expect(history.scoreDelta).toBeNull();
+		expect(history.comparison).toBeNull();
+	});
+
 	it("attributes weak prompt outcomes to execution gaps when issues repeat", () => {
 		const first = createRevisionSession({
 			chapterTitle: "第一版",
@@ -278,12 +475,12 @@ describe("workspace iteration assets", () => {
 
 		const comparison = buildRevisionComparison({ current, previous });
 
-		expect(comparison.scoreDelta).toBe(1.2);
-		expect(comparison.gateChangeLabel).toBe("Gate 改善");
-		expect(comparison.promptOutcome.status).toBe("effective");
-		expect(comparison.resolvedIssues).toContain("章末钩子没有代价");
-		expect(comparison.newIssues).toContain("新章末钩子还不够具体");
-		expect(comparison.nextAction).toContain("方法论卡");
+		expect(comparison?.scoreDelta).toBe(1.2);
+		expect(comparison?.gateChangeLabel).toBe("Gate 改善");
+		expect(comparison?.promptOutcome.status).toBe("effective");
+		expect(comparison?.resolvedIssues).toContain("章末钩子没有代价");
+		expect(comparison?.newIssues).toContain("新章末钩子还不够具体");
+		expect(comparison?.nextAction).toContain("方法论卡");
 	});
 
 	it("builds a project export markdown package", () => {
@@ -301,6 +498,22 @@ describe("workspace iteration assets", () => {
 			methodologyCardIds: ["method-1"],
 			now: "2026-06-24T00:00:00.000Z",
 		});
+		const firstVersion = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本一",
+			sourceSessionId: first.id,
+			now: "2026-06-24T00:00:00.000Z",
+		});
+		const secondVersion = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本二",
+			sourceSessionId: "revision-2",
+			previousVersion: firstVersion,
+			existingVersions: [firstVersion],
+			now: "2026-06-24T01:00:00.000Z",
+		});
 		const second = {
 			...createRevisionSession({
 				projectId: project.id,
@@ -308,9 +521,13 @@ describe("workspace iteration assets", () => {
 				chapterText: "版本二",
 				result: { ...baseResult, quickScore: 6.4, gateDecision: "revise" },
 				methodologyCardIds: ["method-1"],
+				storyAuditFindingIds: ["finding-a"],
 				now: "2026-06-24T01:00:00.000Z",
 			}),
 			revisionNote: "这一版按 Prompt 补了章末代价。",
+			fromVersionId: firstVersion.id,
+			toVersionId: secondVersion.id,
+			textChanged: true,
 		};
 		const mergedCards = mergeProjectMethodologyCards({
 			projectId: project.id,
@@ -324,7 +541,10 @@ describe("workspace iteration assets", () => {
 		const markdown = buildProjectExportMarkdown({
 			project,
 			revisionSessions: [first, second],
+			revisionVersions: [firstVersion, secondVersion],
 			methodologyCards: mergedCards.cards,
+			storyAudit: baseStoryAudit,
+			storyAuditFindingReviews: [baseStoryAuditReview],
 			generatedAt: "2026-06-24T03:00:00.000Z",
 		});
 
@@ -334,6 +554,8 @@ describe("workspace iteration assets", () => {
 		expect(markdown).toContain("下一步动作");
 		expect(markdown).toContain("优先处理：章末钩子没有代价");
 		expect(markdown).toContain("复诊轨迹");
+		expect(markdown).toContain("正文版本：2");
+		expect(markdown).toContain("正文版本：V1 -> V2");
 		expect(markdown).toContain("人工备注");
 		expect(markdown).toContain("这一版按 Prompt 补了章末代价。");
 		expect(markdown).toContain("方法论卡");
@@ -345,5 +567,67 @@ describe("workspace iteration assets", () => {
 		expect(markdown).toContain("诊断理由");
 		expect(markdown).toContain("置信度");
 		expect(markdown).toContain("请补强章末代价。");
+		expect(markdown).toContain("故事体检 storyAudit");
+		expect(markdown).toContain("partial：是，仅导出已分析范围");
+		expect(markdown).toContain("Finding 摘要");
+		expect(markdown).toContain("人工复核：confirmed");
+		expect(markdown).toContain("关联复诊：");
+		expect(markdown).toContain(second.id);
+		expect(markdown).toContain("长老当众宣布取消他的试炼资格。");
+		expect(markdown).toContain("可能是角色记忆偏差，需要作者确认。");
+		expect(markdown).not.toContain("版本一正文");
+		expect(markdown).not.toContain("版本二正文");
+	});
+
+	it("builds a project export JSON package without revision full text", () => {
+		const project: WorkspaceProject = {
+			id: "project-a",
+			name: "退婚流测试项目",
+			createdAt: "2026-06-24T00:00:00.000Z",
+			updatedAt: "2026-06-24T02:00:00.000Z",
+		};
+		const session = createRevisionSession({
+			projectId: project.id,
+			chapterTitle: "第二版",
+			chapterText: "版本二正文",
+			result: baseResult,
+			methodologyCardIds: [],
+			storyAuditFindingIds: ["finding-a"],
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const version = createRevisionTextVersion({
+			projectId: project.id,
+			chapterTitle: "第一章 退婚",
+			chapterText: "版本二正文",
+			sourceSessionId: session.id,
+			now: "2026-06-24T01:00:00.000Z",
+		});
+		const json = buildProjectExportJson({
+			project,
+			revisionSessions: [session],
+			revisionVersions: [version],
+			methodologyCards: [],
+			storyAudit: baseStoryAudit,
+			storyAuditFindingReviews: [baseStoryAuditReview],
+			generatedAt: "2026-06-24T03:00:00.000Z",
+		});
+		const parsed = JSON.parse(json) as {
+			revisionVersions: Array<{ text?: unknown }>;
+			storyAudit: {
+				findings: Array<{
+					evidence: Array<{ quote: string }>;
+					humanReviewState?: string;
+					linkedRevisionSessionIds: string[];
+				}>;
+			};
+		};
+
+		expect(json).not.toContain("版本二正文");
+		expect(parsed.revisionVersions[0]?.text).toBeUndefined();
+		expect(parsed.storyAudit.findings[0]?.evidence[0]?.quote).toBe(
+			"长老当众宣布取消他的试炼资格。",
+		);
+		expect(parsed.storyAudit.findings[0]?.humanReviewState).toBe("confirmed");
+		expect(parsed.storyAudit.findings[0]?.linkedRevisionSessionIds).toEqual([session.id]);
 	});
 });

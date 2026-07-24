@@ -21,6 +21,7 @@ import {
 	listBookHistory,
 	listProviderModels,
 	readBookAnalysisJob,
+	readStoryAuditFindingReviews,
 	readResearchLibrary,
 	readWorkspaceAssets,
 	requestMethodologyCards,
@@ -54,10 +55,15 @@ import {
 	getWorkspaceViewMeta,
 } from "@/lib/workspace-view-model";
 import {
+	buildProjectExportJson,
 	buildProjectExportMarkdown,
 	createRevisionSession,
+	createRevisionTextVersion,
+	findPreviousRevisionTextVersion,
+	findRevisionTextVersionForDraft,
 	mergeProjectMethodologyCards,
 	upsertRevisionSession,
+	upsertRevisionTextVersion,
 } from "@/lib/workspace-iteration";
 import {
 	buildBookAnalysisCacheKey as createBookAnalysisCacheKey,
@@ -317,6 +323,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCoreSellingPoint,
 		quickReviewMustKeepMechanisms,
 		setQuickReviewMustKeepMechanisms,
+		quickReviewStoryAuditFindingIds,
+		setQuickReviewStoryAuditFindingIds,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
 		saveQuickReviewMethodology,
@@ -360,6 +368,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCache,
 		revisionSessions,
 		setRevisionSessions,
+		revisionVersions,
+		setRevisionVersions,
 		methodologyCards,
 		setMethodologyCards,
 		rubricCache,
@@ -429,6 +439,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const projectMethodologyCards = methodologyCards.filter(
 		(card) => (card.projectId || "default-project") === activeProjectId,
 	);
+	const projectRevisionVersions = revisionVersions.filter(
+		(version) => (version.projectId || "default-project") === activeProjectId,
+	);
 
 	/* ──────────── timer effect ──────────── */
 
@@ -483,6 +496,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const hasAssets =
 			assets.projects.length ||
 			assets.revisionSessions.length ||
+			assets.revisionVersions?.length ||
+			0 ||
 			assets.methodologyCards.length;
 		if (!hasAssets) {
 			return;
@@ -490,6 +505,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		setProjects((current) => mergeById(assets.projects, current));
 		setRevisionSessions((current) => mergeById(assets.revisionSessions, current));
+		setRevisionVersions((current) => mergeById(assets.revisionVersions || [], current));
 		setMethodologyCards((current) => mergeMethodologyCards(assets.methodologyCards, current));
 		setActiveProjectId((current) => {
 			const mergedProjects = mergeById(assets.projects, projects);
@@ -561,6 +577,48 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		});
 	}
 
+	function syncActiveProjectBookJob(job: BookAnalysisJob) {
+		if (!job.result?.storyAudit) {
+			return;
+		}
+
+		const now = new Date().toISOString();
+		const projectId =
+			activeProjectId || job.result.storyAudit.projectId || defaultWorkspaceProject.id;
+		const project: WorkspaceProject = activeProject
+			? {
+					...activeProject,
+					id: projectId,
+					bookJobId: job.id,
+					analysisPurpose: "story-audit",
+					updatedAt: now,
+				}
+			: {
+					...defaultWorkspaceProject,
+					id: projectId,
+					name:
+						job.result.book.title ||
+						job.inputSummary.title ||
+						defaultWorkspaceProject.name,
+					bookJobId: job.id,
+					analysisPurpose: "story-audit",
+					updatedAt: now,
+				};
+
+		setProjects((current) => {
+			const exists = current.some((item) => item.id === projectId);
+			if (!exists) {
+				return [project, ...current];
+			}
+
+			return current.map((item) => (item.id === projectId ? project : item));
+		});
+		setActiveProjectId(projectId);
+		void upsertWorkspaceProject(project).catch(() => {
+			setStatus("整书任务已本地关联；后端项目状态暂时未同步成功。");
+		});
+	}
+
 	function saveRevisionNote(sessionId: string, note: string) {
 		const now = new Date().toISOString();
 		setRevisionSessions((current) =>
@@ -589,48 +647,110 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		});
 	}
 
-	async function exportProjectMarkdown() {
-		if (!projectRevisionSessions.length && !projectMethodologyCards.length) {
-			setStatus("当前书籍还没有可导出的修改效果记录或方法论卡。");
-			return;
+	function resolveProjectStoryAuditResult() {
+		const targetJobId = activeProject?.bookJobId || bookJob?.id;
+		if (bookAnalysisResult?.storyAudit && (!targetJobId || bookJob?.id === targetJobId)) {
+			return bookAnalysisResult.storyAudit;
+		}
+
+		if (targetJobId) {
+			const cached = bookAnalysisCache.find(
+				(item) => item.job.id === targetJobId && item.result?.storyAudit,
+			);
+			return cached?.result?.storyAudit ?? null;
+		}
+
+		return bookAnalysisResult?.storyAudit ?? null;
+	}
+
+	async function readProjectStoryAuditFindingReviews() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!storyAudit) {
+			return [];
 		}
 
 		const project = activeProject ?? defaultWorkspaceProject;
 		try {
-			const response = await fetch(
-				apiUrl(`/analysis/workspace/projects/${encodeURIComponent(project.id)}/export`),
-			);
-			if (response.ok) {
-				const content = await response.text();
-				const disposition = response.headers.get("content-disposition") || "";
-				const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
-				const filename = filenameMatch
-					? decodeURIComponent(filenameMatch[1])
-					: `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
-							.toISOString()
-							.slice(0, 10)}.md`;
-				downloadText(
-					filename,
-					content,
-					response.headers.get("content-type") || "text/markdown;charset=utf-8",
-				);
-				setStatus(`书籍资产导出完成：${filename}`);
-				return;
-			}
+			return await readStoryAuditFindingReviews(project.id);
 		} catch {
-			// Fall back to browser-local export below.
+			setStatus("故事体检复核状态暂时读取失败；导出将只包含候选摘要。");
+			return [];
+		}
+	}
+
+	async function exportProjectMarkdown() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
+			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
+			return;
+		}
+
+		const project = activeProject ?? defaultWorkspaceProject;
+		const storyAuditFindingReviews = await readProjectStoryAuditFindingReviews();
+		if (!storyAudit) {
+			try {
+				const response = await fetch(
+					apiUrl(`/analysis/workspace/projects/${encodeURIComponent(project.id)}/export`),
+				);
+				if (response.ok) {
+					const content = await response.text();
+					const disposition = response.headers.get("content-disposition") || "";
+					const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
+					const filename = filenameMatch
+						? decodeURIComponent(filenameMatch[1])
+						: `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+								.toISOString()
+								.slice(0, 10)}.md`;
+					downloadText(
+						filename,
+						content,
+						response.headers.get("content-type") || "text/markdown;charset=utf-8",
+					);
+					setStatus(`书籍资产导出完成：${filename}`);
+					return;
+				}
+			} catch {
+				// Fall back to browser-local export below.
+			}
 		}
 
 		const content = buildProjectExportMarkdown({
 			project,
 			revisionSessions: projectRevisionSessions,
+			revisionVersions: projectRevisionVersions,
 			methodologyCards: projectMethodologyCards,
+			storyAudit,
+			storyAuditFindingReviews,
 		});
 		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
 			.toISOString()
 			.slice(0, 10)}.md`;
 		downloadText(filename, content, "text/markdown;charset=utf-8");
 		setStatus(`书籍资产导出完成：${filename}`);
+	}
+
+	async function exportProjectJson() {
+		const storyAudit = resolveProjectStoryAuditResult();
+		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
+			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
+			return;
+		}
+
+		const project = activeProject ?? defaultWorkspaceProject;
+		const storyAuditFindingReviews = await readProjectStoryAuditFindingReviews();
+		const content = buildProjectExportJson({
+			project,
+			revisionSessions: projectRevisionSessions,
+			revisionVersions: projectRevisionVersions,
+			methodologyCards: projectMethodologyCards,
+			storyAudit,
+			storyAuditFindingReviews,
+		});
+		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
+			.toISOString()
+			.slice(0, 10)}.json`;
+		downloadText(filename, content, "application/json;charset=utf-8");
+		setStatus(`书籍资产 JSON 导出完成：${filename}`);
 	}
 
 	/* ──────────── nav items ──────────── */
@@ -951,6 +1071,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	function rememberQuickReviewIteration(result: QuickReviewResult) {
 		const now = new Date().toISOString();
+		const storyAuditFindingIds = Array.from(
+			new Set(quickReviewStoryAuditFindingIds.map((id) => id.trim()).filter(Boolean)),
+		).slice(0, 10);
 		const project: WorkspaceProject = activeProject
 			? { ...activeProject, updatedAt: now }
 			: { ...defaultWorkspaceProject, updatedAt: now };
@@ -958,16 +1081,50 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			cards: methodologyCards,
 			cardIds: [],
 		};
+		const existingVersion = findRevisionTextVersionForDraft({
+			versions: projectRevisionVersions,
+			projectId: activeProjectId,
+			chapterTitle,
+			chapterText,
+		});
+		const previousVersion = findPreviousRevisionTextVersion({
+			versions: projectRevisionVersions,
+			projectId: activeProjectId,
+			chapterTitle,
+			chapterText,
+		});
+		const version =
+			existingVersion ??
+			createRevisionTextVersion({
+				projectId: activeProjectId,
+				chapterTitle,
+				chapterText,
+				previousVersion,
+				existingVersions: projectRevisionVersions,
+				now,
+			});
 		const session = createRevisionSession({
 			projectId: activeProjectId,
 			chapterTitle,
 			chapterText,
 			result,
 			methodologyCardIds: mergedCards.cardIds,
+			storyAuditFindingIds,
+			fromVersionId: version.previousVersionId,
+			toVersionId: version.id,
+			textChanged: !existingVersion,
 			now,
 		});
+		const versionWithSession = existingVersion
+			? existingVersion
+			: { ...version, sourceSessionId: session.id };
 
 		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		if (!existingVersion) {
+			setRevisionVersions((current) =>
+				upsertRevisionTextVersion(current, versionWithSession),
+			);
+		}
 		setProjects((current) =>
 			current.map((project) =>
 				project.id === activeProjectId ? { ...project, updatedAt: now } : project,
@@ -976,9 +1133,15 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		void upsertRevisionAssets({
 			project,
 			session,
+			revisionVersions: existingVersion ? [] : [versionWithSession],
 			methodologyCards: [],
 		})
-			.then(applyWorkspaceAssets)
+			.then((assets) => {
+				applyWorkspaceAssets(assets);
+				if (storyAuditFindingIds.length) {
+					setQuickReviewStoryAuditFindingIds([]);
+				}
+			})
 			.catch(() => {
 				setStatus("修改效果已本地保存；后端暂时未同步成功。");
 			});
@@ -1501,8 +1664,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				setQuickReviewResult(cached.result);
 				setQuickReviewPlatformFit(null);
 				setQuickReviewError(null);
-				rememberQuickReviewIteration(cached.result);
-				setStatus("已使用缓存的问题分析；如需让 AI 重新分析，请点“重新分析”。");
+				setStatus("已使用缓存的问题分析；缓存结果不会保存为新的正文版本或复诊记录。");
 				openQuickReviewChapter();
 				return;
 			}
@@ -1673,6 +1835,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				chapterTitle,
 				now,
 			});
+			const storyAuditFindingIds = Array.from(
+				new Set(quickReviewStoryAuditFindingIds.map((id) => id.trim()).filter(Boolean)),
+			).slice(0, 10);
 			const session =
 				latestSession ??
 				createRevisionSession({
@@ -1681,12 +1846,16 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					chapterText,
 					result: quickReviewResult,
 					methodologyCardIds: [],
+					storyAuditFindingIds,
 					now,
 				});
 			const updatedSession = {
 				...session,
 				methodologyCardIds: Array.from(
 					new Set([...(session.methodologyCardIds || []), ...mergedCards.cardIds]),
+				),
+				storyAuditFindingIds: Array.from(
+					new Set([...(session.storyAuditFindingIds || []), ...storyAuditFindingIds]),
 				),
 			};
 
@@ -1700,11 +1869,17 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			void upsertRevisionAssets({
 				project,
 				session: updatedSession,
+				revisionVersions: [],
 				methodologyCards: mergedCards.cards.filter(
 					(card) => (card.projectId || defaultWorkspaceProject.id) === activeProjectId,
 				),
 			})
-				.then(applyWorkspaceAssets)
+				.then((assets) => {
+					applyWorkspaceAssets(assets);
+					if (storyAuditFindingIds.length) {
+						setQuickReviewStoryAuditFindingIds([]);
+					}
+				})
 				.catch(() => {
 					setStatus("方法论卡已本地保存；后端暂时未同步成功。");
 				});
@@ -1885,6 +2060,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 						latestJob.result = completedJob.result;
 						setBookAnalysisResult(completedJob.result);
 						updateBookAnalysisCacheByJobId(jobId, completedJob);
+						syncActiveProjectBookJob(completedJob);
 						if (!options?.silent) {
 							setStatus(
 								`整本分析完成：${latestJob.result.characters.length} 张角色卡，已分析 ${latestJob.result.mapReduce?.mapCount ?? 0} 个章节片段`,
@@ -2124,6 +2300,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			syncActiveBookName(job.result?.book.title || job.inputSummary.title);
 			if (job.result) {
 				setBookAnalysisResult(job.result);
+				syncActiveProjectBookJob(job);
 			}
 			if (bookText.trim() || bookFile) {
 				rememberBookAnalysis(buildBookAnalysisCacheKey(), job, job.result ?? null);
@@ -2283,7 +2460,9 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		activeProjectId,
 		activeProject,
 		projectRevisionSessions,
+		projectRevisionVersions,
 		projectMethodologyCards,
+		projectStoryAuditResult: resolveProjectStoryAuditResult(),
 		newProjectName,
 		setNewProjectName,
 
@@ -2378,6 +2557,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setQuickReviewCoreSellingPoint,
 		quickReviewMustKeepMechanisms,
 		setQuickReviewMustKeepMechanisms,
+		quickReviewStoryAuditFindingIds,
+		setQuickReviewStoryAuditFindingIds,
 		quickReviewTargetReaderPleasures,
 		setQuickReviewTargetReaderPleasures,
 		saveQuickReviewMethodology,
@@ -2440,6 +2621,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		createProject,
 		saveRevisionNote,
 		exportProjectMarkdown,
+		exportProjectJson,
 		testProvider,
 		loadProviderModelOptions,
 		applyProviderPreset,

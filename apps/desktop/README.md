@@ -2,6 +2,8 @@
 
 `apps/desktop` 是 AI网文诊断台的 Electron 桌面外壳。它不维护独立渲染应用；窗口加载 `apps/web` 的 Next.js 页面。
 
+桌面端不另建产品语义，完整遵守 [`../../docs/product-doctrine.md`](../../docs/product-doctrine.md) 和 Web/API 的编辑方法蒸馏、作者决定、真实版本与复诊协议。
+
 开发模式下，桌面端默认加载本机 Web 服务。打包模式下，Electron 主进程会先启动内置 API sidecar，再等待 `/health` 通过，随后启动 Next standalone sidecar 并打开窗口。
 
 ## 目录结构
@@ -50,3 +52,4 @@ pnpm --filter desktop pack
 - UI 逻辑放在 `apps/web`，桌面端只负责窗口、IPC、sidecar 生命周期和打包。
 - preload 只暴露明确的 IPC 契约，不直接泄露 Node/Electron 能力给页面。
 - 打包模式下 API 绑定 loopback 地址，避免桌面 sidecar 暴露到局域网。
+- 不在 Electron/IPC 层复制诊断状态、正文版本或方法库；这些对象由 Web/API 的统一契约负责。

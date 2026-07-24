@@ -98,4 +98,26 @@ describe("DiagnosisDashboardView", () => {
 		expect(html).toContain("问题类型");
 		expect(html).toContain("钩子必须绑定代价");
 	});
+
+	it("renders unavailable scores as insufficient instead of zero", () => {
+		const html = renderToStaticMarkup(
+			<DiagnosisDashboardView
+				revisionSessions={[
+					{
+						...sessions[0]!,
+						id: "revision-insufficient",
+						quickScore: null,
+						gateDecision: "insufficient",
+					},
+					sessions[1]!,
+				]}
+				methodologyCards={[]}
+				onOpenDiagnosis={vi.fn()}
+			/>,
+		);
+
+		expect(html).toContain("信息不足，暂不评分");
+		expect(html).toContain("暂无对比");
+		expect(html).not.toContain("0/10");
+	});
 });

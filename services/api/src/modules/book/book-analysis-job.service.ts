@@ -55,6 +55,8 @@ export interface BookAnalysisJobSnapshot {
     author?: string;
     platform?: string;
     publishedYear?: number;
+    purpose?: "own-draft" | "reference-study";
+    profiles?: string[];
   };
   progress: BookAnalysisJobProgress;
   preprocessing?: Omit<BookPreprocessResult, "chapters"> & {

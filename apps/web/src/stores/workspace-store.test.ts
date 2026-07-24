@@ -71,6 +71,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		quickReviewCoreSellingPoint: "",
 		quickReviewMustKeepMechanisms: "",
 		quickReviewTargetReaderPleasures: "",
+		quickReviewStoryAuditFindingIds: [],
 		saveQuickReviewMethodology: false,
 		rubricResult: null,
 		scoreResult: null,
@@ -97,6 +98,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		scoreCache: [],
 		bookAnalysisCache: [],
 		revisionSessions: [],
+		revisionVersions: [],
 		methodologyCards: [],
 		...overrides,
 	};
@@ -451,5 +453,17 @@ describe("workspace store persistence", () => {
 		expect(partialized.providerConfigHistory).toHaveLength(10);
 		expect(partialized.providerConfigHistory[0]?.id).toBe("history-11");
 		expect(partialized.providerConfigHistory.at(-1)?.id).toBe("history-2");
+	});
+
+	it("persists pending story audit finding ids for the next real revision session", () => {
+		const partialized = partializeWorkspaceState(
+			createState({
+				quickReviewStoryAuditFindingIds: ["finding-a"],
+			}),
+		);
+		const merged = mergeWorkspaceState(partialized, createState() as WorkspaceStore);
+
+		expect(partialized.quickReviewStoryAuditFindingIds).toEqual(["finding-a"]);
+		expect(merged.quickReviewStoryAuditFindingIds).toEqual(["finding-a"]);
 	});
 });

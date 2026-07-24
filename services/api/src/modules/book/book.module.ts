@@ -6,6 +6,7 @@ import { BookAnalysisService } from "./book-analysis.service";
 import { BookController } from "./book.controller";
 import { BookExportService } from "./book-export.service";
 import { BookUploadService } from "./book-upload.service";
+import { StoryAuditService } from "../story-audit/story-audit.service";
 import { TextPreprocessorService } from "./text-preprocessor.service";
 
 @Module({
@@ -17,6 +18,7 @@ import { TextPreprocessorService } from "./text-preprocessor.service";
     BookAnalysisService,
     BookExportService,
     BookUploadService,
+    StoryAuditService,
     TextPreprocessorService,
   ],
   // Exported for LibraryModule (distillBookSkill needs BookAnalysisService;

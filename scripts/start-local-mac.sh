@@ -319,7 +319,7 @@ if [[ "$WEB_MODE" == "start" ]]; then
 	echo "[start-local] Starting Web on $WEB_URL"
 	(
 		cd "$WEB_DIR"
-		NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL" \
+		NEXT_PUBLIC_API_BASE_URL="/api/v1" \
 			API_INTERNAL_BASE_URL="$API_BASE_URL" \
 			NEXT_TELEMETRY_DISABLED=1 \
 			"${PNPM[@]}" run dev --hostname 127.0.0.1 --port "$WEB_PORT"

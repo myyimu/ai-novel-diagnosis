@@ -1,5 +1,7 @@
 import {
   IsArray,
+  IsBoolean,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -13,6 +15,14 @@ export class WorkspaceProjectDto {
 
   @IsString()
   name!: string;
+
+  @IsOptional()
+  @IsString()
+  bookJobId?: string;
+
+  @IsOptional()
+  @IsString()
+  analysisPurpose?: string;
 
   @IsString()
   createdAt!: string;
@@ -47,8 +57,9 @@ export class RevisionSessionDto {
   @IsNumber()
   textLength!: number;
 
+  @IsOptional()
   @IsNumber()
-  quickScore!: number;
+  quickScore!: number | null;
 
   @IsString()
   gateDecision!: string;
@@ -75,8 +86,59 @@ export class RevisionSessionDto {
   @IsString()
   revisionNoteUpdatedAt?: string;
 
+  @IsOptional()
+  @IsString()
+  fromVersionId?: string;
+
+  @IsOptional()
+  @IsString()
+  toVersionId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  textChanged?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  storyAuditFindingIds?: string[];
+
   @IsArray()
   methodologyCardIds!: string[];
+}
+
+export class RevisionTextVersionDto {
+  @IsString()
+  id!: string;
+
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
+  @IsString()
+  createdAt!: string;
+
+  @IsString()
+  chapterTitle!: string;
+
+  @IsString()
+  versionLabel!: string;
+
+  @IsString()
+  textHash!: string;
+
+  @IsNumber()
+  textLength!: number;
+
+  @IsString()
+  text!: string;
+
+  @IsOptional()
+  @IsString()
+  sourceSessionId?: string;
+
+  @IsOptional()
+  @IsString()
+  previousVersionId?: string;
 }
 
 export class ProjectMethodologyCardDto {
@@ -148,6 +210,12 @@ export class UpsertRevisionAssetsDto {
   @Type(() => RevisionSessionDto)
   session!: RevisionSessionDto;
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RevisionTextVersionDto)
+  revisionVersions?: RevisionTextVersionDto[];
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProjectMethodologyCardDto)
@@ -157,6 +225,38 @@ export class UpsertRevisionAssetsDto {
 export class UpdateRevisionNoteDto {
   @IsString()
   note!: string;
+
+  @IsOptional()
+  @IsString()
+  updatedAt?: string;
+}
+
+const storyAuditReviewStates = [
+  "unreviewed",
+  "confirmed",
+  "author_intent",
+  "insufficient_evidence",
+  "false_positive",
+  "planned",
+  "resolved",
+] as const;
+
+export class UpsertStoryAuditFindingReviewDto {
+  @IsString()
+  projectId!: string;
+
+  @IsString()
+  auditId!: string;
+
+  @IsString()
+  findingId!: string;
+
+  @IsIn(storyAuditReviewStates)
+  reviewState!: (typeof storyAuditReviewStates)[number];
+
+  @IsOptional()
+  @IsString()
+  note?: string;
 
   @IsOptional()
   @IsString()

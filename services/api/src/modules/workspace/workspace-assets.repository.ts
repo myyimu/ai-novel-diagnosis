@@ -1,18 +1,24 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { DrizzleService } from "@/service/drizzle/drizzle.service";
 import {
   methodologyCards,
   revisionSessions,
+  revisionTextVersions,
+  storyAuditFindingReviews,
   workspaceProjects,
   type MethodologyCardSelect,
   type RevisionSessionSelect,
+  type RevisionTextVersionSelect,
+  type StoryAuditFindingReviewSelect,
   type WorkspaceProjectSelect,
 } from "@/service/drizzle/schema";
 
 export interface WorkspaceProjectSnapshot {
   id: string;
   name: string;
+  bookJobId?: string;
+  analysisPurpose?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,7 +32,7 @@ export interface RevisionSessionSnapshot {
   inputKind: string;
   textHash: string;
   textLength: number;
-  quickScore: number;
+  quickScore: number | null;
   gateDecision: string;
   mainProblem: string;
   issueTitles: string[];
@@ -34,7 +40,24 @@ export interface RevisionSessionSnapshot {
   nextPrompt?: string;
   revisionNote?: string;
   revisionNoteUpdatedAt?: string;
+  fromVersionId?: string;
+  toVersionId?: string;
+  textChanged?: boolean;
+  storyAuditFindingIds?: string[];
   methodologyCardIds: string[];
+}
+
+export interface RevisionTextVersionSnapshot {
+  id: string;
+  projectId?: string;
+  createdAt: string;
+  chapterTitle: string;
+  versionLabel: string;
+  textHash: string;
+  textLength: number;
+  text: string;
+  sourceSessionId?: string;
+  previousVersionId?: string;
 }
 
 export interface ProjectMethodologyCardSnapshot {
@@ -59,7 +82,26 @@ export interface ProjectMethodologyCardSnapshot {
 export interface WorkspaceAssetsSnapshot {
   projects: WorkspaceProjectSnapshot[];
   revisionSessions: RevisionSessionSnapshot[];
+  revisionVersions: RevisionTextVersionSnapshot[];
   methodologyCards: ProjectMethodologyCardSnapshot[];
+}
+
+export type StoryAuditFindingReviewState =
+  | "unreviewed"
+  | "confirmed"
+  | "author_intent"
+  | "insufficient_evidence"
+  | "false_positive"
+  | "planned"
+  | "resolved";
+
+export interface StoryAuditFindingReviewSnapshot {
+  projectId: string;
+  auditId: string;
+  findingId: string;
+  reviewState: StoryAuditFindingReviewState;
+  note?: string;
+  updatedAt: string;
 }
 
 @Injectable()
@@ -67,7 +109,7 @@ export class WorkspaceAssetsRepository {
   constructor(private readonly drizzle: DrizzleService) {}
 
   async listAssets(): Promise<WorkspaceAssetsSnapshot> {
-    const [projects, sessions, cards] = await Promise.all([
+    const [projects, sessions, versions, cards] = await Promise.all([
       this.drizzle.db
         .select()
         .from(workspaceProjects)
@@ -78,6 +120,10 @@ export class WorkspaceAssetsRepository {
         .orderBy(desc(revisionSessions.createdAt)),
       this.drizzle.db
         .select()
+        .from(revisionTextVersions)
+        .orderBy(desc(revisionTextVersions.createdAt)),
+      this.drizzle.db
+        .select()
         .from(methodologyCards)
         .orderBy(desc(methodologyCards.lastSeenAt)),
     ]);
@@ -86,6 +132,9 @@ export class WorkspaceAssetsRepository {
       projects: projects.map((row) => this.projectSnapshot(row)),
       revisionSessions: sessions.map((row) =>
         this.revisionSessionSnapshot(row),
+      ),
+      revisionVersions: versions.map((row) =>
+        this.revisionTextVersionSnapshot(row),
       ),
       methodologyCards: cards.map((row) => this.methodologyCardSnapshot(row)),
     };
@@ -100,6 +149,8 @@ export class WorkspaceAssetsRepository {
       .values({
         id: project.id,
         name: project.name,
+        bookJobId: project.bookJobId,
+        analysisPurpose: project.analysisPurpose,
         createdAt: toDate(project.createdAt, now),
         updatedAt: toDate(project.updatedAt, now),
       })
@@ -107,6 +158,8 @@ export class WorkspaceAssetsRepository {
         target: workspaceProjects.id,
         set: {
           name: project.name,
+          bookJobId: project.bookJobId,
+          analysisPurpose: project.analysisPurpose,
           updatedAt: toDate(project.updatedAt, now),
         },
       })
@@ -118,6 +171,7 @@ export class WorkspaceAssetsRepository {
   async upsertRevisionAssets(input: {
     project: WorkspaceProjectSnapshot;
     session: RevisionSessionSnapshot;
+    revisionVersions: RevisionTextVersionSnapshot[];
     methodologyCards: ProjectMethodologyCardSnapshot[];
   }): Promise<WorkspaceAssetsSnapshot> {
     await this.upsertProject(input.project);
@@ -136,7 +190,7 @@ export class WorkspaceAssetsRepository {
         inputKind: session.inputKind,
         textHash: session.textHash,
         textLength: session.textLength,
-        quickScore: session.quickScore,
+        quickScore: session.quickScore ?? null,
         gateDecision: session.gateDecision,
         mainProblem: session.mainProblem,
         issueTitles: session.issueTitles,
@@ -146,6 +200,10 @@ export class WorkspaceAssetsRepository {
         revisionNoteUpdatedAt: session.revisionNoteUpdatedAt
           ? toDate(session.revisionNoteUpdatedAt, now)
           : undefined,
+        fromVersionId: session.fromVersionId,
+        toVersionId: session.toVersionId,
+        textChanged: session.textChanged ?? true,
+        storyAuditFindingIds: session.storyAuditFindingIds || [],
         methodologyCardIds: session.methodologyCardIds,
       })
       .onConflictDoUpdate({
@@ -157,7 +215,7 @@ export class WorkspaceAssetsRepository {
           inputKind: session.inputKind,
           textHash: session.textHash,
           textLength: session.textLength,
-          quickScore: session.quickScore,
+          quickScore: session.quickScore ?? null,
           gateDecision: session.gateDecision,
           mainProblem: session.mainProblem,
           issueTitles: session.issueTitles,
@@ -167,9 +225,17 @@ export class WorkspaceAssetsRepository {
           revisionNoteUpdatedAt: session.revisionNoteUpdatedAt
             ? toDate(session.revisionNoteUpdatedAt, now)
             : null,
+          fromVersionId: session.fromVersionId,
+          toVersionId: session.toVersionId,
+          textChanged: session.textChanged ?? true,
+          storyAuditFindingIds: session.storyAuditFindingIds || [],
           methodologyCardIds: session.methodologyCardIds,
         },
       });
+
+    for (const version of input.revisionVersions) {
+      await this.upsertRevisionTextVersion(version, input.project.id);
+    }
 
     for (const card of input.methodologyCards) {
       await this.upsertMethodologyCard(card, input.project.id);
@@ -203,6 +269,61 @@ export class WorkspaceAssetsRepository {
     return this.revisionSessionSnapshot(row);
   }
 
+  async listStoryAuditFindingReviews(input: {
+    projectId: string;
+    auditId?: string;
+    findingId?: string;
+  }): Promise<StoryAuditFindingReviewSnapshot[]> {
+    const conditions = [
+      eq(storyAuditFindingReviews.projectId, input.projectId),
+    ];
+    if (input.auditId) {
+      conditions.push(eq(storyAuditFindingReviews.auditId, input.auditId));
+    }
+    if (input.findingId) {
+      conditions.push(eq(storyAuditFindingReviews.findingId, input.findingId));
+    }
+
+    const rows = await this.drizzle.db
+      .select()
+      .from(storyAuditFindingReviews)
+      .where(and(...conditions))
+      .orderBy(desc(storyAuditFindingReviews.updatedAt));
+
+    return rows.map((row) => this.storyAuditFindingReviewSnapshot(row));
+  }
+
+  async upsertStoryAuditFindingReview(
+    review: StoryAuditFindingReviewSnapshot,
+  ): Promise<StoryAuditFindingReviewSnapshot> {
+    const updatedAt = toDate(review.updatedAt, new Date());
+    const [row] = await this.drizzle.db
+      .insert(storyAuditFindingReviews)
+      .values({
+        projectId: review.projectId,
+        auditId: review.auditId,
+        findingId: review.findingId,
+        reviewState: review.reviewState,
+        note: review.note,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [
+          storyAuditFindingReviews.projectId,
+          storyAuditFindingReviews.auditId,
+          storyAuditFindingReviews.findingId,
+        ],
+        set: {
+          reviewState: review.reviewState,
+          note: review.note,
+          updatedAt,
+        },
+      })
+      .returning();
+
+    return this.storyAuditFindingReviewSnapshot(row);
+  }
+
   async readProjectPackage(projectId: string) {
     const [project] = await this.drizzle.db
       .select()
@@ -214,12 +335,17 @@ export class WorkspaceAssetsRepository {
       throw new NotFoundException(`Workspace project not found: ${projectId}`);
     }
 
-    const [sessions, cards] = await Promise.all([
+    const [sessions, versions, cards] = await Promise.all([
       this.drizzle.db
         .select()
         .from(revisionSessions)
         .where(eq(revisionSessions.projectId, projectId))
         .orderBy(asc(revisionSessions.createdAt)),
+      this.drizzle.db
+        .select()
+        .from(revisionTextVersions)
+        .where(eq(revisionTextVersions.projectId, projectId))
+        .orderBy(asc(revisionTextVersions.createdAt)),
       this.drizzle.db
         .select()
         .from(methodologyCards)
@@ -232,8 +358,44 @@ export class WorkspaceAssetsRepository {
       revisionSessions: sessions.map((row) =>
         this.revisionSessionSnapshot(row),
       ),
+      revisionVersions: versions.map((row) =>
+        this.revisionTextVersionSnapshot(row),
+      ),
       methodologyCards: cards.map((row) => this.methodologyCardSnapshot(row)),
     };
+  }
+
+  private async upsertRevisionTextVersion(
+    version: RevisionTextVersionSnapshot,
+    fallbackProjectId: string,
+  ) {
+    await this.drizzle.db
+      .insert(revisionTextVersions)
+      .values({
+        id: version.id,
+        projectId: version.projectId || fallbackProjectId,
+        createdAt: toDate(version.createdAt, new Date()),
+        chapterTitle: version.chapterTitle,
+        versionLabel: version.versionLabel,
+        textHash: version.textHash,
+        textLength: version.textLength,
+        text: version.text,
+        sourceSessionId: version.sourceSessionId,
+        previousVersionId: version.previousVersionId,
+      })
+      .onConflictDoUpdate({
+        target: revisionTextVersions.id,
+        set: {
+          projectId: version.projectId || fallbackProjectId,
+          chapterTitle: version.chapterTitle,
+          versionLabel: version.versionLabel,
+          textHash: version.textHash,
+          textLength: version.textLength,
+          text: version.text,
+          sourceSessionId: version.sourceSessionId,
+          previousVersionId: version.previousVersionId,
+        },
+      });
   }
 
   private async upsertMethodologyCard(
@@ -286,6 +448,8 @@ export class WorkspaceAssetsRepository {
     return {
       id: row.id,
       name: row.name,
+      bookJobId: row.bookJobId ?? undefined,
+      analysisPurpose: row.analysisPurpose ?? undefined,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -311,7 +475,28 @@ export class WorkspaceAssetsRepository {
       nextPrompt: row.nextPrompt ?? undefined,
       revisionNote: row.revisionNote ?? undefined,
       revisionNoteUpdatedAt: row.revisionNoteUpdatedAt?.toISOString(),
+      fromVersionId: row.fromVersionId ?? undefined,
+      toVersionId: row.toVersionId ?? undefined,
+      textChanged: row.textChanged,
+      storyAuditFindingIds: toStringList(row.storyAuditFindingIds),
       methodologyCardIds: toStringList(row.methodologyCardIds),
+    };
+  }
+
+  private revisionTextVersionSnapshot(
+    row: RevisionTextVersionSelect,
+  ): RevisionTextVersionSnapshot {
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      createdAt: row.createdAt.toISOString(),
+      chapterTitle: row.chapterTitle,
+      versionLabel: row.versionLabel,
+      textHash: row.textHash,
+      textLength: row.textLength,
+      text: row.text,
+      sourceSessionId: row.sourceSessionId ?? undefined,
+      previousVersionId: row.previousVersionId ?? undefined,
     };
   }
 
@@ -335,6 +520,19 @@ export class WorkspaceAssetsRepository {
       sourceIssueTitle: row.sourceIssueTitle ?? undefined,
       occurrenceCount: row.occurrenceCount,
       usageCount: row.usageCount,
+    };
+  }
+
+  private storyAuditFindingReviewSnapshot(
+    row: StoryAuditFindingReviewSelect,
+  ): StoryAuditFindingReviewSnapshot {
+    return {
+      projectId: row.projectId,
+      auditId: row.auditId,
+      findingId: row.findingId,
+      reviewState: row.reviewState as StoryAuditFindingReviewState,
+      note: row.note ?? undefined,
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 }
