@@ -10,8 +10,9 @@ import {
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { diagnosisExampleOptions } from "@/lib/diagnosis-examples";
+import { requestParagraphRewrites } from "@/lib/workspace-analysis-client";
 import { hashString } from "@/lib/workspace-cache";
-import type { QuickReviewResult } from "@/stores/workspace-store";
+import type { ProviderForm, QuickReviewResult } from "@/stores/workspace-store";
 import * as textQuoteAnchor from "dom-anchor-text-quote";
 import { BookOpen, Download, FileText, FolderOpen, Lightbulb, Plus } from "lucide-react";
 
@@ -32,11 +33,13 @@ export function ProjectCurrentPage() {
 		projectMethodologyCards,
 		exportProjectMarkdown,
 		providerLabel,
+		provider,
 		quickReviewResult,
 		chapterTitle,
 		chapterText,
 		loading,
 		runQuickExperience,
+		saveRevisedChapterText,
 	} = useWorkspaceHandlers("overview");
 
 	const chapterId = searchParams.get("chapter");
@@ -68,8 +71,10 @@ export function ProjectCurrentPage() {
 				loading={loading === "quick"}
 				revisionCount={projectRevisionSessions.length}
 				methodologyCount={projectMethodologyCards.length}
+				provider={provider}
 				onBack={() => router.push("/project/current")}
 				onRerun={() => runQuickExperience(true)}
+				onSaveRevision={saveRevisedChapterText}
 			/>
 		);
 	}
@@ -293,8 +298,10 @@ function ProjectChapterWorkspace({
 	loading,
 	revisionCount,
 	methodologyCount,
+	provider,
 	onBack,
 	onRerun,
+	onSaveRevision,
 }: {
 	projectName: string;
 	chapterTitle: string;
@@ -303,8 +310,10 @@ function ProjectChapterWorkspace({
 	loading: boolean;
 	revisionCount: number;
 	methodologyCount: number;
+	provider: ProviderForm;
 	onBack: () => void;
 	onRerun: () => void;
+	onSaveRevision: (revisedText: string, result: QuickReviewResult) => boolean;
 }) {
 	const issues = Array.isArray(result?.issues)
 		? result.issues.filter((issue) => issue?.title)
@@ -323,6 +332,9 @@ function ProjectChapterWorkspace({
 	const [commentsOpen, setCommentsOpen] = useState(false);
 	const [rewritePreviewOpen, setRewritePreviewOpen] = useState(false);
 	const [previewDecisions, setPreviewDecisions] = useState<Record<string, PreviewDecision>>({});
+	const [previewRewrites, setPreviewRewrites] = useState<Record<string, string>>({});
+	const [rewriteLoading, setRewriteLoading] = useState(false);
+	const [rewriteError, setRewriteError] = useState<string | null>(null);
 	const getIssueState = useCallback(
 		(issueId: string): IssueState => issueStates[issueId] ?? "pending",
 		[issueStates],
@@ -447,7 +459,7 @@ function ProjectChapterWorkspace({
 		setSelectedIssueId(issueId);
 	}
 
-	function openRewritePreview() {
+	async function openRewritePreview() {
 		if (!acceptedIssues.length) {
 			setChapterTab("annotation");
 			setCommentsOpen(true);
@@ -456,7 +468,33 @@ function ProjectChapterWorkspace({
 		setPreviewDecisions(
 			Object.fromEntries(acceptedIssues.map((issue) => [issue.id, "accepted"])),
 		);
+		setPreviewRewrites({});
+		setRewriteError(null);
 		setRewritePreviewOpen(true);
+		setRewriteLoading(true);
+		try {
+			const targets = buildRewriteTargets(chapterText, acceptedIssues);
+			const response = await requestParagraphRewrites({
+				provider,
+				chapterTitle,
+				targets: targets.map(({ id, originalText, instructions }) => ({
+					id,
+					originalText,
+					instructions,
+				})),
+			});
+			if (response.mode === "mock") {
+				setRewriteError("本地演示模式不能生成正文润色。请先配置可用模型后再改稿。");
+				return;
+			}
+			setPreviewRewrites(
+				Object.fromEntries(response.rewrites.map((item) => [item.id, item.revisedText])),
+			);
+		} catch {
+			setRewriteError("正文润色生成失败，请检查模型配置后重试。");
+		} finally {
+			setRewriteLoading(false);
+		}
 	}
 
 	function applyRewritePreview() {
@@ -466,6 +504,18 @@ function ProjectChapterWorkspace({
 				.map((issue) => issue.id),
 		);
 		if (!selectedIds.size) {
+			return;
+		}
+		if (!result || rewriteLoading || rewriteError) {
+			return;
+		}
+		const rewrittenText = applyParagraphRewrites({
+			chapterText,
+			issues: acceptedIssues,
+			selectedIds,
+			rewrites: previewRewrites,
+		});
+		if (!onSaveRevision(rewrittenText, result)) {
 			return;
 		}
 		setIssueStates((current) => {
@@ -1081,6 +1131,9 @@ function ProjectChapterWorkspace({
 					issues={acceptedIssues}
 					decisions={previewDecisions}
 					selectedCount={previewAcceptedCount}
+					rewrites={previewRewrites}
+					loading={rewriteLoading}
+					error={rewriteError}
 					onDecisionChange={(issueId, decision) =>
 						setPreviewDecisions((current) => ({ ...current, [issueId]: decision }))
 					}
@@ -1119,6 +1172,9 @@ function RewritePreviewModal({
 	issues,
 	decisions,
 	selectedCount,
+	rewrites,
+	loading,
+	error,
 	onDecisionChange,
 	onClose,
 	onApply,
@@ -1128,11 +1184,20 @@ function RewritePreviewModal({
 	issues: QuickReviewIssue[];
 	decisions: Record<string, PreviewDecision>;
 	selectedCount: number;
+	rewrites: Record<string, string>;
+	loading: boolean;
+	error: string | null;
 	onDecisionChange: (issueId: string, decision: PreviewDecision) => void;
 	onClose: () => void;
 	onApply: () => void;
 }) {
 	const paragraphs = splitChapterParagraphs(chapterText);
+	const rewriteTargets = buildRewriteTargets(chapterText, issues);
+	const targetByIssueId = new Map(
+		rewriteTargets.flatMap((target) =>
+			target.issueIds.map((issueId) => [issueId, target.id] as const),
+		),
+	);
 
 	return (
 		<div className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(22,27,34,.42)] p-4">
@@ -1154,6 +1219,16 @@ function RewritePreviewModal({
 				</header>
 
 				<div className="min-h-0 flex-1 overflow-auto p-5">
+					{loading ? (
+						<p className="mb-3 rounded-[10px] bg-[#edf4ff] px-3 py-2 text-xs text-[#405a85]">
+							正在根据原文生成可替换的正文润色稿…
+						</p>
+					) : null}
+					{error ? (
+						<p className="mb-3 rounded-[10px] bg-[#fff0ee] px-3 py-2 text-xs text-[#a13a26]">
+							{error}
+						</p>
+					) : null}
 					<div className="mb-4 rounded-[13px] border border-[#d8e2f6] bg-[#edf4ff] p-3 text-xs leading-6 text-[#405a85]">
 						<b>本次修改范围</b>
 						<span className="ml-2">
@@ -1176,6 +1251,7 @@ function RewritePreviewModal({
 					<div className="grid gap-3">
 						{issues.map((issue, index) => {
 							const paragraph = getIssuePreviewParagraph(issue, paragraphs);
+							const revisedText = rewrites[targetByIssueId.get(issue.id) || ""];
 							const decision = decisions[issue.id] ?? "accepted";
 							return (
 								<article
@@ -1215,7 +1291,8 @@ function RewritePreviewModal({
 										<div className="rounded-[12px] border border-[#c9e7d9] bg-[#f5fff9] p-3">
 											<b className="text-[10px] text-[#176c4d]">修改后</b>
 											<p className="mt-2 text-xs leading-6 text-[#2d473b]">
-												{buildPreviewRewrite(paragraph, issue)}
+												{revisedText ||
+													(loading ? "正在生成正文润色稿…" : paragraph)}
 											</p>
 										</div>
 									</div>
@@ -1223,6 +1300,7 @@ function RewritePreviewModal({
 										<button
 											type="button"
 											onClick={() => onDecisionChange(issue.id, "accepted")}
+											disabled={loading}
 											className={`min-h-8 rounded-lg border px-3 text-[11px] font-bold ${
 												decision === "accepted"
 													? "border-[#82d4a9] bg-[#dff7eb] text-[#176c4d]"
@@ -1234,6 +1312,7 @@ function RewritePreviewModal({
 										<button
 											type="button"
 											onClick={() => onDecisionChange(issue.id, "rejected")}
+											disabled={loading}
 											className={`min-h-8 rounded-lg border px-3 text-[11px] font-bold ${
 												decision === "rejected"
 													? "border-[#b9cdee] bg-[#edf4ff] text-[#2e5cb9]"
@@ -1264,7 +1343,7 @@ function RewritePreviewModal({
 						<button
 							type="button"
 							onClick={onApply}
-							disabled={!selectedCount}
+							disabled={!selectedCount || loading || Boolean(error)}
 							className="min-h-9 rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-4 text-xs font-bold text-white disabled:opacity-50"
 						>
 							应用已接受修改
@@ -1745,13 +1824,56 @@ function getIssuePreviewParagraph(issue: QuickReviewIssue, paragraphs: string[])
 	return paragraphs[0] || "暂无可预览正文。";
 }
 
-function buildPreviewRewrite(paragraph: string, issue: QuickReviewIssue) {
-	const action = issue.fixAction || issue.readerImpact || "补强目标、代价和行动指向。";
-	const trimmed = paragraph.trim();
-	if (!trimmed || trimmed === "暂无可预览正文。") {
-		return action;
-	}
-	return `${trimmed}${trimmed.endsWith("。") ? "" : "。"} ${action}`;
+function buildRewriteTargets(chapterText: string, issues: QuickReviewIssue[]) {
+	const paragraphs = splitChapterParagraphs(chapterText);
+	const targets = new Map<
+		string,
+		{ id: string; originalText: string; instructions: string[]; issueIds: string[] }
+	>();
+	issues.forEach((issue) => {
+		const originalText = getIssuePreviewParagraph(issue, paragraphs);
+		if (!originalText || originalText === "暂无可预览正文。") return;
+		const paragraphIndex = paragraphs.indexOf(originalText);
+		const id = `paragraph-${paragraphIndex >= 0 ? paragraphIndex : 0}`;
+		const instruction = [issue.title, issue.fixAction || issue.readerImpact]
+			.filter(Boolean)
+			.join("：");
+		const current = targets.get(id) || {
+			id,
+			originalText,
+			instructions: [],
+			issueIds: [],
+		};
+		if (instruction) current.instructions.push(instruction);
+		current.issueIds.push(issue.id);
+		targets.set(id, current);
+	});
+	return Array.from(targets.values());
+}
+
+function applyParagraphRewrites({
+	chapterText,
+	issues,
+	selectedIds,
+	rewrites,
+}: {
+	chapterText: string;
+	issues: QuickReviewIssue[];
+	selectedIds: Set<string>;
+	rewrites: Record<string, string>;
+}) {
+	const paragraphs = splitChapterParagraphs(chapterText);
+	const targets = buildRewriteTargets(chapterText, issues);
+	const next = [...paragraphs];
+	targets.forEach((target) => {
+		if (!target.issueIds.some((issueId) => selectedIds.has(issueId))) return;
+		const replacement = rewrites[target.id]?.trim();
+		const index = Number(target.id.replace("paragraph-", ""));
+		if (replacement && Number.isInteger(index) && next[index] === target.originalText) {
+			next[index] = replacement;
+		}
+	});
+	return next.join("\n\n");
 }
 
 function getEvidenceQuotes(issue: QuickReviewIssue) {

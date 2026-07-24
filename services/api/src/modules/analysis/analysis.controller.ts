@@ -8,6 +8,7 @@ import { GenerateMethodologyCardsDto } from "./dto/generate-methodology-cards.dt
 import { InferReferenceProfileDto } from "./dto/infer-reference-profile.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { QuickReviewDto } from "./dto/quick-review.dto";
+import { RewriteParagraphsDto } from "./dto/rewrite-paragraphs.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import {
   ListProviderModelsDto,
@@ -46,6 +47,16 @@ export class AnalysisController {
   @ApiResponse({ status: 200, description: "Structured quick review" })
   quickReview(@Body() body: QuickReviewDto) {
     return this.analysisService.quickReview(body);
+  }
+
+  @Post("rewrite-paragraphs")
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: "Polish accepted paragraph changes into replacement prose",
+  })
+  rewriteParagraphs(@Body() body: RewriteParagraphsDto) {
+    return this.analysisService.rewriteParagraphs(body);
   }
 
   @Post("methodology-cards")

@@ -367,6 +367,33 @@ export function requestQuickReview({
 	});
 }
 
+export interface ParagraphRewriteTarget {
+	id: string;
+	originalText: string;
+	instructions: string[];
+}
+
+export interface ParagraphRewriteResult {
+	mode: "mock" | "model";
+	rewrites: Array<{ id: string; revisedText: string }>;
+}
+
+export function requestParagraphRewrites({
+	provider,
+	chapterTitle,
+	targets,
+}: {
+	provider: ProviderForm;
+	chapterTitle: string;
+	targets: ParagraphRewriteTarget[];
+}) {
+	return postJson<ParagraphRewriteResult>("/analysis/rewrite-paragraphs", {
+		provider,
+		chapterTitle,
+		targets,
+	});
+}
+
 export function requestMethodologyCards({
 	provider,
 	projectId,

@@ -1150,6 +1150,72 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			});
 	}
 
+	function saveRevisedChapterText(revisedText: string, result: QuickReviewResult) {
+		const nextText = revisedText.trim();
+		if (!nextText || nextText === chapterText.trim()) {
+			return false;
+		}
+		const now = new Date().toISOString();
+		const projectId = activeProjectId || defaultWorkspaceProject.id;
+		const project: WorkspaceProject = activeProject
+			? { ...activeProject, id: projectId, updatedAt: now }
+			: { ...defaultWorkspaceProject, id: projectId, updatedAt: now };
+		const currentVersion =
+			findRevisionTextVersionForDraft({
+				versions: projectRevisionVersions,
+				projectId,
+				chapterTitle,
+				chapterText,
+			}) ??
+			createRevisionTextVersion({
+				projectId,
+				chapterTitle,
+				chapterText,
+				existingVersions: projectRevisionVersions,
+				now,
+			});
+		const nextVersion = createRevisionTextVersion({
+			projectId,
+			chapterTitle,
+			chapterText: nextText,
+			previousVersion: currentVersion,
+			existingVersions: [currentVersion, ...projectRevisionVersions],
+			now,
+		});
+		const session = createRevisionSession({
+			projectId,
+			chapterTitle,
+			chapterText: nextText,
+			result,
+			methodologyCardIds: [],
+			fromVersionId: currentVersion.id,
+			toVersionId: nextVersion.id,
+			textChanged: true,
+			now,
+		});
+		const versionWithSession = { ...nextVersion, sourceSessionId: session.id };
+
+		setChapterText(nextText);
+		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		setRevisionVersions((current) => {
+			const withCurrent = current.some((version) => version.id === currentVersion.id)
+				? current
+				: upsertRevisionTextVersion(current, currentVersion);
+			return upsertRevisionTextVersion(withCurrent, versionWithSession);
+		});
+		setProjects((current) => current.map((item) => (item.id === projectId ? project : item)));
+		void upsertRevisionAssets({
+			project,
+			session,
+			revisionVersions: [currentVersion, versionWithSession],
+			methodologyCards: [],
+		}).catch(() => {
+			setStatus("新版本已本地保存；后端暂时未同步成功。");
+		});
+		setStatus("正文润色已保存为新版本。");
+		return true;
+	}
+
 	function openQuickReviewChapter() {
 		const projectId = encodeURIComponent(activeProjectId || defaultWorkspaceProject.id);
 		const chapterSeed = [
@@ -2661,6 +2727,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		importReferenceFile,
 		inferReferenceProfileFromModel,
 		handleChapterTextChange,
+		saveRevisedChapterText,
 		handleReferenceTextChange,
 		handlePlatformStrategyChange,
 		handleChapterDraftChange,
