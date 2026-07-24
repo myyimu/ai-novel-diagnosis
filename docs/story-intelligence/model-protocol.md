@@ -1,15 +1,17 @@
 ---
 title: 故事体检模型与数据协议
-status: proposed
+status: ready-for-implementation
 schema_version: story-audit.v1
-last_updated: 2026-07-13
+last_updated: 2026-07-17
 ---
 
 # 故事体检模型与数据协议
 
+> 本协议服从 [`../product-doctrine.md`](../product-doctrine.md)。模型输出服务编辑方法蒸馏与作者决策，不能把 finding、`confidence` 或优先级解释成客观作品质量。
+
 ## 1. 协议目标
 
-本协议用于指导编码模型实现整书故事体检，也用于约束运行时模型输出。核心要求是把“原文事实”“冲突候选”“复核结论”“编辑建议”分开保存，禁止模型用自然语言结论替代证据。
+本协议用于指导编码模型实现整书故事体检，也用于约束运行时模型输出。核心要求是把“编辑标准”“原文事实”“冲突候选”“复核结论”“作者决定”“修改版本”分开保存，禁止模型用自然语言结论替代证据或人工取舍。
 
 ## 2. 处理流水线
 
@@ -20,8 +22,10 @@ last_updated: 2026-07-13
   -> Reduce：实体消歧、全局事件图、人物状态账本、剧情线
   -> Rule：时间/状态/统计的确定性候选发现
   -> Verify：独立模型只复核候选，不重新自由审稿
-  -> Editorialize：排序、读者影响、修改动作
+  -> Editorialize：关联编辑标准、排序、阅读风险假设、修改动作
   -> Human review：确认问题/创作意图/证据不足/误报
+  -> Revision：保存修改计划、真实 V2 和实际采用项
+  -> Retest：独立比较 finding 状态
 ```
 
 禁止跳过 Map/Reduce，直接把整本书交给一个模型输出最终漏洞列表。
@@ -205,7 +209,6 @@ export interface StoryAuditFinding {
   category: StoryAuditFindingCategory;
   severity: "critical" | "high" | "medium" | "low";
   status: "candidate" | "verified" | "needs_human" | "dismissed";
-  reviewState: "unreviewed" | "confirmed" | "author_intent" | "insufficient_evidence" | "false_positive" | "planned" | "resolved";
   title: string;
   claim: string;
   evidence: StoryEvidenceAnchor[];
@@ -216,6 +219,24 @@ export interface StoryAuditFinding {
   readerImpact?: string;
   fixAction?: string;
   confidence: number;
+}
+
+export interface StoryAuditFindingReview {
+  id: string;
+  projectId: string;
+  bookJobId: string;
+  auditId: string;
+  findingId: string;
+  reviewState:
+    | "confirmed"
+    | "author_intent"
+    | "insufficient_evidence"
+    | "false_positive"
+    | "planned"
+    | "resolved";
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DialogueStatistics {
@@ -268,7 +289,9 @@ export interface StoryAuditResult {
 }
 ```
 
-## 4. 证据与置信度规则
+`StoryAuditResult` 是不可变的模型/规则结果。人工复核通过独立的 `StoryAuditFindingReview` 持久化，禁止把 reviewState 写回 job result，否则重新分析会覆盖作者决定，也无法区分模型状态与人工状态。
+
+## 4. 证据与支持度规则
 
 ### 4.1 证据硬规则
 
@@ -279,9 +302,9 @@ export interface StoryAuditResult {
 - 部分分析不得把未分析章节中的未知状态写成“没有发生”。
 - 模型找不到证据时返回空候选，不得补写合理化文本。
 
-### 4.2 置信度组成
+### 4.2 证据支持度组成（兼容字段 `confidence`）
 
-最终置信度由服务端计算，模型只能提供子信号：
+最终证据支持度由服务端计算，模型只能提供子信号：
 
 ```text
 confidence =
@@ -353,15 +376,17 @@ Verifier JSON：
 }
 ```
 
+`confidence` 在本协议中只表示证据与约束对当前候选的支持强度，不是经过校准的“结论正确概率”。用户界面应显示“证据充分度”；若未来需要概率，必须在独立编辑标注集上校准并使用新字段。
+
 ### 5.5 Editorializer：排序与行动
 
-只对 `verified` 和高置信 `needs_human` 生成读者影响与修复动作。排序公式由服务端计算：
+只对 `verified` 和高证据充分度 `needs_human` 生成阅读风险假设与修复动作。每条 finding 必须关联 `editorialRuleId` 或说明当前没有稳定规则。排序公式由服务端计算：
 
 ```text
 priority = severity_weight * confidence * narrative_span * reader_visibility
 ```
 
-同类问题聚合展示，默认最多把 3 个问题推到顶部。不得自动生成整章重写；只生成修复范围、需要保留的事实和复诊检查点。
+同类问题聚合展示，默认最多把 3 个问题推到顶部。不得自动生成整章重写；只生成修复范围、需要保留的事实、禁止项和复诊检查点。作者拒绝、创作意图和证据不足必须持久化，不能被下一次模型结果覆盖。
 
 ## 6. 对话统计协议
 
@@ -392,7 +417,7 @@ verifierModel
 promptVersion
 ```
 
-修改单章时只重跑该章 Map，并重算受影响的实体、时间图邻居、剧情线和候选；不要默认重跑全书。任何结果都必须保存 `coverage` 和 prompt/model 版本。
+首版继续使用现有整书作业模型：正文变化后整书重跑，但允许复用同一作业、缓存和失败恢复能力，不对用户承诺单章增量重算。具备稳定的章节版本、依赖索引和失效传播机制后，再进入目标态：只重跑变更章节的 Map，并重算受影响的实体、时间图邻居、剧情线和候选。任何版本都必须保存 `coverage` 和 prompt/model 版本。
 
 复用现有 `CachedBookAnalysis`，把 `storyAudit` 作为 `BookAnalysisResult` 的可选字段缓存。禁止新增内容相同的 `CachedStoryAudit`。项目状态只保存 `bookJobId`、作者复核状态和必要索引，不复制整份正文或整份审计结果。
 
@@ -406,6 +431,8 @@ promptVersion
 
 ## 9. Golden 数据要求
 
+本节 fixture 用于工程回归，不足以证明产品有效。发布默认警报还需要独立编辑隐藏评测集，并与规则开发/Prompt 调试样本隔离。
+
 至少新增以下人工标注 fixture：
 
 1. 线性时间、无冲突。
@@ -417,7 +444,9 @@ promptVersion
 7. 伪装/撒谎，不应覆盖客观事实。
 8. 伏笔暂未回收但文本未完结，只能 needs_human。
 9. 多种中文引号和未闭合引号。
-10. 单章变更后的增量复算。
+10. 同一正文整书重跑的结果确定性与缓存命中。
+
+单章变更后的增量复算 fixture 属于进阶阶段，只有在章节版本和依赖失效机制落地后才进入发布门禁。
 
 每个 finding fixture 必须标注期望 category、status、证据 anchor 和允许的替代解释。
 

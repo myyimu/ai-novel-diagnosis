@@ -5,17 +5,19 @@
 [![CI - workspace](https://github.com/myyimu/ai-novel-diagnosis/actions/workflows/ci.yml/badge.svg)](https://github.com/myyimu/ai-novel-diagnosis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Do not rush into AI rewriting. First find out why readers do not continue.
+Do not rush into AI rewriting. First inspect the evidence like an editor, choose a priority, and verify whether the revision worked.
 
-AI Novel Diagnosis Desk is a local AI novel diagnosis and book-analysis tool. It is not a one-click novel generator. It helps writers answer: what is wrong with my story, why does it get no traffic, and why do readers drop off in chapter one?
+AI Novel Diagnosis Desk is a local, evidence-led writing coach. It turns mature editorial checklists, judgment rules, evidence patterns, revision strategies, and retest criteria into a workflow writers can execute. It is not a one-click generator, an objective quality judge, or a traffic predictor.
 
-Feature coverage: AI Novel Diagnosis Desk is an all-in-one AI webnovel diagnosis workspace for automatic novel text parsing, character relationship graph generation, reader drop-off diagnosis, and actionable revision prompt generation.
+It covers chapter triage, full-story audits, relationships and timelines, reference study, revision plans, and versioned retests. Findings must link back to text evidence and remain open to author confirmation, intent, rejection, or deferral.
 
-Paste your first chapter, and it identifies the biggest retention problem, explains the issue with evidence from the text, gives a revision priority, and generates a prompt you can copy into your writing AI. After revision, paste the new version back in and run a retest.
+Paste a first chapter and it proposes the highest-priority reading-risk hypothesis, explains the evidence and plausible alternatives, sets revision boundaries, and generates a prompt for a writing AI. Save the revised text as a real new version, then use issue-state comparison and independent review to test whether the change helped.
 
 For advanced use, it also supports AI book analysis: characters, relationships, worldbuilding, timelines, story structure, and exportable writing assets for learning mature works without copying them.
 
 > Alpha status: suitable for local experiments, feature validation, and feedback collection. Do not expose it as a production public service yet.
+
+The authoritative product direction and scientific boundaries are in [`docs/product-doctrine.md`](./docs/product-doctrine.md).
 
 ## Try It In 3 Minutes
 
@@ -55,18 +57,18 @@ API: http://127.0.0.1:3001/api/v1
 ## What You Get
 
 - A clear diagnosis of the biggest first-chapter drop-off risk: opening, hook, emotion, pacing, setup, or market promise.
-- A concrete explanation of why the chapter may not get traffic, clicks, retention, or follow-up reading.
+- An evidence-backed editorial hypothesis about text signals that may affect willingness to continue.
 - A copyable revision prompt: concrete instructions you can pass to a writing AI, not vague critique.
-- A retest loop: run the revised chapter again and compare whether the core issue changed.
+- A versioned retest loop: preserve before/after text and compare resolved, recurring, and newly introduced issues instead of relying on a score alone.
 - Advanced assets: reference-sample rubrics, full-book character/world analysis, relationship graphs, timelines, and export packs.
 
 ## Why Not Use Built-In Review From A One-Click Writing Tool
 
-One-click writing tools are good at producing more text. AI Novel Diagnosis Desk focuses on why the text does not keep readers.
+One-click writing tools are good at producing more text. AI Novel Diagnosis Desk focuses on how an editor inspects evidence, chooses a revision, and verifies the result.
 
 | One-click writing tool | AI Novel Diagnosis Desk |
 | --- | --- |
-| Generates more prose | Finds why readers do not continue |
+| Generates more prose | Turns editorial judgment into a verifiable revision workflow |
 | Often gives generic critique | Ties diagnosis to text evidence |
 | Tends to rewrite for you | Explains the cause before giving a revision prompt |
 | Hard to compare before and after | Supports a retest loop |
@@ -75,7 +77,7 @@ One-click writing tools are good at producing more text. AI Novel Diagnosis Desk
 Short version:
 
 ```text
-One-click writing tools help you write more. AI Novel Diagnosis Desk helps you understand why the writing does not retain readers.
+One-click writing tools help you write more. AI Novel Diagnosis Desk helps you judge, revise, and learn like an editor.
 ```
 
 ## How It Diagnoses What Is Wrong
@@ -83,19 +85,19 @@ One-click writing tools help you write more. AI Novel Diagnosis Desk helps you u
 It should not only give a score, and you should not have to blindly trust AI. The report follows one evidence chain:
 
 ```text
-Problem -> Text evidence -> Reader reaction -> Revision priority -> Revision prompt -> Retest checklist
+Editorial standard -> Candidate issue -> Text evidence -> Possible reader impact -> Author decision -> Revision boundary -> Revision prompt -> Versioned retest
 ```
 
 It focuses on:
 
-- Where chapter one loses readers.
+- Which chapter-one signals may increase drop-off risk.
 - Whether the title/blurb promise matches the chapter experience.
 - Whether the protagonist has a concrete goal, pressure, loss, and choice.
 - Whether payoff, conflict, and emotion arrive too late.
 - Whether exposition blocks the story.
-- Whether the text wastes clicks even when it gets traffic.
+- When real behavior data exists, which text risks may be associated with clicks that do not convert into continued reading.
 
-It does not predict platform algorithms. It diagnoses whether the text wastes the click it already got.
+It does not predict platform algorithms. Without controlled behavior data, it presents text-side risk hypotheses rather than claiming the cause of actual reader loss.
 
 ## Is AI Book Analysis Just Copying
 
@@ -142,7 +144,7 @@ _The interface is evolving quickly; use the current app as the source of truth._
 Good fit:
 
 - New web novel writers who finished a first chapter but do not know why readers may drop off.
-- Writers who want to know what is wrong with their novel, why it gets no traffic, or why readers do not continue.
+- Writers who want a systematic text review and, when behavior data is available, a cautious investigation of why readers may not continue.
 - Writers who want AI critique to become executable revision tasks, not comments like "the pacing is slow".
 - Writers who want to learn how mature samples deliver genre promise, character relationships, and emotional payoffs.
 - Creators who want to turn a full TXT novel into character cards, world books, relationship graphs, timelines, and writing assets.
@@ -158,7 +160,7 @@ Not a good fit:
 For first-time users, start with the shortest loop:
 
 ```text
-Paste your chapter -> run chapter triage -> read the biggest retention problem -> copy the revision prompt -> revise and run it again
+Paste a chapter -> inspect evidence -> confirm or reject issues -> save a revision plan -> create V2 -> run an independent retest -> decide whether the lesson should be retained
 ```
 
 When you need a deeper critique, move into the advanced workflow:
@@ -179,14 +181,14 @@ The current UI is organized into four workspaces: `/diagnose` for chapter diagno
 
 First-chapter triage:
 
-- Paste only your own first chapter and get positioning, selling points, the biggest problem, concrete fixes, and a revision prompt.
-- Run the revised chapter again and compare quickScore plus issue changes.
+- Paste your own first chapter and get positioning, selling points, a highest-priority issue candidate, concrete fixes, and a revision prompt.
+- Save the revised chapter as a real version and compare issue states and evidence; `quickScore` is only a compatibility severity summary.
 - Start without reference samples, platform profiles, or complex configuration.
 
 Advanced chapter critique:
 
 - Analyze a mature reference chapter and infer category, theme, tags, implicit expectations, and title/blurb promises.
-- Generate a transferable rubric, then score your own chapter with the same standard.
+- Generate a transferable rubric, then inspect your chapter against the same standard; evidence and action take priority over an aggregate score.
 - Use impressions, CTR, 30s/60s read retention, completion rate, and follow rate as diagnostic context.
 
 Full-book visual analysis:
@@ -339,7 +341,7 @@ Open the Web URL for the app UI. `http://localhost:3001` is the API server root,
 - `apps/web`: Next.js console for chapter triage, advanced critique, AI settings, and full-book analysis.
 - `apps/desktop`: Electron desktop shell. In development it loads the local Web app; packaged builds start bundled API and Next sidecars.
 - `services/api`: NestJS API for text cleaning, chapter splitting, async jobs, full-book analysis, and exports.
-- `packages/ai-core`: Shared types, scoring metrics, and analysis contracts.
+- `packages/ai-core`: Shared editorial issue, evidence, retest, and compatibility scoring contracts.
 
 ## Local Data
 
@@ -405,7 +407,9 @@ pnpm run doctor
 
 ## Current Limitations
 
-- This is an Alpha / MVP project. AI analysis and scoring are not guaranteed to be correct.
+- This is an Alpha / MVP project. Outputs are evidence-backed editorial hypotheses, not independently validated objective measurements.
+- `quickScore` summarizes issue severity for compatibility; `confidence` summarizes evidence/context sufficiency. Neither is a quality score or calibrated probability of correctness.
+- A repeated cached result or same-model self-review does not demonstrate that a revision worked; product-effect claims require independent editor labels and controlled before/after evaluation.
 - Partial results are persisted, and failed/interrupted full-book jobs have a basic resume path. More granular partial export and persisted graph-review corrections are still being iterated.
 - Relationship graphs support local manual corrections and correction-aware JSON export, but correction records are not yet stored as a separate database entity.
 - For real PostgreSQL deployments, use committed Drizzle migrations. Generate a new migration after schema changes, then run `pnpm --filter api db:migrate`.
@@ -424,6 +428,7 @@ pnpm run doctor
 - Repository: [github.com/myyimu/ai-novel-diagnosis](https://github.com/myyimu/ai-novel-diagnosis)
 - Contact: [xiaoke5211@gmail.com](mailto:xiaoke5211@gmail.com)
 - Contributing: see [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Product doctrine and evaluation boundaries: see [docs/product-doctrine.md](./docs/product-doctrine.md)
 - Security policy: see [SECURITY.md](./SECURITY.md)
 - GitHub Social Preview candidate: [docs/assets/github-social-preview.png](./docs/assets/github-social-preview.png).
 
