@@ -335,6 +335,10 @@ function ProjectChapterWorkspace({
 	const [previewRewrites, setPreviewRewrites] = useState<Record<string, string>>({});
 	const [rewriteLoading, setRewriteLoading] = useState(false);
 	const [rewriteError, setRewriteError] = useState<string | null>(null);
+	const [editorOpen, setEditorOpen] = useState(false);
+	const [editorMode, setEditorMode] = useState<"edit" | "replace">("edit");
+	const [editorText, setEditorText] = useState(chapterText);
+	const replacementInputRef = useRef<HTMLInputElement | null>(null);
 	const getIssueState = useCallback(
 		(issueId: string): IssueState => issueStates[issueId] ?? "pending",
 		[issueStates],
@@ -537,7 +541,8 @@ function ProjectChapterWorkspace({
 			return;
 		}
 		if (resolvedCount > 0) {
-			setChapterTab("retest");
+			setChapterTab("diagnosis");
+			onRerun();
 			return;
 		}
 		if (acceptedCount > 0) {
@@ -546,6 +551,35 @@ function ProjectChapterWorkspace({
 		}
 		setChapterTab("annotation");
 		setCommentsOpen(true);
+	}
+
+	function openEditor(mode: "edit" | "replace") {
+		if (!result) {
+			onRerun();
+			return;
+		}
+		setEditorMode(mode);
+		setEditorText(chapterText);
+		setEditorOpen(true);
+	}
+
+	function saveEditedText() {
+		if (!result || !onSaveRevision(editorText, result)) return;
+		setEditorOpen(false);
+		setChapterTab("retest");
+	}
+
+	async function handleReplacementFile(file?: File) {
+		if (!file) return;
+		try {
+			const replacementText = await file.text();
+			if (!replacementText.trim()) return;
+			setEditorMode("replace");
+			setEditorText(replacementText);
+			setEditorOpen(true);
+		} finally {
+			if (replacementInputRef.current) replacementInputRef.current.value = "";
+		}
 	}
 
 	useEffect(() => {
@@ -832,12 +866,14 @@ function ProjectChapterWorkspace({
 										</Button>
 										<Button
 											variant="outline"
+											onClick={() => openEditor("edit")}
 											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
 										>
 											编辑正文
 										</Button>
 										<Button
 											variant="outline"
+											onClick={() => replacementInputRef.current?.click()}
 											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
 										>
 											替换正文
@@ -1141,6 +1177,22 @@ function ProjectChapterWorkspace({
 					onApply={applyRewritePreview}
 				/>
 			) : null}
+			<input
+				ref={replacementInputRef}
+				type="file"
+				accept="text/plain,.txt,.md"
+				className="hidden"
+				onChange={(event) => void handleReplacementFile(event.target.files?.[0])}
+			/>
+			{editorOpen ? (
+				<ChapterEditorModal
+					mode={editorMode}
+					value={editorText}
+					onChange={setEditorText}
+					onClose={() => setEditorOpen(false)}
+					onSave={saveEditedText}
+				/>
+			) : null}
 		</div>
 	);
 }
@@ -1163,6 +1215,60 @@ function EntryCard({
 			<strong className="block text-[13px]">{title}</strong>
 			<span className="mt-1 block text-xs leading-5 text-[#69707d]">{description}</span>
 		</button>
+	);
+}
+
+function ChapterEditorModal({
+	mode,
+	value,
+	onChange,
+	onClose,
+	onSave,
+}: {
+	mode: "edit" | "replace";
+	value: string;
+	onChange: (value: string) => void;
+	onClose: () => void;
+	onSave: () => void;
+}) {
+	const title = mode === "replace" ? "替换正文" : "编辑正文";
+	return (
+		<div className="fixed inset-0 z-[90] grid place-items-center bg-[rgba(22,27,34,.42)] p-4">
+			<section className="flex max-h-[88vh] w-[min(860px,100%)] flex-col rounded-[18px] bg-white shadow-[0_22px_70px_rgba(20,25,35,.28)]">
+				<header className="flex items-start justify-between gap-4 border-b border-[#e6e8eb] px-5 py-4">
+					<div>
+						<h2 className="text-lg font-bold">{title}</h2>
+						<p className="mt-1 text-xs leading-5 text-[#69707d]">
+							确认后会保存为新版本，当前版本保持可回退。
+						</p>
+					</div>
+					<button
+						type="button"
+						onClick={onClose}
+						className="grid size-8 place-items-center rounded-lg border border-[#d4d8de] text-sm font-bold text-[#69707d]"
+					>
+						×
+					</button>
+				</header>
+				<textarea
+					value={value}
+					onChange={(event) => onChange(event.target.value)}
+					className="m-5 min-h-[360px] resize-y rounded-xl border border-[#d8dbe0] p-4 text-sm leading-7 outline-none focus:border-[#ff8a61]"
+				/>
+				<footer className="flex justify-end gap-2 border-t border-[#e6e8eb] px-5 py-4">
+					<Button variant="outline" onClick={onClose}>
+						取消
+					</Button>
+					<Button
+						onClick={onSave}
+						disabled={!value.trim()}
+						className="bg-[#ff5a1f] text-white hover:bg-[#e84b13]"
+					>
+						保存为新版本
+					</Button>
+				</footer>
+			</section>
+		</div>
 	);
 }
 
