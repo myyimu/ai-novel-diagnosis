@@ -1,57 +1,39 @@
----
-title: AI网文诊断台文档索引
-status: active
-version: 1.0.0
-last_updated: 2026-07-18
----
+# 产品与研发文档索引
 
-# AI网文诊断台文档索引
+全仓文档共同服务一个方向：把成熟编辑的诊断、取舍、改稿和复诊方法，变成作者可检查、可执行、可验证的写作教练。
 
-本文档是仓库文档入口。后续 AI 和开发者应优先阅读这里列出的权威文档，不再从旧的一次性评审或迁移计划里推断产品方向。
+开始任何产品或研发任务前，先读 [`product-doctrine.md`](./product-doctrine.md)。它定义产品主线、科学边界、功能门槛和完整改稿闭环。
 
-## 必读顺序
+## 文档层级
 
-1. [产品总原则](./product-doctrine.md)
-2. [技术架构](./architecture.md)
-3. [快速诊断 V3 执行规格](./quick-diagnosis-v3-execution-spec.md)
-4. [故事体检产品设计](./story-intelligence/README.md)
-5. [故事体检实施计划](./story-intelligence/implementation-plan.md)
-6. [故事体检模型协议](./story-intelligence/model-protocol.md)
-7. [故事体检机器执行计划](./story-intelligence/execution-plan.yaml)
+### 第一层：不可偏离的产品约束
 
-## 当前产品主线
+- [`product-doctrine.md`](./product-doctrine.md)：最高层产品原则与科学有效性门禁。
+- [`feature-prioritization-and-design-slots.md`](./feature-prioritization-and-design-slots.md)：能力优先级与页面归属。
 
-```text
-快速诊断
--> 原文证据
--> 改稿 Prompt
--> 真实版本复诊
--> 方法论沉淀
--> 整书故事体检
-```
+### 第二层：当前架构与核心链路
 
-所有新文档都必须说明自己属于哪一段链路。不能说明的文档，不应新增。
+- [`architecture.md`](./architecture.md)：系统边界、数据流和工作区结构。
+- [`quick-diagnosis-v3-execution-spec.md`](./quick-diagnosis-v3-execution-spec.md)：快速诊断的输入、模型输出、确定性后处理和兼容策略。
 
-## 文档分层
+### 第三层：故事体检执行包
 
-| 层级 | 文档 | 用途 |
-| --- | --- | --- |
-| 产品原则 | `product-doctrine.md` | 约束所有产品和工程文档的方向 |
-| 架构 | `architecture.md` | 说明工作区、服务、路由和数据流 |
-| 快速诊断 | `quick-diagnosis-v3-execution-spec.md` | 单章急诊和改稿复诊的工程规格 |
-| 故事体检 | `story-intelligence/*` | 整书一致性、结构、人物、剧情漏洞等能力 |
-| 示例 | `examples/*` | 展示诊断输出形态 |
-| 资产 | `assets/*` | README 和文档截图 |
+- [`story-intelligence/implementation-plan.md`](./story-intelligence/implementation-plan.md)：面向开发 AI 的权威任务计划。
+- [`story-intelligence/README.md`](./story-intelligence/README.md)：产品设计和页面融合。
+- [`story-intelligence/model-protocol.md`](./story-intelligence/model-protocol.md)：事实、候选、复核和证据协议。
+- [`story-intelligence/execution-plan.yaml`](./story-intelligence/execution-plan.yaml)：机器可读依赖图。
 
-## 已合并并删除的旧文档类型
+### 第四层：示例与延后决策
 
-以下类型不再作为权威入口维护：
+- `examples/`：示例只证明交互和契约，不作为模型准确率证据。
+- `l4-auto-refresh-deferred.md`：后置技术决策，不改变产品优先级。
 
-- 早期产品定位讨论
-- 一次性内容清晰度评审
-- 一次性拆书可理解性评审
-- UX 重构迁移计划
-- 旧版工作流改造草案
-- Web 重构临时计划
+## 文档维护规则
 
-这些内容的有效结论已经合并到产品总原则、架构文档、快速诊断规格或故事体检文档中。
+1. 产品目标统一写成“编辑方法蒸馏 + 作者决策 + 真实改稿 + 可验证复诊”。
+2. “读者流失、流量、留存”等无行为数据结论必须写成风险假设。
+3. 分数和置信度不得写成客观质量或正确概率。
+4. 新指标必须进入证据、作者确认、改稿和复诊链路，不能只增加图表。
+5. 已完成、失效或被权威文档覆盖的迁移/评审稿直接删除；需要保留的历史决策改写成简短 ADR。
+6. `AGENTS.md` 与 `CLAUDE.md` 由 One CLI 管理，不在产品文档重写范围内。
+7. 运行指南、变更日志、安全策略等事实性文档只需保持准确，不强行重复产品叙事。

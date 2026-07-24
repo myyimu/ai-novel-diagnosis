@@ -2,18 +2,18 @@
 title: 故事体检与叙事智能产品设计
 status: in-progress
 version: 1.2.0
-last_updated: 2026-07-18
+last_updated: 2026-07-17
+implementation_audit: "SIA-001/SIA-002/SIA-005 已验收；SIA-003/SIA-004 部分实现；其余未开始"
 execution_plan: ./execution-plan.yaml
 model_protocol: ./model-protocol.md
 implementation_plan: ./implementation-plan.md
-product_doctrine: ../product-doctrine.md
 ---
 
 # 故事体检与叙事智能产品设计
 
 > 本设计服从 [`../product-doctrine.md`](../product-doctrine.md)。六项能力不是新的“AI 评分器”，而是把整书编辑的事实核对、结构检查和修改复盘交给作者的证据层。
 
-> 实施任务以 [`implementation-plan.md`](./implementation-plan.md) 和 [`execution-plan.yaml`](./execution-plan.yaml) 为准；当前文档提供产品边界，不代表功能已经全部实现。
+> 实施状态以 [`implementation-plan.md`](./implementation-plan.md#21-当前实施验收快照2026-07-17) 为准；当前尚未达到可发布纵切，不能把已有底层代码表述为完整故事体检能力。
 
 ## 1. 决策结论
 
@@ -172,14 +172,14 @@ interface RevisionSession {
   -> 复用整书 Map-Reduce 生成故事体检
   -> 在项目页确认 1～3 个问题
   -> 加入修改计划
-  -> 修改后复诊
+  -> 保存 V2 正文并独立复诊
   -> 仅把重复且确认的问题沉淀为方法论
 ```
 
 边界保持如下：
 
-- `QuickReviewResult.issues` 继续回答“这一章为什么没人追”，不新增全书漏洞 category；可以只保存 `relatedStoryAuditFindingIds` 做交叉引用。
-- 深度质检/Rubric 继续回答“相对成熟样本标准写得怎样”，故事体检不替代参考样本评分。
+- `QuickReviewResult.issues` 继续提出“本章最值得先检查的阅读风险”，不新增全书漏洞 category；可以只保存 `relatedStoryAuditFindingIds` 做交叉引用。
+- 深度质检/Rubric 继续回答“相对所选成熟样本标准有哪些文本差异”，故事体检不替代参考样本检查，也不由总分决定好坏。
 - 关系图谱继续回答“谁和谁如何关联”，人物一致性只在图谱之上增加随时间变化的状态和冲突。
 - 诊断看板继续做复诊趋势，不重复展示某一本书的时间线、结构图或人物弧。
 
@@ -293,7 +293,8 @@ interface RevisionSession {
 ### Milestone D：人物弧与复诊（P2）
 
 - 生成多维人物弧光图。
-- 对比修改前后问题状态，不只对比分数。
+- 保存不可变 V1/V2 和实际采用项；对比修改前后问题状态，不只对比分数。
+- verifier 与生成改稿的模型角色分离，高风险 finding 进入人工抽检。
 - 把反复确认的问题沉淀到项目方法论，不把一次误报写入长期规则。
 
 ## 8. 成功标准与停止条件
@@ -303,7 +304,7 @@ interface RevisionSession {
 - 100% 的高优问题有可点击原文证据。
 - 统计字段可由相同输入稳定复算。
 - 部分分析明确显示覆盖章节，不伪装成全书结论。
-- 人工确认集上，时间冲突高优候选精确率达到 85%，人物/剧情漏洞达到 70% 后才默认展示为警报。
+- 由至少 3 名独立编辑盲标的隐藏集上，时间冲突高优候选精确率达到 85%，人物/剧情漏洞达到 70% 后才默认展示为警报；同时报告严重问题漏报率。
 - 用户能把问题标记为创作意图或误报，且复诊时保留该决定。
 - 单次体检先给 1～3 个最重要问题，不用红点淹没作者。
 
@@ -317,11 +318,13 @@ interface RevisionSession {
 - 不自动改写整本小说。
 - 不把用户原稿发送到未明确选择的外部模型。
 - 不在单章输入上声称完成整书一致性检查。
+- 不用工程 fixture 通过或同模型自评宣称编辑有效性。
 
 ## 10. 给执行模型的入口
 
 实现前必须依次读取：
 
-1. 本文档：确定产品边界和页面位置。
-2. [`model-protocol.md`](./model-protocol.md)：确定数据契约、流水线和模型输出规则。
-3. [`execution-plan.yaml`](./execution-plan.yaml)：按依赖顺序领取任务并执行验收。
+1. [`implementation-plan.md`](./implementation-plan.md)：按当前代码结构领取任务并执行验收。
+2. 本文档：确定产品边界和页面位置。
+3. [`model-protocol.md`](./model-protocol.md)：确定数据契约、流水线和模型输出规则。
+4. [`execution-plan.yaml`](./execution-plan.yaml)：读取机器可解析的依赖图。

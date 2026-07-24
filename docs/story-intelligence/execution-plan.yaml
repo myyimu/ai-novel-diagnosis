@@ -1,8 +1,9 @@
 schema_version: "agent-execution-plan.v2"
 document_version: "1.2.0"
 status: "in-progress"
-last_updated: "2026-07-19"
-project_root: "/Users/yimu/work/ai-novel-diagnosis"
+last_updated: "2026-07-17"
+last_acceptance_audit: "2026-07-17"
+project_root: "E:/ai-novel-diagnosis"
 objective: "复用现有整书 Map-Reduce 和证据索引，把整书编辑方法蒸馏成作者可确认、可改稿、可保存真实版本并可独立复诊的故事体检。"
 authoritative_plan: "docs/story-intelligence/implementation-plan.md"
 
@@ -14,14 +15,62 @@ required_reading:
   - "docs/story-intelligence/README.md"
 
 current_state:
-  restored_from_chat_history: true
-  restored_at: "2026-07-18"
-  implementation_must_be_revalidated: true
+  story_audit_implemented: "partial"
+  shared_book_result_contract: false
+  shared_story_audit_contract: true
   existing_job_system: "BookAnalysisJobService"
   existing_result_storage: "book_analysis_jobs.result jsonb"
   existing_evidence_index: "BookAnalysisResult.mapReduce.chunkEvidenceIndex"
+  project_has_book_job_link: true
+  finding_review_persistence: "implemented-unit-tested-integration-pending"
   project_health_route: false
-  current_priority_task: "SIA-005"
+  current_active_task: "SIA-004"
+
+implementation_status_legend:
+  accepted: "验收标准成立且相关质量门通过。"
+  partial: "已有实现，但至少一个任务验收标准尚未成立。"
+  in_progress: "存在进行中的未提交实现，且当前质量门未全部通过。"
+  not_started: "未发现可验收实现。"
+
+validation_snapshot:
+  audited_at: "2026-07-17"
+  ai_core:
+    status: "passed"
+    tests: "56/56"
+    gates:
+      - "check"
+      - "test"
+      - "build"
+  web:
+    status: "passed"
+    tests: "91/91"
+    gates:
+      - "check"
+      - "test"
+      - "build"
+    note: "构建路由中尚无 /project/health。"
+  api:
+    status: "passed"
+    tests: "224/224"
+    passed_gates:
+      - "lint"
+      - "typecheck"
+      - "format"
+      - "test"
+      - "build"
+  workspace:
+    status: "story-audit-in-progress"
+    note: "SIA-005 的适用 API 门禁已通过；整体 Story Audit 尚未达到发布定义。"
+
+next_execution:
+  resume_order:
+    - "SIA-004"
+    - "SIA-003"
+    - "SIA-006"
+  immediate_exit_criteria:
+    - "在模型 reduce 失败时仍返回 coverage 和确定性对话统计。"
+    - "把运行中 partial chapter maps 派生成 partial Story Audit。"
+    - "补齐 SIA-004 的失败与 partial 回归测试后再改为 accepted。"
 
 decisions:
   analysis_result_path: "BookAnalysisResult.storyAudit"
@@ -62,10 +111,33 @@ guardrails:
   - "复诊必须比较真实 V1/V2；正文 hash 未变化或缓存命中不得创建版本。"
   - "工程 fixture 通过不得表述为产品有效性验证。"
 
+milestones:
+  - id: "mvp"
+    name: "可信故事体检纵切"
+    tasks:
+      - "SIA-001"
+      - "SIA-002"
+      - "SIA-003"
+      - "SIA-004"
+      - "SIA-005"
+      - "SIA-006"
+      - "SIA-007"
+      - "SIA-008"
+    release_outcome: "我的作品可获得对话统计、时间冲突、双证据和人工复核。"
+  - id: "advanced"
+    name: "结构、人物与漏洞"
+    tasks:
+      - "SIA-009"
+      - "SIA-010"
+      - "SIA-011"
+      - "SIA-012"
+    release_outcome: "结构图、人设一致性、人物弧光、剧情漏洞进入作者确认、真实版本改稿、独立复诊和导出闭环。"
+
 tasks:
   - id: "SIA-001"
     title: "共享契约与确定性对话统计"
-    implementation_status: "needs_revalidation"
+    implementation_status: "accepted"
+    audit_note: "公共契约、复核状态分离、确定性统计、测试与 changeset 均已验证；ai-core 56/56 测试及 check/build 通过。"
     depends_on: []
     scope:
       create:
@@ -83,7 +155,8 @@ tasks:
 
   - id: "SIA-002"
     title: "任务用途、profiles 与缓存版本"
-    implementation_status: "needs_revalidation"
+    implementation_status: "accepted"
+    audit_note: "基础输入、默认值、任务恢复和缓存版本语义已验收；Web 用户入口与实际传参由 SIA-008 负责。"
     depends_on:
       - "SIA-001"
     scope:
@@ -102,7 +175,8 @@ tasks:
 
   - id: "SIA-003"
     title: "项目关联和人工复核持久化"
-    implementation_status: "needs_revalidation"
+    implementation_status: "partial"
+    audit_note: "迁移、关联字段、review repository/service/controller 与单元测试已存在；缺 HTTP/E2E、真实迁移/刷新验收，analysisPurpose DTO 仍为 string。"
     depends_on:
       - "SIA-002"
     scope:
@@ -115,6 +189,8 @@ tasks:
         - "services/api/src/modules/workspace/dto/workspace-assets.dto.ts"
         - "services/api/src/modules/workspace/workspace-assets.repository.ts"
         - "apps/web/src/stores/workspace-store.ts"
+      generated:
+        - "services/api/drizzle/migrations/<generated-story-audit-migration>.sql"
     acceptance:
       - "WorkspaceProject 可恢复 bookJobId 和 analysisPurpose。"
       - "finding review 可幂等 upsert 且刷新后存在。"
@@ -122,15 +198,16 @@ tasks:
 
   - id: "SIA-004"
     title: "故事体检纵切接入现有 BookAnalysisJob"
-    implementation_status: "needs_revalidation"
+    implementation_status: "partial"
+    audit_note: "成功路径已嵌入 coverage/dialogue，profiles 已参与执行分流；模型或 reduce 失败时仍不能独立返回确定性统计，任务运行中的 partial Story Audit 尚未接入。"
     depends_on:
       - "SIA-001"
       - "SIA-002"
     scope:
       create:
         - "services/api/src/modules/story-audit/story-audit.module.ts"
-        - "services/api/src/modules/story-audit/story-audit.service.ts"
-        - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
+        - "services/api/src/modules/story-audit/story-audit-orchestrator.service.ts"
+        - "services/api/src/modules/story-audit/story-audit-orchestrator.service.spec.ts"
       modify:
         - "services/api/src/modules/book/book.module.ts"
         - "services/api/src/modules/book/book-analysis.service.ts"
@@ -142,26 +219,30 @@ tasks:
 
   - id: "SIA-005"
     title: "章节 Map 原子事实扩展"
-    implementation_status: "priority_next"
+    implementation_status: "accepted"
+    audit_note: "轻索引与深拆均抽取受限事件/事实；服务端双层验证 quote/offset，丢弃无锚点显式事实并拒绝模型自封 author-canon；coverage/profile 语义与旧整书回归已通过，API 224/224 测试及 check/build 通过。"
     depends_on:
       - "SIA-004"
     scope:
       modify:
         - "services/api/src/modules/book/book-analysis.service.ts"
         - "services/api/src/modules/book/book-analysis.service.spec.ts"
-        - "services/api/src/modules/story-audit/story-audit.service.ts"
-        - "services/api/src/modules/story-audit/story-audit.service.spec.ts"
+        - "services/api/src/modules/story-audit/story-audit-orchestrator.service.ts"
     acceptance:
       - "事件和事实只基于当前可见章节。"
       - "explicit-text 事实全部有有效 sourceAnchor。"
       - "旧整书 fixture 和导出保持兼容。"
-      - "coverage、sceneExtractionRate、evidenceValidationRate 来自真实处理结果。"
 
   - id: "SIA-006"
     title: "全局时间图与冲突规则"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-005"
+    scope:
+      create:
+        - "services/api/src/modules/story-audit/story-graph.service.ts"
+        - "services/api/src/modules/story-audit/story-graph.service.spec.ts"
+        - "fixtures/story-audit/timeline-manifest.json"
     acceptance:
       - "线性时间和倒叙不误报。"
       - "时间环、年龄矛盾、同时异地生成双证据 candidate。"
@@ -169,9 +250,13 @@ tasks:
 
   - id: "SIA-007"
     title: "候选复核器"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-006"
+    scope:
+      create:
+        - "services/api/src/modules/story-audit/story-audit-verifier.service.ts"
+        - "services/api/src/modules/story-audit/story-audit-verifier.service.spec.ts"
     acceptance:
       - "未知 anchorId 被拒绝。"
       - "证据不足不得 verified。"
@@ -180,11 +265,25 @@ tasks:
 
   - id: "SIA-008"
     title: "首个可发布 Web 纵切"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-003"
       - "SIA-004"
       - "SIA-007"
+    scope:
+      create:
+        - "apps/web/src/app/project/health/page.tsx"
+        - "apps/web/src/components/workspace/project/story-audit/StoryAuditPage.tsx"
+        - "apps/web/src/components/workspace/project/story-audit/StoryAuditOverview.tsx"
+        - "apps/web/src/components/workspace/project/story-audit/ContinuityPanel.tsx"
+        - "apps/web/src/components/workspace/project/story-audit/TextStatisticsPanel.tsx"
+        - "apps/web/src/components/workspace/project/story-audit/FindingInspector.tsx"
+      modify:
+        - "apps/web/src/components/workspace/research/ResearchBookPage.tsx"
+        - "apps/web/src/components/workspace/project/ProjectAssetTabs.tsx"
+        - "apps/web/src/lib/workspace-routes.ts"
+        - "apps/web/src/hooks/use-workspace-handlers.ts"
+        - "apps/web/src/lib/workspace-analysis-client.ts"
     acceptance:
       - "我的作品进入 project/health，参考作品旧流程不变。"
       - "双证据可回跳。"
@@ -193,20 +292,32 @@ tasks:
 
   - id: "SIA-009"
     title: "剧情结构视图"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-005"
       - "SIA-008"
+    scope:
+      create:
+        - "services/api/src/modules/story-audit/story-structure.service.ts"
+        - "apps/web/src/components/workspace/project/story-audit/StructurePanel.tsx"
+      reuse:
+        - "apps/web/src/lib/book-comprehension.ts"
+        - "apps/web/src/lib/relationship-graph.ts"
     acceptance:
       - "剧情线矩阵、时间切换和伏笔回收边有证据。"
       - "未选择模板时不评分。"
 
   - id: "SIA-010"
     title: "人物状态与人物弧光"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-005"
       - "SIA-008"
+    scope:
+      create:
+        - "services/api/src/modules/story-audit/character-ledger.service.ts"
+        - "services/api/src/modules/story-audit/character-arc.service.ts"
+        - "apps/web/src/components/workspace/project/story-audit/CharacterPanel.tsx"
     acceptance:
       - "合理成长、伪装和情境变化不被规则直接判错。"
       - "每个弧光变化点有 scene/chapter 和 evidence。"
@@ -214,11 +325,15 @@ tasks:
 
   - id: "SIA-011"
     title: "剧情漏洞候选"
-    implementation_status: "completed"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-007"
       - "SIA-009"
       - "SIA-010"
+    scope:
+      create:
+        - "services/api/src/modules/story-audit/plot-gap-detector.service.ts"
+        - "services/api/src/modules/story-audit/plot-gap-detector.service.spec.ts"
     acceptance:
       - "高优候选至少双证据或正文证据加 canon。"
       - "partial 输入不生成全书 dropped_goal/unresolved_setup 结论。"
@@ -226,26 +341,29 @@ tasks:
 
   - id: "SIA-012"
     title: "复诊、导出、评测与发布"
-    implementation_status: "partial"
+    implementation_status: "not_started"
     depends_on:
       - "SIA-008"
       - "SIA-009"
       - "SIA-010"
       - "SIA-011"
+    scope:
+      modify:
+        - "services/api/src/modules/book/book-export.service.ts"
+        - "services/api/src/modules/workspace/workspace-assets-export.ts"
+        - "apps/web/src/components/workspace/project/ProjectRevisionsPage.tsx"
+        - "apps/web/src/components/workspace/project/ProjectExportPage.tsx"
+        - "README.md"
+        - "docs/architecture.md"
+        - "docs/feature-prioritization-and-design-slots.md"
+      create:
+        - "fixtures/story-audit/README.md"
+        - "fixtures/story-audit/manifest.json"
     acceptance:
       - "时间冲突高优 precision >= 0.85。"
       - "人物/剧情漏洞高优 precision >= 0.70。"
       - "Markdown/JSON 导出不包含全文。"
       - "全仓 check/test/build 和 one:doctor 通过。"
-    implementation_notes:
-      - "项目导出新增 storyAudit 摘要分区，包含 coverage、确定性对话统计、finding 证据短引文、替代解释、人工复核状态和关联复诊。"
-      - "JSON 导出移除正文版本 text，仅保留版本元数据；Markdown 导出不输出正文全文。"
-      - "体检页 finding 可保存为 planned，并把候选判断、证据短引文、替代解释和修改动作带入快速诊断上下文；真实章节正文和 V1/V2 仍由快速诊断复诊流程保存。"
-      - "快速诊断保存真实 revision session 时会关联 pending storyAuditFindingIds，后端同步成功后清空 pending 关联。"
-      - "后端新增 SIA-012 precision report 入口，按高优时间冲突 >= 0.85 与高优人物/剧情漏洞 >= 0.70 分桶评估；只有 independent_editor_set 且标注桶充足时才可声明验收通过。"
-      - "precision report 现支持 story-audit-evaluation-suite/v1 JSON 导入边界，仅接收 finding id/category/severity 与人工标签，不保存正文、全文索引或人工 reviewState。"
-      - "工程 fixture 只验证导出和评测计算契约；precision 门槛仍需真实独立编辑标注集验证。"
-      - "check/test/build 已通过；one:doctor 使用 /Users/yimu/Downloads/one-cli_darwin_arm64 加入 PATH 后通过，仅剩 deploy profile warning。"
 
 recommended_delivery_order:
   - "SIA-001"

@@ -2,12 +2,12 @@
 
 `apps/web` 是 AI网文诊断台的 Next.js 前端控制台。
 
-它的产品入口以“先诊断，再改稿”为主：用户粘贴自己的第一章，系统用 AI 小说诊断找出最大流失点，解释网文为什么没人追，再复制可执行的改稿 Prompt；改完后再复诊，确认问题是否真的被解决。进阶能力再承接 AI 拆书、成熟样本质检、整书可视化拆解、关系图谱复核和导出资产。
+它的产品入口以“按编辑方法诊断，再由作者确认、改稿和复诊”为主：用户粘贴章节后获得问题候选、证据和替代解释，确认取舍并保存修改计划，生成真实 V2 后再独立复诊。进阶能力承接故事体检、成熟样本研究、整书可视化、关系图谱复核和导出资产。产品语义以 [`../../docs/product-doctrine.md`](../../docs/product-doctrine.md) 为准。
 
 ## 主要视图
 
 - 诊断工作区：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`，覆盖快速诊断、深度质检、评分报告和证据链。
-- 项目工作区：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export`，覆盖当前项目、故事体检、复诊记录、方法论卡片和导出资产。
+- 项目工作区：`/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`（故事体检落地后含 `/project/health`），覆盖正文版本、作者决定、修改计划、复诊、经验证的方法和导出资产。
 - 研究工作区：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`，覆盖整书拆解、样本对比、套路沉淀和研究资料。
 - 设置工作区：`/settings/provider`、`/settings/dashboard`、`/settings/history`，覆盖模型配置、诊断看板和历史任务。
 
@@ -76,7 +76,8 @@ pnpm --filter web build
 
 ## 维护原则
 
-- 首屏优先服务新手最短闭环：粘贴章节、诊断、改稿 Prompt、复诊。
+- 首屏优先服务新手入口：粘贴章节、查看证据、确认问题、进入真实改稿；完整闭环在项目工作区完成。
 - 高级参数默认后置，避免把新手第一步变成配置表单。
-- 故事体检属于项目工作区的整书事实层，不应在首页包装成质量总分大屏。
 - 组件内尽量只保留状态绑定和事件编排；请求、缓存、进度状态机和展示派生逻辑放在 `src/lib`。
+- UI 必须把 `quickScore` 标为兼容严重度摘要，把 `confidence` 标为证据/上下文充分度；不得显示成客观质量或准确概率。
+- 缓存命中不能创建复诊版本；“已解决”必须来自真实正文变化和复核，不能只改本地展示状态。
