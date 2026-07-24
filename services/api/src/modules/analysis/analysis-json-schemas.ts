@@ -153,7 +153,11 @@ export const quickReviewJsonSchema = objectSchema({
     ["summary"],
   ),
   mainProblem: stringSchema,
-  issues: arraySchema(diagnosisIssueSchema),
+  issues: {
+    ...arraySchema(diagnosisIssueSchema),
+    minItems: 3,
+    maxItems: 5,
+  },
   strengths: arraySchema(strengthSchema),
   revisionPlan: revisionPlanSchema,
   promptDiagnosis: promptDiagnosisSchema,
@@ -381,4 +385,13 @@ export const researchQaJsonSchema = objectSchema({
   keyFindings: arraySchema(researchFindingSchema),
   sourceGaps: stringArraySchema,
   nextQuestions: stringArraySchema,
+});
+
+export const rewriteParagraphsJsonSchema = objectSchema({
+  rewrites: arraySchema(
+    objectSchema({
+      id: stringSchema,
+      revisedText: stringSchema,
+    }),
+  ),
 });

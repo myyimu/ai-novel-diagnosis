@@ -165,6 +165,31 @@ function createService(options?: { modelProviders?: { chat: jest.Mock } }) {
 }
 
 describe("AnalysisService", () => {
+  it("should not fabricate a rewrite in mock mode", async () => {
+    const service = createService();
+    const result = await service.rewriteParagraphs({
+      provider: { kind: "mock" },
+      chapterTitle: "第一章",
+      targets: [
+        {
+          id: "paragraph-0",
+          originalText: "叶初夏攥紧了灵符，没有立刻开口。",
+          instructions: ["补强她面对危机时的反应。"],
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      mode: "mock",
+      rewrites: [
+        {
+          id: "paragraph-0",
+          revisedText: "叶初夏攥紧了灵符，没有立刻开口。",
+        },
+      ],
+    });
+  });
+
   it("should reuse ai-core preview scoring for the preview endpoint", () => {
     const service = createService();
 
@@ -255,6 +280,7 @@ describe("AnalysisService", () => {
     expect(result.confidence).toBe(0);
     expect(result.mainProblem).toContain("演示模式");
     expect(result.gateDecision).toBe("revise");
+    expect(result.issues).toHaveLength(3);
     expect(result.issues?.[0]?.title).toContain("演示模式");
   });
 

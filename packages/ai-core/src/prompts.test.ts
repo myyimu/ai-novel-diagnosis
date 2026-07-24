@@ -57,6 +57,7 @@ describe("buildQuickReviewPrompt", () => {
     expect(routeQuickReviewPromptMode("human-draft", "middle")).toBe("chapter-progress");
     expect(prompt.messages[1]?.content).toContain("任务模式：chapter-progress");
     expect(prompt.messages[1]?.content).toContain("本次诊断重点：检查本章推进是否有效");
+    expect(prompt.messages[0]?.content).toContain("返回 3-5 个按优先级排序的决定性问题");
     expect(prompt.messages[1]?.content).not.toContain("前 300-800 字");
     expect(prompt.messages[1]?.content).toContain("禁止输出 recommendedPlatforms");
   });

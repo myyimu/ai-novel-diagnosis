@@ -27,11 +27,13 @@ import { GenerateMethodologyCardsDto } from "./dto/generate-methodology-cards.dt
 import { InferReferenceProfileDto } from "./dto/infer-reference-profile.dto";
 import { PreviewAnalysisDto } from "./dto/preview-analysis.dto";
 import { QuickReviewDto } from "./dto/quick-review.dto";
+import { RewriteParagraphsDto } from "./dto/rewrite-paragraphs.dto";
 import { ScoreChapterDto } from "./dto/score-chapter.dto";
 import {
   methodologyCardsJsonSchema,
   platformFitJsonSchema,
   quickReviewJsonSchema,
+  rewriteParagraphsJsonSchema,
   referenceProfileJsonSchema,
   rubricJsonSchema,
   scoreJsonSchema,
@@ -375,6 +377,86 @@ export class AnalysisService {
       input,
       textSample,
     );
+  }
+
+  async rewriteParagraphs(input: RewriteParagraphsDto) {
+    const provider = this.resolveQuickReviewProvider(input.provider);
+    if (provider.kind === "mock") {
+      return {
+        mode: "mock",
+        rewrites: input.targets.map((target) => ({
+          id: target.id,
+          revisedText: target.originalText,
+        })),
+      };
+    }
+
+    const content = await this.modelProviders.chat(
+      provider,
+      [
+        {
+          role: "system",
+          content:
+            "你是中文网文责编。只返回合法 JSON，不使用 Markdown。revisedText 必须是可直接替换原文的小说正文，绝不能包含诊断意见、修改说明、项目符号或元话语。",
+        },
+        { role: "user", content: this.buildRewriteParagraphsPrompt(input) },
+      ],
+      {
+        maxOutputTokens: 2400,
+        jsonSchema: {
+          name: "rewrite_paragraphs_result",
+          schema: rewriteParagraphsJsonSchema,
+        },
+      },
+    );
+    const parsed = await parseJsonWithRepair(
+      this.modelProviders,
+      provider,
+      content,
+      "正文润色",
+    );
+    const source =
+      parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    const modelRewrites = Array.isArray(source.rewrites) ? source.rewrites : [];
+    const byId = new Map(
+      modelRewrites.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const record = item as Record<string, unknown>;
+        const id = asText(record.id).trim();
+        const revisedText = asText(record.revisedText).trim();
+        return id && revisedText ? [[id, revisedText] as const] : [];
+      }),
+    );
+    return {
+      mode: "model",
+      rewrites: input.targets.map((target) => ({
+        id: target.id,
+        revisedText: byId.get(target.id) || target.originalText,
+      })),
+    };
+  }
+
+  private buildRewriteParagraphsPrompt(input: RewriteParagraphsDto): string {
+    const targets = input.targets
+      .map(
+        (target) =>
+          `ID: ${target.id}\n原文：${target.originalText}\n润色约束：${target.instructions.join("；")}`,
+      )
+      .join("\n\n");
+    return `请润色下列小说正文片段。章节：${input.chapterTitle || "未命名章节"}
+
+硬性要求：
+1. revisedText 是替换 originalText 的正文，不能把“建议”“应当”“优先展示”等编辑语言写进小说。
+2. 保留角色姓名、既有事实、事件顺序、世界观和叙事人称；不要杜撰后续情节。
+3. 仅按每段的约束增强表达、动机、冲突或钩子，保持自然、具体、可读。
+4. 必须逐项返回，id 原样保留。
+
+待润色段落：
+${targets}
+
+严格返回：{"rewrites":[{"id":"...","revisedText":"..."}]}`;
   }
 
   async generateMethodologyCards(input: GenerateMethodologyCardsDto) {
@@ -1512,16 +1594,41 @@ export class AnalysisService {
         "使用真实模型时，要求它基于正文证据输出问题、读者影响和改稿动作。",
       blocksNextStep: true,
     };
+    const issues: DiagnosisIssue[] = [
+      issue,
+      {
+        ...issue,
+        id: "issue-2",
+        severity: "medium",
+        title: "当前结果不能验证正文中的其他诊断假设。",
+        description:
+          "mock provider 不会读取叙事节奏、人物目标或冲突压力等实际信号，展示内容仅用于确认页面和数据结构可用。",
+        readerImpact:
+          "作者若据此直接修改正文，可能错过真正影响阅读期待的原因。",
+        fixAction: "连接真实模型后，使用相同正文重新运行诊断并对照证据。",
+      },
+      {
+        ...issue,
+        id: "issue-3",
+        severity: "medium",
+        title: "演示模式无法提供可复诊的真实证据链。",
+        description:
+          "演示结果不产生经过模型判断的正文证据，不能作为改稿计划或后续版本复诊的依据。",
+        readerImpact: "缺少可回查证据会让作者难以判断修改是否真正解决问题。",
+        fixAction:
+          "启用真实模型后保存本次诊断，再基于实际 finding 建立改稿计划。",
+      },
+    ];
     const nextPrompt = this.normalizeNextPrompt(null, {
       positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
       sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
-      mainProblem: issue.title,
+      mainProblem: issues[0].title,
       actionableFixes: [
         "切换共享站或付费模型后重试快速点评。",
         "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
         "需要完整证据链时进入章节质检并生成 Rubric。",
       ],
-      issues: [issue],
+      issues,
       previousPrompt: input.previousPrompt,
     });
 
@@ -1533,7 +1640,7 @@ export class AnalysisService {
       chapterPosition: this.normalizeChapterPosition(input.chapterPosition),
       positioning: "本地演示模式只验证快速点评结构，不调用外部模型。",
       sellingPoints: ["已有章节正文入口", "可以进入完整 Rubric 评分流程"],
-      mainProblem: issue.title,
+      mainProblem: issues[0].title,
       actionableFixes: [
         "切换共享站或付费模型后重试快速点评。",
         "如果使用付费模型，请确认 Base URL、Model 和 API Key 都已填写。",
@@ -1546,15 +1653,15 @@ export class AnalysisService {
       confidence: 0,
       gateDecision: "revise",
       gateReason: "当前是演示结构，真实稿件判断需要切换可用模型。",
-      oneLineDiagnosis: `这稿最该先解决：${issue.title}`,
-      issues: [issue],
+      oneLineDiagnosis: `这稿最该先解决：${issues[0].title}`,
+      issues,
       strengths: [
         {
           title: "已经有可诊断文本入口",
           keepAction: "下一步切换真实模型后保留相同输入复测。",
         },
       ],
-      revisionPlan: this.normalizeRevisionPlan(null, [issue]),
+      revisionPlan: this.normalizeRevisionPlan(null, issues),
       promptDiagnosis: this.normalizePromptDiagnosis(
         null,
         input.previousPrompt,
