@@ -211,7 +211,7 @@ Relationship graph workbench:
 - Desktop shell: Electron
 - DB: PostgreSQL / PGlite fallback
 - Package manager: pnpm
-- Model provider: BYOK, OpenAI-compatible
+- Model provider: shared/public entry points, BYOK, OpenAI-compatible
 
 ## Model Providers
 
@@ -410,6 +410,7 @@ pnpm run doctor
 - This is an Alpha / MVP project. Outputs are evidence-backed editorial hypotheses, not independently validated objective measurements.
 - `quickScore` summarizes issue severity for compatibility; `confidence` summarizes evidence/context sufficiency. Neither is a quality score or calibrated probability of correctness.
 - A repeated cached result or same-model self-review does not demonstrate that a revision worked; product-effect claims require independent editor labels and controlled before/after evaluation.
+- Revision text versions and human review states for story-audit findings are persisted. Per-issue decisions for chapter triage, actual adoption tracking, and a complete independent retest remain under development; missing objects must not be presented as evidence that a revision worked.
 - Partial results are persisted, and failed/interrupted full-book jobs have a basic resume path. More granular partial export and persisted graph-review corrections are still being iterated.
 - Relationship graphs support local manual corrections and correction-aware JSON export, but correction records are not yet stored as a separate database entity.
 - For real PostgreSQL deployments, use committed Drizzle migrations. Generate a new migration after schema changes, then run `pnpm --filter api db:migrate`.

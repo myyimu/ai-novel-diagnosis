@@ -1,9 +1,9 @@
 ---
 title: 故事体检与叙事智能产品设计
-status: in-progress
-version: 1.2.0
-last_updated: 2026-07-17
-implementation_audit: "SIA-001/SIA-002/SIA-005 已验收；SIA-003/SIA-004 部分实现；其余未开始"
+status: implemented-code-validation-pending
+version: 1.3.0
+last_updated: 2026-07-24
+implementation_audit: "SIA-001 至 SIA-012 的代码纵切已合入；独立编辑标注、精确率门槛和产品有效性验证尚未完成"
 execution_plan: ./execution-plan.yaml
 model_protocol: ./model-protocol.md
 implementation_plan: ./implementation-plan.md
@@ -13,7 +13,7 @@ implementation_plan: ./implementation-plan.md
 
 > 本设计服从 [`../product-doctrine.md`](../product-doctrine.md)。六项能力不是新的“AI 评分器”，而是把整书编辑的事实核对、结构检查和修改复盘交给作者的证据层。
 
-> 实施状态以 [`implementation-plan.md`](./implementation-plan.md#21-当前实施验收快照2026-07-17) 为准；当前尚未达到可发布纵切，不能把已有底层代码表述为完整故事体检能力。
+> 故事体检代码纵切已落地：项目健康页、事实/候选/复核、结构/人物/漏洞视图、修订关联和导出均已接入。它仍是 Alpha 能力：独立编辑标注、精确率门槛和产品有效性验证尚未完成，不能包装成客观质量判断。
 
 ## 1. 决策结论
 
@@ -271,26 +271,26 @@ interface RevisionSession {
 
 ## 7. 分阶段路线
 
-### Milestone A：可信事实层（P0）
+### Milestone A：可信事实层（已实现）
 
 - 新建独立 `StoryAuditResult`，不要继续膨胀 `QuickReviewResult`。
 - 复用整书拆章、异步任务和证据锚点。
 - 增加场景、事件、人物事实和 canon 数据结构。
 - 上线对话占比、分析覆盖率和 JSON/Markdown 导出。
 
-### Milestone B：时间与结构（P0/P1）
+### Milestone B：时间与结构（已实现）
 
 - 建立全局事件图和时间约束检查。
 - 上线时间冲突候选、事件时间线、章节 × 剧情线矩阵。
 - 所有问题支持跳回双侧原文。
 
-### Milestone C：人物与漏洞（P1）
+### Milestone C：人物与漏洞（已实现）
 
 - 建立人物状态账本和知识边界。
 - 使用“候选发现 → 独立复核 → 规则校验”流水线。
 - 上线作者确认、创作意图、误报和修改计划状态。
 
-### Milestone D：人物弧与复诊（P2）
+### Milestone D：人物弧与复诊（代码已实现，产品验证待完成）
 
 - 生成多维人物弧光图。
 - 保存不可变 V1/V2 和实际采用项；对比修改前后问题状态，不只对比分数。

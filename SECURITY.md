@@ -23,7 +23,7 @@ Please do not open public issues for vulnerabilities involving API keys, uploade
 
 ## Data Handling Notes
 
-- The default model setup is BYOK. API keys are sent per request and should not be persisted by the app.
+- The app can use an operator-configured shared provider or BYOK. User-provided API keys are sent per request and should not be persisted by the app.
 - Local uploaded texts, model outputs, and intermediate analysis artifacts are stored under `.local` during development.
 - `.local` is ignored by Git and should never be committed.
 - Users are responsible for confirming that they have the rights or legal basis to upload texts and export derived assets.

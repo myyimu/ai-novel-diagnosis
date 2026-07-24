@@ -1,11 +1,13 @@
 schema_version: "agent-execution-plan.v2"
-document_version: "1.2.0"
-status: "in-progress"
-last_updated: "2026-07-17"
-last_acceptance_audit: "2026-07-17"
+document_version: "1.4.0"
+status: "active-maintenance-plan"
+last_updated: "2026-07-24"
+last_acceptance_audit: "historical snapshot: 2026-07-17"
 project_root: "E:/ai-novel-diagnosis"
 objective: "复用现有整书 Map-Reduce 和证据索引，把整书编辑方法蒸馏成作者可确认、可改稿、可保存真实版本并可独立复诊的故事体检。"
 authoritative_plan: "docs/story-intelligence/implementation-plan.md"
+current_source_of_truth: "AGENTS.md, docs/product-doctrine.md, docs/architecture.md, current code and tests"
+task_entries_scope: "Current maintenance plan. File paths in task scopes must be reconciled with current code before editing."
 
 required_reading:
   - "AGENTS.md"
@@ -15,24 +17,24 @@ required_reading:
   - "docs/story-intelligence/README.md"
 
 current_state:
-  story_audit_implemented: "partial"
-  shared_book_result_contract: false
+  story_audit_implemented: "code-mainline-complete; external-product-validation-pending"
+  shared_book_result_contract: true
   shared_story_audit_contract: true
   existing_job_system: "BookAnalysisJobService"
   existing_result_storage: "book_analysis_jobs.result jsonb"
   existing_evidence_index: "BookAnalysisResult.mapReduce.chunkEvidenceIndex"
   project_has_book_job_link: true
-  finding_review_persistence: "implemented-unit-tested-integration-pending"
-  project_health_route: false
-  current_active_task: "SIA-004"
+  finding_review_persistence: "implemented"
+  project_health_route: true
+  current_active_task: "SIA-004/SIA-005 maintenance rework"
 
-implementation_status_legend:
+historical_implementation_status_legend:
   accepted: "验收标准成立且相关质量门通过。"
   partial: "已有实现，但至少一个任务验收标准尚未成立。"
   in_progress: "存在进行中的未提交实现，且当前质量门未全部通过。"
   not_started: "未发现可验收实现。"
 
-validation_snapshot:
+historical_validation_snapshot:
   audited_at: "2026-07-17"
   ai_core:
     status: "passed"
@@ -48,7 +50,7 @@ validation_snapshot:
       - "check"
       - "test"
       - "build"
-    note: "构建路由中尚无 /project/health。"
+    note: "这是 2026-07-17 的快照；/project/health 已于后续实现。"
   api:
     status: "passed"
     tests: "224/224"
@@ -59,10 +61,10 @@ validation_snapshot:
       - "test"
       - "build"
   workspace:
-    status: "story-audit-in-progress"
-    note: "SIA-005 的适用 API 门禁已通过；整体 Story Audit 尚未达到发布定义。"
+    status: "historical-story-audit-in-progress"
+    note: "这是 2026-07-17 的快照；后续 SIA-006 至 SIA-012 已实现，产品有效性验证仍待完成。"
 
-next_execution:
+historical_next_execution:
   resume_order:
     - "SIA-004"
     - "SIA-003"

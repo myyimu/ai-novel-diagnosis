@@ -2,7 +2,7 @@
 
 感谢你关注 AI网文诊断台 / AI Novel Diagnosis Desk。
 
-This project is in Alpha. Contributions are welcome, but please keep changes small, testable, and aligned with the local-first, BYOK product direction and the authoritative [product doctrine](./docs/product-doctrine.md).
+This project is in Alpha. Contributions are welcome, but please keep changes small, testable, and aligned with the local-first deployment model, optional shared providers and BYOK, and the authoritative [product doctrine](./docs/product-doctrine.md).
 
 ## Before You Start
 

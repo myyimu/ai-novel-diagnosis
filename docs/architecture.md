@@ -32,7 +32,7 @@ AI网文诊断台是本地部署、证据驱动的编辑写作教练。架构必
 控制台按工作流组织为四个工作区：
 
 - 诊断工作区 `/diagnose`：`/diagnose/quick` 承接低门槛编辑初筛；`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence` 承接进阶标准和证据检查，但不能独立完成改稿闭环。
-- 项目工作区 `/project`：`/project/current`、`/project/revisions`、`/project/methodology`、`/project/export` 管理正文版本、作者判断、修改计划、故事体检、复诊记录、经验证的方法和导出资产，是核心价值承载区。
+- 项目工作区 `/project`：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export` 管理正文版本、作者判断、修改计划、故事体检、复诊记录、经验证的方法和导出资产，是核心价值承载区。
 - 研究工作区 `/research`：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials` 承接整书拆解、样本对比、套路沉淀和研究资料。
 - 设置工作区 `/settings`：`/settings/provider`、`/settings/dashboard`、`/settings/history` 管理模型供应商、诊断看板和历史任务。
 

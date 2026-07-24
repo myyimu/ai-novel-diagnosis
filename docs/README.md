@@ -16,12 +16,12 @@
 - [`architecture.md`](./architecture.md)：系统边界、数据流和工作区结构。
 - [`quick-diagnosis-v3-execution-spec.md`](./quick-diagnosis-v3-execution-spec.md)：快速诊断的输入、模型输出、确定性后处理和兼容策略。
 
-### 第三层：故事体检执行包
+### 第三层：故事体检协议与实施记录
 
-- [`story-intelligence/implementation-plan.md`](./story-intelligence/implementation-plan.md)：面向开发 AI 的权威任务计划。
+- [`story-intelligence/implementation-plan.md`](./story-intelligence/implementation-plan.md)：2026-07-17 实施前基线与任务范围记录；不是当前任务指令。
 - [`story-intelligence/README.md`](./story-intelligence/README.md)：产品设计和页面融合。
 - [`story-intelligence/model-protocol.md`](./story-intelligence/model-protocol.md)：事实、候选、复核和证据协议。
-- [`story-intelligence/execution-plan.yaml`](./story-intelligence/execution-plan.yaml)：机器可读依赖图。
+- [`story-intelligence/execution-plan.yaml`](./story-intelligence/execution-plan.yaml)：历史机器可读依赖图；代码状态以当前架构、测试和实现为准。
 
 ### 第四层：示例与延后决策
 

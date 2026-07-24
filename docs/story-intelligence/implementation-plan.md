@@ -1,21 +1,21 @@
 ---
 title: 故事体检落地实施与 AI 开发指挥计划
-status: ready-for-execution
-version: 1.1.0
-last_updated: 2026-07-17
+status: active-maintenance-plan
+version: 1.3.0
+last_updated: 2026-07-24
 workspace: E:/ai-novel-diagnosis
 machine_plan: ./execution-plan.yaml
 contract: ./model-protocol.md
 product_design: ./README.md
 ---
 
-# 故事体检落地实施与 AI 开发指挥计划
+# 故事体检实施与维护计划
 
 ## 1. 文档用途
 
-本文档是“剧情漏洞、时间冲突、人设一致性、剧情结构图表、人物弧光、对话占比”等能力的工程实施总指挥。它基于 2026-07-17 的当前代码，而不是理想化目录。
+本文是“剧情漏洞、时间冲突、人设一致性、剧情结构图表、人物弧光、对话占比”等能力的当前维护计划。它以 2026-07-24 的 `master` 代码为基线：已合入的纵切保持可用，新增工作只能补齐明确的失败降级、证据校验和产品验证，不重建平行任务系统。
 
-其他 AI 开始开发前必须按顺序阅读：
+开始维护或新增能力前，按顺序阅读：
 
 1. 根目录 `AGENTS.md`。
 2. 本文档。
@@ -23,13 +23,13 @@ product_design: ./README.md
 4. [`README.md`](./README.md)。
 5. [`execution-plan.yaml`](./execution-plan.yaml)。
 
-发生冲突时，优先级为：`AGENTS.md > implementation-plan.md > model-protocol.md > README.md > execution-plan.yaml`。
+发生冲突时，优先级为：`AGENTS.md > product-doctrine.md > implementation-plan.md > model-protocol.md > README.md > execution-plan.yaml`。计划中的文件路径必须以当前代码结构为准，不得从过期任务名推导新目录。
 
 ## 2. 一句话目标
 
 在不削弱“快速诊断一章为什么没人追”的前提下，把现有整书 Map-Reduce 升级为可追溯的故事体检：统计由程序计算，冲突由规则提出，模型只复核候选，作者决定是否属于问题，确认后的问题进入现有改稿和复诊闭环。
 
-## 3. 当前代码事实
+## 3. 当前代码事实（2026-07-24）
 
 ### 3.1 工作区
 
@@ -60,17 +60,13 @@ One CLI 0.1.0 当前可用。不得手改受 One 管理的 `AGENTS.md`、`CLAUDE
 | 关系图与理解图 | `relationship-graph.ts`、`book-comprehension.ts` | 结构页复用视图模型和证据跳转模式 |
 | 整书导出 | `BookExportService` | 增加故事体检分区，不新建导出系统 |
 
-### 3.3 当前真实缺口
+### 3.3 当前维护缺口
 
-1. 仓库中不存在 `StoryAudit` 代码，只有规划文档。
-2. `BookAnalysisJobSnapshot.result` 仍为 `unknown`；Web 在 `workspace-store.ts` 单独维护 `BookAnalysisResult`，API/共享包没有统一契约。
-3. `AnalyzeBookDto` 和上传任务 DTO 没有“我的作品/参考作品”或分析 profiles。
-4. 整书缓存键只包含 provider、题材、标题和文本指纹，缺少 purpose、profiles、schemaVersion、promptVersion。
-5. `WorkspaceProject` 只有 id/name/time，没有 `bookJobId`，重新打开项目无法稳定恢复对应整书任务。
-6. 人工复核状态没有独立持久化位置。把它写回模型 result 会污染不可变分析结果。
-7. `/project` 只有 current/revisions/methodology/export，没有故事体检入口。
-8. `/research/book` 完成后只引导去图谱和资料，默认语义仍偏参考作品拆解。
-9. 当前整书分析不支持真正的单章版本链，因此“增量重算”不能作为首版承诺。
+1. `packages/ai-core` 已提供共享 `StoryAuditResult` 和确定性 `dialogue-statistics`；任何契约变更必须同时更新其测试和导出。
+2. `BookAnalysisService` 继续负责 Map-Reduce、章节标准化与绝对 `sourceAnchor` 回查；它调用 `StoryAuditService` 组装结果，不能再引入第二套 job、缓存或正文索引。
+3. `StoryAuditService`、`story-audit-evaluation.ts`、`story-audit-verifier.ts` 已承载组装、规则候选和证据复核；当前没有独立 `StoryAuditModule` 或 orchestrator 文件。
+4. Web 已有 `/project/health` 与 `ProjectHealthPage.tsx`，复核与项目资产经 workspace API 持久化；新视图优先拆分现有页面，不创建平行页面目录。
+5. 本轮维护重点是：模型/reduce 失败时仍返回覆盖率和对话统计；运行中或部分章节结果派生可信 `partial` 审计；章节 Map 的事件/事实/逻辑场景均经过去重、范围和锚点偏移校验。
 
 ## 4. 不可更改的架构决策
 
@@ -138,38 +134,31 @@ packages/ai-core/src/
 └── dialogue-statistics.test.ts
 
 services/api/src/modules/story-audit/
-├── story-audit.module.ts
-├── story-audit-orchestrator.service.ts
-├── story-audit-orchestrator.service.spec.ts
-├── story-audit-verifier.service.ts
-├── story-audit-verifier.service.spec.ts
-├── story-graph.service.ts
-├── story-graph.service.spec.ts
-├── story-structure.service.ts
-├── character-ledger.service.ts
-├── character-arc.service.ts
-├── plot-gap-detector.service.ts
-├── dto/
-│   └── review-story-audit-finding.dto.ts
-└── story-audit-review.controller.ts
+├── story-audit.service.ts              # 组装 coverage、统计、事实与 finding
+├── story-audit.service.spec.ts
+├── story-audit-evaluation.ts           # 规则候选和结构评估
+├── story-audit-evaluation.spec.ts
+├── story-audit-verifier.ts             # anchor 与候选复核
+└── story-audit-verifier.spec.ts
 
-services/api/src/dao/repositories/
-└── story-audit-review.repository.ts
+services/api/src/modules/book/
+├── book-analysis.service.ts            # Map-Reduce、chapter map 与绝对 anchor
+└── book.module.ts                      # 注册现有 StoryAuditService
+
+services/api/src/modules/workspace/
+├── workspace.controller.ts             # story-audit review 路由
+└── workspace-assets.repository.ts      # 项目资产和 review 持久化
 
 apps/web/src/app/project/health/
 └── page.tsx
 
-apps/web/src/components/workspace/project/story-audit/
-├── StoryAuditPage.tsx
-├── StoryAuditOverview.tsx
-├── ContinuityPanel.tsx
-├── StructurePanel.tsx
-├── CharacterPanel.tsx
-├── TextStatisticsPanel.tsx
-└── FindingInspector.tsx
+apps/web/src/components/workspace/project/
+├── ProjectHealthPage.tsx               # 现有故事体检组合页
+├── ProjectAssetTabs.tsx
+└── ProjectHealthPage.test.tsx
 ```
 
-`BookAnalysisService` 只负责把现有 Map-Reduce 结果交给 `StoryAuditOrchestratorService`。禁止继续把图算法、人物账本和 verifier 塞进当前已经很大的 service。
+`BookAnalysisService` 保持 Map-Reduce、chapter map 和证据锚点的唯一来源，并把规范化输入交给 `StoryAuditService`。规则评估和 verifier 不得回塞入 `BookAnalysisService`；新增领域能力优先在现有 story-audit 服务中拆分。
 
 ## 6. 数据与迁移设计
 
@@ -345,7 +334,7 @@ dialogueAtoms[]（可选；比例仍由程序复算）
 
 ## 10. 实施任务包
 
-机器依赖图见 [`execution-plan.yaml`](./execution-plan.yaml)。以下任务描述为执行真相。
+机器依赖图见 [`execution-plan.yaml`](./execution-plan.yaml)。SIA-001～003 与 SIA-006～012 已有代码纵切；后续改动以维护验收为准。当前可执行重做任务是 SIA-004 与 SIA-005，旧任务中的文件名仅作设计溯源，不得覆盖本计划第 5 节的真实结构。
 
 ### SIA-001：共享契约与确定性对话统计
 
@@ -387,22 +376,19 @@ dialogueAtoms[]（可选；比例仍由程序复算）
 
 依赖：SIA-001、SIA-002。
 
-文件：
+维护范围：`book-analysis.service.ts/spec.ts`、`story-audit.service.ts/spec.ts`、`story-audit-evaluation.ts/spec.ts`、`workspace-store.ts`。复用现有 `StoryAuditService`，不得新建 module 或 orchestrator。
 
-- 新建 StoryAuditModule 和 orchestrator。
-- 修改 BookModule、BookAnalysisService、Web BookAnalysisResult。
+目标：在成功、模型失败、reduce 失败和运行中 partial 四种路径中，都以同一份章节输入派生 coverage；对话统计不依赖模型结果；结果继续嵌入 `BookAnalysisResult.storyAudit`。
 
-首版只生成 coverage + dialogue statistics，并嵌入 `BookAnalysisResult.storyAudit`。
-
-验收：不增加新任务端点；mock 和真实 provider 均可返回契约；模型失败时统计仍可返回；partial coverage 正确。
+验收：不增加新任务系统或轮询端点；mock 与真实 provider 返回同一契约；失败时保留确定性统计和明确降级原因；partial coverage 列出已分析/未分析章节并禁止全书性结论。
 
 ### SIA-005：章节 Map 原子事实扩展
 
 依赖：SIA-004。
 
-文件：`book-analysis.service.ts/spec.ts`、story audit coercion/validation。
+维护范围：`book-analysis.service.ts/spec.ts`、`story-audit.service.ts/spec.ts`、`story-audit-verifier.ts/spec.ts` 和 Golden fixtures。首版场景定义为“每个可见章节一个逻辑场景”；不在本任务改写预处理器或引入第二套 scene splitter。
 
-验收：事件和事实只基于可见章节；所有 explicit-text 事实有有效 anchor；旧 fixture 与导出兼容；不得继续引入 `any`。
+验收：事件、事实和场景只来自当前可见章节；重复 chapterId、范围外 chapterId 与无效 quote/offset 均被丢弃；explicit-text 事实必须关联有效绝对 `sourceAnchor`；偏移回查失败不得生成 finding；旧 fixture、导出和 API/Web 类型兼容；不得引入 `any`。
 
 ### SIA-006：全局时间图与冲突规则
 
