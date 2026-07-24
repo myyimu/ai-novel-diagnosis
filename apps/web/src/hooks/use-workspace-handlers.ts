@@ -129,6 +129,7 @@ import {
 	type ScoreResult,
 	type WorkspaceProject,
 	defaultBookText,
+	defaultOwnDraftStoryAuditProfiles,
 	defaultWorkspaceProject,
 	defaultProvider,
 	defaultReferenceText,
@@ -1054,6 +1055,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			bookTitle,
 			bookText,
 			bookFile,
+			purpose: "own-draft",
+			profiles: defaultOwnDraftStoryAuditProfiles,
 		});
 	}
 
@@ -1930,6 +1933,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			const createdUploadJob = await createBookAnalysisJobFromUpload(
 				upload.id,
 				providerPayload,
+				{
+					purpose: "own-draft",
+					profiles: defaultOwnDraftStoryAuditProfiles,
+				},
 			);
 			setBookJob(createdUploadJob);
 			rememberBookAnalysis(cacheKey, createdUploadJob, null);
@@ -1968,6 +1975,11 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 					const recreatedJob = await createBookAnalysisJobFromUpload(
 						bookJob.uploadId,
 						providerPayload,
+						{
+							purpose: bookJob.inputSummary.purpose ?? "own-draft",
+							profiles:
+								bookJob.inputSummary.profiles ?? defaultOwnDraftStoryAuditProfiles,
+						},
 					);
 					setBookJob(recreatedJob);
 					rememberBookAnalysis(cacheKey, recreatedJob, null);

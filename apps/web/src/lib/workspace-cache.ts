@@ -1,5 +1,6 @@
 import type {
 	BookAnalysisJob,
+	BookAnalysisPurpose,
 	BookAnalysisResult,
 	CachedBookAnalysis,
 	CachedQuickReview,
@@ -11,11 +12,15 @@ import type {
 	QuickReviewResult,
 	RubricResult,
 	ScoreResult,
+	StoryAuditProfile,
 } from "@/stores/workspace-store";
 import {
 	QUICK_REVIEW_PROMPT_VERSION,
 	QUICK_REVIEW_SAMPLING_VERSION,
 } from "@ai-novel-diagnosis/ai-core";
+
+const STORY_AUDIT_SCHEMA_VERSION = "story-audit.v1";
+const STORY_AUDIT_PROMPT_VERSION = "story-audit.v1";
 
 export function hashString(value: string): string {
 	let hash = 0;
@@ -246,12 +251,16 @@ export function buildBookAnalysisCacheKey({
 	bookTitle,
 	bookText,
 	bookFile,
+	purpose,
+	profiles,
 }: {
 	provider: ProviderForm;
 	bookGenre: string;
 	bookTitle: string;
 	bookText: string;
 	bookFile: File | null;
+	purpose?: BookAnalysisPurpose;
+	profiles?: StoryAuditProfile[];
 }) {
 	const bookFingerprint = bookFile
 		? [bookFile.name, bookFile.size, bookFile.lastModified].join(":")
@@ -262,6 +271,10 @@ export function buildBookAnalysisCacheKey({
 		bookGenre,
 		bookTitle.trim(),
 		bookFingerprint,
+		STORY_AUDIT_SCHEMA_VERSION,
+		STORY_AUDIT_PROMPT_VERSION,
+		purpose ?? "reference-study",
+		[...(profiles ?? [])].sort().join(","),
 	].join("|");
 }
 

@@ -30,6 +30,17 @@ export type {
 
 export const defaultQuickReviewDiagnosticFocus = "为什么没人追读";
 
+export type BookAnalysisPurpose = "own-draft" | "reference-study";
+export type StoryAuditProfile = "statistics" | "continuity" | "structure" | "character" | "full";
+
+export const defaultOwnDraftStoryAuditProfiles: StoryAuditProfile[] = [
+	"statistics",
+	"continuity",
+	"structure",
+	"character",
+	"full",
+];
+
 export interface ProviderForm {
 	preset: ProviderPresetId;
 	kind: ProviderKind;
@@ -526,6 +537,7 @@ export interface BookAnalysisResult {
 		}>;
 		reducerNote: string;
 	};
+	analysisPurpose?: BookAnalysisPurpose;
 }
 
 export interface BookPreprocessingPreview {
@@ -555,6 +567,8 @@ export interface BookAnalysisJob {
 		title: string;
 		genre: string;
 		textLength: number;
+		purpose?: BookAnalysisPurpose;
+		profiles?: StoryAuditProfile[];
 	};
 	progress: {
 		stage: "queued" | "preprocess" | "map" | "reduce" | "succeeded" | "failed";
@@ -727,7 +741,7 @@ export interface WorkspaceProject {
 	id: string;
 	name: string;
 	bookJobId?: string;
-	analysisPurpose?: string;
+	analysisPurpose?: BookAnalysisPurpose | "story-audit";
 	createdAt: string;
 	updatedAt: string;
 }

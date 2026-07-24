@@ -1,11 +1,13 @@
 import { deleteJson, getJson, patchJson, postForm, postJson } from "@/lib/api-client";
 import type {
 	BookAnalysisJob,
+	BookAnalysisPurpose,
 	BookUploadPreview,
 	MethodologyCard,
 	PersistedResearchLibrary,
 	ProjectMethodologyCard,
 	ProviderForm,
+	StoryAuditProfile,
 	QuickReviewInputKind,
 	QuickReviewResult,
 	ResearchComparisonResult,
@@ -551,9 +553,18 @@ export function uploadBookPreview({
 	return postForm<BookUploadPreview>("/analysis/book/uploads", formData);
 }
 
-export function createBookAnalysisJobFromUpload(uploadId: string, provider: ProviderForm) {
+export function createBookAnalysisJobFromUpload(
+	uploadId: string,
+	provider: ProviderForm,
+	options?: {
+		purpose?: BookAnalysisPurpose;
+		profiles?: StoryAuditProfile[];
+	},
+) {
 	return postJson<BookAnalysisJob>(`/analysis/book/uploads/${uploadId}/jobs`, {
 		provider,
+		...(options?.purpose ? { purpose: options.purpose } : {}),
+		...(options?.profiles ? { profiles: options.profiles } : {}),
 	});
 }
 
