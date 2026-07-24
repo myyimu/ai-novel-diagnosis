@@ -1,4 +1,5 @@
 ﻿import { BadRequestException, Injectable } from "@nestjs/common";
+import { type StoryAuditProfile } from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
@@ -118,6 +119,7 @@ export class BookAnalysisService {
   }
 
   async createBookAnalysisJob(input: AnalyzeBookDto) {
+    const storyAuditInput = this.resolveStoryAuditInput(input);
     return this.bookJobs.create(
       {
         title: input.title,
@@ -128,6 +130,8 @@ export class BookAnalysisService {
         ...(input.publishedYear !== undefined
           ? { publishedYear: input.publishedYear }
           : {}),
+        purpose: storyAuditInput.purpose,
+        profiles: storyAuditInput.profiles,
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);
@@ -237,11 +241,14 @@ export class BookAnalysisService {
 
     const upload = await this.bookUploads.getUpload(job.uploadId);
     const text = await this.bookUploads.readNormalizedText(job.uploadId);
+    const storyAuditInput = this.resolveStoryAuditInput(job.inputSummary);
     const analysisInput: AnalyzeBookDto = {
       provider: input.provider,
       title: upload.title,
       genre: upload.genre,
       text,
+      purpose: storyAuditInput.purpose,
+      profiles: storyAuditInput.profiles,
     };
 
     return this.bookJobs.resume(input.jobId, async (jobId) => {
@@ -409,12 +416,45 @@ export class BookAnalysisService {
     };
   }
 
+  private resolveStoryAuditInput(input: {
+    purpose?: string;
+    profiles?: readonly string[];
+  }): {
+    purpose: "own-draft" | "reference-study";
+    profiles: StoryAuditProfile[];
+  } {
+    const purpose =
+      input.purpose === "own-draft" ? "own-draft" : "reference-study";
+    const requested = Array.isArray(input.profiles)
+      ? input.profiles.filter(
+          (profile): profile is StoryAuditProfile =>
+            profile === "statistics" ||
+            profile === "continuity" ||
+            profile === "structure" ||
+            profile === "character" ||
+            profile === "full",
+        )
+      : [];
+    const profiles =
+      purpose === "own-draft" && requested.length === 0
+        ? ([
+            "statistics",
+            "continuity",
+            "structure",
+            "character",
+          ] as StoryAuditProfile[])
+        : requested;
+    return { purpose, profiles };
+  }
+
   async createBookAnalysisJobFromUpload(input: {
     uploadId: string;
     provider: ProviderConfigDto;
     author?: string;
     platform?: string;
     publishedYear?: number;
+    purpose?: "own-draft" | "reference-study";
+    profiles?: StoryAuditProfile[];
   }) {
     const upload = await this.bookUploads.getUpload(input.uploadId);
     const text = await this.bookUploads.readNormalizedText(input.uploadId);
@@ -423,7 +463,10 @@ export class BookAnalysisService {
       title: upload.title,
       genre: upload.genre,
       text,
+      ...(input.purpose ? { purpose: input.purpose } : {}),
+      ...(input.profiles ? { profiles: input.profiles } : {}),
     };
+    const storyAuditInput = this.resolveStoryAuditInput(analysisInput);
 
     return this.bookJobs.create(
       {
@@ -435,6 +478,8 @@ export class BookAnalysisService {
         ...(input.publishedYear !== undefined
           ? { publishedYear: input.publishedYear }
           : {}),
+        purpose: storyAuditInput.purpose,
+        profiles: storyAuditInput.profiles,
       },
       async (jobId) => {
         await this.bookJobs.markRunning(jobId);
@@ -710,16 +755,21 @@ export class BookAnalysisService {
         ? this.mockBookReduce(input, preprocessing, chapterMaps)
         : await this.reduceBookMaps(input, preprocessing, chapterMaps);
     const normalized = this.normalizeBookAnalysisResult(input, reduced);
-    const storyAudit = this.storyAudit.buildStoryAudit({
-      bookJobId: options.jobId ?? "book-analysis-inline",
-      chapters,
-      chapterMaps,
-      totalChapterCount: chapters.length,
-    });
+    const storyAuditInput = this.resolveStoryAuditInput(input);
+    const storyAudit =
+      storyAuditInput.purpose === "own-draft" &&
+      storyAuditInput.profiles.length > 0
+        ? this.storyAudit.buildStoryAudit({
+            bookJobId: options.jobId ?? "book-analysis-inline",
+            chapters,
+            chapterMaps,
+            totalChapterCount: chapters.length,
+          })
+        : undefined;
 
     return {
       ...normalized,
-      storyAudit,
+      ...(storyAudit ? { storyAudit } : {}),
       preprocessing: {
         cleaning: preprocessing.cleaning,
         chapters: chapters.map(({ text: _text, ...chapter }) => chapter),
@@ -778,17 +828,22 @@ export class BookAnalysisService {
       ...base,
       ...partial,
     }) as Record<string, unknown>;
-    const storyAudit = this.storyAudit.buildStoryAudit({
-      bookJobId: job.id,
-      generatedAt: job.partialResult.savedAt,
-      chapters: preprocessing.chapters,
-      chapterMaps,
-      totalChapterCount: job.partialResult.totalChapters,
-    });
+    const storyAuditInput = this.resolveStoryAuditInput(job.inputSummary);
+    const storyAudit =
+      storyAuditInput.purpose === "own-draft" &&
+      storyAuditInput.profiles.length > 0
+        ? this.storyAudit.buildStoryAudit({
+            bookJobId: job.id,
+            generatedAt: job.partialResult.savedAt,
+            chapters: preprocessing.chapters,
+            chapterMaps,
+            totalChapterCount: job.partialResult.totalChapters,
+          })
+        : undefined;
 
     return {
       ...normalized,
-      storyAudit,
+      ...(storyAudit ? { storyAudit } : {}),
       preprocessing: {
         cleaning: preprocessing.cleaning,
         chapters: preprocessing.chapters.map(

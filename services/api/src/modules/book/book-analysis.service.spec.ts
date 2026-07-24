@@ -25,6 +25,35 @@ function createBookService(options?: {
 }
 
 describe("BookAnalysisService", () => {
+  describe("resolveStoryAuditInput", () => {
+    const resolve = createBookService() as unknown as {
+      resolveStoryAuditInput: (input: {
+        purpose?: string;
+        profiles?: string[];
+      }) => { purpose: "own-draft" | "reference-study"; profiles: string[] };
+    };
+
+    it("should apply the own-draft defaults only to an own draft", () => {
+      expect(resolve.resolveStoryAuditInput({ purpose: "own-draft" })).toEqual({
+        purpose: "own-draft",
+        profiles: ["statistics", "continuity", "structure", "character"],
+      });
+      expect(resolve.resolveStoryAuditInput({})).toEqual({
+        purpose: "reference-study",
+        profiles: [],
+      });
+    });
+
+    it("should retain valid requested profiles and discard invalid values", () => {
+      expect(
+        resolve.resolveStoryAuditInput({
+          purpose: "own-draft",
+          profiles: ["statistics", "not-a-profile"],
+        }),
+      ).toEqual({ purpose: "own-draft", profiles: ["statistics"] });
+    });
+  });
+
   it("should reject the legacy synchronous full-book endpoint", async () => {
     const service = createBookService();
 
@@ -562,6 +591,7 @@ describe("BookAnalysisService", () => {
       title: "测试书",
       genre: "xuanhuan",
       text: "主角进入考场...",
+      purpose: "own-draft",
     });
 
     expect(job.id).toBe("job-mock-1");
@@ -631,6 +661,8 @@ describe("BookAnalysisService", () => {
           title: "测试书",
           genre: "xuanhuan",
           textLength: 1200,
+          purpose: "own-draft",
+          profiles: ["statistics"],
         },
         preprocessing: {
           cleaning: {
