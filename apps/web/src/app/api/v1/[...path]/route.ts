@@ -119,6 +119,14 @@ function resolveProxyTimeoutMessage(path: string[]) {
 	return "Request timed out, please retry later";
 }
 
+function resolveProxyUnavailableMessage(path: string[]) {
+	if (isProviderTestPath(path)) {
+		return "Provider test proxy failed. Check network or server status";
+	}
+
+	return "本地 API 服务暂时不可用，可能正在启动或重启。请稍候重试。";
+}
+
 async function proxy(request: NextRequest, context: RouteContext) {
 	const { path } = await context.params;
 	const upstreamUrl = new URL(`${getApiBaseUrl()}/${path.map(encodeURIComponent).join("/")}`);
@@ -163,13 +171,14 @@ async function proxy(request: NextRequest, context: RouteContext) {
 		return new Response(
 			JSON.stringify({
 				code: -1,
-				message: "Provider test proxy failed. Check network or server status",
+				message: resolveProxyUnavailableMessage(path),
 				data: null,
 			}),
 			{
 				status: 502,
 				headers: {
 					"content-type": "application/json",
+					"x-api-proxy-error": "upstream-unavailable",
 				},
 			},
 		);

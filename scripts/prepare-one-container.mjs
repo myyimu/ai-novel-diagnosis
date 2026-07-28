@@ -59,7 +59,15 @@ function clean(relativePath) {
 	if (!absolutePath.startsWith(root)) {
 		throw new Error(`Refusing to remove outside workspace: ${absolutePath}`);
 	}
-	rmSync(absolutePath, { recursive: true, force: true });
+	// Native Next binaries can remain briefly locked on Windows immediately
+	// after a build. Retry the bounded, workspace-local cleanup instead of
+	// leaving an opaque EPERM failure for container dry-runs.
+	rmSync(absolutePath, {
+		recursive: true,
+		force: true,
+		maxRetries: 4,
+		retryDelay: 250,
+	});
 }
 
 function copy(fromRelativePath, toAbsolutePath) {

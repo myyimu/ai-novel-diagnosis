@@ -100,6 +100,15 @@ describe("WorkspaceAssetsRepository", () => {
         mainProblem: "伏笔尚未回收",
         issueTitles: ["伏笔尚未回收"],
         issueCategories: ["plot"],
+        issueDecisions: [
+          {
+            issueId: "issue-1",
+            title: "伏笔尚未回收",
+            decision: "accepted",
+            adopted: true,
+          },
+        ],
+        retestStatus: "pending",
         storyAuditFindingIds: ["finding-1"],
         methodologyCardIds: [],
       },
@@ -118,5 +127,9 @@ describe("WorkspaceAssetsRepository", () => {
     expect(projectPackage.revisionSessions[0]?.storyAuditFindingIds).toEqual([
       "finding-1",
     ]);
+    expect(projectPackage.revisionSessions[0]).toMatchObject({
+      retestStatus: "pending",
+      issueDecisions: [expect.objectContaining({ adopted: true })],
+    });
   });
 });

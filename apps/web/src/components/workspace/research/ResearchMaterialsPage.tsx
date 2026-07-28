@@ -1,99 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 
-import { WorkspaceTaskFrame } from "@/components/workspace/WorkspaceTaskFrame";
-import type { ContextInspectorSection } from "@/components/workspace/ContextInspector";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
-import type { TaskNavItem } from "@/components/workspace/TaskNav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FolderOpen, FileText, BookOpen, Download, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ResearchWorkspaceShell } from "./ResearchWorkspaceShell";
 
 export function ResearchMaterialsPage() {
 	const router = useRouter();
 
-	const { bookAnalysisResult, bookJob, exportBookResult } = useWorkspaceHandlers("book");
-
-	const taskNavItems: TaskNavItem[] = useMemo(
-		() => [
-			{
-				id: "book",
-				label: "整书拆解",
-				description: "上传和分析整书内容",
-				meta: "",
-			},
-			{
-				id: "compare",
-				label: "样本对比",
-				description: "对比多个样本的写作风格",
-				meta: "",
-			},
-			{
-				id: "patterns",
-				label: "图谱/模式",
-				description: "查看人物关系和情节模式",
-				meta: "",
-			},
-			{
-				id: "materials",
-				label: "研究资料",
-				description: "管理和查看研究资料",
-				meta: "当前",
-			},
-		],
-		[],
-	);
-
-	const inspectorSections: ContextInspectorSection[] = useMemo(
-		() => [
-			{
-				title: "资料统计",
-				description: "当前研究资料的统计",
-				fields: [
-					{
-						label: "任务状态",
-						value: bookJob ? bookJob.status : "未创建",
-						tone: bookJob ? "secondary" : "outline",
-					},
-					{
-						label: "整书拆解结果",
-						value: bookAnalysisResult ? "已完成" : "未完成",
-						tone: bookAnalysisResult ? "secondary" : "outline",
-					},
-				],
-			},
-			{
-				title: "页面信息",
-				description: "研究资料页面信息",
-				fields: [
-					{
-						label: "当前路径",
-						value: "/research/materials",
-						tone: "outline",
-					},
-					{
-						label: "布局模式",
-						value: "研究工作区",
-						hint: "独立的研究资料管理页面",
-					},
-				],
-			},
-		],
-		[bookJob, bookAnalysisResult],
-	);
-
-	const handleNavChange = (id: string) => {
-		if (id === "book") {
-			router.push("/research/book");
-		} else if (id === "compare") {
-			router.push("/research/compare");
-		} else if (id === "patterns") {
-			router.push("/research/patterns");
-		}
-	};
+	const { bookAnalysisResult, exportBookResult } = useWorkspaceHandlers("book");
 
 	const handleBackToBook = () => {
 		router.push("/research/book");
@@ -106,29 +25,13 @@ export function ResearchMaterialsPage() {
 	const hasResults = Boolean(bookAnalysisResult);
 
 	return (
-		<WorkspaceTaskFrame
+		<ResearchWorkspaceShell
+			active="materials"
 			title="研究资料"
 			description="查看和管理整书拆解的研究结果和分析资料"
 			status={hasResults ? "有资料" : "等待分析"}
-			taskNav={{
-				items: taskNavItems,
-				activeId: "materials",
-				onChange: handleNavChange,
-				title: "研究导航",
-				description: "选择要管理的研究内容",
-			}}
-			inspector={{
-				title: "资料上下文",
-				description: "当前研究资料的统计和状态",
-				sections: inspectorSections,
-				emptyState: (
-					<div className="space-y-2">
-						<p className="text-sm text-muted-foreground">暂无研究资料。</p>
-					</div>
-				),
-			}}
 		>
-			<div className="space-y-4">
+			<div className="space-y-4 [&>div]:rounded-[14px] [&>div]:border-[#e6e8eb] [&>div]:bg-white [&>div]:shadow-[0_6px_20px_rgba(22,27,34,.055)]">
 				{!hasResults ? (
 					<Card>
 						<CardContent className="flex flex-col items-center justify-center py-12">
@@ -283,6 +186,6 @@ export function ResearchMaterialsPage() {
 					</CardContent>
 				</Card>
 			</div>
-		</WorkspaceTaskFrame>
+		</ResearchWorkspaceShell>
 	);
 }

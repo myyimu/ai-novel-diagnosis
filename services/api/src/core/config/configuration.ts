@@ -45,6 +45,15 @@ export const jwtConfig = registerAs("jwt", () => {
 
 export const serverConfig = registerAs("server", () => ({
   port: parseInt(process.env.PORT || "3001", 10),
+  // Desktop sidecars stay on loopback. Container deployments must explicitly
+  // opt into 0.0.0.0 so the Web container can reach the API over its private
+  // Docker network.
+  host: process.env.HOST?.trim() || "127.0.0.1",
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  isProduction: process.env.NODE_ENV === "production",
 }));
 
 export const databaseConfig = registerAs("database", () => ({
@@ -73,4 +82,22 @@ export const analysisConfig = registerAs("analysis", () => ({
   // Optional symmetric key for AES-256-GCM encryption of upload artifacts.
   // When unset, uploads are stored as plaintext (local-only dev mode).
   storageKey: process.env.ANALYSIS_STORAGE_KEY?.trim() || undefined,
+  // Whole-book jobs are expensive. Four concurrent jobs keep local batch
+  // analysis responsive while the hard cap protects model and memory usage.
+  bookJobConcurrency: Math.max(
+    1,
+    Math.min(4, Number(process.env.BOOK_JOB_CONCURRENCY) || 4),
+  ),
+  // Keep a single-user installation from silently accumulating manuscripts and
+  // model artifacts forever. Both values can be raised explicitly for a
+  // deliberate local archive.
+  retentionDays: Math.max(1, Number(process.env.ANALYSIS_RETENTION_DAYS) || 30),
+  storageMaxBytes:
+    Math.max(64, Number(process.env.ANALYSIS_STORAGE_MAX_MB) || 512) *
+    1024 *
+    1024,
+  artifactMaxBytes:
+    Math.max(64, Number(process.env.ANALYSIS_ARTIFACT_MAX_MB) || 512) *
+    1024 *
+    1024,
 }));

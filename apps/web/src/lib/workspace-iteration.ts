@@ -2,6 +2,7 @@ import type {
 	MethodologyCard,
 	ProjectMethodologyCard,
 	QuickReviewResult,
+	RevisionIssueDecision,
 	RevisionSession,
 	RevisionTextVersion,
 	StoryAuditFindingReview,
@@ -65,6 +66,8 @@ export function createRevisionSession({
 	fromVersionId,
 	toVersionId,
 	textChanged,
+	issueDecisions = [],
+	retestStatus = "not_requested",
 	now = new Date().toISOString(),
 }: {
 	projectId?: string;
@@ -76,6 +79,8 @@ export function createRevisionSession({
 	fromVersionId?: string;
 	toVersionId?: string;
 	textChanged?: boolean;
+	issueDecisions?: RevisionIssueDecision[];
+	retestStatus?: "not_requested" | "pending" | "completed";
 	now?: string;
 }): RevisionSession {
 	const text = chapterText.trim();
@@ -105,6 +110,8 @@ export function createRevisionSession({
 					.filter(Boolean)
 					.slice(0, 5)
 			: [],
+		issueDecisions,
+		retestStatus,
 		nextPrompt: result.nextPrompt?.prompt,
 		fromVersionId,
 		toVersionId,

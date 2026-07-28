@@ -1,6 +1,13 @@
 import { normalizeUploadFilename } from "./upload-filename";
 import { BookUploadService } from "./book-upload.service";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -169,6 +176,38 @@ describe("BookUploadService", () => {
       );
       expect((await service.getUpload(upload.id)).title).toBe("加密测试");
       expect((await service.listUploads(5))[0].id).toBe(upload.id);
+    } finally {
+      await rm(storageDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps local files when database cleanup fails", async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), "book-upload-cleanup-"));
+    const uploadId = "cleanup-test";
+    const uploadDir = join(storageDir, "uploads", uploadId);
+    const rawPath = join(uploadDir, "raw.txt");
+
+    try {
+      await mkdir(uploadDir, { recursive: true });
+      await writeFile(rawPath, "保留稿件", "utf8");
+      const service = new BookUploadService(
+        {
+          deleteUpload: jest.fn().mockRejectedValue(new Error("db down")),
+        } as never,
+        {} as never,
+        makeConfigService({ "analysis.storageDir": storageDir }) as never,
+      );
+
+      await (
+        service as unknown as {
+          removeStoredUpload: (
+            id: string,
+            reason: "expired" | "storage quota",
+          ) => Promise<void>;
+        }
+      ).removeStoredUpload(uploadId, "expired");
+
+      expect(await readFile(rawPath, "utf8")).toBe("保留稿件");
     } finally {
       await rm(storageDir, { recursive: true, force: true });
     }

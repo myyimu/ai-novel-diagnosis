@@ -31,6 +31,20 @@ export class WorkspaceProjectDto {
   updatedAt!: string;
 }
 
+export class RevisionIssueDecisionDto {
+  @IsString()
+  issueId!: string;
+
+  @IsString()
+  title!: string;
+
+  @IsIn(["accepted", "author_intent", "false_positive", "deferred"])
+  decision!: "accepted" | "author_intent" | "false_positive" | "deferred";
+
+  @IsBoolean()
+  adopted!: boolean;
+}
+
 export class RevisionSessionDto {
   @IsString()
   id!: string;
@@ -73,6 +87,16 @@ export class RevisionSessionDto {
   @IsOptional()
   @IsArray()
   issueCategories?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RevisionIssueDecisionDto)
+  issueDecisions?: RevisionIssueDecisionDto[];
+
+  @IsOptional()
+  @IsIn(["not_requested", "pending", "completed"])
+  retestStatus?: "not_requested" | "pending" | "completed";
 
   @IsOptional()
   @IsString()

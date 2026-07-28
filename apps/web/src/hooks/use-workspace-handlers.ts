@@ -125,6 +125,7 @@ import {
 	type BookAnalysisJob,
 	type ProviderPresetId,
 	type QuickReviewResult,
+	type RevisionIssueDecision,
 	type RubricResult,
 	type ScoreResult,
 	type WorkspaceProject,
@@ -1121,8 +1122,20 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const versionWithSession = existingVersion
 			? existingVersion
 			: { ...version, sourceSessionId: session.id };
+		const completedRetestSession = existingVersion
+			? projectRevisionSessions.find(
+					(session) =>
+						session.toVersionId === version.id && session.retestStatus === "pending",
+				)
+			: undefined;
+		const retestSession = completedRetestSession
+			? { ...completedRetestSession, retestStatus: "completed" as const }
+			: undefined;
 
-		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		setRevisionSessions((current) => {
+			const withCurrent = upsertRevisionSession(current, session);
+			return retestSession ? upsertRevisionSession(withCurrent, retestSession) : withCurrent;
+		});
 		if (!existingVersion) {
 			setRevisionVersions((current) =>
 				upsertRevisionTextVersion(current, versionWithSession),
@@ -1139,18 +1152,69 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			revisionVersions: existingVersion ? [] : [versionWithSession],
 			methodologyCards: [],
 		})
-			.then((assets) => {
-				applyWorkspaceAssets(assets);
+			.then(async (assets) => {
+				const syncedAssets = retestSession
+					? await upsertRevisionAssets({
+							project,
+							session: retestSession,
+							revisionVersions: [],
+							methodologyCards: [],
+						})
+					: assets;
+				applyWorkspaceAssets(syncedAssets);
 				if (storyAuditFindingIds.length) {
 					setQuickReviewStoryAuditFindingIds([]);
 				}
 			})
 			.catch(() => {
-				setStatus("修改效果已本地保存；后端暂时未同步成功。");
+				setStatus("复诊记录已本地保存；后端暂时未同步成功。");
 			});
 	}
 
-	function saveRevisedChapterText(revisedText: string, result: QuickReviewResult) {
+	function saveQuickReviewIssueDecisions(
+		result: QuickReviewResult,
+		issueDecisions: RevisionIssueDecision[],
+	) {
+		const now = new Date().toISOString();
+		const projectId = activeProjectId || defaultWorkspaceProject.id;
+		const project: WorkspaceProject = activeProject
+			? { ...activeProject, id: projectId, updatedAt: now }
+			: { ...defaultWorkspaceProject, id: projectId, updatedAt: now };
+		const latestSession =
+			projectRevisionSessions.find(
+				(session) =>
+					session.textHash === hashString(chapterText.trim()) &&
+					session.mainProblem === result.mainProblem,
+			) ?? undefined;
+		const session = latestSession
+			? { ...latestSession, issueDecisions, retestStatus: "not_requested" as const }
+			: createRevisionSession({
+					projectId,
+					chapterTitle,
+					chapterText,
+					result,
+					methodologyCardIds: [],
+					issueDecisions,
+					now,
+				});
+
+		setRevisionSessions((current) => upsertRevisionSession(current, session));
+		setProjects((current) => current.map((item) => (item.id === projectId ? project : item)));
+		void upsertRevisionAssets({
+			project,
+			session,
+			revisionVersions: [],
+			methodologyCards: [],
+		}).catch(() => {
+			setStatus("作者判断已本地保存；后端暂时未同步成功。");
+		});
+	}
+
+	function saveRevisedChapterText(
+		revisedText: string,
+		result: QuickReviewResult,
+		issueDecisions: RevisionIssueDecision[] = [],
+	) {
 		const nextText = revisedText.trim();
 		if (!nextText || nextText === chapterText.trim()) {
 			return false;
@@ -1191,6 +1255,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			fromVersionId: currentVersion.id,
 			toVersionId: nextVersion.id,
 			textChanged: true,
+			issueDecisions,
+			retestStatus: "pending",
 			now,
 		});
 		const versionWithSession = { ...nextVersion, sourceSessionId: session.id };
@@ -1212,7 +1278,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}).catch(() => {
 			setStatus("新版本已本地保存；后端暂时未同步成功。");
 		});
-		setStatus("正文润色已保存为新版本。");
+		setStatus("正文已保存为新版本，待复诊确认问题变化。");
 		return true;
 	}
 
@@ -2728,6 +2794,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		inferReferenceProfileFromModel,
 		handleChapterTextChange,
 		saveRevisedChapterText,
+		saveQuickReviewIssueDecisions,
 		handleReferenceTextChange,
 		handlePlatformStrategyChange,
 		handleChapterDraftChange,

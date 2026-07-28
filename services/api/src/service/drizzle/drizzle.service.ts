@@ -76,6 +76,11 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       });
       this.db = drizzleNodePg(this.pool, { schema });
     } else {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "DATABASE_URL is required in production; PGlite is only supported for local development.",
+        );
+      }
       this.mode = "pglite";
       this.pgliteDataDir =
         process.env.PGLITE_DATA_DIR?.trim() ||
@@ -113,7 +118,6 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         getDatabaseConnectTimeoutMs(),
       );
       client.release();
-      await this.applyDatabaseCompatibilityMigrations();
       this.logger.log("Database connection established");
     } catch (error) {
       this.logger.error(
@@ -241,6 +245,8 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
         "main_problem" text NOT NULL,
         "issue_titles" jsonb NOT NULL,
         "issue_categories" jsonb NOT NULL,
+        "issue_decisions" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "retest_status" varchar(32) DEFAULT 'not_requested' NOT NULL,
         "next_prompt" text,
         "revision_note" text,
         "revision_note_updated_at" timestamp(3),
@@ -417,6 +423,14 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
       await this.db.execute(sql`
         ALTER TABLE "revision_sessions"
         ADD COLUMN IF NOT EXISTS "story_audit_finding_ids" jsonb DEFAULT '[]'::jsonb NOT NULL
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "revision_sessions"
+        ADD COLUMN IF NOT EXISTS "issue_decisions" jsonb DEFAULT '[]'::jsonb NOT NULL
+      `);
+      await this.db.execute(sql`
+        ALTER TABLE "revision_sessions"
+        ADD COLUMN IF NOT EXISTS "retest_status" varchar(32) DEFAULT 'not_requested' NOT NULL
       `);
     }
 

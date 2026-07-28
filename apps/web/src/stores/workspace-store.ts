@@ -746,6 +746,19 @@ export interface WorkspaceProject {
 	updatedAt: string;
 }
 
+export type RevisionIssueDecisionState =
+	| "accepted"
+	| "author_intent"
+	| "false_positive"
+	| "deferred";
+
+export interface RevisionIssueDecision {
+	issueId: string;
+	title: string;
+	decision: RevisionIssueDecisionState;
+	adopted: boolean;
+}
+
 export interface RevisionSession {
 	id: string;
 	projectId?: string;
@@ -760,6 +773,8 @@ export interface RevisionSession {
 	mainProblem: string;
 	issueTitles: string[];
 	issueCategories?: string[];
+	issueDecisions?: RevisionIssueDecision[];
+	retestStatus?: "not_requested" | "pending" | "completed";
 	nextPrompt?: string;
 	revisionNote?: string;
 	revisionNoteUpdatedAt?: string;

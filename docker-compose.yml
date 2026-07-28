@@ -3,10 +3,10 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-novel}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Docker Compose}
       POSTGRES_DB: ${POSTGRES_DB:-ai_novel_first_step}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,20 +20,29 @@ services:
       context: .
       dockerfile: services/api/Dockerfile
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
       PORT: ${API_PORT:-3001}
+      HOST: 0.0.0.0
+      # Docker Compose is production-like by default. The API is kept on the
+      # private Compose network; the Web service is the only browser entry.
+      NODE_ENV: production
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-      DATABASE_URL: postgres://${POSTGRES_USER:-novel}:${POSTGRES_PASSWORD:-novel}@postgres:5432/${POSTGRES_DB:-ai_novel_first_step}
-      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      DATABASE_URL: postgres://${POSTGRES_USER:-novel}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Docker Compose}@postgres:5432/${POSTGRES_DB:-ai_novel_first_step}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env before starting Docker Compose}
+      ANALYSIS_STORAGE_KEY: ${ANALYSIS_STORAGE_KEY:?Set ANALYSIS_STORAGE_KEY in .env before starting Docker Compose}
+      BOOK_JOB_CONCURRENCY: ${BOOK_JOB_CONCURRENCY:-4}
+      ANALYSIS_RETENTION_DAYS: ${ANALYSIS_RETENTION_DAYS:-30}
+      ANALYSIS_STORAGE_MAX_MB: ${ANALYSIS_STORAGE_MAX_MB:-512}
+      ANALYSIS_ARTIFACT_MAX_MB: ${ANALYSIS_ARTIFACT_MAX_MB:-512}
       SHARED_GPU_BASE_URL: ${SHARED_GPU_BASE_URL:-}
       SHARED_GPU_MODEL: ${SHARED_GPU_MODEL:-}
       SHARED_GPU_API_KEY: ${SHARED_GPU_API_KEY:-}
       SHARED_GPU_JSON_MODE: ${SHARED_GPU_JSON_MODE:-false}
-    ports:
-      - "${API_PORT:-3001}:${API_PORT:-3001}"
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - analysis_data:/app/.local/analysis
+      - artifact_data:/app/.local/artifacts
     healthcheck:
       test:
         [
@@ -52,8 +61,9 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
       API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-http://api:3001/api/v1}
+      APP_ACCESS_TOKEN: ${APP_ACCESS_TOKEN:?Set APP_ACCESS_TOKEN in .env before starting Docker Compose}
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -61,7 +71,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:3000',{headers:{authorization:'Basic '+Buffer.from('local:'+(process.env.APP_ACCESS_TOKEN||'')).toString('base64')}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
@@ -70,3 +80,5 @@ services:
 
 volumes:
   postgres_data:
+  analysis_data:
+  artifact_data:

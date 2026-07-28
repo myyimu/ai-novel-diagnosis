@@ -12,14 +12,18 @@ import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { diagnosisExampleOptions } from "@/lib/diagnosis-examples";
 import { requestParagraphRewrites } from "@/lib/workspace-analysis-client";
 import { hashString } from "@/lib/workspace-cache";
-import type { ProviderForm, QuickReviewResult } from "@/stores/workspace-store";
+import type {
+	ProviderForm,
+	QuickReviewResult,
+	RevisionIssueDecision,
+} from "@/stores/workspace-store";
 import * as textQuoteAnchor from "dom-anchor-text-quote";
-import { BookOpen, Download, FileText, FolderOpen, Lightbulb, Plus } from "lucide-react";
+import { BookOpen, Download, FileText, FolderOpen, Lightbulb, Loader2, Plus } from "lucide-react";
 
 type QuickReviewIssue = NonNullable<QuickReviewResult["issues"]>[number];
 type ChapterTab = "annotation" | "diagnosis" | "rewrite" | "retest";
-type IssueState = "pending" | "accepted" | "ignored" | "disputed" | "resolved";
-type IssueFilter = "all" | "must" | "accepted" | "resolved" | "disputed";
+type IssueState = "pending" | "accepted" | "ignored" | "disputed";
+type IssueFilter = "all" | "must" | "accepted" | "disputed";
 type PreviewDecision = "accepted" | "rejected";
 
 export function ProjectCurrentPage() {
@@ -37,9 +41,12 @@ export function ProjectCurrentPage() {
 		quickReviewResult,
 		chapterTitle,
 		chapterText,
+		status,
 		loading,
+		quickReviewElapsedSeconds,
 		runQuickExperience,
 		saveRevisedChapterText,
+		saveQuickReviewIssueDecisions,
 	} = useWorkspaceHandlers("overview");
 
 	const chapterId = searchParams.get("chapter");
@@ -69,12 +76,29 @@ export function ProjectCurrentPage() {
 				chapterText={resolvedChapterText}
 				result={resolvedQuickReviewResult}
 				loading={loading === "quick"}
+				status={status}
+				elapsedSeconds={quickReviewElapsedSeconds}
 				revisionCount={projectRevisionSessions.length}
+				pendingRetestCount={
+					projectRevisionSessions.filter(
+						(session) =>
+							session.retestStatus === "pending" &&
+							session.chapterTitle.trim() === resolvedChapterTitle.trim(),
+					).length
+				}
+				completedRetestCount={
+					projectRevisionSessions.filter(
+						(session) =>
+							session.retestStatus === "completed" &&
+							session.chapterTitle.trim() === resolvedChapterTitle.trim(),
+					).length
+				}
 				methodologyCount={projectMethodologyCards.length}
 				provider={provider}
 				onBack={() => router.push("/project/current")}
 				onRerun={() => runQuickExperience(true)}
 				onSaveRevision={saveRevisedChapterText}
+				onPersistIssueDecisions={saveQuickReviewIssueDecisions}
 			/>
 		);
 	}
@@ -296,25 +320,43 @@ function ProjectChapterWorkspace({
 	chapterText,
 	result,
 	loading,
+	status,
+	elapsedSeconds,
 	revisionCount,
+	pendingRetestCount,
+	completedRetestCount,
 	methodologyCount,
 	provider,
 	onBack,
 	onRerun,
 	onSaveRevision,
+	onPersistIssueDecisions,
 }: {
 	projectName: string;
 	chapterTitle: string;
 	chapterText: string;
 	result: QuickReviewResult | null;
 	loading: boolean;
+	status: string;
+	elapsedSeconds: number;
 	revisionCount: number;
+	pendingRetestCount: number;
+	completedRetestCount: number;
 	methodologyCount: number;
 	provider: ProviderForm;
 	onBack: () => void;
 	onRerun: () => void;
-	onSaveRevision: (revisedText: string, result: QuickReviewResult) => boolean;
+	onSaveRevision: (
+		revisedText: string,
+		result: QuickReviewResult,
+		issueDecisions?: RevisionIssueDecision[],
+	) => boolean;
+	onPersistIssueDecisions: (
+		result: QuickReviewResult,
+		issueDecisions: RevisionIssueDecision[],
+	) => void;
 }) {
+	const router = useRouter();
 	const issues = Array.isArray(result?.issues)
 		? result.issues.filter((issue) => issue?.title)
 		: [];
@@ -338,13 +380,13 @@ function ProjectChapterWorkspace({
 	const [editorOpen, setEditorOpen] = useState(false);
 	const [editorMode, setEditorMode] = useState<"edit" | "replace">("edit");
 	const [editorText, setEditorText] = useState(chapterText);
+	const [isRetestRun, setIsRetestRun] = useState(false);
 	const replacementInputRef = useRef<HTMLInputElement | null>(null);
 	const getIssueState = useCallback(
 		(issueId: string): IssueState => issueStates[issueId] ?? "pending",
 		[issueStates],
 	);
 	const acceptedCount = issues.filter((issue) => getIssueState(issue.id) === "accepted").length;
-	const resolvedCount = issues.filter((issue) => getIssueState(issue.id) === "resolved").length;
 	const disputedCount = issues.filter((issue) => getIssueState(issue.id) === "disputed").length;
 	const pendingCount = issues.filter((issue) => getIssueState(issue.id) === "pending").length;
 	const acceptedIssues = issues.filter((issue) => getIssueState(issue.id) === "accepted");
@@ -355,7 +397,7 @@ function ProjectChapterWorkspace({
 	const workflow = buildChapterWorkflow({
 		hasResult: Boolean(result),
 		acceptedCount,
-		resolvedCount,
+		pendingRetestCount,
 	});
 	const activeIssueId =
 		selectedIssueId && issues.some((issue) => issue.id === selectedIssueId)
@@ -438,19 +480,24 @@ function ProjectChapterWorkspace({
 		);
 	}, [activeIssueId]);
 	function updateIssueState(issueId: string, state: IssueState) {
-		setIssueStates((current) => {
-			const currentState = current[issueId] ?? "pending";
-			const nextState = currentState === state ? "pending" : state;
-			if (
-				nextState === "accepted" &&
-				Object.entries(current).filter(
-					([id, value]) => id !== issueId && value === "accepted",
-				).length >= 3
-			) {
-				return current;
-			}
-			return { ...current, [issueId]: nextState };
-		});
+		const currentState = issueStates[issueId] ?? "pending";
+		const nextState = currentState === state ? "pending" : state;
+		if (
+			nextState === "accepted" &&
+			Object.entries(issueStates).filter(
+				([id, value]) => id !== issueId && value === "accepted",
+			).length >= 3
+		) {
+			return;
+		}
+		const nextStates = { ...issueStates, [issueId]: nextState };
+		setIssueStates(nextStates);
+		if (result) {
+			onPersistIssueDecisions(
+				result,
+				buildRevisionIssueDecisions(issues, nextStates, new Set<string>()),
+			);
+		}
 		setSelectedIssueId(issueId);
 		if (state === "accepted") {
 			setIssueFilter("all");
@@ -519,30 +566,29 @@ function ProjectChapterWorkspace({
 			selectedIds,
 			rewrites: previewRewrites,
 		});
-		if (!onSaveRevision(rewrittenText, result)) {
+		if (
+			!onSaveRevision(
+				rewrittenText,
+				result,
+				buildRevisionIssueDecisions(issues, issueStates, selectedIds),
+			)
+		) {
 			return;
 		}
-		setIssueStates((current) => {
-			const next = { ...current };
-			selectedIds.forEach((issueId) => {
-				next[issueId] = "resolved";
-			});
-			return next;
-		});
 		setRewritePreviewOpen(false);
 		setChapterTab("retest");
-		setIssueFilter("resolved");
+		setIssueFilter("accepted");
 		setCommentsOpen(false);
 	}
 
 	function handlePrimaryChapterAction() {
 		if (!result) {
-			onRerun();
+			runDiagnosis();
 			return;
 		}
-		if (resolvedCount > 0) {
+		if (pendingRetestCount > 0) {
 			setChapterTab("diagnosis");
-			onRerun();
+			runDiagnosis();
 			return;
 		}
 		if (acceptedCount > 0) {
@@ -555,7 +601,7 @@ function ProjectChapterWorkspace({
 
 	function openEditor(mode: "edit" | "replace") {
 		if (!result) {
-			onRerun();
+			runDiagnosis();
 			return;
 		}
 		setEditorMode(mode);
@@ -563,8 +609,37 @@ function ProjectChapterWorkspace({
 		setEditorOpen(true);
 	}
 
+	function runDiagnosis() {
+		setIsRetestRun(Boolean(result));
+		onRerun();
+	}
+
+	function openRewritePlan() {
+		setChapterTab("rewrite");
+		setTreeOpen(false);
+	}
+
+	function openProjectAsset(href: "/project/revisions" | "/project/methodology") {
+		setTreeOpen(false);
+		router.push(href);
+	}
+
+	useEffect(() => {
+		if (!loading) {
+			setIsRetestRun(false);
+		}
+	}, [loading]);
+
 	function saveEditedText() {
-		if (!result || !onSaveRevision(editorText, result)) return;
+		if (
+			!result ||
+			!onSaveRevision(
+				editorText,
+				result,
+				buildRevisionIssueDecisions(issues, issueStates, new Set<string>()),
+			)
+		)
+			return;
 		setEditorOpen(false);
 		setChapterTab("retest");
 	}
@@ -721,9 +796,21 @@ function ProjectChapterWorkspace({
 						<div className="mx-2 mb-1 mt-3 text-[9px] font-black uppercase tracking-[.08em] text-[#989fa8]">
 							修改资产
 						</div>
-						<TreeAssetRow label="本轮修改计划" value={acceptedCount} />
-						<TreeAssetRow label="修改效果" value={resolvedCount || revisionCount} />
-						<TreeAssetRow label="方法论卡片" value={methodologyCount} />
+						<TreeAssetRow
+							label="本轮修改计划"
+							value={acceptedCount}
+							onClick={openRewritePlan}
+						/>
+						<TreeAssetRow
+							label="复诊记录"
+							value={pendingRetestCount || revisionCount}
+							onClick={() => openProjectAsset("/project/revisions")}
+						/>
+						<TreeAssetRow
+							label="方法论卡片"
+							value={methodologyCount}
+							onClick={() => openProjectAsset("/project/methodology")}
+						/>
 					</div>
 					<div className="grid grid-cols-3 gap-1 border-t border-[#e6e8eb] px-2.5 py-2 text-[9px] text-[#6f7782]">
 						<span className="inline-flex items-center gap-1">
@@ -778,7 +865,7 @@ function ProjectChapterWorkspace({
 							</button>
 							<button
 								type="button"
-								onClick={onRerun}
+								onClick={runDiagnosis}
 								disabled={loading}
 								className="min-h-[30px] rounded-lg border border-[#ff5a1f] bg-[#ff5a1f] px-2.5 text-[11px] font-bold text-white disabled:opacity-60"
 							>
@@ -801,7 +888,7 @@ function ProjectChapterWorkspace({
 									},
 									{ id: "diagnosis", label: "诊断总览", count: result ? 1 : 0 },
 									{ id: "rewrite", label: "修改方案", count: acceptedCount },
-									{ id: "retest", label: "修改效果", count: resolvedCount },
+									{ id: "retest", label: "待复诊", count: pendingRetestCount },
 								].map((tab) => (
 									<button
 										key={tab.id}
@@ -945,8 +1032,10 @@ function ProjectChapterWorkspace({
 							{chapterTab === "retest" ? (
 								<RetestPanel
 									chapterTitle={chapterTitle}
-									resolvedCount={resolvedCount}
+									pendingRetestCount={pendingRetestCount}
+									completedRetestCount={completedRetestCount}
 									revisionCount={revisionCount}
+									onRunRetest={runDiagnosis}
 								/>
 							) : null}
 						</div>
@@ -967,7 +1056,6 @@ function ProjectChapterWorkspace({
 							{ id: "all", label: "全部" },
 							{ id: "must", label: "必须先改" },
 							{ id: "accepted", label: "已加入计划" },
-							{ id: "resolved", label: "已应用" },
 							{ id: "disputed", label: "待人工判断" },
 						].map((filter) => (
 							<button
@@ -1193,6 +1281,56 @@ function ProjectChapterWorkspace({
 					onSave={saveEditedText}
 				/>
 			) : null}
+			{loading ? (
+				<ChapterDiagnosisRunningOverlay
+					isRetest={isRetestRun}
+					status={status}
+					elapsedSeconds={elapsedSeconds}
+				/>
+			) : null}
+		</div>
+	);
+}
+
+export function getChapterDiagnosisRunCopy(isRetest: boolean) {
+	return isRetest
+		? {
+				title: "正在进行复诊",
+				description: "正在重新检查已修改正文，验证旧问题是否解决，并排查新增风险。",
+			}
+		: {
+				title: "正在生成诊断",
+				description: "正在读取章节正文，整理问题证据和可执行的修改建议。",
+			};
+}
+
+function ChapterDiagnosisRunningOverlay({
+	isRetest,
+	status,
+	elapsedSeconds,
+}: {
+	isRetest: boolean;
+	status: string;
+	elapsedSeconds: number;
+}) {
+	const copy = getChapterDiagnosisRunCopy(isRetest);
+	return (
+		<div className="fixed inset-0 z-[100] grid place-items-center bg-[#f6f7f9]/90 p-4 backdrop-blur-sm">
+			<section className="w-[min(410px,calc(100%_-_30px))] rounded-[14px] border border-[#e6e8eb] bg-white p-[22px] shadow-[0_12px_34px_rgba(22,27,34,.12)]">
+				<div className="flex items-start gap-3 rounded-[11px] border border-[#d8e2f6] bg-[#edf4ff] p-3 text-xs leading-5 text-[#405a85]">
+					<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+					<div>
+						<h2 className="font-bold text-[#2f5faa]">{copy.title}</h2>
+						<p className="mt-0.5">{copy.description}</p>
+						<p className="mt-1">
+							已等待 {elapsedSeconds} 秒，完成后会更新本章诊断结果。
+						</p>
+					</div>
+				</div>
+				<p className="mt-3 rounded-[10px] border border-[#e6e8eb] bg-[#fbfcfd] px-3 py-2 text-[11px] leading-5 text-[#69707d]">
+					{status}
+				</p>
+			</section>
 		</div>
 	);
 }
@@ -1479,15 +1617,27 @@ function AssetRow({ title, value }: { title: string; value: string }) {
 	);
 }
 
-function TreeAssetRow({ label, value }: { label: string; value: number }) {
+export function TreeAssetRow({
+	label,
+	value,
+	onClick,
+}: {
+	label: string;
+	value: number;
+	onClick: () => void;
+}) {
 	return (
-		<div className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[11px] text-[#4b525c]">
+		<button
+			type="button"
+			onClick={onClick}
+			className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[11px] text-[#4b525c] transition hover:bg-[#fff2ec] hover:text-[#c94413] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ff8b5f]"
+		>
 			<span className="w-[18px] text-center text-[#9299a3]">✓</span>
 			<span className="min-w-0 flex-1 truncate">{label}</span>
 			<span className="rounded-full bg-[#f0f2f5] px-1.5 py-0.5 text-[9px] text-[#777f89]">
 				{value}
 			</span>
-		</div>
+		</button>
 	);
 }
 
@@ -1631,31 +1781,43 @@ function RewritePlanPanel({
 
 function RetestPanel({
 	chapterTitle,
-	resolvedCount,
+	pendingRetestCount,
+	completedRetestCount,
 	revisionCount,
+	onRunRetest,
 }: {
 	chapterTitle: string;
-	resolvedCount: number;
+	pendingRetestCount: number;
+	completedRetestCount: number;
 	revisionCount: number;
+	onRunRetest: () => void;
 }) {
 	return (
 		<section className="mx-auto grid w-[min(900px,100%)] gap-4">
 			<div className="rounded-[18px] border border-[#e6e8eb] bg-white p-5 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 				<span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[10px] font-bold text-[#2e5cb9]">
-					修改效果
+					{completedRetestCount > 0 ? "复诊已生成" : "待复诊"}
 				</span>
 				<h1 className="mt-3 text-[21px] font-bold">{chapterTitle}</h1>
 				<p className="mt-2 text-xs leading-6 text-[#69707d]">
-					这里对齐参考页的“修改效果”入口：展示版本、复诊记录和已应用问题。当前先提供本地预览状态。
+					{completedRetestCount > 0
+						? "新的诊断已经生成，但系统尚未把原问题自动判为解决；请结合证据和人工判断确认变化。"
+						: "新版本已保存，但保存改稿不等于问题已解决。请运行新的诊断，并结合人工判断确认旧问题的变化。"}
 				</p>
 				<div className="mt-4 grid grid-cols-3 gap-2">
-					<ChapterStat label="已应用" value={String(resolvedCount)} />
+					<ChapterStat label="待复诊版本" value={String(pendingRetestCount)} />
+					<ChapterStat label="复诊记录" value={String(completedRetestCount)} />
 					<ChapterStat label="修改记录" value={String(revisionCount)} />
-					<ChapterStat label="当前版本" value="1" />
 				</div>
 			</div>
 			<div className="rounded-[13px] border border-dashed border-[#d4d8de] bg-white p-8 text-center text-xs leading-6 text-[#69707d]">
-				应用修改后，本页会显示绿色改动、版本链路和复诊结论。
+				<p>在独立复核或人工确认前，系统不会把任何问题标记为“已解决”。</p>
+				<Button
+					className="mt-4 rounded-[9px] bg-[#ff5a1f] text-white hover:bg-[#e84b13]"
+					onClick={onRunRetest}
+				>
+					运行复诊
+				</Button>
 			</div>
 		</section>
 	);
@@ -1688,7 +1850,7 @@ type ParagraphMatch = {
 	end?: number;
 };
 
-function AnnotatedParagraph({
+export function AnnotatedParagraph({
 	annotation,
 	activeIssueId,
 	onFocusIssue,
@@ -1718,7 +1880,8 @@ function AnnotatedParagraph({
 		}
 
 		const markerActive = marker.issue.id === activeIssueId;
-		const anchorClass = getAnchorClass(marker.issue.severity, markerActive);
+		const anchorClass = `${getAnchorClass(marker.issue.severity, markerActive)} relative`;
+		const anchorNumberClass = getAnnotationCornerNumberClass(markerActive);
 		nodes.push(paragraph.slice(cursor, start));
 		nodes.push(
 			<button
@@ -1730,40 +1893,58 @@ function AnnotatedParagraph({
 				title={marker.issue.title}
 			>
 				{paragraph.slice(start, end)}
+				<span className={anchorNumberClass} aria-hidden="true">
+					{marker.issueIndex + 1}
+				</span>
 			</button>,
 		);
 		cursor = end;
 		renderedIssueIds.add(marker.issue.id);
 	});
 	nodes.push(paragraph.slice(cursor));
+	const unrenderedMarkers = markers.filter((marker) => !renderedIssueIds.has(marker.issue.id));
 
 	return (
 		<p className="mb-[0.72em] text-left last:mb-0">
 			{nodes}
-			<span className="ml-1.5 inline-flex flex-wrap items-center gap-1 align-[2px]">
-				{markers.map((marker) => {
-					const markerActive = marker.issue.id === activeIssueId;
-					const anchorNumberClass = `inline-grid size-[18px] place-items-center rounded-full bg-[#ff5a1f] font-sans text-[9px] font-black text-white transition ${
-						markerActive ? "scale-110 shadow-[0_0_0_3px_rgba(255,90,31,.18)]" : ""
-					}`;
-					return (
-						<button
-							key={`number-${marker.issue.id}`}
-							type="button"
-							onClick={() => onFocusIssue(marker.issue.id)}
-							data-annotation-anchor={
-								renderedIssueIds.has(marker.issue.id) ? undefined : marker.issue.id
-							}
-							className={anchorNumberClass}
-							aria-label={`查看诊断意见 ${marker.issueIndex + 1}`}
-						>
-							{marker.issueIndex + 1}
-						</button>
-					);
-				})}
-			</span>
+			{unrenderedMarkers.length ? (
+				<span className="ml-1.5 inline-flex flex-wrap items-center gap-1 align-[2px]">
+					{unrenderedMarkers.map((marker) => {
+						const markerActive = marker.issue.id === activeIssueId;
+						const anchorNumberClass = getAnnotationNumberClass(markerActive);
+						return (
+							<button
+								key={`number-${marker.issue.id}`}
+								type="button"
+								onClick={() => onFocusIssue(marker.issue.id)}
+								data-annotation-anchor={
+									renderedIssueIds.has(marker.issue.id)
+										? undefined
+										: marker.issue.id
+								}
+								className={anchorNumberClass}
+								aria-label={`查看诊断意见 ${marker.issueIndex + 1}`}
+							>
+								{marker.issueIndex + 1}
+							</button>
+						);
+					})}
+				</span>
+			) : null}
 		</p>
 	);
+}
+
+function getAnnotationNumberClass(active: boolean) {
+	return `ml-1 inline-grid size-[18px] align-[2px] place-items-center rounded-full bg-[#ff5a1f] font-sans text-[9px] font-black text-white transition ${
+		active ? "scale-110 shadow-[0_0_0_3px_rgba(255,90,31,.18)]" : ""
+	}`;
+}
+
+function getAnnotationCornerNumberClass(active: boolean) {
+	return `pointer-events-none absolute -bottom-2 -right-2 z-10 grid size-[18px] place-items-center rounded-full bg-[#ff5a1f] font-sans text-[9px] font-black text-white transition ${
+		active ? "scale-110 shadow-[0_0_0_3px_rgba(255,90,31,.18)]" : ""
+	}`;
 }
 
 export function buildAnnotatedParagraphs(
@@ -2037,11 +2218,11 @@ function matchesIssueFilter(issue: QuickReviewIssue, state: IssueState, filter: 
 function buildChapterWorkflow({
 	hasResult,
 	acceptedCount,
-	resolvedCount,
+	pendingRetestCount,
 }: {
 	hasResult: boolean;
 	acceptedCount: number;
-	resolvedCount: number;
+	pendingRetestCount: number;
 }) {
 	if (!hasResult) {
 		return {
@@ -2051,11 +2232,11 @@ function buildChapterWorkflow({
 			action: "开始诊断",
 		};
 	}
-	if (resolvedCount > 0) {
+	if (pendingRetestCount > 0) {
 		return {
 			stage: 2,
-			title: "正文已经修改",
-			description: "下一步验证旧问题是否解决，并检查是否出现新问题。",
+			title: "新版本待复诊",
+			description: "请运行新的诊断；在独立复核或人工确认前，系统不会将问题标记为已解决。",
 			action: "运行复诊",
 		};
 	}
@@ -2085,13 +2266,35 @@ export function buildVisibleIssueEntries(
 		.filter(({ issue }) => matchesIssueFilter(issue, getIssueState(issue.id), issueFilter));
 }
 
+export function buildRevisionIssueDecisions(
+	issues: QuickReviewIssue[],
+	issueStates: Record<string, IssueState>,
+	adoptedIssueIds: Set<string>,
+): RevisionIssueDecision[] {
+	return issues.map((issue) => {
+		const state = issueStates[issue.id] ?? "pending";
+		return {
+			issueId: issue.id,
+			title: issue.title,
+			decision:
+				state === "accepted"
+					? "accepted"
+					: state === "ignored"
+						? "author_intent"
+						: state === "disputed"
+							? "false_positive"
+							: "deferred",
+			adopted: state === "accepted" && adoptedIssueIds.has(issue.id),
+		};
+	});
+}
+
 function getIssueStateLabel(state: IssueState) {
 	const labels: Record<IssueState, string> = {
 		pending: "待处理",
 		accepted: "已加入计划",
 		ignored: "已忽略",
 		disputed: "待人工判断",
-		resolved: "已应用",
 	};
 	return labels[state];
 }
@@ -2106,9 +2309,6 @@ function getIssueStateBadgeClass(state: IssueState) {
 	}
 	if (state === "disputed") {
 		return `${base} bg-[#fff7e8] text-[#8d520a]`;
-	}
-	if (state === "resolved") {
-		return `${base} bg-[#edf4ff] text-[#2e5cb9]`;
 	}
 	return `${base} bg-[#fff2ec] text-[#c94413]`;
 }

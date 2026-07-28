@@ -177,7 +177,10 @@ export class BookController {
   @UseInterceptors(
     FileInterceptor("file", {
       limits: {
-        fileSize: 50 * 1024 * 1024,
+        // Multer's memory storage keeps the request body in RAM. 10 MiB is
+        // sufficient for a full TXT novel while avoiding large local spikes.
+        fileSize: 10 * 1024 * 1024,
+        files: 1,
       },
     }),
   )
@@ -193,7 +196,9 @@ export class BookController {
       },
     },
   })
-  @ApiOperation({ summary: "Upload a TXT novel and preview chapter splitting" })
+  @ApiOperation({
+    summary: "Upload a TXT novel (up to 10 MiB) and preview chapter splitting",
+  })
   uploadBook(
     @UploadedFile() file: { originalname?: string; buffer?: Buffer },
     @Body()

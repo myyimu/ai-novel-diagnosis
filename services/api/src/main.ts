@@ -1,4 +1,5 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { json, urlencoded } from "express";
@@ -11,17 +12,19 @@ async function bootstrap() {
   });
 
   const logger = new Logger("Bootstrap");
-  const port = process.env.PORT || 3001;
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>("server.port") || 3001;
+  const host = configService.get<string>("server.host") || "127.0.0.1";
+  const isProduction = configService.get<boolean>("server.isProduction");
 
   app.use(json({ limit: "10mb" }));
   app.use(urlencoded({ extended: true, limit: "10mb" }));
 
   // Enable CORS with custom configuration
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const allowedOrigins =
+    configService.get<string[]>("server.allowedOrigins") || [];
   if (!allowedOrigins?.length) {
-    if (process.env.NODE_ENV === "production") {
+    if (isProduction) {
       throw new Error("ALLOWED_ORIGINS must be set in production.");
     }
 
@@ -86,10 +89,11 @@ async function bootstrap() {
   // Enable graceful shutdown hooks (triggers onModuleDestroy, onApplicationShutdown, etc.)
   app.enableShutdownHooks();
 
-  // Start the server — bind loopback so the desktop sidecar never exposes the
-  // API on the LAN. (Web requests reach the API via the Next proxy, same host.)
-  await app.listen(port, "127.0.0.1");
-  logger.log(`Application is running on: http://127.0.0.1:${port}`);
+  // Desktop sidecars keep the default loopback host. Docker explicitly sets
+  // HOST=0.0.0.0 so its Web container can reach the API over the private
+  // Compose network.
+  await app.listen(port, host);
+  logger.log(`Application is running on: http://${host}:${port}`);
 }
 
 bootstrap().catch((err) => {

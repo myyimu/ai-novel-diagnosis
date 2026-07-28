@@ -50,7 +50,9 @@ function runPnpm(args, { cwd = OUTER_ROOT, extraEnv = {} } = {}) {
     stdio: "inherit",
   });
   if (result.status !== 0) {
-    throw new Error(`corepack pnpm ${args.join(" ")} failed (exit ${result.status})`);
+    throw new Error(
+      `corepack pnpm ${args.join(" ")} failed (exit ${result.status})`,
+    );
   }
 }
 
@@ -87,12 +89,21 @@ for (const name of Object.keys(apiPkg.dependencies || {})) {
 }
 delete apiPkg.scripts;
 delete apiPkg.devDependencies;
-writeFileSync(join(apiSidecar, "package.json"), JSON.stringify(apiPkg, null, 2));
+writeFileSync(
+  join(apiSidecar, "package.json"),
+  JSON.stringify(apiPkg, null, 2),
+);
 
 // 2) 扁平安装运行时依赖（hoisted = npm 式扁平 node_modules，无 junction）
 //    --ignore-workspace：避开外层共享 lockfile；--no-frozen-lockfile：全新目录
 runPnpm(
-  ["install", "--prod", "--ignore-scripts", "--ignore-workspace", "--no-frozen-lockfile"],
+  [
+    "install",
+    "--prod",
+    "--ignore-scripts",
+    "--ignore-workspace",
+    "--no-frozen-lockfile",
+  ],
   { cwd: apiSidecar, extraEnv: { npm_config_node_linker: "hoisted" } },
 );
 
@@ -107,13 +118,22 @@ copyDir(join(OUTER_ROOT, "packages/ai-core/dist"), join(aiCoreDest, "dist"));
 
 // 4) 覆盖 api 自身产物
 copyDir(join(OUTER_ROOT, "services/api/dist"), join(apiSidecar, "dist"));
-copyDir(join(OUTER_ROOT, "services/api/drizzle/migrations"), join(apiSidecar, "drizzle/migrations"));
+copyDir(
+  join(OUTER_ROOT, "services/api/drizzle/migrations"),
+  join(apiSidecar, "drizzle/migrations"),
+);
 
 // ── Next sidecar：standalone 已自带扁平 node_modules ──
 console.log("[assemble] 组装 Next sidecar（standalone + static + public）");
 copyDir(join(OUTER_ROOT, "apps/web/.next/standalone"), webSidecar);
-copyDir(join(OUTER_ROOT, "apps/web/.next/static"), join(webSidecar, "apps/web/.next/static"));
-copyDir(join(OUTER_ROOT, "apps/web/public"), join(webSidecar, "apps/web/public"));
+copyDir(
+  join(OUTER_ROOT, "apps/web/.next/static"),
+  join(webSidecar, "apps/web/.next/static"),
+);
+copyDir(
+  join(OUTER_ROOT, "apps/web/public"),
+  join(webSidecar, "apps/web/public"),
+);
 
 // ── Node 运行时 ──
 console.log("[assemble] 拉取内嵌 Node 运行时");

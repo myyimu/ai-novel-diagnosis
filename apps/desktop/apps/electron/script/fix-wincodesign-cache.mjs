@@ -16,7 +16,11 @@ function findSevenZip() {
   if (existsSync(pnpmDir)) {
     const hit = readdirSync(pnpmDir).find((d) => d.startsWith("7zip-bin@"));
     if (hit) {
-      const candidate = join(pnpmDir, hit, "node_modules/7zip-bin/win/x64/7za.exe");
+      const candidate = join(
+        pnpmDir,
+        hit,
+        "node_modules/7zip-bin/win/x64/7za.exe",
+      );
       if (existsSync(candidate)) return candidate;
     }
   }
@@ -29,8 +33,13 @@ function findSevenZip() {
 const sevenZip = findSevenZip();
 
 function cacheDir() {
-  const localAppData = process.env.LOCALAPPDATA || join(process.env.USERPROFILE || "", "AppData", "Local");
-  return join(localAppData, "electron-builder", "Cache", "winCodeSign").replace(/\\/g, "/");
+  const localAppData =
+    process.env.LOCALAPPDATA ||
+    join(process.env.USERPROFILE || "", "AppData", "Local");
+  return join(localAppData, "electron-builder", "Cache", "winCodeSign").replace(
+    /\\/g,
+    "/",
+  );
 }
 
 const dir = cacheDir();
@@ -44,10 +53,16 @@ for (const archive of archives) {
   const name = archive.replace(/\.7z$/, "");
   const target = join(dir, name);
   rmSync(target, { recursive: true, force: true });
-  const r = spawnSync(sevenZip, ["x", join(dir, archive), `-o${target}`, "-x!darwin", "-y"], {
-    stdio: ["ignore", "ignore", "inherit"],
-  });
+  const r = spawnSync(
+    sevenZip,
+    ["x", join(dir, archive), `-o${target}`, "-x!darwin", "-y"],
+    {
+      stdio: ["ignore", "ignore", "inherit"],
+    },
+  );
   const signtool = join(target, "windows-10/x64/signtool.exe");
-  console.log(`${name}: ${r.status === 0 && existsSync(signtool) ? "OK" : "FAILED"}`);
+  console.log(
+    `${name}: ${r.status === 0 && existsSync(signtool) ? "OK" : "FAILED"}`,
+  );
 }
 console.log("[fix-wincodesign] done");

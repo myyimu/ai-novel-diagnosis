@@ -19,7 +19,10 @@ import {
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
 import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
-import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
+import {
+  type RevisionIssueDecisionSnapshot,
+  WorkspaceAssetsRepository,
+} from "./workspace-assets.repository";
 import type { StoryAuditResult } from "@ai-novel-diagnosis/ai-core";
 
 @ApiTags("analysis")
@@ -57,7 +60,14 @@ export class WorkspaceController {
   upsertRevisionAssets(@Body() body: UpsertRevisionAssetsDto) {
     return this.workspaceAssets.upsertRevisionAssets({
       project: body.project,
-      session: body.session,
+      session: {
+        ...body.session,
+        issueDecisions: body.session.issueDecisions?.map((decision) => ({
+          ...decision,
+          decision:
+            decision.decision as RevisionIssueDecisionSnapshot["decision"],
+        })),
+      },
       revisionVersions: body.revisionVersions || [],
       methodologyCards: body.methodologyCards,
     });

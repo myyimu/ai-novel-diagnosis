@@ -9,7 +9,12 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ELECTRON_DIR = dirname(__dirname); // apps/desktop/apps/electron
-const RETRY_PATTERNS = ["winCodeSign", "darwin", "symbolic link", "Cannot create symbolic link"];
+const RETRY_PATTERNS = [
+  "winCodeSign",
+  "darwin",
+  "symbolic link",
+  "Cannot create symbolic link",
+];
 
 for (let attempt = 1; attempt <= 6; attempt += 1) {
   console.log(`\n========== package attempt ${attempt}/6 ==========`);
@@ -44,5 +49,7 @@ for (let attempt = 1; attempt <= 6; attempt += 1) {
   }
 }
 
-console.error("\n打包在 6 次尝试后仍失败（winCodeSign）。建议开启 Windows 开发者模式或用管理员终端。");
+console.error(
+  "\n打包在 6 次尝试后仍失败（winCodeSign）。建议开启 Windows 开发者模式或用管理员终端。",
+);
 process.exit(1);

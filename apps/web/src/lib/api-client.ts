@@ -15,6 +15,8 @@ type TimeoutHandle = {
 	clear: () => void;
 };
 
+const TRANSIENT_PROXY_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000];
+
 function createTimeoutHandle(timeoutMs?: number): TimeoutHandle | null {
 	if (!timeoutMs) {
 		return null;
@@ -54,6 +56,35 @@ export function apiUrl(path: string) {
 	return `${API_BASE_URL}${path}`;
 }
 
+function isTransientProxyFailure(response: Response) {
+	return response.headers.get("x-api-proxy-error") === "upstream-unavailable";
+}
+
+function waitForRetry(delayMs: number) {
+	return new Promise<void>((resolve) => {
+		setTimeout(resolve, delayMs);
+	});
+}
+
+async function fetchWithTransientProxyRetry(url: string, requestInit: RequestInit) {
+	let response = await fetch(url, requestInit);
+	const method = requestInit.method?.toUpperCase() ?? "GET";
+	if (method !== "GET" && method !== "HEAD") {
+		return response;
+	}
+
+	for (const delayMs of TRANSIENT_PROXY_RETRY_DELAYS_MS) {
+		if (!isTransientProxyFailure(response)) {
+			return response;
+		}
+
+		await waitForRetry(delayMs);
+		response = await fetch(url, requestInit);
+	}
+
+	return response;
+}
+
 async function readApiEnvelope<T>(response: Response): Promise<ApiEnvelope<T> | null> {
 	const contentType = response.headers.get("content-type") ?? "";
 	if (!contentType.includes("application/json")) {
@@ -87,7 +118,7 @@ async function requestJson<T>(
 	const timeoutHandle = createTimeoutHandle(options.timeoutMs);
 	let response: Response;
 	try {
-		response = await fetch(apiUrl(path), {
+		response = await fetchWithTransientProxyRetry(apiUrl(path), {
 			...requestInit,
 			signal: timeoutHandle?.signal,
 		});
@@ -153,7 +184,7 @@ export async function postForm<T>(
 	let response: Response;
 
 	try {
-		response = await fetch(apiUrl(path), {
+		response = await fetchWithTransientProxyRetry(apiUrl(path), {
 			method: "POST",
 			body,
 			signal: timeoutHandle?.signal,

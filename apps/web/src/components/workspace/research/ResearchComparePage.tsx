@@ -1,121 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-
-import { WorkspaceTaskFrame } from "@/components/workspace/WorkspaceTaskFrame";
-import type { ContextInspectorSection } from "@/components/workspace/ContextInspector";
-import type { TaskNavItem } from "@/components/workspace/TaskNav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GitCompare, Plus } from "lucide-react";
+import { ResearchWorkspaceShell } from "./ResearchWorkspaceShell";
 
 export function ResearchComparePage() {
-	const router = useRouter();
-
-	const taskNavItems: TaskNavItem[] = useMemo(
-		() => [
-			{
-				id: "book",
-				label: "整书拆解",
-				description: "上传和分析整书内容",
-				meta: "",
-			},
-			{
-				id: "compare",
-				label: "样本对比",
-				description: "对比多个样本的写作风格",
-				meta: "当前",
-			},
-			{
-				id: "patterns",
-				label: "图谱/模式",
-				description: "查看人物关系和情节模式",
-				meta: "",
-			},
-			{
-				id: "materials",
-				label: "研究资料",
-				description: "管理和查看研究资料",
-				meta: "",
-			},
-		],
-		[],
-	);
-
-	const inspectorSections: ContextInspectorSection[] = useMemo(
-		() => [
-			{
-				title: "对比状态",
-				description: "当前样本对比的状态",
-				fields: [
-					{
-						label: "样本数量",
-						value: "2 个样本",
-						tone: "secondary",
-					},
-					{
-						label: "对比状态",
-						value: "准备就绪",
-						tone: "outline",
-					},
-				],
-			},
-			{
-				title: "页面信息",
-				description: "样本对比页面信息",
-				fields: [
-					{
-						label: "当前路径",
-						value: "/research/compare",
-						tone: "outline",
-					},
-					{
-						label: "布局模式",
-						value: "研究工作区",
-						hint: "独立的样本对比页面",
-					},
-				],
-			},
-		],
-		[],
-	);
-
-	const handleNavChange = (id: string) => {
-		if (id === "book") {
-			router.push("/research/book");
-		} else if (id === "patterns") {
-			router.push("/research/patterns");
-		} else if (id === "materials") {
-			router.push("/research/materials");
-		}
-	};
-
 	return (
-		<WorkspaceTaskFrame
+		<ResearchWorkspaceShell
+			active="compare"
 			title="样本对比"
 			description="对比多个文本样本的写作风格和结构特征"
 			status="对比分析"
-			taskNav={{
-				items: taskNavItems,
-				activeId: "compare",
-				onChange: handleNavChange,
-				title: "研究导航",
-				description: "选择要管理的研究内容",
-			}}
-			inspector={{
-				title: "对比上下文",
-				description: "当前样本对比的配置和状态",
-				sections: inspectorSections,
-				emptyState: (
-					<div className="space-y-2">
-						<p className="text-sm text-muted-foreground">暂无对比信息。</p>
-					</div>
-				),
-			}}
 		>
-			<div className="space-y-4">
+			<div className="space-y-4 [&>div]:rounded-[14px] [&>div]:border-[#e6e8eb] [&>div]:bg-white [&>div]:shadow-[0_6px_20px_rgba(22,27,34,.055)]">
 				{/* 样本对比区域 */}
 				<Card>
 					<CardHeader>
@@ -210,6 +109,6 @@ export function ResearchComparePage() {
 					</CardContent>
 				</Card>
 			</div>
-		</WorkspaceTaskFrame>
+		</ResearchWorkspaceShell>
 	);
 }

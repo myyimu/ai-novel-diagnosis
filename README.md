@@ -398,6 +398,8 @@ Health: http://127.0.0.1:3001/health
 
 上传 TXT、标准化文本和上传快照默认存放在 `.local/analysis`；整书拆解的章节 map 中间产物默认存放在 `.local/artifacts`。这些目录已被 `.gitignore` 忽略，不应提交上传文本、模型输出、本地数据库或 API Key。
 
+单人本地部署会在 API 启动、每次上传和整书任务结束后删除超过 30 天的上传与已结束任务，并将上传稿件总占用限制在 512 MiB；整书任务中间产物也限制为 512 MiB。可在 `.env` 通过 `ANALYSIS_RETENTION_DAYS`、`ANALYSIS_STORAGE_MAX_MB` 和 `ANALYSIS_ARTIFACT_MAX_MB` 调整。上传接口使用内存接收文件，单个 TXT 限制为 10 MiB，以避免本地机器因大文件出现明显内存峰值。
+
 如果处理真实作者稿件或商业稿件，可以设置 `ANALYSIS_STORAGE_KEY` 启用本地隐私模式。启用后，上传原文、标准化文本和上传快照会以 AES-256-GCM 写成 `.enc` 文件；API 会在读取时透明解密。请妥善保存这个密钥，丢失后已加密的本地上传无法恢复。
 
 真实 PostgreSQL 部署使用 Drizzle migrations。初始迁移文件位于 `services/api/drizzle/migrations`；修改 `services/api/src/service/drizzle/schema.ts` 后，应执行：
@@ -431,12 +433,18 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Docker Compose 仅面向单人自托管：请在 `.env` 中设置随机的
+`POSTGRES_PASSWORD`、`JWT_SECRET`、`APP_ACCESS_TOKEN` 和
+`ANALYSIS_STORAGE_KEY`。首次打开页面时浏览器会要求输入访问密码；存储密钥
+会加密本地保存的稿件，丢失或更换后无法读取旧稿。Compose 只把 Web 映射到
+`127.0.0.1`，不会把 API 或数据库暴露到局域网或公网。
+
 默认地址：
 
 ```text
 Web: http://localhost:3000
-API: http://localhost:3001/api/v1
-健康检查: http://localhost:3001/health
+API：通过 Web 的 `/api/v1` 代理访问（未向宿主机暴露）
+健康检查：`docker compose ps` 查看服务健康状态
 ```
 
 当前 compose 只启动实际使用的 `postgres`、`api`、`web`。
@@ -455,6 +463,8 @@ API: http://localhost:3001/api/v1
 ```
 
 `.local` 已被 `.gitignore` 忽略，不应提交上传文本、模型输出、本地数据库或 API Key。
+
+Compose 会将上传稿件和任务产物分别保存到命名数据卷；容器重建不会丢失这些本地数据。需要彻底清除时，先停止服务，再显式执行 `docker compose down -v`（这也会删除 PostgreSQL 数据）。
 
 ## 质量检查
 
@@ -487,6 +497,7 @@ pnpm run doctor
 - 中间结果已经留存，失败或中断后的继续拆解已有基础入口；更细的半成品导出和跨会话复核持久化仍在迭代。
 - 关系图谱支持本地人工修正和导出记录，但修正记录暂未做独立数据库持久化。
 - 当前没有账号系统，更适合本地单人部署。
+- Docker Compose 是单人本地部署，不是多租户或公网服务。若要暴露到公网，必须先补齐账号、资源所有权、授权、限流和审计，不能仅依赖共享访问密码。
 - 工具只提供拆解、学习、质检和导出能力；用户需要自行确认上传文本和导出素材的使用权与风险边界。
 
 ## 友情链接

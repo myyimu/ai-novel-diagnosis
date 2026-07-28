@@ -1,0 +1,2 @@
+ALTER TABLE "revision_sessions" ADD COLUMN "issue_decisions" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "revision_sessions" ADD COLUMN "retest_status" varchar(32) DEFAULT 'not_requested' NOT NULL;

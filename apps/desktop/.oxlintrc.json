@@ -17,6 +17,7 @@
     "no-console": "off",
     "no-empty-interface": "off",
     "no-explicit-any": "off",
+    "no-underscore-dangle": "off",
     "react/react-in-jsx-scope": "off",
     "import/no-unassigned-import": "off",
     "unicorn/no-abusive-eslint-disable": "off"

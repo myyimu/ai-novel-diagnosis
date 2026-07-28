@@ -180,6 +180,15 @@ describe("workspace iteration assets", () => {
 			chapterText: "主角被退婚后拿到旧案信物。",
 			result: baseResult,
 			methodologyCardIds: ["method-1"],
+			issueDecisions: [
+				{
+					issueId: "issue-1",
+					title: "章末钩子没有代价",
+					decision: "accepted",
+					adopted: true,
+				},
+			],
+			retestStatus: "pending",
 			storyAuditFindingIds: ["finding-1"],
 			now: "2026-06-24T00:00:00.000Z",
 		});
@@ -190,6 +199,8 @@ describe("workspace iteration assets", () => {
 		expect(session.gateDecision).toBe("revise");
 		expect(session.issueTitles).toContain("章末钩子没有代价");
 		expect(session.issueCategories).toContain("hook");
+		expect(session.issueDecisions?.[0]).toMatchObject({ adopted: true });
+		expect(session.retestStatus).toBe("pending");
 		expect(session.storyAuditFindingIds).toEqual(["finding-1"]);
 		expect(session.methodologyCardIds).toEqual(["method-1"]);
 	});

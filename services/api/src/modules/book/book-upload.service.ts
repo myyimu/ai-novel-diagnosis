@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  type OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -12,7 +13,14 @@ import {
   randomBytes,
   randomUUID,
 } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import {
   AnalysisPersistenceRepository,
@@ -36,10 +44,12 @@ export interface CreateUploadInput {
 }
 
 @Injectable()
-export class BookUploadService {
+export class BookUploadService implements OnModuleInit {
   private readonly logger = new Logger(BookUploadService.name);
   private readonly storageRoot: string;
   private readonly encryptionKey: Buffer | undefined;
+  private readonly retentionDays: number;
+  private readonly storageMaxBytes: number;
 
   constructor(
     private readonly repository: AnalysisPersistenceRepository,
@@ -53,6 +63,20 @@ export class BookUploadService {
     this.encryptionKey = storageKey
       ? createHash("sha256").update(storageKey).digest()
       : undefined;
+    this.retentionDays =
+      configService.get<number>("analysis.retentionDays") || 30;
+    this.storageMaxBytes =
+      configService.get<number>("analysis.storageMaxBytes") ||
+      512 * 1024 * 1024;
+    if (process.env.NODE_ENV === "production" && !this.encryptionKey) {
+      throw new Error(
+        "ANALYSIS_STORAGE_KEY is required in production to protect author manuscripts at rest.",
+      );
+    }
+  }
+
+  async onModuleInit(): Promise<void> {
+    await this.pruneStoredUploads();
   }
 
   async createUpload(
@@ -116,6 +140,7 @@ export class BookUploadService {
         preprocessing: snapshot.preprocessing,
       });
       await this.writeSnapshot(persisted);
+      await this.pruneStoredUploads();
       return persisted;
     } catch (error) {
       this.logger.warn(
@@ -427,6 +452,79 @@ export class BookUploadService {
       );
     } catch {
       return [];
+    }
+  }
+
+  private async pruneStoredUploads(): Promise<void> {
+    const uploads = await this.listSnapshotUploads();
+    const cutoff = Date.now() - this.retentionDays * 24 * 60 * 60 * 1000;
+    const expired = uploads.filter(
+      (upload) => new Date(upload.updatedAt).getTime() < cutoff,
+    );
+
+    for (const upload of expired) {
+      await this.removeStoredUpload(upload.id, "expired");
+    }
+
+    const candidates = uploads
+      .filter((upload) => !expired.some((entry) => entry.id === upload.id))
+      .sort(
+        (left: AnalysisUploadSnapshot, right: AnalysisUploadSnapshot) =>
+          new Date(left.updatedAt).getTime() -
+          new Date(right.updatedAt).getTime(),
+      );
+    let totalBytes = 0;
+    const sizedUploads = await Promise.all(
+      candidates.map(async (upload) => ({
+        upload,
+        size: await this.directorySize(
+          join(this.storageRoot, "uploads", upload.id),
+        ),
+      })),
+    );
+    for (const entry of sizedUploads) {
+      totalBytes += entry.size;
+    }
+    for (const entry of sizedUploads) {
+      if (totalBytes <= this.storageMaxBytes) break;
+      await this.removeStoredUpload(entry.upload.id, "storage quota");
+      totalBytes -= entry.size;
+    }
+  }
+
+  private async removeStoredUpload(
+    uploadId: string,
+    reason: "expired" | "storage quota",
+  ): Promise<void> {
+    try {
+      await this.repository.deleteUpload(uploadId);
+    } catch (error) {
+      this.logger.warn(
+        `Keeping ${reason} upload ${uploadId} because database cleanup failed: ${(error as Error).message}`,
+      );
+      return;
+    }
+    await rm(join(this.storageRoot, "uploads", uploadId), {
+      recursive: true,
+      force: true,
+    });
+    this.logger.log(`Removed ${reason} upload: ${uploadId}`);
+  }
+
+  private async directorySize(path: string): Promise<number> {
+    try {
+      const entries = await readdir(path, { withFileTypes: true });
+      const sizes = await Promise.all(
+        entries.map(async (entry) => {
+          const entryPath = join(path, entry.name);
+          return entry.isDirectory()
+            ? this.directorySize(entryPath)
+            : (await stat(entryPath)).size;
+        }),
+      );
+      return sizes.reduce((total, size) => total + size, 0);
+    } catch {
+      return 0;
     }
   }
 

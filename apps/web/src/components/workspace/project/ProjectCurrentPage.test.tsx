@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import type { QuickReviewResult } from "@/stores/workspace-store";
 import {
+	AnnotatedParagraph,
 	buildAnnotatedParagraphs,
+	buildRevisionIssueDecisions,
 	buildVisibleIssueEntries,
+	getChapterDiagnosisRunCopy,
 	getAnnotatedIssueIds,
+	TreeAssetRow,
 } from "./ProjectCurrentPage";
 
 type QuickReviewIssue = NonNullable<QuickReviewResult["issues"]>[number];
@@ -60,6 +65,18 @@ describe("buildAnnotatedParagraphs", () => {
 		expect(annotations.flatMap((annotation) => annotation.markers)).toHaveLength(0);
 		expect(getAnnotatedIssueIds(annotations).size).toBe(0);
 	});
+
+	it("should render a marker number at the lower-right corner of its anchored evidence", () => {
+		const [annotation] = buildAnnotatedParagraphs("证据内容。后续正文。", [
+			buildIssue("issue-1", "证据内容"),
+		]);
+		const html = renderToStaticMarkup(
+			<AnnotatedParagraph annotation={annotation!} onFocusIssue={() => undefined} />,
+		);
+
+		expect(html).toContain("-bottom-2");
+		expect(html).toMatch(/证据内容.*>1<\/span><\/button>。后续正文/);
+	});
 });
 
 describe("buildVisibleIssueEntries", () => {
@@ -84,5 +101,60 @@ describe("buildVisibleIssueEntries", () => {
 		const entries = buildVisibleIssueEntries(issues, () => "pending", "must");
 
 		expect(entries.map((entry) => entry.index)).toEqual([1, 2]);
+	});
+});
+
+describe("buildRevisionIssueDecisions", () => {
+	it("should record author intent and distinguish an adopted rewrite from acceptance", () => {
+		const decisions = buildRevisionIssueDecisions(
+			[
+				buildIssue("issue-1", "证据 1"),
+				buildIssue("issue-2", "证据 2"),
+				buildIssue("issue-3", "证据 3"),
+			],
+			{
+				"issue-1": "accepted",
+				"issue-2": "ignored",
+				"issue-3": "disputed",
+			},
+			new Set(["issue-1"]),
+		);
+
+		expect(decisions).toEqual([
+			expect.objectContaining({ issueId: "issue-1", decision: "accepted", adopted: true }),
+			expect.objectContaining({
+				issueId: "issue-2",
+				decision: "author_intent",
+				adopted: false,
+			}),
+			expect.objectContaining({
+				issueId: "issue-3",
+				decision: "false_positive",
+				adopted: false,
+			}),
+		]);
+	});
+});
+
+describe("getChapterDiagnosisRunCopy", () => {
+	it("should distinguish a first diagnosis from a retest run", () => {
+		expect(getChapterDiagnosisRunCopy(false)).toMatchObject({
+			title: "正在生成诊断",
+		});
+		expect(getChapterDiagnosisRunCopy(true)).toMatchObject({
+			title: "正在进行复诊",
+		});
+	});
+});
+
+describe("TreeAssetRow", () => {
+	it("should render a keyboard-accessible button for a project asset", () => {
+		const html = renderToStaticMarkup(
+			<TreeAssetRow label="修改效果" value={20} onClick={() => undefined} />,
+		);
+
+		expect(html).toContain("<button");
+		expect(html).toContain("修改效果");
+		expect(html).toContain(">20<");
 	});
 });

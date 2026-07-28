@@ -109,6 +109,10 @@ export const revisionSessions = pgTable("revision_sessions", {
   mainProblem: text("main_problem").notNull(),
   issueTitles: jsonb("issue_titles").notNull(),
   issueCategories: jsonb("issue_categories").notNull(),
+  issueDecisions: jsonb("issue_decisions").notNull().default([]),
+  retestStatus: varchar("retest_status", { length: 32 })
+    .notNull()
+    .default("not_requested"),
   nextPrompt: text("next_prompt"),
   revisionNote: text("revision_note"),
   revisionNoteUpdatedAt: timestamp("revision_note_updated_at", {

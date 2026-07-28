@@ -209,6 +209,19 @@ export class AnalysisPersistenceRepository {
     return rows.map((row) => this.uploadSnapshot(row));
   }
 
+  async deleteUpload(uploadId: string): Promise<boolean> {
+    const rows = await this.drizzle.queryRows<{ id: string }>(
+      `
+      DELETE FROM "analysis_uploads"
+      WHERE "id" = $1
+      RETURNING "id"
+    `,
+      [uploadId],
+    );
+
+    return rows.length > 0;
+  }
+
   async createJob(
     job: BookAnalysisJobSnapshot,
     uploadId?: string,
@@ -357,6 +370,46 @@ export class AnalysisPersistenceRepository {
       [safeLimit],
     );
 
+    return rows.map((row) => this.jobSnapshotFromRaw(row));
+  }
+
+  async listExpiredJobs(
+    cutoff: Date,
+    limit = 100,
+  ): Promise<BookAnalysisJobSnapshot[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.drizzle.queryRows<BookAnalysisJobRow>(
+      `
+      SELECT
+        "id", "upload_id", "type", "status", "input_summary", "progress",
+        "preprocessing", "partial_result", "result", "error", "created_at",
+        "updated_at", "started_at", "finished_at"
+      FROM "book_analysis_jobs"
+      WHERE "status" NOT IN ('queued', 'running')
+        AND "updated_at" < $1
+      ORDER BY "updated_at" ASC
+      LIMIT $2
+    `,
+      [this.toDatabaseTimestamp(cutoff), safeLimit],
+    );
+    return rows.map((row) => this.jobSnapshotFromRaw(row));
+  }
+
+  async listFinishedJobs(limit = 100): Promise<BookAnalysisJobSnapshot[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.drizzle.queryRows<BookAnalysisJobRow>(
+      `
+      SELECT
+        "id", "upload_id", "type", "status", "input_summary", "progress",
+        "preprocessing", "partial_result", "result", "error", "created_at",
+        "updated_at", "started_at", "finished_at"
+      FROM "book_analysis_jobs"
+      WHERE "status" NOT IN ('queued', 'running')
+      ORDER BY "updated_at" ASC
+      LIMIT $1
+    `,
+      [safeLimit],
+    );
     return rows.map((row) => this.jobSnapshotFromRaw(row));
   }
 

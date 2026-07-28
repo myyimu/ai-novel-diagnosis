@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 describe("DrizzleService", () => {
   const originalUrl = process.env.DATABASE_URL;
   const originalPgliteDataDir = process.env.PGLITE_DATA_DIR;
+  const originalNodeEnv = process.env.NODE_ENV;
   let tempPgliteDataDir: string | undefined;
 
   afterEach(() => {
@@ -18,6 +19,11 @@ describe("DrizzleService", () => {
       delete process.env.PGLITE_DATA_DIR;
     } else {
       process.env.PGLITE_DATA_DIR = originalPgliteDataDir;
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
     }
     if (tempPgliteDataDir) {
       rmSync(tempPgliteDataDir, { recursive: true, force: true });
@@ -88,5 +94,14 @@ describe("DrizzleService", () => {
         await svc.onModuleDestroy();
       }
     });
+  });
+
+  it("rejects the PGlite fallback in production", () => {
+    delete process.env.DATABASE_URL;
+    process.env.NODE_ENV = "production";
+
+    expect(() => new DrizzleService()).toThrow(
+      "DATABASE_URL is required in production",
+    );
   });
 });

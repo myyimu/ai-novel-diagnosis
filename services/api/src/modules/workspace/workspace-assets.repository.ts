@@ -37,6 +37,8 @@ export interface RevisionSessionSnapshot {
   mainProblem: string;
   issueTitles: string[];
   issueCategories?: string[];
+  issueDecisions?: RevisionIssueDecisionSnapshot[];
+  retestStatus?: "not_requested" | "pending" | "completed";
   nextPrompt?: string;
   revisionNote?: string;
   revisionNoteUpdatedAt?: string;
@@ -45,6 +47,13 @@ export interface RevisionSessionSnapshot {
   textChanged?: boolean;
   storyAuditFindingIds?: string[];
   methodologyCardIds: string[];
+}
+
+export interface RevisionIssueDecisionSnapshot {
+  issueId: string;
+  title: string;
+  decision: "accepted" | "author_intent" | "false_positive" | "deferred";
+  adopted: boolean;
 }
 
 export interface RevisionTextVersionSnapshot {
@@ -195,6 +204,8 @@ export class WorkspaceAssetsRepository {
         mainProblem: session.mainProblem,
         issueTitles: session.issueTitles,
         issueCategories: session.issueCategories || [],
+        issueDecisions: session.issueDecisions || [],
+        retestStatus: session.retestStatus || "not_requested",
         nextPrompt: session.nextPrompt,
         revisionNote: session.revisionNote,
         revisionNoteUpdatedAt: session.revisionNoteUpdatedAt
@@ -220,6 +231,8 @@ export class WorkspaceAssetsRepository {
           mainProblem: session.mainProblem,
           issueTitles: session.issueTitles,
           issueCategories: session.issueCategories || [],
+          issueDecisions: session.issueDecisions || [],
+          retestStatus: session.retestStatus || "not_requested",
           nextPrompt: session.nextPrompt,
           revisionNote: session.revisionNote,
           revisionNoteUpdatedAt: session.revisionNoteUpdatedAt
@@ -472,6 +485,11 @@ export class WorkspaceAssetsRepository {
       mainProblem: row.mainProblem,
       issueTitles: toStringList(row.issueTitles),
       issueCategories: toStringList(row.issueCategories),
+      issueDecisions: toRevisionIssueDecisions(row.issueDecisions),
+      retestStatus:
+        row.retestStatus === "pending" || row.retestStatus === "completed"
+          ? row.retestStatus
+          : "not_requested",
       nextPrompt: row.nextPrompt ?? undefined,
       revisionNote: row.revisionNote ?? undefined,
       revisionNoteUpdatedAt: row.revisionNoteUpdatedAt?.toISOString(),
@@ -550,4 +568,38 @@ function toStringList(value: unknown): string[] {
   return Array.isArray(value)
     ? value.map((item) => String(item)).filter(Boolean)
     : [];
+}
+
+function toRevisionIssueDecisions(
+  value: unknown,
+): RevisionIssueDecisionSnapshot[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const candidate = item as Record<string, unknown>;
+    const decision = candidate.decision;
+    if (
+      typeof candidate.issueId !== "string" ||
+      typeof candidate.title !== "string" ||
+      typeof candidate.adopted !== "boolean" ||
+      !["accepted", "author_intent", "false_positive", "deferred"].includes(
+        decision as string,
+      )
+    ) {
+      return [];
+    }
+    return [
+      {
+        issueId: candidate.issueId,
+        title: candidate.title,
+        decision: decision as RevisionIssueDecisionSnapshot["decision"],
+        adopted: candidate.adopted,
+      },
+    ];
+  });
 }
