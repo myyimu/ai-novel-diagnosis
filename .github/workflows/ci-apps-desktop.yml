@@ -24,8 +24,10 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - name: Install dependencies
+        working-directory: apps/desktop
         run: pnpm install --frozen-lockfile
       - name: Run desktop checks
-        run: pnpm --filter desktop run check
+        working-directory: apps/desktop
+        run: pnpm run check
