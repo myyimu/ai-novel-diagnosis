@@ -82,6 +82,25 @@ export const STORY_CRAFT_RUBRIC_DIMENSIONS: StoryCraftDimension[] = [
     failSignal: "节点稀疏、爆点后置、共鸣只停留在口号或控诉。",
   },
   {
+    id: "complete-story-arc",
+    label: "完整故事弧",
+    diagnosticQuestion: "短篇从开端、发展、转折、高潮到结局是否形成自足的因果链和情绪闭环？",
+    failSignal: "事件只是片段拼接，转折没有铺垫，或结局没有回应开篇承诺与核心冲突。",
+  },
+  {
+    id: "ending-payoff",
+    label: "高潮与结局兑现",
+    diagnosticQuestion: "高潮是否由前文冲突推动，结局是否完成关系、目标、认知或情绪上的有效兑现？",
+    failSignal: "高潮突兀、靠巧合解决，结局仓促收尾，或反转只制造信息而没有情感/主题回响。",
+  },
+  {
+    id: "character-change",
+    label: "人物变化",
+    diagnosticQuestion:
+      "主角是否因关键选择付出代价、获得认知或改变关系，使人物在全文前后有可感知的变化？",
+    failSignal: "人物从头到尾只被事件推着走，选择无代价，或结局状态与开头几乎没有差异。",
+  },
+  {
     id: "long-form-learning-asset",
     label: "长篇拆解资产",
     diagnosticQuestion: "整书拆解是否沉淀节奏、情绪模块、角色状态、时间线和伏笔表？",
@@ -235,6 +254,16 @@ export function selectStoryCraftCriteria(mode: QuickReviewPromptMode): StoryCraf
       "character-motivation",
       "continuity-ledger",
       "judge-mechanism-before-style",
+    ],
+    "short-story-full": [
+      "core-selling-point",
+      "complete-story-arc",
+      "minimum-plot-loop",
+      "character-change",
+      "ending-payoff",
+      "short-form-density",
+      "prose-naturalness",
+      "show-emotion-through-action",
     ],
     "generic-draft": [
       "core-selling-point",

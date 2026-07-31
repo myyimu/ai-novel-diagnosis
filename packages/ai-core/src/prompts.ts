@@ -117,6 +117,7 @@ export function routeQuickReviewPromptMode(
   if (chapterPosition === "first") return "first-chapter";
   if (chapterPosition === "early") return "early-chapter";
   if (chapterPosition === "middle" || chapterPosition === "final") return "chapter-progress";
+  if (chapterPosition === "short-story") return "short-story-full";
   return "generic-draft";
 }
 
@@ -132,6 +133,15 @@ export function buildQuickReviewPrompt(input: QuickReviewPromptInput): PromptBun
   const criteria = selectStoryCraftCriteria(promptMode)
     .map((item, index) => `${index + 1}. ${item.label}：${item.rule}`)
     .join("\n");
+  const shortStoryFullTextRequirements =
+    promptMode === "short-story-full"
+      ? [
+          "短篇全文评审要求：",
+          "本次输入是短篇全文，必须按完整故事评审；不要套用单章钩子、下一章承接或追更留存标准。",
+          "通读全文后检查故事核、人物欲望与变化、因果链、冲突升级、高潮、结局兑现、主题/情感余味和篇幅密度。",
+          "问题须说明它影响全文哪一段的铺垫、转折或收束，并给出兼顾前后文的改法；不能只点评开头片段。",
+        ].join("\n")
+      : "";
 
   return {
     id: QUICK_REVIEW_PROMPT_VERSION,
@@ -159,6 +169,7 @@ export function buildQuickReviewPrompt(input: QuickReviewPromptInput): PromptBun
           "",
           "本模式检查标准：",
           criteria,
+          ...(shortStoryFullTextRequirements ? ["", shortStoryFullTextRequirements] : []),
           "",
           "执行顺序：",
           "1. 先概括当前输入承诺给读者什么体验。",

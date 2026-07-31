@@ -25,14 +25,20 @@ export class QuickReviewDto {
 
   @ApiPropertyOptional({
     description:
-      "Chapter position hint. Defaults to unknown so non-first chapters are not forced into first-chapter rules.",
-    enum: ["first", "early", "middle", "final", "unknown"],
+      "Chapter position hint. Use short-story for a full short-story review rather than single-chapter criteria.",
+    enum: ["first", "early", "middle", "final", "short-story", "unknown"],
     example: "unknown",
   })
   @IsOptional()
   @IsString()
-  @IsIn(["first", "early", "middle", "final", "unknown"])
-  chapterPosition?: "first" | "early" | "middle" | "final" | "unknown";
+  @IsIn(["first", "early", "middle", "final", "short-story", "unknown"])
+  chapterPosition?:
+    | "first"
+    | "early"
+    | "middle"
+    | "final"
+    | "short-story"
+    | "unknown";
 
   @ApiPropertyOptional({
     description: "Chapter title. If omitted, the LLM infers one.",

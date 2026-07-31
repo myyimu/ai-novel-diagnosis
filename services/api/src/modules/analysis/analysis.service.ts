@@ -894,7 +894,11 @@ ${targets}
 
   private normalizeChapterPosition(value: unknown): ChapterPosition {
     const position = asText(value).toLowerCase();
-    if (["first", "early", "middle", "final", "unknown"].includes(position)) {
+    if (
+      ["first", "early", "middle", "final", "short-story", "unknown"].includes(
+        position,
+      )
+    ) {
       return position as ChapterPosition;
     }
 
@@ -909,11 +913,16 @@ ${targets}
       input.chapterPosition,
     );
     const assumptions =
-      chapterPosition === "unknown"
-        ? ["章节位置未知，未强制使用第一章标准。"]
-        : [];
+      chapterPosition === "short-story"
+        ? ["已按短篇全文评审，不使用单章钩子或追更标准。"]
+        : chapterPosition === "unknown"
+          ? ["章节位置未知，未强制使用第一章标准。"]
+          : [];
 
-    if (trimmed.length <= quickReviewSamplingLimit) {
+    if (
+      chapterPosition === "short-story" ||
+      trimmed.length <= quickReviewSamplingLimit
+    ) {
       return {
         text: trimmed,
         analysisScope: {

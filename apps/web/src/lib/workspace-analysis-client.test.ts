@@ -67,6 +67,25 @@ describe("workspace analysis client", () => {
 		expect(body.includeMethodologyCards).toBe(false);
 	});
 
+	it("keeps a short story intact instead of compacting it before review", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(okJson({}));
+		vi.stubGlobal("fetch", fetchMock);
+		const chapterText = `${"开场".repeat(10_000)}中段转折${"结局".repeat(10_000)}`;
+
+		await requestQuickReview({
+			provider,
+			chapterText,
+			chapterTitle: "雨夜来信",
+			quickReviewGenre: "",
+			quickReviewChapterPosition: "short-story",
+		});
+
+		const [, init] = fetchMock.mock.calls[0];
+		const body = readJsonBody(init);
+
+		expect(body.chapterText).toBe(chapterText);
+	});
+
 	it("requests methodology cards from structured diagnosis output only", async () => {
 		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(okJson({ methodologyCards: [] }));
 		vi.stubGlobal("fetch", fetchMock);

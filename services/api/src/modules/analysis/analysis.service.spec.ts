@@ -262,6 +262,43 @@ describe("AnalysisService", () => {
     expect(messages[0].content).toContain("不得删除用户声明必须保留的机制");
   });
 
+  it("should review short stories as complete text without head-tail sampling", async () => {
+    const modelProviders = {
+      chat: jest.fn(async () => quickReviewJson),
+    };
+    const service = createService({ modelProviders });
+    const chapterText = `${"开场铺垫".repeat(1300)}关键转折发生在故事中段${"结局回响".repeat(1300)}`;
+
+    const result = await service.quickReview({
+      provider: {
+        preset: "deepseek",
+        kind: "openai-compatible",
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKey: "sk-user-owned",
+        model: "deepseek-chat",
+      },
+      title: "雨夜来信",
+      chapterPosition: "short-story",
+      chapterText,
+    });
+
+    const [, messages] = modelProviders.chat.mock.calls[0] as unknown as [
+      ProviderConfigDto,
+      Array<{ content: string }>,
+      unknown,
+    ];
+    expect(messages[1].content).toContain("任务模式：short-story-full");
+    expect(messages[1].content).toContain("关键转折发生在故事中段");
+    expect(messages[1].content).toContain("短篇全文评审要求");
+    expect(result.analysisScope).toMatchObject({
+      originalCharacters: chapterText.length,
+      sampledCharacters: chapterText.length,
+      isPartial: false,
+      samplingStrategy: "full",
+      assumptions: ["已按短篇全文评审，不使用单章钩子或追更标准。"],
+    });
+  });
+
   it("should keep mock quick review local without calling the provider", async () => {
     const modelProviders = {
       chat: jest.fn(),

@@ -349,7 +349,10 @@ export function requestQuickReview({
 	quickReviewTargetReaderPleasures?: string;
 	includeMethodologyCards?: boolean;
 }) {
-	const compactedChapterText = compactChapterText(chapterText);
+	const compactedChapterText =
+		quickReviewChapterPosition === "short-story"
+			? chapterText.trim()
+			: compactChapterText(chapterText);
 
 	return postJson<QuickReviewResult>("/analysis/quick-review", {
 		provider,

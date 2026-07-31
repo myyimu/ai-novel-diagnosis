@@ -115,6 +115,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 	const fallbackBookName = handlers.activeProject?.name.trim() || "默认书籍";
 	const bookName = bookTitleFocused ? handlers.bookTitle : handlers.bookTitle || fallbackBookName;
 	const charCount = handlers.chapterText.trim().length;
+	const isShortStoryReview = handlers.quickReviewChapterPosition === "short-story";
 	const quickScore =
 		typeof handlers.quickReviewResult?.quickScore === "number"
 			? handlers.quickReviewResult.quickScore.toFixed(1)
@@ -329,6 +330,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 										<option value="early">前期章节</option>
 										<option value="middle">中段章节</option>
 										<option value="final">收束章节</option>
+										<option value="short-story">短篇全文</option>
 									</select>
 								</label>
 
@@ -437,7 +439,11 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 												handlers.handleChapterTextChange(event.target.value)
 											}
 											onPaste={handleChapterTextPaste}
-											placeholder="粘贴第一章或待诊断片段。建议 1500-6000 字。"
+											placeholder={
+												isShortStoryReview
+													? "粘贴短篇全文。系统会按完整故事评审，不按单章钩子标准。"
+													: "粘贴第一章或待诊断片段。建议 1500-6000 字。"
+											}
 											className="min-h-80 w-full resize-y rounded-[10px] border border-[#d8dbe0] bg-white px-3.5 py-[13px] text-sm leading-7 outline-none focus:border-[#ff8b5f] focus:ring-4 focus:ring-[#ff5a1f]/10"
 										/>
 										<span className="absolute bottom-2.5 right-3 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-[#69707d]">
@@ -578,7 +584,10 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 								<div className="mt-4 grid grid-cols-3 gap-2">
 									{[
 										["预计耗时", "30-60 秒"],
-										["建议字数", "1.5k-6k"],
+										[
+											"建议字数",
+											isShortStoryReview ? "全文 ≤ 3万字" : "1.5k-6k",
+										],
 										["诊断模式", "证据优先"],
 									].map(([label, value]) => (
 										<div

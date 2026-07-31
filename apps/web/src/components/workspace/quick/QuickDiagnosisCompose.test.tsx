@@ -138,6 +138,7 @@ describe("QuickDiagnosisCompose", () => {
 		expect(html).toContain("复制修改指令");
 		expect(html).toContain("本地演示");
 		expect(html).toContain("章节诊断");
+		expect(html).toContain("短篇全文");
 		expect(html).not.toContain("书籍上传");
 		expect(html).not.toContain("AI 提供商设置");
 		expect(html).not.toContain("保存可复用方法论卡");

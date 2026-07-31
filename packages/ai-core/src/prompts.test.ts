@@ -72,4 +72,19 @@ describe("buildQuickReviewPrompt", () => {
     expect(prompt.messages[1]?.content).toContain("任务模式：prompt-review");
     expect(prompt.messages[1]?.content).toContain("内容类型：prompt");
   });
+
+  it("uses full-story criteria for short-story review", () => {
+    const prompt = buildQuickReviewPrompt({
+      title: "雨夜来信",
+      inputKind: "human-draft",
+      chapterPosition: "short-story",
+      sampledText: "雨夜里，她收到了十年前寄出的信，并决定在天亮前赶到旧车站。",
+    });
+
+    expect(routeQuickReviewPromptMode("human-draft", "short-story")).toBe("short-story-full");
+    expect(prompt.messages[1]?.content).toContain("任务模式：short-story-full");
+    expect(prompt.messages[1]?.content).toContain("短篇全文评审要求");
+    expect(prompt.messages[1]?.content).toContain("完整故事弧");
+    expect(prompt.messages[1]?.content).toContain("不要套用单章钩子、下一章承接或追更留存标准");
+  });
 });

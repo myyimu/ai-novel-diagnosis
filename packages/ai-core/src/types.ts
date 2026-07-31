@@ -224,7 +224,7 @@ export type QuickReviewInputKind = "human-draft" | "ai-draft" | "idea" | "outlin
  * @example
  * const position: ChapterPosition = "middle";
  */
-export type ChapterPosition = "first" | "early" | "middle" | "final" | "unknown";
+export type ChapterPosition = "first" | "early" | "middle" | "final" | "short-story" | "unknown";
 
 /** Prompt mode selected from input kind and chapter position.
  *
@@ -235,6 +235,7 @@ export type QuickReviewPromptMode =
   | "first-chapter"
   | "early-chapter"
   | "chapter-progress"
+  | "short-story-full"
   | "generic-draft"
   | "outline-review"
   | "idea-review"
