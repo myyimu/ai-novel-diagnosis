@@ -103,24 +103,37 @@ describe("BookAnalysisJobService", () => {
     expect(snapshot.partialResult).not.toHaveProperty("chapterMaps");
   });
 
+  // Format-compliant jobId matching validateJobId(): /^book_[a-z0-9]{4,20}_[a-z0-9]{2,12}$/i
+  const VALID_JOB_ID = "book_testid1234_ab";
+
   it("deletes completed persisted jobs", async () => {
-    const repository = createRepositoryMock();
+    const repository = createRepositoryMock({
+      getJob: jest.fn(async () => ({
+        id: VALID_JOB_ID,
+        type: "book-map-reduce-analysis",
+        status: "succeeded",
+        createdAt: "2026-06-20T00:00:00.000Z",
+        updatedAt: "2026-06-20T00:00:00.000Z",
+        inputSummary: { title: "测试书", genre: "other", textLength: 1200 },
+        progress: { stage: "succeeded", current: 1, total: 1, message: "done" },
+      })),
+    });
     const service = new BookAnalysisJobService(
       repository as never,
       mockConfigService as never,
     );
 
-    await expect(service.delete("job-1")).resolves.toEqual({
+    await expect(service.delete(VALID_JOB_ID)).resolves.toEqual({
       deleted: true,
-      jobId: "job-1",
+      jobId: VALID_JOB_ID,
     });
-    expect(repository.deleteJob).toHaveBeenCalledWith("job-1");
+    expect(repository.deleteJob).toHaveBeenCalledWith(VALID_JOB_ID);
   });
 
   it("rejects deletion while a job is still running", async () => {
     const repository = createRepositoryMock({
       getJob: jest.fn(async () => ({
-        id: "job-1",
+        id: VALID_JOB_ID,
         type: "book-map-reduce-analysis",
         status: "running",
         createdAt: "2026-06-20T00:00:00.000Z",
@@ -143,7 +156,7 @@ describe("BookAnalysisJobService", () => {
       mockConfigService as never,
     );
 
-    await expect(service.delete("job-1")).rejects.toThrow(
+    await expect(service.delete(VALID_JOB_ID)).rejects.toThrow(
       "Running book analysis jobs cannot be deleted.",
     );
     expect(repository.deleteJob).not.toHaveBeenCalled();

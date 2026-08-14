@@ -14,8 +14,12 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
+import {
+  validateJobId,
+  resolveSafePath,
+} from "../../shared/utils/path-sanitizer";
 import { BookPreprocessResult } from "./text-preprocessor.service";
 
 export type BookAnalysisJobStatus =
@@ -168,6 +172,7 @@ export class BookAnalysisJobService implements OnModuleInit {
   }
 
   async delete(jobId: string) {
+    this.validateJobIdOrThrow(jobId);
     const job = await this.get(jobId, { includeResult: false });
     if (job.status === "queued" || job.status === "running") {
       throw new BadRequestException(
@@ -181,12 +186,15 @@ export class BookAnalysisJobService implements OnModuleInit {
     }
 
     this.jobs.delete(jobId);
+    const safeArtifactDir = resolveSafePath(this.artifactRoot, jobId, "jobId");
+    const safeStorageDir = resolveSafePath(
+      join(this.storageRoot, "jobs"),
+      jobId,
+      "jobId",
+    );
     await Promise.all([
-      rm(join(this.artifactRoot, jobId), { recursive: true, force: true }),
-      rm(join(this.storageRoot, "jobs", jobId), {
-        recursive: true,
-        force: true,
-      }),
+      rm(safeArtifactDir, { recursive: true, force: true }),
+      rm(safeStorageDir, { recursive: true, force: true }),
     ]);
 
     return {
@@ -291,8 +299,13 @@ export class BookAnalysisJobService implements OnModuleInit {
     deepCompletedCount?: number;
     phase?: "outline" | "deep";
   }) {
+    this.validateJobIdOrThrow(input.jobId);
     const job = this.read(input.jobId);
-    const artifactDir = join(this.artifactRoot, input.jobId);
+    const artifactDir = resolveSafePath(
+      this.artifactRoot,
+      input.jobId,
+      "jobId",
+    );
     const mapId = this.chapterMapFileId(input.chapterMap, input.mapCount);
     await mkdir(artifactDir, { recursive: true });
     await writeFile(
@@ -359,9 +372,12 @@ export class BookAnalysisJobService implements OnModuleInit {
   }
 
   async readChapterMaps<T = unknown>(jobId: string): Promise<T[]> {
+    this.validateJobIdOrThrow(jobId);
     const artifactDirs = [
-      join(this.artifactRoot, jobId),
-      join(this.storageRoot, "jobs", jobId, "maps"),
+      resolveSafePath(this.artifactRoot, jobId, "jobId"),
+      resolveSafePath(join(this.storageRoot, "jobs"), jobId, "jobId") +
+        sep +
+        "maps",
     ];
     for (const artifactDir of artifactDirs) {
       let files: string[];
@@ -451,6 +467,11 @@ export class BookAnalysisJobService implements OnModuleInit {
     }
 
     return job;
+  }
+
+  /** Validates jobId format and throws BadRequestException if invalid. */
+  private validateJobIdOrThrow(jobId: string): void {
+    validateJobId(jobId);
   }
 
   private enqueueProcessor(

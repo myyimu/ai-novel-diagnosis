@@ -1,19 +1,46 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { randomUUID } from "node:crypto";
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  async getAccessToken(code: string) {
-    const payload = { userId: code };
-    return this.jwtService.sign(payload);
+  async getAccessToken(code: string): Promise<string> {
+    // If APP_ACCESS_TOKEN is configured, verify the code matches it.
+    // This prevents arbitrary JWT minting when authentication is enabled.
+    const expectedToken = this.configService.get<string>("app.accessToken");
+    if (expectedToken && code !== expectedToken) {
+      throw new UnauthorizedException("Invalid access token");
+    }
+
+    const payload = {
+      sub: code,
+      jti: randomUUID(),
+      iss: "ai-novel-diagnosis",
+      aud: "ai-novel-diagnosis-client",
+      iat: Math.floor(Date.now() / 1000),
+    };
+
+    return this.jwtService.sign(payload, {
+      algorithm: "HS256",
+    });
   }
 
-  async refreshAccessToken(token: string) {
+  async refreshAccessToken(token: string): Promise<string> {
     try {
-      const payload = this.jwtService.verify(token, { ignoreExpiration: true });
-      // 只保留业务字段，去除 JWT 元数据（iat、exp 等），重新签发
+      const payload = this.jwtService.verify(token, {
+        algorithms: ["HS256"],
+        // Do NOT ignore expiration by default — tokens must be valid.
+        // Callers who need grace-period refresh should use a separate endpoint.
+        ignoreExpiration: false,
+      });
+
+      // Strip JWT metadata fields, keep only business claims
       const {
         iat: _iat,
         exp: _exp,
@@ -21,13 +48,23 @@ export class AuthService {
         jti: _jti,
         ...cleanPayload
       } = payload;
-      return this.jwtService.sign(cleanPayload);
+
+      return this.jwtService.sign(
+        {
+          ...cleanPayload,
+          jti: randomUUID(),
+          iat: Math.floor(Date.now() / 1000),
+        },
+        { algorithm: "HS256" },
+      );
     } catch {
-      throw new UnauthorizedException("Invalid token");
+      throw new UnauthorizedException("Invalid or expired token");
     }
   }
 
-  verifyAccessToken(token: string) {
-    return this.jwtService.verify(token);
+  verifyAccessToken(token: string): unknown {
+    return this.jwtService.verify(token, {
+      algorithms: ["HS256"],
+    });
   }
 }

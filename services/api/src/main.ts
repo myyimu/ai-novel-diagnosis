@@ -2,8 +2,10 @@ import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import helmet from "helmet";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
+import { initLogger, setLogLevel } from "./shared/utils/logger";
 
 async function bootstrap() {
   // Create the application instance
@@ -16,6 +18,13 @@ async function bootstrap() {
   const port = configService.get<number>("server.port") || 3001;
   const host = configService.get<string>("server.host") || "127.0.0.1";
   const isProduction = configService.get<boolean>("server.isProduction");
+
+  // Initialize logger with configuration (before any logging)
+  initLogger({
+    logsDir: configService.get<string>("logging.logsDir"),
+    isProduction,
+  });
+  setLogLevel(isProduction ?? false);
 
   app.use(json({ limit: "10mb" }));
   app.use(urlencoded({ extended: true, limit: "10mb" }));
@@ -37,6 +46,24 @@ async function bootstrap() {
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     credentials: Boolean(allowedOrigins?.length),
   });
+
+  // Security headers via Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // required for Swagger UI
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameSrc: ["'none'"],
+        },
+      },
+    }),
+  );
 
   // Set global prefix for all routes except /metrics and /health
   app.setGlobalPrefix("api/v1", {
@@ -88,6 +115,14 @@ async function bootstrap() {
 
   // Enable graceful shutdown hooks (triggers onModuleDestroy, onApplicationShutdown, etc.)
   app.enableShutdownHooks();
+
+  // Startup security warning
+  const accessToken = configService.get<string>("app.accessToken");
+  if (host === "0.0.0.0" && !accessToken && !isProduction) {
+    logger.warn(
+      "SECURITY WARNING: API bound to 0.0.0.0 without authentication (APP_ACCESS_TOKEN not set). Do not expose to network.",
+    );
+  }
 
   // Desktop sidecars keep the default loopback host. Docker explicitly sets
   // HOST=0.0.0.0 so its Web container can reach the API over the private
