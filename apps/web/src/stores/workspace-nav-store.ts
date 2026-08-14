@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, devtools, persist } from "zustand/middleware";
 
 export type WorkspaceType = "diagnose" | "project" | "research" | "settings";
 
@@ -43,14 +43,17 @@ export const workspaceNavItems: WorkspaceNavItem[] = [
 ];
 
 export const useWorkspaceNavStore = create<WorkspaceNavState>()(
-	persist(
-		(set) => ({
-			activeWorkspace: "diagnose",
-			setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
-		}),
-		{
-			name: "workspace-nav",
-			storage: createJSONStorage(() => localStorage),
-		},
+	devtools(
+		persist(
+			(set) => ({
+				activeWorkspace: "diagnose",
+				setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
+			}),
+			{
+				name: "workspace-nav",
+				storage: createJSONStorage(() => localStorage),
+			},
+		),
+		{ name: "workspace-nav" },
 	),
 );

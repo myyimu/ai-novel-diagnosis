@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, devtools, persist } from "zustand/middleware";
 
 /**
  * Workspace UI Store
@@ -153,143 +153,163 @@ export type WorkspaceUIStore = WorkspaceUIState & WorkspaceUIActions;
 
 // 创建UI Store
 export const useWorkspaceUIStore = create<WorkspaceUIStore>()(
-	persist<WorkspaceUIStore, [], [], Partial<WorkspaceUIState>>(
-		(set) => ({
-			...defaultUIState,
+	devtools(
+		persist<WorkspaceUIStore, [], [], Partial<WorkspaceUIState>>(
+			(set) => ({
+				...defaultUIState,
 
-			// 导航操作
-			setNavCollapsed: (collapsed) =>
-				set((state) => ({
-					navCollapsed:
-						typeof collapsed === "function" ? collapsed(state.navCollapsed) : collapsed,
-				})),
-			toggleNavCollapsed: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
-			setMobileNavOpen: (open) =>
-				set((state) => ({
-					mobileNavOpen: typeof open === "function" ? open(state.mobileNavOpen) : open,
-				})),
-			setAdvancedMenuOpen: (open) =>
-				set((state) => ({
-					advancedMenuOpen:
-						typeof open === "function" ? open(state.advancedMenuOpen) : open,
-				})),
-			toggleAdvancedMenu: () =>
-				set((state) => ({ advancedMenuOpen: !state.advancedMenuOpen })),
+				// 导航操作
+				setNavCollapsed: (collapsed) =>
+					set((state) => ({
+						navCollapsed:
+							typeof collapsed === "function"
+								? collapsed(state.navCollapsed)
+								: collapsed,
+					})),
+				toggleNavCollapsed: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
+				setMobileNavOpen: (open) =>
+					set((state) => ({
+						mobileNavOpen:
+							typeof open === "function" ? open(state.mobileNavOpen) : open,
+					})),
+				setAdvancedMenuOpen: (open) =>
+					set((state) => ({
+						advancedMenuOpen:
+							typeof open === "function" ? open(state.advancedMenuOpen) : open,
+					})),
+				toggleAdvancedMenu: () =>
+					set((state) => ({ advancedMenuOpen: !state.advancedMenuOpen })),
 
-			// 面板操作
-			setLeftSidebarOpen: (open) =>
-				set((state) => ({
-					leftSidebarOpen:
-						typeof open === "function" ? open(state.leftSidebarOpen) : open,
-				})),
-			setLeftSidebarWidth: (width) =>
-				set((state) => ({
-					leftSidebarWidth:
-						typeof width === "function" ? width(state.leftSidebarWidth) : width,
-				})),
-			setRightPanelOpen: (open) =>
-				set((state) => ({
-					rightPanelOpen: typeof open === "function" ? open(state.rightPanelOpen) : open,
-				})),
-			setRightPanelWidth: (width) =>
-				set((state) => ({
-					rightPanelWidth:
-						typeof width === "function" ? width(state.rightPanelWidth) : width,
-				})),
-			setRightPanelTab: (tab) =>
-				set((state) => ({
-					rightPanelTab: typeof tab === "function" ? tab(state.rightPanelTab) : tab,
-				})),
-			setMainTab: (tab) =>
-				set((state) => ({
-					mainTab: typeof tab === "function" ? tab(state.mainTab) : tab,
-				})),
+				// 面板操作
+				setLeftSidebarOpen: (open) =>
+					set((state) => ({
+						leftSidebarOpen:
+							typeof open === "function" ? open(state.leftSidebarOpen) : open,
+					})),
+				setLeftSidebarWidth: (width) =>
+					set((state) => ({
+						leftSidebarWidth:
+							typeof width === "function" ? width(state.leftSidebarWidth) : width,
+					})),
+				setRightPanelOpen: (open) =>
+					set((state) => ({
+						rightPanelOpen:
+							typeof open === "function" ? open(state.rightPanelOpen) : open,
+					})),
+				setRightPanelWidth: (width) =>
+					set((state) => ({
+						rightPanelWidth:
+							typeof width === "function" ? width(state.rightPanelWidth) : width,
+					})),
+				setRightPanelTab: (tab) =>
+					set((state) => ({
+						rightPanelTab: typeof tab === "function" ? tab(state.rightPanelTab) : tab,
+					})),
+				setMainTab: (tab) =>
+					set((state) => ({
+						mainTab: typeof tab === "function" ? tab(state.mainTab) : tab,
+					})),
 
-			// Inspector操作
-			setInspectorOpen: (open) =>
-				set((state) => ({
-					inspectorOpen: typeof open === "function" ? open(state.inspectorOpen) : open,
-				})),
-			setInspectorSection: (section) =>
-				set((state) => {
-					const newSection =
-						typeof section === "function" ? section(state.inspectorSection) : section;
-					return {
-						inspectorSection: newSection,
-						inspectorOpen: newSection !== null,
-					};
-				}),
-			openInspector: (section) => set({ inspectorOpen: true, inspectorSection: section }),
-			closeInspector: () => set({ inspectorOpen: false, inspectorSection: null }),
+				// Inspector操作
+				setInspectorOpen: (open) =>
+					set((state) => ({
+						inspectorOpen:
+							typeof open === "function" ? open(state.inspectorOpen) : open,
+					})),
+				setInspectorSection: (section) =>
+					set((state) => {
+						const newSection =
+							typeof section === "function"
+								? section(state.inspectorSection)
+								: section;
+						return {
+							inspectorSection: newSection,
+							inspectorOpen: newSection !== null,
+						};
+					}),
+				openInspector: (section) => set({ inspectorOpen: true, inspectorSection: section }),
+				closeInspector: () => set({ inspectorOpen: false, inspectorSection: null }),
 
-			// 调整大小操作
-			setIsResizingLeft: (resizing) =>
-				set((state) => ({
-					isResizingLeft:
-						typeof resizing === "function" ? resizing(state.isResizingLeft) : resizing,
-				})),
-			setIsResizingRight: (resizing) =>
-				set((state) => ({
-					isResizingRight:
-						typeof resizing === "function" ? resizing(state.isResizingRight) : resizing,
-				})),
-		}),
-		{
-			name: "workspace-ui-state",
-			version: 1,
-			storage: createJSONStorage(() => localStorage),
-			// 只持久化部分状态，调整大小状态不持久化
-			partialize: (state) => ({
-				navCollapsed: state.navCollapsed,
-				leftSidebarOpen: state.leftSidebarOpen,
-				leftSidebarWidth: state.leftSidebarWidth,
-				rightPanelOpen: state.rightPanelOpen,
-				rightPanelWidth: state.rightPanelWidth,
-				// 不持久化临时状态
-				mobileNavOpen: false,
-				advancedMenuOpen: false,
-				isResizingLeft: false,
-				isResizingRight: false,
-				inspectorOpen: false,
-				inspectorSection: null,
-				rightPanelTab: "",
-				mainTab: "",
+				// 调整大小操作
+				setIsResizingLeft: (resizing) =>
+					set((state) => ({
+						isResizingLeft:
+							typeof resizing === "function"
+								? resizing(state.isResizingLeft)
+								: resizing,
+					})),
+				setIsResizingRight: (resizing) =>
+					set((state) => ({
+						isResizingRight:
+							typeof resizing === "function"
+								? resizing(state.isResizingRight)
+								: resizing,
+					})),
 			}),
-			// 兼容旧的localStorage key读取
-			onRehydrateStorage: () => (state) => {
-				if (!state) return;
+			{
+				name: "workspace-ui-state",
+				version: 1,
+				storage: createJSONStorage(() => localStorage),
+				// 只持久化部分状态，调整大小状态不持久化
+				partialize: (state) => ({
+					navCollapsed: state.navCollapsed,
+					leftSidebarOpen: state.leftSidebarOpen,
+					leftSidebarWidth: state.leftSidebarWidth,
+					rightPanelOpen: state.rightPanelOpen,
+					rightPanelWidth: state.rightPanelWidth,
+					// 不持久化临时状态
+					mobileNavOpen: false,
+					advancedMenuOpen: false,
+					isResizingLeft: false,
+					isResizingRight: false,
+					inspectorOpen: false,
+					inspectorSection: null,
+					rightPanelTab: "",
+					mainTab: "",
+				}),
+				// 兼容旧的localStorage key读取
+				onRehydrateStorage: () => (state) => {
+					if (!state) return;
 
-				try {
-					const oldLayoutState = localStorage.getItem("workspace-layout-mode");
-					const oldWorkspaceState = localStorage.getItem(
-						"ai-novel-diagnosis-local-settings",
-					);
-					const legacyLayoutMode = oldLayoutState
-						? (JSON.parse(oldLayoutState) as { state?: { mode?: LegacyLayoutMode } })
-								.state?.mode
-						: undefined;
-					const legacyWorkspaceSettings = oldWorkspaceState
-						? (
-								JSON.parse(oldWorkspaceState) as {
-									state?: LegacyWorkspaceSettings;
-								}
-							).state
-						: undefined;
-					const migrated = migrateLegacyWorkspaceUIState(
-						legacyLayoutMode,
-						legacyWorkspaceSettings,
-					);
-					if (Object.keys(migrated).length > 0) {
-						useWorkspaceUIStore.setState((current) => ({
-							...current,
-							...migrated,
-						}));
+					try {
+						const oldLayoutState = localStorage.getItem("workspace-layout-mode");
+						const oldWorkspaceState = localStorage.getItem(
+							"ai-novel-diagnosis-local-settings",
+						);
+						const legacyLayoutMode = oldLayoutState
+							? (
+									JSON.parse(oldLayoutState) as {
+										state?: { mode?: LegacyLayoutMode };
+									}
+								).state?.mode
+							: undefined;
+						const legacyWorkspaceSettings = oldWorkspaceState
+							? (
+									JSON.parse(oldWorkspaceState) as {
+										state?: LegacyWorkspaceSettings;
+									}
+								).state
+							: undefined;
+						const migrated = migrateLegacyWorkspaceUIState(
+							legacyLayoutMode,
+							legacyWorkspaceSettings,
+						);
+						if (Object.keys(migrated).length > 0) {
+							useWorkspaceUIStore.setState((current) => ({
+								...current,
+								...migrated,
+							}));
+						}
+					} catch (error) {
+						// Migration failure is non-fatal; state will use defaults
+						// Using console.warn here is intentional: this is a one-time migration,
+						// not business logic. A proper logger would require injecting into a Zustand store.
+						console.warn("[workspace-ui] Failed to migrate old UI state:", error);
 					}
-				} catch (error) {
-					console.warn("Failed to migrate old UI state:", error);
-				}
+				},
 			},
-		},
+		),
+		{ name: "workspace-ui" },
 	),
 );
 
@@ -307,7 +327,10 @@ export function resetWorkspaceUIState() {
 }
 
 // 辅助函数：清理路由相关的UI状态（用于路由切换时）
+
+// 辅助函数：清理路由相关的UI状态（用于路由切换时）
 export function clearRouteScopedUIState() {
+	const current = useWorkspaceUIStore.getState();
 	useWorkspaceUIStore.setState({
 		// 清理临时UI状态
 		mobileNavOpen: false,
@@ -315,9 +338,14 @@ export function clearRouteScopedUIState() {
 		inspectorSection: null,
 		isResizingLeft: false,
 		isResizingRight: false,
-		// 保留用户偏好设置
-		navCollapsed: useWorkspaceUIStore.getState().navCollapsed,
-		leftSidebarWidth: useWorkspaceUIStore.getState().leftSidebarWidth,
-		rightPanelWidth: useWorkspaceUIStore.getState().rightPanelWidth,
+		// 保留用户偏好设置（含菜单展开状态）
+		navCollapsed: current.navCollapsed,
+		advancedMenuOpen: current.advancedMenuOpen,
+		leftSidebarOpen: current.leftSidebarOpen,
+		leftSidebarWidth: current.leftSidebarWidth,
+		rightPanelOpen: current.rightPanelOpen,
+		rightPanelWidth: current.rightPanelWidth,
+		rightPanelTab: current.rightPanelTab,
+		mainTab: current.mainTab,
 	});
 }
