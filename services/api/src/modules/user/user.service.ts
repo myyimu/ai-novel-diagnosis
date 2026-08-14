@@ -6,7 +6,20 @@ import type { User } from "@/dao/entities/user.entity";
 // 会被 TS 编译时擦除，运行时反射拿到 Function，触发
 // UnknownDependenciesException。
 import { UserRepository } from "@/dao/repositories/user.repository";
-import { PaginatedResult } from "@/shared/dto/pagination.dto";
+import {
+  UserResponseDto,
+  UserPaginatedResponseDto,
+} from "./dto/user-response.dto";
+
+/** Maps a User entity to a safe response DTO (excludes internal fields). */
+function toUserResponseDto(user: User): UserResponseDto {
+  return {
+    id: user.id,
+    name: user.name,
+    createdAt: user.createdAt ?? new Date().toISOString(),
+    updatedAt: user.updatedAt ?? new Date().toISOString(),
+  };
+}
 
 @Injectable()
 export class UserService {
@@ -15,12 +28,19 @@ export class UserService {
   async getAllUsers(
     page: number,
     pageSize: number,
-  ): Promise<PaginatedResult<User>> {
+  ): Promise<UserPaginatedResponseDto> {
     const { items, total } = await this.userRepository.findAll(page, pageSize);
-    return new PaginatedResult(items, total, page, pageSize);
+    return {
+      items: items.map(toUserResponseDto),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
   }
 
-  async createUser(name: string): Promise<User> {
-    return this.userRepository.create(name);
+  async createUser(name: string): Promise<UserResponseDto> {
+    const user = await this.userRepository.create(name);
+    return toUserResponseDto(user);
   }
 }

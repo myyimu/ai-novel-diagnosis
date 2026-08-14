@@ -9,7 +9,7 @@ import {
   Res,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { type Response } from "express";
+import type { Response } from "express";
 import { Public } from "@/core/decorators/public.decorators";
 import { BookAnalysisService } from "@/modules/book/book-analysis.service";
 import {
@@ -19,17 +19,14 @@ import {
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
 import { buildWorkspaceProjectMarkdown } from "./workspace-assets-export";
-import {
-  type RevisionIssueDecisionSnapshot,
-  WorkspaceAssetsRepository,
-} from "./workspace-assets.repository";
 import type { StoryAuditResult } from "@ai-novel-diagnosis/ai-core";
+import { WorkspaceService } from "./workspace.service";
 
 @ApiTags("analysis")
 @Controller("analysis/workspace")
 export class WorkspaceController {
   constructor(
-    private readonly workspaceAssets: WorkspaceAssetsRepository,
+    private readonly workspaceService: WorkspaceService,
     private readonly bookAnalysis: BookAnalysisService,
   ) {}
 
@@ -40,7 +37,7 @@ export class WorkspaceController {
       "Read persisted workspace projects, revisions, and methodology cards",
   })
   listWorkspaceAssets() {
-    return this.workspaceAssets.listAssets();
+    return this.workspaceService.listAssets();
   }
 
   @Post("projects")
@@ -48,7 +45,7 @@ export class WorkspaceController {
   @Public()
   @ApiOperation({ summary: "Create or update a workspace project" })
   upsertWorkspaceProject(@Body() body: UpsertWorkspaceProjectDto) {
-    return this.workspaceAssets.upsertProject(body.project);
+    return this.workspaceService.upsertProject(body);
   }
 
   @Post("revision-assets")
@@ -58,19 +55,7 @@ export class WorkspaceController {
     summary: "Persist one revision session and its methodology cards",
   })
   upsertRevisionAssets(@Body() body: UpsertRevisionAssetsDto) {
-    return this.workspaceAssets.upsertRevisionAssets({
-      project: body.project,
-      session: {
-        ...body.session,
-        issueDecisions: body.session.issueDecisions?.map((decision) => ({
-          ...decision,
-          decision:
-            decision.decision as RevisionIssueDecisionSnapshot["decision"],
-        })),
-      },
-      revisionVersions: body.revisionVersions || [],
-      methodologyCards: body.methodologyCards,
-    });
+    return this.workspaceService.upsertRevisionAssets(body);
   }
 
   @Patch("revision-sessions/:sessionId/note")
@@ -81,11 +66,7 @@ export class WorkspaceController {
     @Param("sessionId") sessionId: string,
     @Body() body: UpdateRevisionNoteDto,
   ) {
-    return this.workspaceAssets.updateRevisionNote({
-      sessionId,
-      note: body.note,
-      updatedAt: body.updatedAt,
-    });
+    return this.workspaceService.updateRevisionNote(sessionId, body);
   }
 
   @Get("story-audit/reviews/:projectId")
@@ -94,7 +75,7 @@ export class WorkspaceController {
     summary: "Read persisted human review states for story audit findings",
   })
   listStoryAuditFindingReviews(@Param("projectId") projectId: string) {
-    return this.workspaceAssets.listStoryAuditFindingReviews({ projectId });
+    return this.workspaceService.listStoryAuditFindingReviews({ projectId });
   }
 
   @Post("story-audit/reviews")
@@ -106,14 +87,7 @@ export class WorkspaceController {
   upsertStoryAuditFindingReview(
     @Body() body: UpsertStoryAuditFindingReviewDto,
   ) {
-    return this.workspaceAssets.upsertStoryAuditFindingReview({
-      projectId: body.projectId,
-      auditId: body.auditId,
-      findingId: body.findingId,
-      reviewState: body.reviewState,
-      note: body.note,
-      updatedAt: body.updatedAt ?? new Date().toISOString(),
-    });
+    return this.workspaceService.upsertStoryAuditFindingReview(body);
   }
 
   @Get("projects/:projectId/export")
@@ -124,7 +98,7 @@ export class WorkspaceController {
     @Res() response: Response,
   ) {
     const projectPackage =
-      await this.workspaceAssets.readProjectPackage(projectId);
+      await this.workspaceService.readProjectPackage(projectId);
     const storyAudit = projectPackage.project.bookJobId
       ? ((
           (
@@ -136,7 +110,7 @@ export class WorkspaceController {
         )?.storyAudit ?? null)
       : null;
     const storyAuditFindingReviews = storyAudit
-      ? await this.workspaceAssets.listStoryAuditFindingReviews({
+      ? await this.workspaceService.listStoryAuditFindingReviews({
           projectId: projectPackage.project.id,
           auditId: storyAudit.auditId,
         })

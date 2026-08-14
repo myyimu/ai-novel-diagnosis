@@ -21,7 +21,9 @@ export class UserRepository {
     ]);
 
     return {
-      items: result.map((row) => new User(row.id, row.name)),
+      items: result.map(
+        (row) => new User(row.id, row.name, row.created, row.updated),
+      ),
       total,
     };
   }

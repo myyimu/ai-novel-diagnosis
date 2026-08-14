@@ -3,5 +3,7 @@ export class User {
   constructor(
     public readonly id: string,
     public name: string,
+    public readonly createdAt?: Date | string,
+    public readonly updatedAt?: Date | string,
   ) {}
 }
