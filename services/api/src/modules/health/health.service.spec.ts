@@ -1,15 +1,26 @@
 import { HealthService } from "./health.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("HealthService", () => {
   let service: HealthService;
   let mockDrizzle: any;
+  let mockConfigService: ConfigService;
 
   beforeEach(() => {
     mockDrizzle = {
       isConfigured: jest.fn().mockReturnValue(true),
       isHealthy: jest.fn().mockResolvedValue(true),
     };
-    service = new HealthService(mockDrizzle);
+    mockConfigService = {
+      get: jest.fn((key: string) => {
+        const defaults: Record<string, unknown> = {
+          "server.isProduction": false,
+          "app.version": "0.1.0",
+        };
+        return defaults[key];
+      }),
+    } as unknown as ConfigService;
+    service = new HealthService(mockDrizzle, mockConfigService);
   });
 
   describe("getHealthStatus", () => {

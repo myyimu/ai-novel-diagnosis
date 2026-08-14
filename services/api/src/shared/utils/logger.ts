@@ -2,9 +2,24 @@ import { mkdirSync } from "fs";
 import { join } from "path";
 import pino from "pino";
 
-// LOGS_DIR override lets the desktop sidecar redirect logs into a writable
-// userData dir; falls back to <cwd>/logs (original behavior) when unset.
-const logsDir = process.env.LOGS_DIR?.trim() || join(process.cwd(), "logs");
+// Default logs directory — will be overridden by initLogger() if called.
+let logsDir = join(process.cwd(), "logs");
+
+/**
+ * Initialize the logger with configuration from ConfigService.
+ * Call once during bootstrap (main.ts) before any logging occurs.
+ */
+export function initLogger(config?: {
+  logsDir?: string;
+  isProduction?: boolean;
+}): void {
+  if (config?.logsDir) {
+    logsDir = config.logsDir;
+  }
+  mkdirSync(logsDir, { recursive: true });
+}
+
+// Create directory at module load time for backward compatibility
 mkdirSync(logsDir, { recursive: true });
 
 const transport = pino.transport({
@@ -70,19 +85,35 @@ const transport = pino.transport({
   ],
 });
 
+/** Whether logger has been initialized with production settings */
+let isProductionMode = false;
+
+/**
+ * Set the log level. Call from bootstrap after ConfigService is available.
+ */
+export function setLogLevel(isProduction: boolean): void {
+  isProductionMode = isProduction;
+}
+
 export const logger = pino(
   {
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
+    get level() {
+      return isProductionMode ? "info" : "debug";
+    },
   },
   transport,
 );
 
 // 导出常用的日志方法
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logInfo = (msg: string, ...args: any[]) =>
   logger.info(msg, ...args);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logError = (msg: string, ...args: any[]) =>
   logger.error(msg, ...args);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logWarn = (msg: string, ...args: any[]) =>
   logger.warn(msg, ...args);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logDebug = (msg: string, ...args: any[]) =>
   logger.debug(msg, ...args);

@@ -1,4 +1,5 @@
 ﻿import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { ProviderPreset } from "@ai-novel-diagnosis/ai-core";
@@ -286,18 +287,6 @@ const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 const TEST_MODE_TIMEOUT_MS = 15_000;
 const TEST_MODE_MAX_OUTPUT_TOKENS = 64;
 
-function providerTimeoutMs() {
-  const raw = Number(process.env.PROVIDER_REQUEST_TIMEOUT_MS);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PROVIDER_TIMEOUT_MS;
-}
-
-function providerLengthRetryMaxOutputTokens() {
-  const raw = Number(process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS);
-  return Number.isFinite(raw) && raw > 0
-    ? raw
-    : DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS;
-}
-
 function isPrivateIpAddress(address: string) {
   if (address === "::1") return true;
   if (address.startsWith("fe80:")) return true;
@@ -360,6 +349,39 @@ function isLocalBaseUrl(baseUrl?: string) {
 @Injectable()
 export class ModelProviderService {
   private readonly logger = new Logger(ModelProviderService.name);
+
+  constructor(private readonly configService: ConfigService) {}
+
+  /** Reads provider timeout from ConfigService (not process.env directly). */
+  private getConfiguredProviderTimeoutMs(): number {
+    const raw = this.configService.get<number>("provider.requestTimeoutMs");
+    return Number.isFinite(raw) && raw! > 0
+      ? raw!
+      : DEFAULT_PROVIDER_TIMEOUT_MS;
+  }
+
+  /** Reads length retry max output tokens from ConfigService. */
+  private getConfiguredLengthRetryMaxOutputTokens(): number {
+    const raw = this.configService.get<number>(
+      "provider.lengthRetryMaxOutputTokens",
+    );
+    return Number.isFinite(raw) && raw! > 0
+      ? raw!
+      : DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS;
+  }
+
+  /** Reads shared GPU config from ConfigService (not process.env directly). */
+  private getSharedGpuConfig() {
+    return {
+      baseUrl: this.configService.get<string>("provider.sharedGpu.baseUrl"),
+      apiKey: this.configService.get<string>("provider.sharedGpu.apiKey"),
+      model: this.configService.get<string>("provider.sharedGpu.model"),
+      jsonMode: this.configService.get<boolean>(
+        "provider.sharedGpu.jsonMode",
+        false,
+      ),
+    };
+  }
 
   getPresets() {
     return providerPresets.filter((item) => item.id !== "new-api");
@@ -528,16 +550,14 @@ export class ModelProviderService {
     const preset = providerPresets.find((item) => item.id === provider.preset);
 
     if (provider.preset === "shared-gpu") {
+      const sharedGpu = this.getSharedGpuConfig();
       return {
         ...provider,
         kind: "openai-compatible",
-        baseUrl: process.env.SHARED_GPU_BASE_URL?.trim(),
-        apiKey: process.env.SHARED_GPU_API_KEY?.trim(),
-        model: process.env.SHARED_GPU_MODEL?.trim(),
-        jsonMode:
-          process.env.SHARED_GPU_JSON_MODE === "true"
-            ? true
-            : (preset?.jsonMode ?? false),
+        baseUrl: sharedGpu.baseUrl ?? undefined,
+        apiKey: sharedGpu.apiKey ?? undefined,
+        model: sharedGpu.model ?? undefined,
+        jsonMode: sharedGpu.jsonMode ?? preset?.jsonMode ?? false,
       };
     }
 
@@ -709,7 +729,7 @@ export class ModelProviderService {
   }
 
   private lengthRetryMaxOutputTokens(options: ProviderChatOptions) {
-    const configuredMax = providerLengthRetryMaxOutputTokens();
+    const configuredMax = this.getConfiguredLengthRetryMaxOutputTokens();
     const requested = options.maxOutputTokens ?? 0;
     return Math.min(configuredMax, Math.max(4096, requested * 4));
   }
@@ -889,7 +909,10 @@ export class ModelProviderService {
     return (
       baseUrl.includes("api.openai.com") ||
       baseUrl.includes("openai.azure.com") ||
-      process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true"
+      this.configService.get<boolean>(
+        "provider.enableOpenaiCompatJsonSchema",
+        false,
+      )
     );
   }
 
@@ -1069,7 +1092,8 @@ export class ModelProviderService {
     timeoutOverrideMs?: number,
   ) {
     const controller = new AbortController();
-    const timeoutMs = timeoutOverrideMs ?? providerTimeoutMs();
+    const timeoutMs =
+      timeoutOverrideMs ?? this.getConfiguredProviderTimeoutMs();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, {

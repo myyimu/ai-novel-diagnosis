@@ -68,7 +68,10 @@ export class BookUploadService implements OnModuleInit {
     this.storageMaxBytes =
       configService.get<number>("analysis.storageMaxBytes") ||
       512 * 1024 * 1024;
-    if (process.env.NODE_ENV === "production" && !this.encryptionKey) {
+    if (
+      configService.get<boolean>("server.isProduction") &&
+      !this.encryptionKey
+    ) {
       throw new Error(
         "ANALYSIS_STORAGE_KEY is required in production to protect author manuscripts at rest.",
       );

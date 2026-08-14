@@ -1,8 +1,18 @@
 import { ModelProviderService } from "./model-provider.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("ModelProviderService shared-gpu fallback", () => {
   const originalFetch = global.fetch;
   const originalSetTimeout = global.setTimeout;
+
+  /** Creates a mock ConfigService that returns provided values for get() */
+  function createMockConfigService(
+    overrides: Record<string, unknown> = {},
+  ): ConfigService {
+    return {
+      get: jest.fn((key: string) => overrides[key]),
+    } as unknown as ConfigService;
+  }
 
   afterEach(() => {
     global.fetch = originalFetch;
@@ -38,7 +48,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "shared-gpu",
@@ -78,7 +88,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -130,7 +140,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.listModels({
       preset: "custom",
       kind: "openai-compatible",
@@ -154,7 +164,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
   });
 
   it("exposes the Zhipu preset with OpenAI-compatible defaults", () => {
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const preset = service.getPresets().find((item) => item.id === "zhipu");
     const resolved = service.resolve({
       preset: "zhipu",
@@ -187,7 +197,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -219,7 +229,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "ollama",
@@ -251,7 +261,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -292,7 +302,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -326,7 +336,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -371,7 +381,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -405,7 +415,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -447,7 +457,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
 
     await expect(
       service.chat(
@@ -494,7 +504,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
       });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -533,7 +543,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
 
     const result = await service.chat(
       {
@@ -573,7 +583,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
 
     await expect(
       service.chat(
@@ -608,7 +618,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
       });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.chat(
       {
         preset: "custom",
@@ -656,7 +666,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     const result = await service.test({
       preset: "shared-gpu",
       kind: "openai-compatible",
@@ -705,7 +715,7 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService();
+    const service = new ModelProviderService(createMockConfigService());
     await expect(
       service.test({
         preset: "ollama",

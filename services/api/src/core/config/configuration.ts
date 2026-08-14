@@ -68,6 +68,46 @@ export const appConfig = registerAs("app", () => ({
     "/health",
   ],
   authGuardExcludePaths: ["/metrics", "/health"],
+  // When set, getAccessToken() requires callers to provide this exact value.
+  // Unset (undefined) means any code is accepted — suitable for local-only dev.
+  accessToken: process.env.APP_ACCESS_TOKEN?.trim() || undefined,
+  version: process.env.npm_package_version || "0.1.0",
+}));
+
+/** AI model provider configuration */
+export const providerConfig = registerAs("provider", () => ({
+  requestTimeoutMs: parseInt(
+    process.env.PROVIDER_REQUEST_TIMEOUT_MS || "120000",
+    10,
+  ),
+  lengthRetryMaxOutputTokens: parseInt(
+    process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS || "16384",
+    10,
+  ),
+  sharedGpu: {
+    baseUrl: process.env.SHARED_GPU_BASE_URL?.trim() || null,
+    apiKey: process.env.SHARED_GPU_API_KEY?.trim() || null,
+    model: process.env.SHARED_GPU_MODEL?.trim() || null,
+    jsonMode: process.env.SHARED_GPU_JSON_MODE === "true",
+  },
+  enableOpenaiCompatJsonSchema:
+    process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true",
+}));
+
+/** Logging configuration */
+export const loggingConfig = registerAs("logging", () => ({
+  logsDir: process.env.LOGS_DIR?.trim() || join(process.cwd(), "logs"),
+}));
+
+/** Drizzle/infrastructure configuration */
+export const drizzleConfig = registerAs("drizzle", () => ({
+  connectTimeoutMs: parseInt(
+    process.env.DATABASE_CONNECT_TIMEOUT_MS || "10000",
+    10,
+  ),
+  migrationsFolder:
+    process.env.DRIZZLE_MIGRATIONS_FOLDER || "./drizzle/migrations",
+  pgliteDataDir: process.env.PGLITE_DATA_DIR?.trim(),
 }));
 
 export const analysisConfig = registerAs("analysis", () => ({
