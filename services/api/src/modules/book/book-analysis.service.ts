@@ -581,7 +581,11 @@ export class BookAnalysisService {
           pendingOutlineChapters,
           outlineConcurrency,
           async (chapter) => {
-            const chapterMap = await this.analyzeChapterOutline(input, chapter);
+            const chapterMap = await this.analyzeChapterOutline(
+              input,
+              chapter,
+              options.jobId,
+            );
             chapterMapByOrder.set(chapter.order, chapterMap);
             outlineCompleted += 1;
             await onChapterMap?.(chapterMap, outlineCompleted, outlineTotal, {
@@ -672,6 +676,7 @@ export class BookAnalysisService {
               input,
               chapter,
               baseMap,
+              options.jobId,
             );
             chapterMapByOrder.set(chapter.order, chapterMap);
             deepCompleted += 1;
@@ -753,7 +758,12 @@ export class BookAnalysisService {
     const reduced =
       input.provider.kind === "mock"
         ? this.mockBookReduce(input, preprocessing, chapterMaps)
-        : await this.reduceBookMaps(input, preprocessing, chapterMaps);
+        : await this.reduceBookMaps(
+            input,
+            preprocessing,
+            chapterMaps,
+            options.jobId,
+          );
     const normalized = this.normalizeBookAnalysisResult(input, reduced);
     const storyAuditInput = this.resolveStoryAuditInput(input);
     const storyAudit =
@@ -2232,6 +2242,7 @@ export class BookAnalysisService {
   private async analyzeChapterOutline(
     input: AnalyzeBookDto,
     chapter: ChapterSegment,
+    usageJobId?: string,
   ) {
     const content = await this.modelProviders.chat(
       input.provider,
@@ -2246,7 +2257,15 @@ export class BookAnalysisService {
           content: this.bookChapterOutlinePrompt(input, chapter),
         },
       ],
-      { maxOutputTokens: 900 },
+      {
+        maxOutputTokens: 900,
+        usageMeta: {
+          jobId: usageJobId,
+          stage: "book-outline",
+          component: "book-analysis",
+          requestKind: "map",
+        },
+      },
     );
 
     const raw = (await parseJsonWithRepair(
@@ -2266,6 +2285,7 @@ export class BookAnalysisService {
     input: AnalyzeBookDto,
     chapter: ChapterSegment,
     fallback?: ChapterMapResult,
+    usageJobId?: string,
   ) {
     const content = await this.modelProviders.chat(
       input.provider,
@@ -2280,7 +2300,15 @@ export class BookAnalysisService {
           content: this.bookChapterMapPrompt(input, chapter, fallback),
         },
       ],
-      { maxOutputTokens: 1800 },
+      {
+        maxOutputTokens: 1800,
+        usageMeta: {
+          jobId: usageJobId,
+          stage: "book-deep-map",
+          component: "book-analysis",
+          requestKind: "map",
+        },
+      },
     );
 
     const raw = (await parseJsonWithRepair(
@@ -2302,6 +2330,7 @@ export class BookAnalysisService {
     input: AnalyzeBookDto,
     preprocessing: BookPreprocessResult,
     chapterMaps: ChapterMapResult[],
+    usageJobId?: string,
   ) {
     const reducerChapterMaps = this.prepareReducerChapterMaps(chapterMaps);
     const content = await this.modelProviders.chat(
@@ -2321,7 +2350,15 @@ export class BookAnalysisService {
           ),
         },
       ],
-      { maxOutputTokens: 3072 },
+      {
+        maxOutputTokens: 3072,
+        usageMeta: {
+          jobId: usageJobId,
+          stage: "book-reduce",
+          component: "book-analysis",
+          requestKind: "reduce",
+        },
+      },
     );
 
     return parseJsonWithRepair(

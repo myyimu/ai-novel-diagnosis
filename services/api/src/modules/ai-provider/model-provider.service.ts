@@ -3,11 +3,21 @@ import { ConfigService } from "@nestjs/config";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { ProviderPreset } from "@ai-novel-diagnosis/ai-core";
+import { ModelUsageRepository } from "@/dao/repositories/model-usage.repository";
+import { estimateChatUsage } from "@/shared/utils/estimate-tokens";
 import { ProviderConfigDto } from "./dto/provider-config.dto";
 
 export interface ProviderMessage {
   role: "system" | "user";
   content: string;
+}
+
+/** Attribution metadata persisted alongside each usage event. */
+export interface ProviderUsageMeta {
+  jobId?: string;
+  stage?: string;
+  component?: string;
+  requestKind?: string;
 }
 
 export interface ProviderChatOptions {
@@ -22,6 +32,7 @@ export interface ProviderChatOptions {
    * Real diagnosis paths leave this undefined.
    */
   testMode?: boolean;
+  usageMeta?: ProviderUsageMeta;
 }
 
 interface OpenAICompatibleContentPart {
@@ -65,6 +76,12 @@ interface ExtractedProviderContent {
 
 interface OpenAICompatibleChatResponse {
   choices?: OpenAICompatibleChatChoice[];
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 interface OpenAICompatibleModelListResponse {
@@ -288,6 +305,22 @@ const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 const TEST_MODE_TIMEOUT_MS = 15_000;
 const TEST_MODE_MAX_OUTPUT_TOKENS = 64;
 
+// Usage-event error snippets stay short: they are for triage, not forensics.
+const MAX_USAGE_ERROR_LENGTH = 500;
+
+function sanitizeTokenCount(
+  reported: number | undefined,
+  fallback: number,
+): number {
+  return Number.isFinite(reported) && reported! >= 0
+    ? Math.round(reported!)
+    : fallback;
+}
+
+function toUsageErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function isPrivateIpAddress(address: string) {
   if (address === "::1") return true;
   if (address.startsWith("fe80:")) return true;
@@ -351,7 +384,10 @@ function isLocalBaseUrl(baseUrl?: string) {
 export class ModelProviderService {
   private readonly logger = new Logger(ModelProviderService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly modelUsage: ModelUsageRepository,
+  ) {}
 
   /** Reads provider timeout from ConfigService (not process.env directly). */
   private getConfiguredProviderTimeoutMs(): number {
@@ -499,7 +535,7 @@ export class ModelProviderService {
     }
 
     if (this.shouldUseSharedGpuFallback(provider, resolved)) {
-      return this.callSharedGpuFallback(messages, options);
+      return this.callSharedGpuFallback(provider, messages, options);
     }
 
     return this.callOpenAICompatible(resolved, messages, options);
@@ -633,6 +669,10 @@ export class ModelProviderService {
     const headers = this.buildOpenAICompatibleHeaders(provider);
     headers["content-type"] = "application/json";
 
+    // Each HTTP attempt gets its own usage event, so retries (json-schema
+    // fallback, length-truncation) surface as separate rows via metadata.attempt.
+    const requestStartedAt = Date.now();
+    const attempt = hasRetriedLength ? "length-retry" : "initial";
     const response = await this.fetchWithTimeout(
       url,
       {
@@ -641,23 +681,45 @@ export class ModelProviderService {
         body: JSON.stringify(body),
       },
       options.testMode ? TEST_MODE_TIMEOUT_MS : undefined,
-    );
-
-    if (!response.ok && options.jsonSchema && body.response_format) {
-      return this.callOpenAICompatible(provider, messages, {
-        ...options,
-        jsonSchema: undefined,
+    ).catch((error: unknown) => {
+      this.recordModelUsage({
+        provider,
+        messages,
+        requestMs: Date.now() - requestStartedAt,
+        success: false,
+        error,
+        usageMeta: options.usageMeta,
+        attempt,
       });
-    }
+      throw error;
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(
-        `Provider request failed: ${response.status} ${errorText.slice(
-          0,
-          MAX_ERROR_BODY_LENGTH,
-        )}`,
-      );
+      const message = `Provider request failed: ${response.status} ${errorText.slice(
+        0,
+        MAX_ERROR_BODY_LENGTH,
+      )}`;
+      this.recordModelUsage({
+        provider,
+        messages,
+        requestMs: Date.now() - requestStartedAt,
+        success: false,
+        error: message,
+        usageMeta: options.usageMeta,
+        attempt:
+          options.jsonSchema && body.response_format
+            ? "json-schema-fallback"
+            : attempt,
+      });
+      if (options.jsonSchema && body.response_format) {
+        return this.callOpenAICompatible(provider, messages, {
+          ...options,
+          jsonSchema: undefined,
+        });
+      }
+
+      throw new BadRequestException(message);
     }
 
     const data = (await response.json()) as OpenAICompatibleChatResponse;
@@ -667,6 +729,17 @@ export class ModelProviderService {
       this.isLengthTruncated(firstChoice) &&
       this.canRetryLength(options, hasRetriedLength)
     ) {
+      this.recordModelUsage({
+        provider,
+        messages,
+        completionText: extracted.text,
+        usage: data.usage,
+        model: data.model,
+        requestMs: Date.now() - requestStartedAt,
+        success: true,
+        usageMeta: options.usageMeta,
+        attempt: "length-truncated",
+      });
       return this.callOpenAICompatible(
         provider,
         messages,
@@ -679,18 +752,116 @@ export class ModelProviderService {
     }
 
     if (this.isLengthTruncated(firstChoice) && !extracted.text) {
-      throw new BadRequestException(
-        this.describeLengthTruncatedProviderContent(firstChoice, options),
+      const message = this.describeLengthTruncatedProviderContent(
+        firstChoice,
+        options,
       );
+      this.recordModelUsage({
+        provider,
+        messages,
+        requestMs: Date.now() - requestStartedAt,
+        success: false,
+        error: message,
+        usageMeta: options.usageMeta,
+        attempt,
+      });
+      throw new BadRequestException(message);
     }
 
     if (!extracted.text) {
-      throw new BadRequestException(
-        this.describeMissingProviderContent(firstChoice),
-      );
+      const message = this.describeMissingProviderContent(firstChoice);
+      this.recordModelUsage({
+        provider,
+        messages,
+        requestMs: Date.now() - requestStartedAt,
+        success: false,
+        error: message,
+        usageMeta: options.usageMeta,
+        attempt,
+      });
+      throw new BadRequestException(message);
     }
 
+    this.recordModelUsage({
+      provider,
+      messages,
+      completionText: extracted.text,
+      usage: data.usage,
+      model: data.model,
+      requestMs: Date.now() - requestStartedAt,
+      success: true,
+      usageMeta: options.usageMeta,
+      attempt,
+    });
     return extracted.text;
+  }
+
+  /**
+   * Fire-and-forget usage bookkeeping. A failed insert must never break the
+   * user's diagnosis request, so errors are logged and swallowed here.
+   */
+  private recordModelUsage(input: {
+    provider: ProviderConfigDto;
+    messages: ProviderMessage[];
+    completionText?: string;
+    usage?: OpenAICompatibleChatResponse["usage"];
+    model?: string;
+    requestMs: number;
+    success: boolean;
+    error?: unknown;
+    usageMeta?: ProviderUsageMeta;
+    attempt: string;
+  }): void {
+    const estimated = estimateChatUsage(
+      input.messages.map((message) => message.content).join("\n"),
+      input.completionText ?? "",
+    );
+    const usage = input.usage;
+    const promptTokens = sanitizeTokenCount(
+      usage?.prompt_tokens,
+      estimated.promptTokens,
+    );
+    const completionTokens = sanitizeTokenCount(
+      usage?.completion_tokens,
+      estimated.completionTokens,
+    );
+
+    void this.modelUsage
+      .insertUsageEvent({
+        jobId: input.usageMeta?.jobId,
+        stage: input.usageMeta?.stage,
+        component: input.usageMeta?.component,
+        requestKind: input.usageMeta?.requestKind,
+        provider: input.provider.kind || "openai-compatible",
+        preset: input.provider.preset || "custom",
+        model: input.model || input.provider.model || "unknown-model",
+        promptTokens,
+        completionTokens,
+        totalTokens: sanitizeTokenCount(
+          usage?.total_tokens,
+          promptTokens + completionTokens,
+        ),
+        requestMs: Math.max(0, Math.round(input.requestMs)),
+        estimated: !usage,
+        success: input.success,
+        error: input.success
+          ? undefined
+          : toUsageErrorText(input.error).slice(0, MAX_USAGE_ERROR_LENGTH),
+        metadata: {
+          ...input.usageMeta,
+          attempt: input.attempt,
+        },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          {
+            action: "provider.usage.insert_failed",
+            preset: input.provider.preset,
+            message: toUsageErrorText(error),
+          },
+          "Failed to persist model usage event",
+        );
+      });
   }
 
   private isLengthTruncated(choice: OpenAICompatibleChatChoice | undefined) {
@@ -936,6 +1107,40 @@ export class ModelProviderService {
   }
 
   private async callSharedGpuFallback(
+    provider: ProviderConfigDto,
+    messages: ProviderMessage[],
+    options: ProviderChatOptions,
+  ) {
+    const requestStartedAt = Date.now();
+    try {
+      const result = await this.executeSharedGpuFallback(messages, options);
+      // The anonymous Horde queue never reports token usage, so counts are
+      // always heuristic estimates here (estimated=true on the row).
+      this.recordModelUsage({
+        provider,
+        messages,
+        completionText: result,
+        requestMs: Date.now() - requestStartedAt,
+        success: true,
+        usageMeta: options.usageMeta,
+        attempt: "initial",
+      });
+      return result;
+    } catch (error) {
+      this.recordModelUsage({
+        provider,
+        messages,
+        requestMs: Date.now() - requestStartedAt,
+        success: false,
+        error,
+        usageMeta: options.usageMeta,
+        attempt: "initial",
+      });
+      throw error;
+    }
+  }
+
+  private async executeSharedGpuFallback(
     messages: ProviderMessage[],
     options: ProviderChatOptions,
   ) {

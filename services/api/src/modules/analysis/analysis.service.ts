@@ -365,6 +365,11 @@ export class AnalysisService {
         name: "quick_review_result",
         schema: quickReviewJsonSchema,
       },
+      usageMeta: {
+        stage: "quick-review",
+        component: "analysis",
+        requestKind: "diagnosis",
+      },
     });
 
     return this.normalizeQuickReviewResult(

@@ -1,5 +1,6 @@
 import { ModelProviderService } from "./model-provider.service";
 import { ConfigService } from "@nestjs/config";
+import type { ModelUsageRepository } from "@/dao/repositories/model-usage.repository";
 
 describe("ModelProviderService shared-gpu fallback", () => {
   const originalFetch = global.fetch;
@@ -12,6 +13,13 @@ describe("ModelProviderService shared-gpu fallback", () => {
     return {
       get: jest.fn((key: string) => overrides[key]),
     } as unknown as ConfigService;
+  }
+
+  /** In-memory stub so usage recording can be asserted without PGlite. */
+  function createStubUsageRepository() {
+    return {
+      insertUsageEvent: jest.fn().mockResolvedValue({}),
+    } as unknown as ModelUsageRepository;
   }
 
   afterEach(() => {
@@ -48,7 +56,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "shared-gpu",
@@ -79,6 +90,141 @@ describe("ModelProviderService shared-gpu fallback", () => {
     );
   });
 
+  it("records a usage event with reported tokens on successful chat calls", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' } }],
+        model: "gpt-test-2026",
+        usage: {
+          prompt_tokens: 120,
+          completion_tokens: 30,
+          total_tokens: 150,
+        },
+      }),
+    });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = createStubUsageRepository();
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      usageRepository,
+    );
+    await service.chat(
+      {
+        preset: "custom",
+        kind: "openai-compatible",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "sk-test",
+        model: "gpt-test",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "请返回 JSON" }],
+      {
+        usageMeta: {
+          jobId: "job-1",
+          stage: "quick-review",
+          component: "analysis",
+          requestKind: "diagnosis",
+        },
+      },
+    );
+
+    expect(usageRepository.insertUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "job-1",
+        stage: "quick-review",
+        component: "analysis",
+        requestKind: "diagnosis",
+        provider: "openai-compatible",
+        preset: "custom",
+        model: "gpt-test-2026",
+        promptTokens: 120,
+        completionTokens: 30,
+        totalTokens: 150,
+        estimated: false,
+        success: true,
+        metadata: {
+          jobId: "job-1",
+          stage: "quick-review",
+          component: "analysis",
+          requestKind: "diagnosis",
+          attempt: "initial",
+        },
+      }),
+    );
+  });
+
+  it("records a failed usage event without breaking the thrown diagnosis error", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => "upstream exploded",
+    });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = createStubUsageRepository();
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      usageRepository,
+    );
+    await expect(
+      service.chat(
+        {
+          preset: "custom",
+          kind: "openai-compatible",
+          baseUrl: "https://api.openai.com/v1",
+          apiKey: "sk-test",
+          model: "gpt-test",
+          temperature: 0.2,
+          jsonMode: false,
+        },
+        [{ role: "user", content: "请返回 JSON" }],
+      ),
+    ).rejects.toThrow("Provider request failed: 503 upstream exploded");
+
+    expect(usageRepository.insertUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        estimated: true,
+        error: "Provider request failed: 503 upstream exploded",
+      }),
+    );
+  });
+
+  it("keeps the chat result when the usage insert itself fails", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = {
+      insertUsageEvent: jest.fn().mockRejectedValue(new Error("db down")),
+    } as unknown as ModelUsageRepository;
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      usageRepository,
+    );
+    const result = await service.chat(
+      {
+        preset: "custom",
+        kind: "openai-compatible",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "sk-test",
+        model: "gpt-test",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "请返回 JSON" }],
+    );
+
+    expect(result).toBe('{"ok":true}');
+  });
+
   it("sends json_schema response_format for OpenAI-compatible providers that support it", async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
@@ -88,7 +234,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -140,7 +289,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.listModels({
       preset: "custom",
       kind: "openai-compatible",
@@ -164,7 +316,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
   });
 
   it("exposes the Zhipu preset with OpenAI-compatible defaults", () => {
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const preset = service.getPresets().find((item) => item.id === "zhipu");
     const resolved = service.resolve({
       preset: "zhipu",
@@ -197,7 +352,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -229,7 +387,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "ollama",
@@ -261,7 +422,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -302,7 +466,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -336,7 +503,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -381,7 +551,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -415,7 +588,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -457,7 +633,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
 
     await expect(
       service.chat(
@@ -504,7 +683,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
       });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -543,7 +725,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
 
     const result = await service.chat(
       {
@@ -583,7 +768,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
     });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
 
     await expect(
       service.chat(
@@ -618,7 +806,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
       });
     global.fetch = fetchMock as never;
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.chat(
       {
         preset: "custom",
@@ -666,7 +857,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     const result = await service.test({
       preset: "shared-gpu",
       kind: "openai-compatible",
@@ -715,7 +909,10 @@ describe("ModelProviderService shared-gpu fallback", () => {
       return 0 as never;
     }) as unknown as typeof setTimeout);
 
-    const service = new ModelProviderService(createMockConfigService());
+    const service = new ModelProviderService(
+      createMockConfigService(),
+      createStubUsageRepository(),
+    );
     await expect(
       service.test({
         preset: "ollama",
