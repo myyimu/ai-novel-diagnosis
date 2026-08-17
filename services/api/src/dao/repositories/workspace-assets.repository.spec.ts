@@ -132,4 +132,154 @@ describe("WorkspaceAssetsRepository", () => {
       issueDecisions: [expect.objectContaining({ adopted: true })],
     });
   });
+
+  it("should find sessions by id and list earlier sessions for comparison", async () => {
+    const repository = new WorkspaceAssetsRepository(drizzle!);
+
+    await repository.upsertRevisionAssets({
+      project: {
+        id: "project-1",
+        name: "测试书",
+        createdAt: "2026-07-18T08:00:00.000Z",
+        updatedAt: "2026-07-18T08:00:00.000Z",
+      },
+      session: {
+        id: "revision-1",
+        projectId: "project-1",
+        createdAt: "2026-07-18T08:00:00.000Z",
+        chapterTitle: "第一章",
+        genre: "xuanhuan",
+        inputKind: "human-draft",
+        textHash: "hash-1",
+        textLength: 12,
+        quickScore: 5.4,
+        gateDecision: "rebuild",
+        mainProblem: "开局无事件",
+        issueTitles: ["开局无事件"],
+        issueCategories: ["opening"],
+        retestStatus: "not_requested",
+        methodologyCardIds: [],
+      },
+      revisionVersions: [],
+      methodologyCards: [],
+    });
+    await repository.upsertRevisionAssets({
+      project: {
+        id: "project-1",
+        name: "测试书",
+        createdAt: "2026-07-18T08:00:00.000Z",
+        updatedAt: "2026-07-18T09:00:00.000Z",
+      },
+      session: {
+        id: "revision-2",
+        projectId: "project-1",
+        createdAt: "2026-07-18T09:00:00.000Z",
+        chapterTitle: "第一章",
+        genre: "xuanhuan",
+        inputKind: "human-draft",
+        textHash: "hash-2",
+        textLength: 14,
+        quickScore: null,
+        gateDecision: "insufficient",
+        mainProblem: "材料不足",
+        issueTitles: [],
+        issueCategories: [],
+        retestStatus: "pending",
+        methodologyCardIds: [],
+      },
+      revisionVersions: [],
+      methodologyCards: [],
+    });
+
+    const session = await repository.findRevisionSessionById("revision-2");
+    const earlier = await repository.listProjectSessionsBefore(
+      "project-1",
+      session.createdAt,
+    );
+
+    expect(session.retestStatus).toBe("pending");
+    expect(earlier.map((item) => item.id)).toEqual(["revision-1"]);
+    expect(earlier[0]?.quickScore).toBe(5.4);
+    await expect(repository.findRevisionSessionById("missing")).rejects.toThrow(
+      "Revision session not found: missing",
+    );
+  });
+
+  it("should complete a pending retest in place and keep its version linkage", async () => {
+    const repository = new WorkspaceAssetsRepository(drizzle!);
+
+    await repository.upsertRevisionAssets({
+      project: {
+        id: "project-1",
+        name: "测试书",
+        createdAt: "2026-07-18T08:00:00.000Z",
+        updatedAt: "2026-07-18T08:00:00.000Z",
+      },
+      session: {
+        id: "revision-pending",
+        projectId: "project-1",
+        createdAt: "2026-07-18T08:00:00.000Z",
+        chapterTitle: "第一章",
+        genre: "xuanhuan",
+        inputKind: "human-draft",
+        textHash: "hash-old",
+        textLength: 10,
+        quickScore: 5.4,
+        gateDecision: "rebuild",
+        mainProblem: "开局无事件",
+        issueTitles: ["开局无事件"],
+        issueCategories: ["opening"],
+        retestStatus: "pending",
+        fromVersionId: "version-1",
+        toVersionId: "version-2",
+        methodologyCardIds: [],
+      },
+      revisionVersions: [],
+      methodologyCards: [],
+    });
+    await repository.upsertRevisionTextVersion(
+      {
+        id: "version-2",
+        projectId: "project-1",
+        createdAt: "2026-07-18T08:30:00.000Z",
+        chapterTitle: "第一章",
+        versionLabel: "V2",
+        textHash: "hash-new",
+        textLength: 16,
+        text: "版本二正文",
+      },
+      "project-1",
+    );
+
+    const completed = await repository.completeRevisionRetest({
+      sessionId: "revision-pending",
+      chapterTitle: "第一章",
+      genre: "xuanhuan",
+      inputKind: "human-draft",
+      textHash: "hash-new",
+      textLength: 16,
+      quickScore: 6.4,
+      gateDecision: "revise",
+      mainProblem: "章末钩子没有代价",
+      issueTitles: ["章末钩子没有代价"],
+      issueCategories: ["hook"],
+      nextPrompt: "请补强章末代价。",
+      toVersionId: "version-2",
+    });
+    const version = await repository.findRevisionTextVersionById("version-2");
+    const reread = await repository.findRevisionSessionById("revision-pending");
+    const projectVersions =
+      await repository.listProjectRevisionVersions("project-1");
+
+    expect(completed.retestStatus).toBe("completed");
+    expect(completed.quickScore).toBe(6.4);
+    expect(completed.fromVersionId).toBe("version-1");
+    expect(completed.toVersionId).toBe("version-2");
+    expect(reread.mainProblem).toBe("章末钩子没有代价");
+    expect(version?.text).toBe("版本二正文");
+    expect(projectVersions.map((item) => item.id)).toEqual(["version-2"]);
+    await expect(
+      repository.findRevisionTextVersionById("missing"),
+    ).resolves.toBeNull();
+  });
 });

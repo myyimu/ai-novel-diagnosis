@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { DrizzleService } from "@/service/drizzle/drizzle.service";
 import {
   methodologyCards,
@@ -193,6 +193,109 @@ export class WorkspaceAssetsRepository {
     return this.revisionSessionSnapshot(row);
   }
 
+  async findRevisionSessionById(
+    sessionId: string,
+  ): Promise<RevisionSessionSnapshot> {
+    const [row] = await this.drizzle.db
+      .select()
+      .from(revisionSessions)
+      .where(eq(revisionSessions.id, sessionId))
+      .limit(1);
+
+    if (!row) {
+      throw new NotFoundException(`Revision session not found: ${sessionId}`);
+    }
+
+    return this.revisionSessionSnapshot(row);
+  }
+
+  async findRevisionTextVersionById(
+    versionId: string,
+  ): Promise<RevisionTextVersionSnapshot | null> {
+    const [row] = await this.drizzle.db
+      .select()
+      .from(revisionTextVersions)
+      .where(eq(revisionTextVersions.id, versionId))
+      .limit(1);
+
+    return row ? this.revisionTextVersionSnapshot(row) : null;
+  }
+
+  async listProjectRevisionVersions(
+    projectId: string,
+  ): Promise<RevisionTextVersionSnapshot[]> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(revisionTextVersions)
+      .where(eq(revisionTextVersions.projectId, projectId))
+      .orderBy(asc(revisionTextVersions.createdAt));
+
+    return rows.map((row) => this.revisionTextVersionSnapshot(row));
+  }
+
+  async listProjectSessionsBefore(
+    projectId: string,
+    beforeIso: string,
+  ): Promise<RevisionSessionSnapshot[]> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(revisionSessions)
+      .where(
+        and(
+          eq(revisionSessions.projectId, projectId),
+          lt(revisionSessions.createdAt, toDate(beforeIso, new Date(0))),
+        ),
+      )
+      .orderBy(desc(revisionSessions.createdAt));
+
+    return rows.map((row) => this.revisionSessionSnapshot(row));
+  }
+
+  async completeRevisionRetest(input: {
+    sessionId: string;
+    chapterTitle: string;
+    genre: string;
+    inputKind: string;
+    textHash: string;
+    textLength: number;
+    quickScore: number | null;
+    gateDecision: string;
+    mainProblem: string;
+    issueTitles: string[];
+    issueCategories: string[];
+    nextPrompt?: string;
+    toVersionId?: string;
+  }): Promise<RevisionSessionSnapshot> {
+    const [row] = await this.drizzle.db
+      .update(revisionSessions)
+      .set({
+        chapterTitle: input.chapterTitle,
+        genre: input.genre,
+        inputKind: input.inputKind,
+        textHash: input.textHash,
+        textLength: input.textLength,
+        quickScore: input.quickScore,
+        gateDecision: input.gateDecision,
+        mainProblem: input.mainProblem,
+        issueTitles: input.issueTitles,
+        issueCategories: input.issueCategories,
+        nextPrompt: input.nextPrompt,
+        toVersionId: input.toVersionId,
+        retestStatus: "completed",
+        updatedAt: new Date(),
+      })
+      .where(eq(revisionSessions.id, input.sessionId))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException(
+        `Revision session not found: ${input.sessionId}`,
+      );
+    }
+
+    return this.revisionSessionSnapshot(row);
+  }
+
   async listStoryAuditFindingReviews(input: {
     projectId: string;
     auditId?: string;
@@ -289,10 +392,10 @@ export class WorkspaceAssetsRepository {
     };
   }
 
-  private async upsertRevisionTextVersion(
+  async upsertRevisionTextVersion(
     version: RevisionTextVersionSnapshot,
     fallbackProjectId: string,
-  ) {
+  ): Promise<void> {
     await this.drizzle.db
       .insert(revisionTextVersions)
       .values({
