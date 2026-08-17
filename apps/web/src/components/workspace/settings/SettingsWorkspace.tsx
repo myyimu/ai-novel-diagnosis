@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -8,10 +9,21 @@ import {
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import type { ProviderPresetId } from "@/stores/workspace-store";
+import {
+	getModelUsageEvents,
+	getModelUsageSummary,
+	type ModelUsageEvent,
+	type ModelUsageSummary,
+} from "@/api/model-usage";
+import { ModelUsagePanel } from "./ModelUsagePanel";
 import { ProviderSettings } from "./ProviderSettings";
 
 export function SettingsWorkspace() {
 	const router = useRouter();
+	const [usageSummary, setUsageSummary] = useState<ModelUsageSummary | null>(null);
+	const [usageEvents, setUsageEvents] = useState<ModelUsageEvent[]>([]);
+	const [usageLoading, setUsageLoading] = useState(false);
+	const [usageError, setUsageError] = useState<string | null>(null);
 	const {
 		provider: providerData,
 		providerLabel,
@@ -37,6 +49,31 @@ export function SettingsWorkspace() {
 	const handleChangeProviderPreset = (preset: string) => {
 		applyProviderPreset(preset as ProviderPresetId);
 	};
+
+	const refreshModelUsage = useCallback(async () => {
+		setUsageLoading(true);
+		setUsageError(null);
+		try {
+			const [summary, events] = await Promise.all([
+				getModelUsageSummary(),
+				getModelUsageEvents({ limit: 50 }),
+			]);
+			setUsageSummary(summary);
+			setUsageEvents(events);
+		} catch (error) {
+			setUsageSummary(null);
+			setUsageEvents([]);
+			setUsageError(
+				error instanceof Error ? error.message : "用量数据加载失败，请稍后重试。",
+			);
+		} finally {
+			setUsageLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		void refreshModelUsage();
+	}, [refreshModelUsage]);
 
 	const handleChangeProviderModel = (model: string) => {
 		setProviderModelSearch(model);
@@ -160,6 +197,14 @@ export function SettingsWorkspace() {
 					onApplyProviderConfigHistory={applyProviderConfigHistory}
 					onDeleteProviderConfigHistory={deleteProviderConfigHistory}
 					onClearProviderConfigHistory={clearProviderConfigHistory}
+				/>
+
+				<ModelUsagePanel
+					summary={usageSummary}
+					events={usageEvents}
+					loading={usageLoading}
+					error={usageError}
+					onRefresh={() => void refreshModelUsage()}
 				/>
 			</main>
 		</RedesignWorkspaceShell>
