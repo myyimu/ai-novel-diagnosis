@@ -11,23 +11,12 @@ export const IPC = {
   contextMenu: {
     show: "contextMenu.show",
   },
-  update: {
-    check: "update.check",
-    startDownload: "update.startDownload",
-    install: "update.install",
-  },
 } as const;
 
-// 主进程主动推送到 renderer 的事件通道（无返回值）
-export const EVENT = {
-  update: {
-    checking: "update:checking",
-    available: "update:available",
-    notAvailable: "update:notAvailable",
-    downloadProgress: "update:downloadProgress",
-    downloaded: "update:downloaded",
-  },
-} as const;
+// 主进程主动推送到 renderer 的事件通道（无返回值）。
+// 目前没有使用中的推送事件；保留空对象以维持 EVENT/EventChannel 契约，
+// 新增推送通道时在此登记即可。
+export const EVENT = {} as const;
 
 // 统一响应信封：主进程所有 handler 都返回这个结构
 export interface IpcResponse<T = unknown> {
@@ -63,9 +52,6 @@ export interface InvokeMap {
   [IPC.dialog.save]: { args: [DialogSaveOptions]; return: string };
   [IPC.shell.open]: { args: [string]; return: void };
   [IPC.contextMenu.show]: { args: [ContextMenuItem[]]; return: string | null };
-  [IPC.update.check]: { args: []; return: void };
-  [IPC.update.startDownload]: { args: []; return: void };
-  [IPC.update.install]: { args: []; return: void };
 }
 
 export type InvokeChannel = keyof InvokeMap;

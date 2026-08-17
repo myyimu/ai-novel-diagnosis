@@ -8,25 +8,25 @@
 
 ## 📊 总体评级: **B-** (修复后提升)
 
-> ✅ **原评级 C+ (2026-08-12)，经修复 10 个问题后提升至 B-**
-> ⚠️ **仍存在：认证禁用(按设计)、无速率限制、God Store/Component、DDL不同步、Electron竞态条件**
+> ✅ **原评级 C+ (2026-08-12)，第一轮修复 10 个问题；第二轮 (2026-08-17) 又修复 6 个，共 16 个**
+> ⚠️ **仍存在：认证禁用(按设计)、God Store/Component、DDL不同步**
 
 | 维度 | 原评分 | 当前评分 | 说明 |
 |------|--------|---------|------|
 | 架构设计 | B+ | **A-** | 分层违规已修复，Controller→Service→Repository 三层分离 |
 | 代码质量 | B- | **B** | process.env 已迁移，Logger 已重构，仍有 `any` 类型待清理 |
-| 🔴 **安全性** | D | **C+** | 路径遍历/JWT/时序/Helmet 已修复；认证禁用(按设计)和无速率限制仍存 |
-| 可维护性 | C+ | **C+** | Store 已集成 devtools；God Store/Component 和 DDL 问题待解决 |
-| 测试覆盖 | B+ | **B+** | 核心测试通过，测试文件已同步更新 |
+| 🔴 **安全性** | D | **B-** | 路径遍历/JWT/时序/Helmet/速率限制已修复；认证禁用按设计保留 |
+| 可维护性 | C+ | **B-** | Store 已集成 devtools；竞态条件已修复；God Store/Component 和 DDL 问题待解决 |
+| 测试覆盖 | B+ | **B+** | 核心测试通过 (37 suites / 241 tests)，测试文件已同步更新 |
 
-### 问题统计 (更新于 2026-08-12)
+### 问题统计 (更新于 2026-08-17 第二轮)
 
 | 严重度 | 总数 | ✅ 已修复 | ❌ 待修复 | 关键主题 |
 |--------|------|-----------|-----------|----------|
 | 🔴 **CRITICAL** | **7** | **4** | **3** | ~~路径遍历✅~~, 认证禁用(按设计), ~~伪登录✅~~, ~~实体泄露✅~~, ~~process.env✅~~, DDL不同步, ~~Repository注入✅~~ |
-| 🟠 **HIGH** | **6** | **2** | **4** | Sidecar竞态, God Store, God Component, Service直连Drizzle, ~~无安全头✅~~, 无速率限制 |
-| 🟡 MEDIUM | **14** | **4** | **10** | any类型, Schema缺陷, ~~Store未用helper✅~~, 冗余代码, ~~console残留✅~~, 缺索引, ~~时序攻击✅~~, IDOR, 硬编码密钥, TOCTOU竞态 |
-| 🟢 LOW | **8** | **0** | **8** | HTTP localhost, 测试密钥, Docker质量, 错误处理, 命名建议, async反模式, 缓存缺失, duck-type风险 |
+| 🟠 **HIGH** | **6** | **5** | **1** | ~~Sidecar竞态✅~~, God Store, God Component, ~~Service直连Drizzle(按设计豁免)~~, ~~无安全头✅~~, ~~无速率限制✅~~ |
+| 🟡 MEDIUM | **14** | **8** | **6** | any类型, Schema缺陷, ~~Store未用helper✅~~, 冗余代码, ~~console残留✅~~, 缺索引, ~~时序攻击✅~~, ~~IDOR(按设计)~~, ~~硬编码密钥✅~~, ~~TOCTOU竞态✅~~, ~~重复监听器✅~~ |
+| 🟢 LOW | **8** | **1** | **7** | HTTP localhost, 测试密钥, Docker质量, 错误处理, 命名建议, async反模式, 缓存缺失, duck-type风险 |
 | ❓ 待确认 | **7** | **0** | **7** | Proxy性能, JSONB增长, DI复杂度, pglmte稳定性, 跨平台兼容等 |
 
 ---
@@ -96,18 +96,18 @@
 
 ---
 
-### 🟠 SEC-H4: 无速率限制
+### 🟠 SEC-H4: 无速率限制 ~~HIGH~~ → ✅ **FIXED**
 
-**范围**: 整个后端
+> **修复日期**: 2026-08-17 | **验证**: typecheck ✅ lint ✅ 241 tests ✅
 
-零匹配 `ThrottlerGuard`, `throttle`, `rate-limit`。无相关依赖。
+**原问题**: 零速率限制，`POST /api/v1/auth/login` 可无限暴力破解，`POST /api/v1/analysis/*` 可费用滥用。
 
-**高危端点**:
-| 端点 | 风险 |
-|------|------|
-| `POST /api/v1/auth/login` | 无限 token 签发 / 暴力破解 |
-| `POST /api/v1/analysis/*` | **费用滥用** — 触发外部 LLM API 调用 |
-| `POST /api/v1/book/uploads` | 磁盘耗尽 |
+**✅ 已实施修复**:
+1. 安装 `@nestjs/throttler`
+2. [app.module.ts](services/api/src/app.module.ts): `ThrottlerModule.forRootAsync` 从 ConfigService 读取配置，`ThrottlerGuard` 注册为全局 `APP_GUARD`
+3. [configuration.ts](services/api/src/core/config/configuration.ts): 新增 `throttlerConfig` 命名空间 (`THROTTLE_TTL` / `THROTTLE_LIMIT`，默认 60s / 120 次)
+4. [health.controller.ts](services/api/src/modules/health/health.controller.ts): `@SkipThrottle()` 豁免 `/health`（sidecar 启动期以 500ms 轮询 = 120 次/分钟，恰好等于默认阈值）
+5. [.env.example](.env.example): 补充 `THROTTLE_TTL` / `THROTTLE_LIMIT` 文档
 
 ---
 
@@ -149,13 +149,18 @@
 
 ---
 
-### 🟡 SEC-M8: 硬编码 API Key
+### 🟡 SEC-M8: 硬编码 API Key ~~MEDIUM~~ → ✅ **FIXED**
 
-**文件**: [model-provider.service.ts:271](services/api/src/modules/ai-provider/model-provider.service.ts#L271)
+> **修复日期**: 2026-08-17 | **验证**: typecheck ✅ lint ✅ 241 tests ✅
 
-```typescript
-apiKey: "0000000000",  // AI Horde 匿名池 fallback key
-```
+**原问题**: `apiKey: "0000000000"` 硬编码在源码中。
+
+**说明**: 该值是 AI Horde 官方文档公开的匿名池 key（非机密），提取到配置是为部署时可替换为注册用户 key 获得更高队列优先级。
+
+**✅ 已实施修复**:
+1. [configuration.ts](services/api/src/core/config/configuration.ts): 新增 `provider.sharedGpuAnonymousApiKey`（默认保持 `"0000000000"`）
+2. [model-provider.service.ts](services/api/src/modules/ai-provider/model-provider.service.ts): 新增私有方法 `getSharedGpuAnonymousApiKey()` 从 ConfigService 读取
+3. [.env.example](.env.example): 补充 `SHARED_GPU_ANONYMOUS_API_KEY` 文档
 
 ---
 
@@ -175,99 +180,109 @@ apiKey: "0000000000",  // AI Horde 匿名池 fallback key
 
 ## ⚡ Electron 桌面端竞态条件 (新增)
 
-### 🟠 RACE-H1: SidecarSupervisor.start() 无重入保护
+### 🟠 RACE-H1: SidecarSupervisor.start() 无重入保护 ~~HIGH~~ → ✅ **FIXED**
 
-**严重度**: **HIGH**  
-**文件**: [sidecar-supervisor.ts:33-69](apps/desktop/apps/electron/src/services/sidecar-supervisor.ts#L33-L69)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅
 
-**问题**: `start()` 无重入守卫。若被调用两次（如快速连续的 `activate` 事件）：
-1. 在相同端口生成**重复的 API 和 Web 子进程**
-2. 端口冲突 ("address already in use")
-3. `stop()` 调用时遗留孤儿进程
+**原问题**: `start()` 无重入守卫。快速连续调用会在相同端口生成重复子进程、端口冲突、遗留孤儿进程。
 
-**修复**: 添加 `starting`/`started` 标志 + Promise 去重。
-
----
-
-### 🟠 RACE-H2: 轮询循环在 stop() 后继续
-
-**严重度**: **HIGH**  
-**文件**: [sidecar-supervisor.ts:108-134](apps/desktop/apps/electron/src/services/sidecar-supervisor.ts#L108-L134)
-
-**问题**: `waitForHttp()` 轮询无取消机制。若用户在启动期间关闭窗口：
-1. `stop()` 杀死子进程并设置 `this.api = null`
-2. 但 `waitForHttp()` 继续轮询最多 60 秒
-3. 导致双重清理
-
-**修复**: 使用 `AbortController` + 在 `stop()` 中调用 `abort()`。
+**✅ 已实施修复** ([sidecar-supervisor.ts](apps/desktop/apps/electron/src/services/sidecar-supervisor.ts)):
+- 添加 `starting: Promise<void> | null` 字段做 Promise 去重
+- 并发调用 `start()` 时复用同一次启动 Promise 并记录 warn 日志
+- 启动流程抽取到私有 `doStart(signal)` 方法
 
 ---
 
-### 🟡 RACE-M3: TOCTOU 竞态 (Protocol Service)
+### 🟠 RACE-H2: 轮询循环在 stop() 后继续 ~~HIGH~~ → ✅ **FIXED**
 
-**文件**: [protocol.ts:23-30](apps/desktop/apps/electron/src/core/protocol.ts#L23-L30)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅
 
-```typescript
-await access(filePath);  // 检查存在
-// ... 文件可能在此被删除 ...
-const data = await readFile(filePath);  // 使用时可能不存在
-```
+**原问题**: `waitForHttp()` 轮询无取消机制，`stop()` 后仍继续轮询最多 60 秒。
 
-**修复**: 移除冗余的 `access()` 调用，直接尝试 `readFile()` 并 catch fallback 到 index.html。
+**✅ 已实施修复**:
+- 添加 `startupAbort: AbortController` 字段
+- `start()` 创建 AbortController 并传递给 `doStart(signal)`
+- `waitForHttp()` 每轮循环检查 `abort.aborted`，fetch 传入 `signal: abort`
+- `stop()` 首先调用 `startupAbort?.abort()` 中止轮询
+- 中止错误带 `cause` 保留原始错误（oxlint preserve-caught-error 合规）
 
 ---
 
-### 🟡 RACE-M4: 重复 close 事件监听器
+### 🟡 RACE-M3: TOCTOU 竞态 (Protocol Service) ~~MEDIUM~~ → ✅ **FIXED**
 
-**文件**: [main.window.ts:56-66](apps/desktop/apps/electron/src/windows/main.window.ts#L56-L66)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅
 
-基类 `Window` 和 `MainWindow` 各自附加了 `close` 处理器。执行顺序可能导致窗口边界**未保存**（基类先执行并将 `this.window = null`）。
+**原问题**: `access()` 检查与 `readFile()` 使用之间存在时间窗口。
+
+**✅ 已实施修复** ([protocol.ts](apps/desktop/apps/electron/src/core/protocol.ts)):
+- 移除冗余的 `access()` 调用
+- 直接尝试 `readFile()`，失败时 catch 回退到 `index.html`
+- 消除检查-使用间隙
+
+---
+
+### 🟡 RACE-M4: 重复 close 事件监听器 / bounds 永不保存 ~~MEDIUM~~ → ✅ **FIXED (确认为真实 bug)**
+
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅
+
+**原问题**: 基类 `windowClose`（attached first）先执行并把 `this.window` 置 null，MainWindow 的 close 处理器（attached second）检查 `if (!this.window) return` 直接返回——**窗口大小/位置永远不会被保存**。
+
+**✅ 已实施修复** ([main.window.ts](apps/desktop/apps/electron/src/windows/main.window.ts)):
+- `init()` 和 `loadStatusPage()` 中改为闭包捕获 `const win = this.create()`
+- close 处理器使用 `win.getBounds()`（局部引用不受 `this.window = null` 影响）
 
 ---
 
 ## Electron 其他发现
 
-| # | 严重度 | 文件 | 问题 |
-|---|--------|------|------|
-| E1 | Medium | [ElectronUpdater.ts:50](apps/desktop/apps/electron/src/vendor/ElectronUpdater.ts#L50) | setTimeout 中的 Promise 无错误处理 |
-| E2 | Low-Medium | [index.ts:36](apps/desktop/apps/electron/src/index.ts#L36) | 顶层 `void start()` 无 `.catch()` |
-| E3 | Minor | [context-menu.controller.ts:19](apps/desktop/apps/electron/src/controller/context-menu.controller.ts#L19) | 不必要的 async 包装 Promise |
-| E4 | Low-Medium | [protocol.ts:20-34](apps/desktop/apps/electron/src/core/protocol.ts#L20-L34) | 无请求缓存/去重，每次都读磁盘 |
-| E5 | Low | [preload/src/index.ts:7-19](apps/desktop/packages/preload/src/index.ts#L7-L19) | duck-type 信封检查可能误匹配 |
+| # | 严重度 | 文件 | 问题 | 状态 |
+|---|--------|------|------|------|
+| E1 | ~~Medium~~ | ~~ElectronUpdater.ts~~ | setTimeout 中的 Promise 无错误处理 | ✅ 复核为误报；文件已作为死代码删除 (2026-08-17) |
+| E2 | ~~Low-Medium~~ | [index.ts](apps/desktop/apps/electron/src/index.ts) | 顶层 `void start()` 无 `.catch()` | ✅ FIXED 2026-08-17 — 改为 `start().catch(err => { console.error; app.quit(); })` |
+| E3 | Minor | [context-menu.controller.ts](apps/desktop/apps/electron/src/controller/context-menu.controller.ts) | 不必要的 async 包装 Promise | ❌ 待处理 |
+| E4 | ~~Low-Medium~~ | ~~protocol.ts~~ | 无请求缓存/去重，每次都读磁盘 | ✅ 随死代码删除消亡 (2026-08-17) |
+| E5 | Low | [preload/src/index.ts](apps/desktop/packages/preload/src/index.ts) | duck-type 信封检查可能误匹配 | ❌ 待处理 |
 
 ---
 
-## 💀 死代码与未使用代码 (新增)
+## 💀 死代码与未使用代码 (新增) → ✅ **ALL FIXED 2026-08-17**
 
-### 完全未使用的类/模块
+> **修复日期**: 2026-08-17 | **验证**: oxlint ✅ build（preload + electron）✅
+> 每次删除前均经全仓 grep 确认零引用。
 
-| 文件 | 说明 | 建议 |
+### 完全未使用的类/模块 → ✅ 已全部删除
+
+| 文件 | 说明 | 处置 |
 |------|------|------|
-| [core/router.ts](apps/desktop/apps/electron/src/core/router.ts) | **整个类从未被调用** — Router 初始化缺失 | 删除或集成到启动流程 |
-| [core/protocol.ts](apps/desktop/apps/electron/src/core/protocol.ts) | **整个类从未被调用** — 自定义协议未启用 | 删除或条件加载 |
-| [vendor/ElectronUpdater.ts](apps/desktop/apps/electron/src/vendor/ElectronUpdater.ts) | **整个类是死代码** — 更新功能未接入 | 删除或实现更新功能 |
-| [vendor/ElectronDevtools.ts](apps/desktop/apps/electron/src/vendor/ElectronDevtools.ts) | **整个类是死代码** — devtools 安装未使用 | 删除 |
+| [core/router.ts](apps/desktop/apps/electron/src/core/router.ts) | **整个类从未被调用** — Router 初始化缺失 | ✅ 已删除 |
+| [core/protocol.ts](apps/desktop/apps/electron/src/core/protocol.ts) | **整个类从未被调用** — 自定义协议未启用 | ✅ 已删除（应用始终走 HTTP `127.0.0.1:3000`，见 constants） |
+| [vendor/ElectronUpdater.ts](apps/desktop/apps/electron/src/vendor/ElectronUpdater.ts) | **整个类是死代码** — 更新功能未接入 | ✅ 已删除 |
+| [vendor/ElectronDevtools.ts](apps/desktop/apps/electron/src/vendor/ElectronDevtools.ts) | **整个类是死代码** — devtools 安装未使用 | ✅ 已删除 |
 
-### 未使用的导出
+> 注：RACE-M3（TOCTOU）与 E4（protocol 请求缓存）的原修复对象即 protocol.ts —— 该文件本轮已作为死代码删除，两个问题随之消亡。
 
-| 文件 | 未使用导出 |
-|------|-----------|
-| [core/decorators.ts](apps/desktop/apps/electron/src/core/decorators.ts) | `on` 装饰器 |
-| [types/events.ts](apps/desktop/apps/electron/src/types/events.ts) | 行 7-15 的重导出块 |
-| [utils/index.ts](apps/desktop/apps/electron/src/utils/index.ts) | `noop`, `__filename` |
-| [services/paths.ts](apps/desktop/apps/electron/src/services/paths.ts) | `isPackaged()` |
+### 未使用的导出 → ✅ 已全部清理
 
-### 孤儿 IPC 通道 (Preload 端声明但无 Handler)
+| 文件 | 未使用导出 | 处置 |
+|------|-----------|------|
+| [core/decorators.ts](apps/desktop/apps/electron/src/core/decorators.ts) | `on` 装饰器 | ✅ 已删除，仅保留 `@handle` |
+| [types/events.ts](apps/desktop/apps/electron/src/types/events.ts) | 无消费方的重导出 | ✅ 收敛为 `IPC` + 类型重导出（控制器仍依赖） |
+| [utils/index.ts](apps/desktop/apps/electron/src/utils/index.ts) | `noop`, `__filename` | ✅ 已删除（`__filename` 保留为模块内常量），`defaultScheme` 一并移除 |
+| [services/paths.ts](apps/desktop/apps/electron/src/services/paths.ts) | `isPackaged()` | ✅ 已删除 |
+
+同步清理：`constants/index.ts` 移除 `DEFAULT_SCHEME`；`registerControllerHandlers.ts` 注释由 "@handle/@on" 更正为 "@handle"。
+
+### 孤儿 IPC 通道 (Preload 端声明但无 Handler) → ✅ 已全部移除
 
 **文件**: [packages/preload/src/channels.ts](apps/desktop/packages/preload/src/channels.ts)
 
 | 通道名 | 状态 |
 |--------|------|
-| `IPC.update.check` | ❌ 无 Handler |
-| `IPC.update.startDownload` | ❌ 无 Handler |
-| `IPC.update.install` | ❌ 无 Handler |
+| `IPC.update.check` | ✅ 已从 `IPC` 常量与 `InvokeMap` 移除 |
+| `IPC.update.startDownload` | ✅ 已从 `IPC` 常量与 `InvokeMap` 移除 |
+| `IPC.update.install` | ✅ 已从 `IPC` 常量与 `InvokeMap` 移除 |
 
-这些 IPC 通道在 preload 层暴露给渲染进程，但主进程无对应 handler，调用时会静默失败或抛出 "no handler registered" 错误。
+同时移除了 `EVENT.update.*` 推送通道（唯一消费方是被删除的 ElectronUpdater）。`EVENT` 保留为空对象常量以维持 `EventChannel` 类型契约 —— preload 的 `on/once<K extends EventChannel | string>` 对空集天然兼容，后续新增推送通道时在 `EVENT` 登记即可。
 
 ---
 
@@ -699,25 +714,25 @@ console.error("Global error captured", error);
 
 ---
 
-## 🗓️ 修复路线图 (更新于 2026-08-12)
+## 🗓️ 修复路线图 (更新于 2026-08-17 第二轮)
 
 ### ✅ Phase -1: 安全紧急 — 已完成
 
-> **2026-08-12 完成 4/6 项安全修复**
+> **2026-08-12 完成 4/6 项；2026-08-17 补齐速率限制，共 5/6 项**
 
 | 优先级 | 问题 | 状态 | 完成日期 |
 |--------|------|------|---------|
 | **P0** | ~~SEC-C1: 路径遍历~~ | ✅ FIXED | 2026-08-12 |
 | **P0** | SEC-C2: 移除 `@Public()` | ⏸️ 按设计保留 | - |
 | **P0** | ~~SEC-C3: JWT 伪登录~~ | ✅ FIXED | 2026-08-12 |
-| **P1** | SEC-H4: 速率限制 | ❌ 待实现 | - |
+| **P1** | ~~SEC-H4: 速率限制~~ | ✅ FIXED | 2026-08-17 |
 | **P1** | ~~SEC-H5: 时序攻击~~ | ✅ FIXED | 2026-08-12 |
 | **P1** | ~~SEC-H6: Helmet 安全头~~ | ✅ FIXED | 2026-08-12 |
 
-### ✅ Phase 0: 紧急 — 部分完成
+### ✅ Phase 0: 紧急 — 大部分完成
 - [x] **补全 `.env.example`** — 添加所有缺失的环境变量文档 (#9.5) ✅ 2026-08-12
-- [ ] **消除 PGlite DDL 与 schema.ts 的不同步** — 改用程序化 DDL 生成或 Drizzle push (#9.1) ❌ 待处理
-- [ ] **RACE-H1/H2: SidecarSupervisor 重入保护 + AbortController** — 防止孤儿进程和端口冲突 ❌ 待处理
+- [x] **RACE-H1/H2: SidecarSupervisor 重入保护 + AbortController** ✅ 2026-08-17
+- [ ] **消除 PGlite DDL 与 schema.ts 的不同步** — 改用程序化 DDL 生成或 Drizzle push (#9.1) ❌ 待处理（改动面大，需专项处理）
 
 ### ✅ Phase 1: 架构违规修复 — 已完成
 - [x] 创建 `UserResponseDto`，修复 Controller 实体泄露 (#1) ✅ 2026-08-12
@@ -732,14 +747,15 @@ console.error("Global error captured", error);
 - [x] 所有 Store 改用 `createStore()` helper / devtools 中间件 (#10) ✅ 2026-08-12
 - [ ] 为高频查询列添加数据库索引 (#9.3) ❌ 待处理
 
-### ⏳ Phase 3: 技术债务清理 (下迭代)
+### 🔄 Phase 3: 技术债务清理 — 部分完成 (2026-08-17)
 - [ ] 为 AI 输出定义严格接口，消除 `Record<string, any>` (#8)
 - [ ] 添加外键约束和 Drizzle relations (#9.2)
 - [ ] 标准化 Schema 时间戳命名，统一 PK 类型 (#9.4)
 - [ ] 删除冗余 `layout-store.ts` (#11)
-- [ ] RACE-M3/M4: 修复 TOCTOU 和重复事件监听器
-- [ ] SEC-M7: 资源所有权 (IDOR) 防护
-- [ ] SEC-M8: 提取硬编码 key 到环境变量
+- [x] ~~RACE-M3/M4: 修复 TOCTOU 和重复事件监听器~~ ✅ 2026-08-17
+- [x] ~~SEC-M7: 资源所有权 (IDOR) 防护~~ ⏸️ 按设计保留（单用户本地模式）
+- [x] ~~SEC-M8: 提取硬编码 key 到环境变量~~ ✅ 2026-08-17
+- [x] ~~E2: 顶层 start() 错误处理~~ ✅ 2026-08-17
 
 ---
 

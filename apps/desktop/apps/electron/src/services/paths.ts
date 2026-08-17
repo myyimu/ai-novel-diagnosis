@@ -7,10 +7,6 @@ import { fileURLToPath } from "node:url";
 // <安装目录>/resources/sidecars，运行时用 process.resourcesPath 解析。
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function isPackaged(): boolean {
-  return app.isPackaged;
-}
-
 // sidecars 根目录
 export function sidecarRoot(): string {
   if (app.isPackaged) {

@@ -9,11 +9,3 @@ export const handle = (route: string) => {
     Reflect.defineMetadata(IPC_EVENT_METADATA, route, target, propertyName);
   };
 };
-
-// @on(channel) —— ipcMain.on 版本，用于无返回值的"推送"类事件
-export const on = (route: string) => {
-  return (target: any, propertyName: string): void => {
-    Reflect.defineMetadata(IPC_METHOD_METADATA, "on", target, propertyName);
-    Reflect.defineMetadata(IPC_EVENT_METADATA, route, target, propertyName);
-  };
-};

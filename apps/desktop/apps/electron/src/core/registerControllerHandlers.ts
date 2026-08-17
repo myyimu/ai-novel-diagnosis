@@ -14,7 +14,7 @@ export type ControllerHandlerBinder = (
   registration: ControllerHandlerRegistration,
 ) => void;
 
-// 扫描控制器原型上带 @handle/@on 元数据的方法，交给 binder 处理
+// 扫描控制器原型上带 @handle 元数据的方法，交给 binder 处理
 // 不直接操作 ipcMain —— binder 抽象了"如何绑定"，便于单测时传假实现
 export function registerControllerHandlers(
   controllers: Controller[],
