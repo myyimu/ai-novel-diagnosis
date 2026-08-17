@@ -45,6 +45,7 @@ export function ProjectCurrentPage() {
 		loading,
 		quickReviewElapsedSeconds,
 		runQuickExperience,
+		runRevisionRetest,
 		saveRevisedChapterText,
 		saveQuickReviewIssueDecisions,
 	} = useWorkspaceHandlers("overview");
@@ -68,6 +69,11 @@ export function ProjectCurrentPage() {
 			? chapterText
 			: routeExample?.chapterText || "";
 		const resolvedQuickReviewResult = quickReviewResult ?? routeExample?.result ?? null;
+		const pendingRetestSessionId = projectRevisionSessions.find(
+			(session) =>
+				session.retestStatus === "pending" &&
+				session.chapterTitle.trim() === resolvedChapterTitle.trim(),
+		)?.id;
 
 		return (
 			<ProjectChapterWorkspace
@@ -97,6 +103,7 @@ export function ProjectCurrentPage() {
 				provider={provider}
 				onBack={() => router.push("/project/current")}
 				onRerun={() => runQuickExperience(true)}
+				onRunServerRetest={() => runRevisionRetest(pendingRetestSessionId)}
 				onSaveRevision={saveRevisedChapterText}
 				onPersistIssueDecisions={saveQuickReviewIssueDecisions}
 			/>
@@ -329,6 +336,7 @@ function ProjectChapterWorkspace({
 	provider,
 	onBack,
 	onRerun,
+	onRunServerRetest,
 	onSaveRevision,
 	onPersistIssueDecisions,
 }: {
@@ -346,6 +354,7 @@ function ProjectChapterWorkspace({
 	provider: ProviderForm;
 	onBack: () => void;
 	onRerun: () => void;
+	onRunServerRetest: () => Promise<boolean>;
 	onSaveRevision: (
 		revisedText: string,
 		result: QuickReviewResult,
@@ -610,6 +619,14 @@ function ProjectChapterWorkspace({
 	}
 
 	function runDiagnosis() {
+		if (pendingRetestCount > 0) {
+			void onRunServerRetest().then((completed) => {
+				if (completed) {
+					setIsRetestRun(true);
+				}
+			});
+			return;
+		}
 		setIsRetestRun(Boolean(result));
 		onRerun();
 	}

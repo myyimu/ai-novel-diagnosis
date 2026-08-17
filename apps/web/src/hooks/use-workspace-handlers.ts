@@ -28,6 +28,7 @@ import {
 	requestPlatformFit,
 	requestQuickReview,
 	requestReferenceProfile,
+	requestRevisionRetest,
 	requestRubric,
 	requestScoreChapter,
 	resumeBookAnalysisJob,
@@ -62,6 +63,7 @@ import {
 	findPreviousRevisionTextVersion,
 	findRevisionTextVersionForDraft,
 	mergeProjectMethodologyCards,
+	normalizeRevisionChapterTitle,
 	upsertRevisionSession,
 	upsertRevisionTextVersion,
 } from "@/lib/workspace-iteration";
@@ -1280,6 +1282,57 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		});
 		setStatus("正文已保存为新版本，待复诊确认问题变化。");
 		return true;
+	}
+
+	async function runRevisionRetest(sessionId?: string): Promise<boolean> {
+		const target =
+			projectRevisionSessions.find((session) => session.id === sessionId) ??
+			projectRevisionSessions.find(
+				(session) =>
+					session.retestStatus === "pending" &&
+					normalizeRevisionChapterTitle(session.chapterTitle) ===
+						normalizeRevisionChapterTitle(chapterTitle),
+			);
+		if (!target || target.retestStatus !== "pending") {
+			setStatus("没有待复诊的会话，请先保存修订后的正文。");
+			toast.error("没有待复诊的会话");
+			return false;
+		}
+		const draftText = chapterText.trim();
+		setLoading("quick");
+		try {
+			const response = await requestRevisionRetest({
+				sessionId: target.id,
+				provider: providerPayload,
+				...(draftText.length >= 50 ? { toVersionText: draftText } : {}),
+			});
+			setRevisionSessions((current) => upsertRevisionSession(current, response.session));
+			const createdVersion = response.createdVersion;
+			if (createdVersion) {
+				setRevisionVersions((current) =>
+					upsertRevisionTextVersion(current, createdVersion),
+				);
+			}
+			const delta = response.comparison?.scoreDelta;
+			const scoreText =
+				response.session.quickScore === null
+					? "未出分"
+					: `${response.session.quickScore}/10`;
+			const deltaText =
+				delta === undefined
+					? ""
+					: `（较上一轮 ${delta >= 0 ? "+" : ""}${delta.toFixed(1)}）`;
+			setStatus(`复诊完成：${scoreText}${deltaText}`);
+			toast.success("复诊完成", { description: `本次诊断 ${scoreText}${deltaText}` });
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "请求失败";
+			setStatus(`复诊失败：${message}。会话仍保持待复诊，可重试。`);
+			toast.error("复诊失败", { description: message });
+			return false;
+		} finally {
+			setLoading(null);
+		}
 	}
 
 	function openQuickReviewChapter() {
@@ -2794,6 +2847,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		inferReferenceProfileFromModel,
 		handleChapterTextChange,
 		saveRevisedChapterText,
+		runRevisionRetest,
 		saveQuickReviewIssueDecisions,
 		handleReferenceTextChange,
 		handlePlatformStrategyChange,

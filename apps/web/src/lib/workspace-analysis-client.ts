@@ -549,6 +549,32 @@ export function updateRevisionSessionNote({
 	});
 }
 
+export interface RevisionRetestResponse {
+	session: RevisionSession;
+	previousSession: RevisionSession;
+	comparison: import("@ai-novel-diagnosis/ai-core").RevisionComparison | null;
+	promptAttribution: import("@ai-novel-diagnosis/ai-core").PromptAttributionSummary;
+	createdVersion: RevisionTextVersion | null;
+}
+
+export function requestRevisionRetest({
+	sessionId,
+	provider,
+	toVersionText,
+}: {
+	sessionId: string;
+	provider: ProviderForm;
+	toVersionText?: string;
+}) {
+	return postJson<RevisionRetestResponse>(
+		`/analysis/workspace/revision-sessions/${sessionId}/retest`,
+		{
+			provider,
+			...(toVersionText?.trim() ? { toVersionText: toVersionText.trim() } : {}),
+		},
+	);
+}
+
 export function readStoryAuditFindingReviews(projectId: string) {
 	return getJson<StoryAuditFindingReview[]>(
 		`/analysis/workspace/story-audit/reviews/${encodeURIComponent(projectId)}`,
