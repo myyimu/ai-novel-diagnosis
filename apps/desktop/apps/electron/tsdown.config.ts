@@ -6,7 +6,7 @@ export default defineConfig({
   outDir: "build/main",
   platform: "node",
   target: "node20",
-  external: ["electron", "electron-updater", "electron-devtools-installer"],
+  external: ["electron", "electron-devtools-installer"],
   dts: false,
   clean: true,
   sourcemap: true,

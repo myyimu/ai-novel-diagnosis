@@ -7,15 +7,15 @@
   "license": "MIT",
   "author": "",
   "scripts": {
-    "dev": "pnpm -F @app/preload build && pnpm -F @app/electron run dev",
-    "build": "pnpm -F @app/preload build && pnpm -F @app/electron run build",
+    "dev": "pnpm -F @app/electron run dev",
+    "build": "pnpm -F @app/electron run build",
     "assemble": "pnpm -F @app/electron run assemble",
     "pack": "pnpm run assemble && pnpm run build && pnpm -F @app/electron run pack",
     "release": "pnpm run assemble && pnpm run build && pnpm -F @app/electron run package",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "format": "oxfmt --check package.json pnpm-workspace.yaml apps/electron/script apps/electron/src apps/electron/tsconfig.json apps/electron/tsdown.config.ts packages/preload/package.json packages/preload/src packages/preload/tsconfig.json packages/preload/tsdown.config.ts",
-    "format:check": "oxfmt --check package.json pnpm-workspace.yaml apps/electron/script apps/electron/src apps/electron/tsconfig.json apps/electron/tsdown.config.ts packages/preload/package.json packages/preload/src packages/preload/tsconfig.json packages/preload/tsdown.config.ts",
+    "format": "oxfmt --check package.json pnpm-workspace.yaml apps/electron/script apps/electron/src apps/electron/tsconfig.json apps/electron/tsdown.config.ts",
+    "format:check": "oxfmt --check package.json pnpm-workspace.yaml apps/electron/script apps/electron/src apps/electron/tsconfig.json apps/electron/tsdown.config.ts",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build"
   },
   "devDependencies": {

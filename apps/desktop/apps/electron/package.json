@@ -15,14 +15,12 @@
     "release": "cross-env NODE_ENV=production node script/release.mjs"
   },
   "dependencies": {
-    "@app/preload": "workspace:*",
     "@inversifyjs/binding-decorators": "^1.1.3",
     "dayjs": "^1.11.11",
     "electron-devtools-installer": "^4.0.0",
     "electron-is-dev": "^3.0.1",
     "electron-log": "^5.1.5",
     "electron-store": "^11.0.2",
-    "electron-updater": "^6.8.3",
     "inversify": "^7.9.1",
     "mime-types": "^3.0.1",
     "reflect-metadata": "^0.2.2"
