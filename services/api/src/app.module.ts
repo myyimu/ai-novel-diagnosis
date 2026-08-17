@@ -14,6 +14,7 @@ import { AnalysisModule } from "@/modules/analysis/analysis.module";
 import { BookModule } from "@/modules/book/book.module";
 import { HealthModule } from "@/modules/health/health.module";
 import { LibraryModule } from "@/modules/library/library.module";
+import { ModelUsageModule } from "@/modules/model-usage/model-usage.module";
 import { MetricsModule } from "@/modules/metrics/metrics.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
@@ -55,6 +56,7 @@ import { AppController } from "./app.controller";
     WorkspaceModule,
     LibraryModule,
     BookModule,
+    ModelUsageModule,
   ],
   controllers: [AppController],
   providers: [
