@@ -269,7 +269,8 @@ const providerPresets: ProviderPresetWithId[] = [
 ];
 
 const defaultSharedGpuFallback = {
-  apiKey: "0000000000",
+  // API key comes from provider.sharedGpuAnonymousApiKey (ConfigService),
+  // resolved where used — see getSharedGpuAnonymousApiKey().
   baseUrl: "https://aihorde.net/api/v2",
   label: "AI Horde 匿名共享池",
 };
@@ -381,6 +382,14 @@ export class ModelProviderService {
         false,
       ),
     };
+  }
+
+  /** AI Horde anonymous pool key — configurable, defaults to the documented public value. */
+  private getSharedGpuAnonymousApiKey(): string {
+    return (
+      this.configService.get<string>("provider.sharedGpuAnonymousApiKey") ||
+      "0000000000"
+    );
   }
 
   getPresets() {
@@ -943,7 +952,7 @@ export class ModelProviderService {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          apikey: defaultSharedGpuFallback.apiKey,
+          apikey: this.getSharedGpuAnonymousApiKey(),
           "Client-Agent": "ai-novel-diagnosis:shared-fallback",
         },
         body: JSON.stringify({

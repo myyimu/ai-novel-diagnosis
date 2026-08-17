@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrometheusModule } from "@willsoto/nestjs-prometheus";
 import * as configurations from "@/core/config/configuration";
 import { HttpExceptionFilter } from "@/core/filters/http-exception.filter";
@@ -26,6 +27,18 @@ import { AppController } from "./app.controller";
       envFilePath: ".env",
       load: Object.values(configurations),
     }),
+    // 全局速率限制：防暴力破解 / 费用滥用（触发 LLM 调用的端点）。
+    // 本地单用户默认较宽松（120 次/分钟）；网络部署时可通过
+    // THROTTLE_TTL / THROTTLE_LIMIT 收紧。
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.get<number>("throttler.ttlMs", 60_000),
+          limit: config.get<number>("throttler.limit", 120),
+        },
+      ],
+    }),
     PrometheusModule.register({
       path: "/metrics",
       defaultLabels: {
@@ -45,6 +58,10 @@ import { AppController } from "./app.controller";
   ],
   controllers: [AppController],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,

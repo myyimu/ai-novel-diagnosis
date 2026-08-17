@@ -74,6 +74,15 @@ export const appConfig = registerAs("app", () => ({
   version: process.env.npm_package_version || "0.1.0",
 }));
 
+/** Global rate-limit configuration (@nestjs/throttler) */
+export const throttlerConfig = registerAs("throttler", () => ({
+  // Time window in milliseconds (default: 60s)
+  ttlMs: parseInt(process.env.THROTTLE_TTL || "60000", 10),
+  // Max requests per window per client. 120/min is generous enough for a
+  // single-user local app while still blunting brute force and LLM cost abuse.
+  limit: parseInt(process.env.THROTTLE_LIMIT || "120", 10),
+}));
+
 /** AI model provider configuration */
 export const providerConfig = registerAs("provider", () => ({
   requestTimeoutMs: parseInt(
@@ -90,6 +99,10 @@ export const providerConfig = registerAs("provider", () => ({
     model: process.env.SHARED_GPU_MODEL?.trim() || null,
     jsonMode: process.env.SHARED_GPU_JSON_MODE === "true",
   },
+  // AI Horde 匿名池 key（官方公开文档值，非机密）。提取为配置项
+  // 便于部署时替换为注册用户 key 以获得更高优先级。
+  sharedGpuAnonymousApiKey:
+    process.env.SHARED_GPU_ANONYMOUS_API_KEY?.trim() || "0000000000",
   enableOpenaiCompatJsonSchema:
     process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true",
 }));
