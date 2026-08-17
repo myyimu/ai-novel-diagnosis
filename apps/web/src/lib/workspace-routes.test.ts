@@ -154,5 +154,9 @@ describe("workspace routes", () => {
 		expect(resolveWorkspaceRoute("patterns")).toBe(researchRoutes.patterns);
 		expect(resolveWorkspaceRoute("materials")).toBe(researchRoutes.materials);
 		expect(resolveWorkspaceRoute("provider")).toBe(settingsRoutes.provider);
+
+		// 原设置子页 dashboard/history 已下线，旧视图名指回承接它们的项目页
+		expect(workspaceViewRoutes.dashboard).toBe("/project/current");
+		expect(workspaceViewRoutes.history).toBe("/project/revisions");
 	});
 });

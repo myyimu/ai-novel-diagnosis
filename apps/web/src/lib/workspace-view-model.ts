@@ -135,20 +135,6 @@ export const settingsNavItems: WorkspaceNavItem<SettingsView>[] = [
 		title: "AI设置",
 		description: "配置AI模型服务",
 	},
-	{
-		id: "dashboard",
-		label: "诊断看板",
-		icon: BarChart3,
-		title: "诊断看板",
-		description: "数据统计和质量趋势",
-	},
-	{
-		id: "history",
-		label: "历史任务",
-		icon: History,
-		title: "历史任务",
-		description: "查看历史整本导入任务",
-	},
 ];
 
 // 根据工作区获取导航项

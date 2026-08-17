@@ -26,7 +26,7 @@ export type ProjectView = "current" | "revisions" | "methodology" | "export";
 export type ResearchView = "book" | "compare" | "patterns" | "materials";
 
 // 设置工作区子页面
-export type SettingsView = "provider" | "dashboard" | "history";
+export type SettingsView = "provider";
 
 // 工作区路由映射
 export const workspaceRoutes: Record<WorkspaceType, string> = {
@@ -63,14 +63,6 @@ export const researchRoutes: Record<ResearchView, string> = {
 // 设置工作区子页面路由
 export const settingsRoutes: Record<SettingsView, string> = {
 	provider: "/settings/provider",
-	dashboard: "/settings/dashboard",
-	history: "/settings/history",
-};
-
-// 设置工作区兼容路由（input 和 ai-settings 重定向到 provider）
-export const settingsRoutesCompat: Record<string, string> = {
-	"settings/input": "/settings/provider",
-	"settings/ai-settings": "/settings/provider",
 };
 
 export type WorkspaceRouteView = DiagnoseView | ProjectView | ResearchView | SettingsView;
@@ -195,22 +187,6 @@ export const workspaceRouteMeta: WorkspaceRouteMeta[] = [
 		defaultMainTab: "input",
 		defaultRightPanelTab: "ai-settings",
 	},
-	{
-		workspace: "settings",
-		view: "dashboard",
-		path: settingsRoutes.dashboard,
-		legacyView: "dashboard",
-		defaultMainTab: "results",
-		defaultRightPanelTab: "project",
-	},
-	{
-		workspace: "settings",
-		view: "history",
-		path: settingsRoutes.history,
-		legacyView: "history",
-		defaultMainTab: "analysis",
-		defaultRightPanelTab: "history-tasks",
-	},
 ];
 
 export interface WorkspaceTopNavMeta {
@@ -298,7 +274,7 @@ export function getWorkspaceRouteMetaByLegacyView(
 	return workspaceRouteMeta.find((route) => route.legacyView === view);
 }
 
-// 旧视图路由映射（保持兼容性）
+// 旧视图路由映射（保持兼容性；dashboard/history 原设置子页已下线，指回承接它们的项目页）
 export const workspaceViewRoutes: Record<WorkspaceView, string> = {
 	overview: "/diagnose/quick",
 	chapter: "/diagnose/deep",
@@ -309,8 +285,8 @@ export const workspaceViewRoutes: Record<WorkspaceView, string> = {
 	methodology: "/project/methodology",
 	exports: "/project/export",
 	provider: "/settings/provider",
-	dashboard: "/settings/dashboard",
-	history: "/settings/history",
+	dashboard: "/project/current",
+	history: "/project/revisions",
 	materials: "/research/materials",
 };
 
@@ -323,7 +299,6 @@ const workspaceRouteResolvers: ReadonlyArray<Record<string, string>> = [
 	projectRoutes,
 	researchRoutes,
 	settingsRoutes,
-	settingsRoutesCompat,
 	workspaceRoutes,
 ];
 

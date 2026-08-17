@@ -6,16 +6,16 @@ const staticRoutes = [
 		priority: 1,
 	},
 	{
-		path: "/critique",
+		path: "/diagnose/quick",
 		priority: 0.8,
 	},
 	{
-		path: "/model",
+		path: "/project/current",
+		priority: 0.8,
+	},
+	{
+		path: "/research/book",
 		priority: 0.6,
-	},
-	{
-		path: "/book",
-		priority: 0.8,
 	},
 ] as const;
 
