@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StoryAuditFinding, StoryAuditFindingReview } from "./story-audit";
+import type { StoryAuditFinding, StoryAuditFindingReview, StoryAuditResult } from "./story-audit";
 
 describe("story audit contract", () => {
   it("should keep machine findings separate from human review state", () => {
@@ -27,5 +27,52 @@ describe("story audit contract", () => {
 
     expect(finding).not.toHaveProperty("reviewState");
     expect(review.reviewState).toBe("author_intent");
+  });
+
+  it("should treat the verification summary as optional counters on StoryAuditResult", () => {
+    const base = {
+      schemaVersion: "story-audit.v1" as const,
+      auditId: "audit-1",
+      projectId: "project-1",
+      bookJobId: "job-1",
+      generatedAt: "2026-08-17T00:00:00.000Z",
+      coverage: {
+        analyzedChapterIds: ["chapter-1"],
+        totalChapterCount: 1,
+        isPartial: false,
+        sceneExtractionRate: 1,
+        evidenceValidationRate: 1,
+      },
+      scenes: [],
+      events: [],
+      facts: [],
+      characterStates: [],
+      findings: [],
+      metrics: { dialogue: [] },
+      views: {
+        temporalGraph: {
+          eventIds: [],
+          relationEdges: [],
+          conflictCandidateIds: [],
+        },
+        plotlineMatrix: [],
+        setupPayoffEdges: [],
+      },
+    };
+
+    const withoutVerification: StoryAuditResult = base;
+    const withVerification: StoryAuditResult = {
+      ...base,
+      verification: {
+        attemptedCount: 3,
+        skippedCount: 1,
+        rejectedCount: 1,
+        unavailableCount: 0,
+        verifiedCount: 2,
+      },
+    };
+
+    expect(withoutVerification.verification).toBeUndefined();
+    expect(withVerification.verification?.verifiedCount).toBe(2);
   });
 });

@@ -236,4 +236,16 @@ export interface StoryAuditResult {
       status: "open" | "reminded" | "paid" | "abandoned" | "unknown";
     }>;
   };
+  /**
+   * Optional second-pass verification summary. Absent when the audit was
+   * produced without an LLM verifier (e.g. mock providers); the counters
+   * describe how many findings went through each verification outcome.
+   */
+  verification?: {
+    attemptedCount: number;
+    skippedCount: number;
+    rejectedCount: number;
+    unavailableCount: number;
+    verifiedCount: number;
+  };
 }
