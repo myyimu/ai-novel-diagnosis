@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   boolean,
   real,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -46,44 +47,57 @@ export const analysisUploads = pgTable("analysis_uploads", {
     .$onUpdate(() => new Date()),
 });
 
-export const bookAnalysisJobs = pgTable("book_analysis_jobs", {
-  id: text("id").primaryKey(),
-  uploadId: text("upload_id"),
-  type: varchar("type", { length: 64 }).notNull(),
-  status: varchar("status", { length: 32 }).notNull(),
-  inputSummary: jsonb("input_summary").notNull(),
-  progress: jsonb("progress").notNull(),
-  preprocessing: jsonb("preprocessing"),
-  partialResult: jsonb("partial_result"),
-  result: jsonb("result"),
-  error: text("error"),
-  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
-  startedAt: timestamp("started_at", { precision: 3 }),
-  finishedAt: timestamp("finished_at", { precision: 3 }),
-});
+export const bookAnalysisJobs = pgTable(
+  "book_analysis_jobs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    uploadId: text("upload_id"),
+    type: varchar("type", { length: 64 }).notNull(),
+    status: varchar("status", { length: 32 }).notNull(),
+    inputSummary: jsonb("input_summary").notNull(),
+    progress: jsonb("progress").notNull(),
+    preprocessing: jsonb("preprocessing"),
+    partialResult: jsonb("partial_result"),
+    result: jsonb("result"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+    startedAt: timestamp("started_at", { precision: 3 }),
+    finishedAt: timestamp("finished_at", { precision: 3 }),
+  },
+  (table) => [
+    index("book_analysis_jobs_upload_id_idx").on(table.uploadId),
+    index("book_analysis_jobs_status_idx").on(table.status),
+  ],
+);
 
-export const modelUsageEvents = pgTable("model_usage_events", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => randomUUID()),
-  jobId: text("job_id"),
-  stage: varchar("stage", { length: 64 }),
-  component: varchar("component", { length: 64 }),
-  requestKind: varchar("request_kind", { length: 64 }),
-  provider: varchar("provider", { length: 64 }).notNull(),
-  preset: varchar("preset", { length: 64 }).notNull(),
-  model: varchar("model", { length: 128 }).notNull(),
-  promptTokens: integer("prompt_tokens").notNull(),
-  completionTokens: integer("completion_tokens").notNull(),
-  totalTokens: integer("total_tokens").notNull(),
-  requestMs: integer("request_ms").notNull(),
-  estimated: boolean("estimated").notNull(),
-  success: boolean("success").notNull(),
-  error: text("error"),
-  metadata: jsonb("metadata").notNull(),
-  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
-});
+export const modelUsageEvents = pgTable(
+  "model_usage_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    jobId: text("job_id"),
+    stage: varchar("stage", { length: 64 }),
+    component: varchar("component", { length: 64 }),
+    requestKind: varchar("request_kind", { length: 64 }),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    preset: varchar("preset", { length: 64 }).notNull(),
+    model: varchar("model", { length: 128 }).notNull(),
+    promptTokens: integer("prompt_tokens").notNull(),
+    completionTokens: integer("completion_tokens").notNull(),
+    totalTokens: integer("total_tokens").notNull(),
+    requestMs: integer("request_ms").notNull(),
+    estimated: boolean("estimated").notNull(),
+    success: boolean("success").notNull(),
+    error: text("error"),
+    metadata: jsonb("metadata").notNull(),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  },
+  (table) => [index("model_usage_events_job_id_idx").on(table.jobId)],
+);
 
 export const workspaceProjects = pgTable("workspace_projects", {
   id: text("id").primaryKey(),
@@ -94,68 +108,85 @@ export const workspaceProjects = pgTable("workspace_projects", {
   updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
 });
 
-export const revisionSessions = pgTable("revision_sessions", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id").notNull(),
-  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
-  chapterTitle: text("chapter_title").notNull(),
-  genre: varchar("genre", { length: 64 }).notNull(),
-  inputKind: varchar("input_kind", { length: 64 }).notNull(),
-  textHash: text("text_hash").notNull(),
-  textLength: integer("text_length").notNull(),
-  quickScore: real("quick_score"),
-  gateDecision: varchar("gate_decision", { length: 32 }).notNull(),
-  mainProblem: text("main_problem").notNull(),
-  issueTitles: jsonb("issue_titles").notNull(),
-  issueCategories: jsonb("issue_categories").notNull(),
-  issueDecisions: jsonb("issue_decisions").notNull().default([]),
-  retestStatus: varchar("retest_status", { length: 32 })
-    .notNull()
-    .default("not_requested"),
-  nextPrompt: text("next_prompt"),
-  revisionNote: text("revision_note"),
-  revisionNoteUpdatedAt: timestamp("revision_note_updated_at", {
-    precision: 3,
-  }),
-  fromVersionId: text("from_version_id"),
-  toVersionId: text("to_version_id"),
-  textChanged: boolean("text_changed").default(true).notNull(),
-  storyAuditFindingIds: jsonb("story_audit_finding_ids").notNull(),
-  methodologyCardIds: jsonb("methodology_card_ids").notNull(),
-});
+export const revisionSessions = pgTable(
+  "revision_sessions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+    chapterTitle: text("chapter_title").notNull(),
+    genre: varchar("genre", { length: 64 }).notNull(),
+    inputKind: varchar("input_kind", { length: 64 }).notNull(),
+    textHash: text("text_hash").notNull(),
+    textLength: integer("text_length").notNull(),
+    quickScore: real("quick_score"),
+    gateDecision: varchar("gate_decision", { length: 32 }).notNull(),
+    mainProblem: text("main_problem").notNull(),
+    issueTitles: jsonb("issue_titles").notNull(),
+    issueCategories: jsonb("issue_categories").notNull(),
+    issueDecisions: jsonb("issue_decisions").notNull().default([]),
+    retestStatus: varchar("retest_status", { length: 32 })
+      .notNull()
+      .default("not_requested"),
+    nextPrompt: text("next_prompt"),
+    revisionNote: text("revision_note"),
+    revisionNoteUpdatedAt: timestamp("revision_note_updated_at", {
+      precision: 3,
+    }),
+    fromVersionId: text("from_version_id"),
+    toVersionId: text("to_version_id"),
+    textChanged: boolean("text_changed").default(true).notNull(),
+    storyAuditFindingIds: jsonb("story_audit_finding_ids").notNull(),
+    methodologyCardIds: jsonb("methodology_card_ids").notNull(),
+  },
+  (table) => [index("revision_sessions_project_id_idx").on(table.projectId)],
+);
 
-export const revisionTextVersions = pgTable("revision_text_versions", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id").notNull(),
-  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
-  chapterTitle: text("chapter_title").notNull(),
-  versionLabel: varchar("version_label", { length: 32 }).notNull(),
-  textHash: text("text_hash").notNull(),
-  textLength: integer("text_length").notNull(),
-  text: text("text").notNull(),
-  sourceSessionId: text("source_session_id"),
-  previousVersionId: text("previous_version_id"),
-});
+export const revisionTextVersions = pgTable(
+  "revision_text_versions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    chapterTitle: text("chapter_title").notNull(),
+    versionLabel: varchar("version_label", { length: 32 }).notNull(),
+    textHash: text("text_hash").notNull(),
+    textLength: integer("text_length").notNull(),
+    text: text("text").notNull(),
+    sourceSessionId: text("source_session_id"),
+    previousVersionId: text("previous_version_id"),
+  },
+  (table) => [
+    index("revision_text_versions_project_id_idx").on(table.projectId),
+    index("revision_text_versions_source_session_id_idx").on(
+      table.sourceSessionId,
+    ),
+  ],
+);
 
-export const methodologyCards = pgTable("methodology_cards", {
-  projectCardId: text("project_card_id").primaryKey(),
-  projectId: text("project_id").notNull(),
-  id: text("id").notNull(),
-  sourceIssueId: text("source_issue_id").notNull(),
-  type: varchar("type", { length: 64 }).notNull(),
-  title: text("title").notNull(),
-  triggerProblem: text("trigger_problem").notNull(),
-  reusableRule: text("reusable_rule").notNull(),
-  selfCheckQuestion: text("self_check_question").notNull(),
-  promptTemplate: text("prompt_template"),
-  firstSeenAt: timestamp("first_seen_at", { precision: 3 }).notNull(),
-  lastSeenAt: timestamp("last_seen_at", { precision: 3 }).notNull(),
-  sourceChapterTitle: text("source_chapter_title").notNull(),
-  sourceIssueTitle: text("source_issue_title"),
-  occurrenceCount: integer("occurrence_count").notNull(),
-  usageCount: integer("usage_count").notNull(),
-});
+export const methodologyCards = pgTable(
+  "methodology_cards",
+  {
+    projectCardId: text("project_card_id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    id: text("id").notNull(),
+    sourceIssueId: text("source_issue_id").notNull(),
+    type: varchar("type", { length: 64 }).notNull(),
+    title: text("title").notNull(),
+    triggerProblem: text("trigger_problem").notNull(),
+    reusableRule: text("reusable_rule").notNull(),
+    selfCheckQuestion: text("self_check_question").notNull(),
+    promptTemplate: text("prompt_template"),
+    firstSeenAt: timestamp("first_seen_at", { precision: 3 }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { precision: 3 }).notNull(),
+    sourceChapterTitle: text("source_chapter_title").notNull(),
+    sourceIssueTitle: text("source_issue_title"),
+    occurrenceCount: integer("occurrence_count").notNull(),
+    usageCount: integer("usage_count").notNull(),
+  },
+  (table) => [index("methodology_cards_project_id_idx").on(table.projectId)],
+);
 
 export const storyAuditFindingReviews = pgTable(
   "story_audit_finding_reviews",

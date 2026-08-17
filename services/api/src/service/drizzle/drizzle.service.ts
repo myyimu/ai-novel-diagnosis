@@ -8,6 +8,7 @@ import { mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import {
   drizzle as drizzleNodePg,
   type NodePgDatabase,
@@ -15,6 +16,12 @@ import {
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { Pool, type PoolClient } from "pg";
 import * as schema from "./schema";
+import {
+  alterTableAddColumnSql,
+  createIndexSql,
+  createTableSql,
+  listSchemaTables,
+} from "./ddl";
 
 const DEFAULT_DATABASE_CONNECT_TIMEOUT_MS = 5_000;
 
@@ -169,410 +176,75 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * bootstrapPgliteSchema applies the schema DDL to a local PGlite
-   * database. Real PostgreSQL uses Drizzle migrations; keep this local
-   * fallback DDL in sync with `schema.ts` and `drizzle/migrations`.
+   * database. DDL is generated programmatically from schema.ts (see
+   * ddl.ts) — the canonical schema is the single source of truth.
+   * Real PostgreSQL uses Drizzle migrations (drizzle/migrations).
    */
   private async bootstrapPgliteSchema(): Promise<void> {
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "users" (
-        "id" text PRIMARY KEY,
-        "name" varchar(255) NOT NULL UNIQUE,
-        "created" timestamp(3) DEFAULT now() NOT NULL,
-        "updated" timestamp(3) NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "analysis_uploads" (
-        "id" text PRIMARY KEY,
-        "title" varchar(255) NOT NULL,
-        "genre" varchar(64) NOT NULL,
-        "original_filename" varchar(255) NOT NULL,
-        "raw_text_path" text NOT NULL,
-        "normalized_text_path" text NOT NULL,
-        "raw_length" integer NOT NULL,
-        "cleaned_length" integer NOT NULL,
-        "chapter_count" integer NOT NULL,
-        "preprocessing" jsonb NOT NULL,
-        "created" timestamp(3) DEFAULT now() NOT NULL,
-        "updated" timestamp(3) NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "book_analysis_jobs" (
-        "id" text PRIMARY KEY,
-        "upload_id" text,
-        "type" varchar(64) NOT NULL,
-        "status" varchar(32) NOT NULL,
-        "input_summary" jsonb NOT NULL,
-        "progress" jsonb NOT NULL,
-        "preprocessing" jsonb,
-        "partial_result" jsonb,
-        "result" jsonb,
-        "error" text,
-        "created_at" timestamp(3) DEFAULT now() NOT NULL,
-        "updated_at" timestamp(3) NOT NULL,
-        "started_at" timestamp(3),
-        "finished_at" timestamp(3)
-      )
-    `);
-    await this.db.execute(sql`
-      ALTER TABLE "book_analysis_jobs"
-      ADD COLUMN IF NOT EXISTS "partial_result" jsonb
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "workspace_projects" (
-        "id" text PRIMARY KEY,
-        "name" varchar(255) NOT NULL,
-        "book_job_id" text,
-        "analysis_purpose" varchar(64),
-        "created_at" timestamp(3) DEFAULT now() NOT NULL,
-        "updated_at" timestamp(3) NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "revision_sessions" (
-        "id" text PRIMARY KEY,
-        "project_id" text NOT NULL,
-        "created_at" timestamp(3) DEFAULT now() NOT NULL,
-        "updated_at" timestamp(3) NOT NULL,
-        "chapter_title" text NOT NULL,
-        "genre" varchar(64) NOT NULL,
-        "input_kind" varchar(64) NOT NULL,
-        "text_hash" text NOT NULL,
-        "text_length" integer NOT NULL,
-        "quick_score" real NOT NULL,
-        "gate_decision" varchar(32) NOT NULL,
-        "main_problem" text NOT NULL,
-        "issue_titles" jsonb NOT NULL,
-        "issue_categories" jsonb NOT NULL,
-        "issue_decisions" jsonb DEFAULT '[]'::jsonb NOT NULL,
-        "retest_status" varchar(32) DEFAULT 'not_requested' NOT NULL,
-        "next_prompt" text,
-        "revision_note" text,
-        "revision_note_updated_at" timestamp(3),
-        "from_version_id" text,
-        "to_version_id" text,
-        "text_changed" boolean DEFAULT true NOT NULL,
-        "story_audit_finding_ids" jsonb NOT NULL,
-        "methodology_card_ids" jsonb NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "revision_text_versions" (
-        "id" text PRIMARY KEY,
-        "project_id" text NOT NULL,
-        "created_at" timestamp(3) DEFAULT now() NOT NULL,
-        "chapter_title" text NOT NULL,
-        "version_label" varchar(32) NOT NULL,
-        "text_hash" text NOT NULL,
-        "text_length" integer NOT NULL,
-        "text" text NOT NULL,
-        "source_session_id" text,
-        "previous_version_id" text
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "methodology_cards" (
-        "project_card_id" text PRIMARY KEY,
-        "project_id" text NOT NULL,
-        "id" text NOT NULL,
-        "source_issue_id" text NOT NULL,
-        "type" varchar(64) NOT NULL,
-        "title" text NOT NULL,
-        "trigger_problem" text NOT NULL,
-        "reusable_rule" text NOT NULL,
-        "self_check_question" text NOT NULL,
-        "prompt_template" text,
-        "first_seen_at" timestamp(3) NOT NULL,
-        "last_seen_at" timestamp(3) NOT NULL,
-        "source_chapter_title" text NOT NULL,
-        "source_issue_title" text,
-        "occurrence_count" integer NOT NULL,
-        "usage_count" integer NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "model_usage_events" (
-        "id" text PRIMARY KEY,
-        "job_id" text,
-        "stage" varchar(64),
-        "component" varchar(64),
-        "request_kind" varchar(64),
-        "provider" varchar(64) NOT NULL,
-        "preset" varchar(64) NOT NULL,
-        "model" varchar(128) NOT NULL,
-        "prompt_tokens" integer NOT NULL,
-        "completion_tokens" integer NOT NULL,
-        "total_tokens" integer NOT NULL,
-        "request_ms" integer NOT NULL,
-        "estimated" boolean NOT NULL,
-        "success" boolean NOT NULL,
-        "error" text,
-        "metadata" jsonb NOT NULL,
-        "created_at" timestamp(3) DEFAULT now() NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE INDEX IF NOT EXISTS "model_usage_events_job_id_idx"
-      ON "model_usage_events" ("job_id")
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "story_audit_finding_reviews" (
-        "project_id" text NOT NULL,
-        "audit_id" text NOT NULL,
-        "finding_id" text NOT NULL,
-        "review_state" varchar(64) NOT NULL,
-        "note" text,
-        "updated_at" timestamp(3) NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE UNIQUE INDEX IF NOT EXISTS "story_audit_finding_reviews_unique"
-      ON "story_audit_finding_reviews" ("project_id", "audit_id", "finding_id")
-    `);
-    await this.applyDatabaseCompatibilityMigrations();
+    for (const table of listSchemaTables()) {
+      await this.db.execute(sql.raw(createTableSql(table)));
+    }
+    for (const statement of listSchemaTables().flatMap((table) =>
+      createIndexSql(table),
+    )) {
+      await this.db.execute(sql.raw(statement));
+    }
+    await this.applySchemaDriftMigrations();
   }
 
-  private async applyDatabaseCompatibilityMigrations(): Promise<void> {
-    const tables = await this.getExistingTables();
+  /**
+   * applySchemaDriftMigrations aligns an existing local PGlite database
+   * with schema.ts: missing columns are added via a generic diff against
+   * information_schema, plus a few explicit legacy data fixes. Fresh
+   * databases are created verbatim by bootstrap, so the diff is empty.
+   */
+  private async applySchemaDriftMigrations(): Promise<void> {
+    const existingColumns = await this.getExistingColumns();
 
-    if (tables.has("users")) {
-      await this.db.execute(sql`
-        ALTER TABLE "users"
-        ADD COLUMN IF NOT EXISTS "created" timestamp(3) DEFAULT now() NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "users"
-        ADD COLUMN IF NOT EXISTS "updated" timestamp(3) DEFAULT now() NOT NULL
-      `);
-      await this.db.execute(sql`
-        UPDATE "users"
-        SET "updated" = now()
-        WHERE "updated" IS NULL
-      `);
+    for (const table of listSchemaTables()) {
+      const config = getTableConfig(table);
+      for (const column of config.columns) {
+        const columnKey = `${config.name}.${column.name}`;
+        if (existingColumns.has(columnKey)) continue;
+        this.logger.log(`补齐缺失列：${columnKey}`);
+        await this.db.execute(sql.raw(alterTableAddColumnSql(table, column)));
+      }
     }
 
-    if (tables.has("analysis_uploads")) {
-      await this.db.execute(sql`
-        ALTER TABLE "analysis_uploads"
-        ADD COLUMN IF NOT EXISTS "created" timestamp(3) DEFAULT now() NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "analysis_uploads"
-        ADD COLUMN IF NOT EXISTS "updated" timestamp(3) DEFAULT now() NOT NULL
-      `);
-      await this.db.execute(sql`
-        UPDATE "analysis_uploads"
-        SET "created" = COALESCE("created", now()),
-            "updated" = COALESCE("updated", now())
-        WHERE "created" IS NULL OR "updated" IS NULL
-      `);
-    }
-
-    if (tables.has("book_analysis_jobs")) {
-      await this.db.execute(sql`
-        ALTER TABLE "book_analysis_jobs"
-        ADD COLUMN IF NOT EXISTS "partial_result" jsonb
-      `);
-    }
-
-    if (tables.has("workspace_projects")) {
-      await this.db.execute(sql`
-        ALTER TABLE "workspace_projects"
-        ADD COLUMN IF NOT EXISTS "book_job_id" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "workspace_projects"
-        ADD COLUMN IF NOT EXISTS "analysis_purpose" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "workspace_projects"
-        ADD COLUMN IF NOT EXISTS "created_at" timestamp(3) DEFAULT now() NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "workspace_projects"
-        ADD COLUMN IF NOT EXISTS "updated_at" timestamp(3) DEFAULT now() NOT NULL
-      `);
-    }
-
-    if (tables.has("revision_sessions")) {
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ALTER COLUMN "quick_score" DROP NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "revision_note" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "revision_note_updated_at" timestamp(3)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "from_version_id" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "to_version_id" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "text_changed" boolean DEFAULT true NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "story_audit_finding_ids" jsonb DEFAULT '[]'::jsonb NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "issue_decisions" jsonb DEFAULT '[]'::jsonb NOT NULL
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "revision_sessions"
-        ADD COLUMN IF NOT EXISTS "retest_status" varchar(32) DEFAULT 'not_requested' NOT NULL
-      `);
-    }
-
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "revision_text_versions" (
-        "id" text PRIMARY KEY,
-        "project_id" text NOT NULL,
-        "created_at" timestamp(3) DEFAULT now() NOT NULL,
-        "chapter_title" text NOT NULL,
-        "version_label" varchar(32) NOT NULL,
-        "text_hash" text NOT NULL,
-        "text_length" integer NOT NULL,
-        "text" text NOT NULL,
-        "source_session_id" text,
-        "previous_version_id" text
-      )
-    `);
-
-    if (tables.has("model_usage_events")) {
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "job_id" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "stage" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "component" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "request_kind" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "provider" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "preset" varchar(64)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "model" varchar(128)
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "prompt_tokens" integer
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "completion_tokens" integer
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "total_tokens" integer
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "request_ms" integer
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "estimated" boolean
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "success" boolean
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "error" text
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "metadata" jsonb
-      `);
-      await this.db.execute(sql`
-        ALTER TABLE "model_usage_events"
-        ADD COLUMN IF NOT EXISTS "created_at" timestamp(3) DEFAULT now() NOT NULL
-      `);
-    } else {
-      await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS "model_usage_events" (
-          "id" text PRIMARY KEY,
-          "job_id" text,
-          "stage" varchar(64),
-          "component" varchar(64),
-          "request_kind" varchar(64),
-          "provider" varchar(64) NOT NULL,
-          "preset" varchar(64) NOT NULL,
-          "model" varchar(128) NOT NULL,
-          "prompt_tokens" integer NOT NULL,
-          "completion_tokens" integer NOT NULL,
-          "total_tokens" integer NOT NULL,
-          "request_ms" integer NOT NULL,
-          "estimated" boolean NOT NULL,
-          "success" boolean NOT NULL,
-          "error" text,
-          "metadata" jsonb NOT NULL,
-          "created_at" timestamp(3) DEFAULT now() NOT NULL
-        )
-      `);
-    }
-
-    await this.db.execute(sql`
-      CREATE INDEX IF NOT EXISTS "model_usage_events_job_id_idx"
-      ON "model_usage_events" ("job_id")
-    `);
-    await this.db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "story_audit_finding_reviews" (
-        "project_id" text NOT NULL,
-        "audit_id" text NOT NULL,
-        "finding_id" text NOT NULL,
-        "review_state" varchar(64) NOT NULL,
-        "note" text,
-        "updated_at" timestamp(3) NOT NULL
-      )
-    `);
-    await this.db.execute(sql`
-      CREATE UNIQUE INDEX IF NOT EXISTS "story_audit_finding_reviews_unique"
-      ON "story_audit_finding_reviews" ("project_id", "audit_id", "finding_id")
-    `);
+    // 历史修复：早期 DDL 曾把 quick_score 建为 NOT NULL，schema.ts 定义为可空
+    await this.db.execute(sql.raw(
+      'ALTER TABLE "revision_sessions" ALTER COLUMN "quick_score" DROP NOT NULL',
+    ));
+    // 历史修复：早期数据文件可能存在 NULL 时间戳，回填后再由 NOT NULL 约束接管
+    await this.db.execute(
+      sql.raw('UPDATE "users" SET "updated" = now() WHERE "updated" IS NULL'),
+    );
+    await this.db.execute(
+      sql.raw(
+        'UPDATE "analysis_uploads" SET "created" = COALESCE("created", now()), ' +
+          '"updated" = COALESCE("updated", now()) ' +
+          'WHERE "created" IS NULL OR "updated" IS NULL',
+      ),
+    );
   }
 
-  private async getExistingTables(): Promise<Set<string>> {
-    const result = await this.db.execute(sql`
-      SELECT "table_name"
-      FROM "information_schema"."tables"
-      WHERE "table_schema" = 'public'
-    `);
+  private async getExistingColumns(): Promise<Set<string>> {
+    const result = await this.db.execute(
+      sql.raw(
+        `SELECT "table_name", "column_name" FROM "information_schema"."columns" ` +
+          `WHERE "table_schema" = 'public'`,
+      ),
+    );
     const rows = this.rowsFromQueryResult(result);
 
     return new Set(
       rows
-        .map((row) =>
-          typeof row === "object" && row !== null && "table_name" in row
-            ? String(row.table_name)
-            : "",
-        )
+        .map((row) => {
+          if (typeof row !== "object" || row === null) return "";
+          const table = "table_name" in row ? String(row.table_name) : "";
+          const column = "column_name" in row ? String(row.column_name) : "";
+          return table && column ? `${table}.${column}` : "";
+        })
         .filter(Boolean),
     );
   }
