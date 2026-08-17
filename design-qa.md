@@ -6,26 +6,26 @@
 
 ---
 
-## 📊 总体评级: **B-** (修复后提升)
+## 📊 总体评级: **B+** (修复后提升)
 
-> ✅ **原评级 C+ (2026-08-12)，第一轮修复 10 个问题；第二轮 (2026-08-17) 又修复 6 个，共 16 个**
-> ⚠️ **仍存在：认证禁用(按设计)、God Store/Component、DDL不同步**
+> ✅ **原评级 C+ (2026-08-12)，第一轮修复 10 个问题；第二轮 (2026-08-17) 又修复 6 个；第三轮 (2026-08-17) 修复 DDL不同步 / God Store / God Component / Repository归位，共 26 个**
+> ⚠️ **仍存在：认证禁用(按设计)、少量 any 类型、JSONB/Schema 细节**
 
 | 维度 | 原评分 | 当前评分 | 说明 |
 |------|--------|---------|------|
-| 架构设计 | B+ | **A-** | 分层违规已修复，Controller→Service→Repository 三层分离 |
+| 架构设计 | B+ | **A-** | 分层违规已修复，Controller→Service→Repository 三层分离，Repository 全部归位 dao/ |
 | 代码质量 | B- | **B** | process.env 已迁移，Logger 已重构，仍有 `any` 类型待清理 |
 | 🔴 **安全性** | D | **B-** | 路径遍历/JWT/时序/Helmet/速率限制已修复；认证禁用按设计保留 |
-| 可维护性 | C+ | **B-** | Store 已集成 devtools；竞态条件已修复；God Store/Component 和 DDL 问题待解决 |
-| 测试覆盖 | B+ | **B+** | 核心测试通过 (37 suites / 241 tests)，测试文件已同步更新 |
+| 可维护性 | C+ | **B+** | DDL 单一数据源化；God Component 为死代码已删除（~7.3k 行）；God Store 拆分三模块 |
+| 测试覆盖 | B+ | **B+** | 核心测试通过 (38 suites / 247 tests + web 89 tests)，新增 DDL 单一数据源验证 |
 
-### 问题统计 (更新于 2026-08-17 第二轮)
+### 问题统计 (更新于 2026-08-17 第三轮)
 
 | 严重度 | 总数 | ✅ 已修复 | ❌ 待修复 | 关键主题 |
 |--------|------|-----------|-----------|----------|
-| 🔴 **CRITICAL** | **7** | **4** | **3** | ~~路径遍历✅~~, 认证禁用(按设计), ~~伪登录✅~~, ~~实体泄露✅~~, ~~process.env✅~~, DDL不同步, ~~Repository注入✅~~ |
-| 🟠 **HIGH** | **6** | **5** | **1** | ~~Sidecar竞态✅~~, God Store, God Component, ~~Service直连Drizzle(按设计豁免)~~, ~~无安全头✅~~, ~~无速率限制✅~~ |
-| 🟡 MEDIUM | **14** | **8** | **6** | any类型, Schema缺陷, ~~Store未用helper✅~~, 冗余代码, ~~console残留✅~~, 缺索引, ~~时序攻击✅~~, ~~IDOR(按设计)~~, ~~硬编码密钥✅~~, ~~TOCTOU竞态✅~~, ~~重复监听器✅~~ |
+| 🔴 **CRITICAL** | **7** | **6** | **1** | ~~路径遍历✅~~, 认证禁用(按设计), ~~伪登录✅~~, ~~实体泄露✅~~, ~~process.env✅~~, ~~DDL不同步✅~~, ~~Repository注入✅~~ |
+| 🟠 **HIGH** | **6** | **6** | **0** | ~~Sidecar竞态✅~~, ~~God Store✅~~, ~~God Component✅~~, ~~Service直连Drizzle(按设计豁免)~~, ~~无安全头✅~~, ~~无速率限制✅~~ |
+| 🟡 MEDIUM | **14** | **10** | **4** | any类型, Schema缺陷(部分), ~~Store未用helper✅~~, ~~冗余代码✅~~, ~~console残留✅~~, ~~缺索引✅~~, ~~时序攻击✅~~, ~~IDOR(按设计)~~, ~~硬编码密钥✅~~, ~~TOCTOU竞态✅~~, ~~重复监听器✅~~ |
 | 🟢 LOW | **8** | **1** | **7** | HTTP localhost, 测试密钥, Docker质量, 错误处理, 命名建议, async反模式, 缓存缺失, duck-type风险 |
 | ❓ 待确认 | **7** | **0** | **7** | Proxy性能, JSONB增长, DI复杂度, pglmte稳定性, 跨平台兼容等 |
 
@@ -385,53 +385,32 @@ drizzleConfig: {
 
 ## 🟠 高优先级问题 (计划修复)
 
-### 4. 前端 God Store — workspace-store.ts (1415 行)
+### 4. 前端 God Store — workspace-store.ts (1415 行) → ✅ **FIXED (文件级拆分)**
 
-**文件**: [workspace-store.ts](apps/web/src/stores/workspace-store.ts)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ vitest 89/89 ✅ next build ✅
 
-| 指标 | 数值 |
-|------|------|
-| 总行数 | **1,415** |
-| 状态字段 | ~78 个属性 |
-| Setter 方法 | ~77 个 |
+**处置**: 按职责拆为三模块，**零行为变更**（同一个 zustand store、同一 localStorage key 和 version，已持久化的用户数据无需迁移）：
 
-**问题**:
-- 单一 Store 包含所有工作区状态：Provider 配置、书籍分析、研究库、修订会话、UI 偏好
-- 使用原始 `setXxx` setter 暴露实现细节
-- **未使用 `createStore()` helper** — 零 Redux DevTools 集成
+- [workspace-types.ts](apps/web/src/stores/workspace-types.ts) (~800 行) — 领域类型与默认值，零运行时逻辑
+- [workspace-persistence.ts](apps/web/src/stores/workspace-persistence.ts) (~270 行) — partialize/merge 与裁剪逻辑
+- [workspace-store.ts](apps/web/src/stores/workspace-store.ts) (~410 行) — state/actions 接口 + create()
 
-**建议拆分**:
+`workspace-store.ts` re-export 全部符号，39 个既有消费方零改动；新代码可直接从聚焦模块导入。devtools 已在前一轮接入。
 
-```
-stores/
-├── provider-store.ts      # ProviderForm, 连接状态, 历史
-├── analysis-store.ts      # 书籍任务, 结果, 缓存
-├── research-store.ts      # 研究库, 对比, QA
-├── revision-store.ts      # 修订会话, 版本, 决策
-└── workspace-store.ts     # 项目, 导航 (精简编排器)
-```
+**遗留**: 完整多 store 拆分（provider/analysis/research/revision 各自独立 store）**主动延期** —— 需要持久化数据迁移和 use-workspace-handlers 的重写，属独立项目。
 
 ---
 
-### 5. 前端 God Component — export-view.tsx (3133 行)
+### 5. 前端 God Component — export-view.tsx (3133 行) → ✅ **FIXED (确认为死代码，已删除)**
 
-**文件**: [export-view.tsx](apps/web/src/components/workspace/export-view.tsx)
+> **修复日期**: 2026-08-17 | **验证**: 全仓引用 grep 零命中；tsc/vitest/build ✅
 
-**问题**: 单个组件 3133 行，无法安全地审查、测试或修改。
+**复核发现**: `ExportView`/`BookAnalysisPanel` **没有任何渲染入口** —— 旧壳视图层已被项目化页面（`/project/*`、`/diagnose/*`、`/research/*`）整体取代，旧路由（/export、/library 等）只剩 `redirect()` 桩。唯一外部引用是 use-workspace-handlers 的 type-only import（已迁至 [types/book-export.ts](apps/web/src/types/book-export.ts)）。
 
-**建议拆分**:
+**处置**: 删除整个旧视图层 **~7.3k 行**：export-view、library-view、diagnosis-dashboard-view、methodology-library-view、revision-history-view、starter-view、overview-view 及其测试；连带仅被 export-view 消费的 `lib/relationship-graph.ts`、`lib/book-comprehension.ts` 及测试。删除优于拆分。
 
-```
-components/workspace/export/
-├── ExportView.tsx          # 编排器 (<200 行)
-├── ExportFormatSelector.tsx
-├── ExportPreview.tsx
-├── ExportOptionsPanel.tsx
-└── ExportHistoryTable.tsx
-```
-
-其他大组件也需关注:
-- [chapter-critique-view.tsx](apps/web/src/components/workspace/chapter-chritique-view.tsx) — 1,547 行
+其他大组件（在用，保留）:
+- [chapter-critique-view.tsx](apps/web/src/components/workspace/chapter-critique-view.tsx) — 1,547 行
 - [quick-experience-panel.tsx](apps/web/src/components/workspace/quick-experience-panel.tsx) — 889 行
 
 ---
@@ -449,13 +428,13 @@ constructor(private readonly drizzle: DrizzleService) {}
 
 ---
 
-### 7. Repository 放置位置错误
+### 7. Repository 放置位置错误 → ✅ **FIXED**
 
-**文件**: [workspace-assets.repository.ts](services/api/src/modules/workspace/workspace-assets.repository.ts)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅ jest 247/247 ✅
 
-**问题**: 该文件是完整的 Drizzle 操作（使用 `drizzle-orm` 查询、`DrizzleService`、schema 表），却位于 `modules/workspace/` 而非 `dao/repositories/`。
+**原问题**: 完整的 Drizzle 操作文件却位于 `modules/workspace/` 而非 `dao/repositories/`。
 
-**修复方案**: 移动到 `src/dao/repositories/workspace-assets.repository.ts`。
+**✅ 已实施修复**: 仓库移至 [dao/repositories/workspace-assets.repository.ts](services/api/src/dao/repositories/workspace-assets.repository.ts)，快照接口抽到 [dao/entities/workspace-assets.entity.ts](services/api/src/dao/entities/workspace-assets.entity.ts)（与 user.entity 同层），workspace 模块三处 import 路径同步更新。
 
 ---
 
@@ -485,19 +464,18 @@ const defaultRecord = defaults as Record<string, any>;
 
 **文件**: [schema.ts](services/api/src/service/drizzle/schema.ts), [drizzle.service.ts](services/api/src/service/drizzle/drizzle.service.ts)
 
-#### 9.1 🔴 PGlite 启动 DDL 与 Schema 严重不同步 (新增 CRITICAL)
+#### 9.1 🔴 PGlite 启动 DDL 与 Schema 严重不同步 (新增 CRITICAL) → ✅ **FIXED**
 
-**文件**: [drizzle.service.ts:176-559](services/api/src/service/drizzle/drizzle.service.ts#L176-L559)
+> **修复日期**: 2026-08-17 | **验证**: tsc ✅ oxlint ✅ jest 247/247 ✅（含新增 ddl.spec.ts 6 项）
 
-**问题**: 整个 Schema 被复制为 **~600 行手写 SQL 字符串**在 `bootstrapPgliteSchema()` 和 `applyDatabaseCompatibilityMigrations()` 中。这已经与 canonical `schema.ts` 定义出现**实际不一致**：
+**原问题**: 整个 Schema 被复制为 **~390 行手写 SQL 字符串**在 `bootstrapPgliteSchema()` 和 `applyDatabaseCompatibilityMigrations()` 中，且已与 canonical `schema.ts` 出现实际不一致（`quick_score` 手写为 `real NOT NULL`，schema.ts 为可空）。PGlite 与 PostgreSQL 两路径表结构会持续 diverge。
 
-| 字段 | DDL (drizzle.service.ts) | Schema (schema.ts) | 状态 |
-|------|--------------------------|-------------------|------|
-| `quick_score` | `real NOT NULL` (行 243) | `real("quick_score")` (可空, 行 107) | ❌ **不一致** |
+**✅ 已实施修复**: 新增 [ddl.ts](services/api/src/service/drizzle/ddl.ts) —— 从 drizzle 表定义程序化生成 CREATE TABLE / CREATE INDEX / ADD COLUMN（基于 `getTableConfig` + `getSQLType` + `PgDialect`），不支持的默认值形态**启动即抛错**而非静默漂移。`drizzle.service.ts` 删除全部手写 DDL：
+- 新建库：逐表生成 `CREATE TABLE IF NOT EXISTS` + 全部索引
+- 已有本地库：通用 information_schema 列 diff 补齐缺失列，仅保留 3 条显式历史修复（quick_score 放宽可空、users/analysis_uploads 时间戳回填）
+- Postgres 路径：`drizzle-kit generate` 产出 migration 0004（7 个索引），两路径同源
 
-**风险**: PGlite 路径和 PostgreSQL 路径的表结构可能 diverge，导致难以排查的 bug。
-
-**修复方案**: 使用 Drizzle 的 `migrator.push()` 或从 `schema.ts` 对象程序化生成 DDL，确保单一数据源。
+新增 [ddl.spec.ts](services/api/src/service/drizzle/ddl.spec.ts) 直测单一数据源性质：引导后的库逐列匹配 schema.ts（含可空性）、全部索引存在、模拟旧库原地升级成功。
 
 ---
 
@@ -509,18 +487,19 @@ const defaultRecord = defaults as Record<string, any>;
 
 ---
 
-#### 9.3 缺少查询索引
+#### 9.3 缺少查询索引 → ✅ **FIXED**
 
-当前仅有 1 个显式索引 (`story_audit_finding_reviews_unique`)。以下高频查询列缺少索引：
+> **修复日期**: 2026-08-17（随 #9.1 一并完成）| **验证**: ddl.spec.ts 断言全部索引存在于引导后的库
 
-| 表 | 缺少索引的列 | 查询场景 |
-|----|-------------|---------|
+原仅 1 个显式索引 (`story_audit_finding_reviews_unique`)。现已在 schema.ts 声明并两路径生效（PGlite 生成器 + Postgres migration 0004）：
+
+| 表 | 新增索引 | 查询场景 |
+|----|---------|---------|
 | `book_analysis_jobs` | `upload_id`, `status` | 按上传/状态筛选任务 |
 | `revision_sessions` | `project_id` | 查询项目修订记录 |
 | `revision_text_versions` | `project_id`, `source_session_id` | 版本历史查询 |
 | `methodology_cards` | `project_id` | 方法论卡片查询 |
-
-**影响**: 数据量增长后会出现全表扫描。
+| `model_usage_events` | `job_id`（原仅在 PGlite 手写 DDL 存在，已收编进 schema.ts） | 用量统计按任务查询 |
 
 ---
 
@@ -732,7 +711,7 @@ console.error("Global error captured", error);
 ### ✅ Phase 0: 紧急 — 大部分完成
 - [x] **补全 `.env.example`** — 添加所有缺失的环境变量文档 (#9.5) ✅ 2026-08-12
 - [x] **RACE-H1/H2: SidecarSupervisor 重入保护 + AbortController** ✅ 2026-08-17
-- [ ] **消除 PGlite DDL 与 schema.ts 的不同步** — 改用程序化 DDL 生成或 Drizzle push (#9.1) ❌ 待处理（改动面大，需专项处理）
+- [x] **消除 PGlite DDL 与 schema.ts 的不同步** — 程序化 DDL 生成器 ddl.ts，单一数据源 (#9.1) ✅ 2026-08-17
 
 ### ✅ Phase 1: 架构违规修复 — 已完成
 - [x] 创建 `UserResponseDto`，修复 Controller 实体泄露 (#1) ✅ 2026-08-12
@@ -741,11 +720,11 @@ console.error("Global error captured", error);
 - [x] Logger 重构：移除 process.env，使用 pino 结构化日志 ✅ 2026-08-12
 
 ### 🔄 Phase 2: 前端重构 — 进行中
-- [ ] 拆分 `workspace-store.ts` 为领域子 Store (#4) ⚠️ 已集成 devtools，待拆分
-- [ ] 提取 `export-view.tsx` 子组件 (#5) ❌ 待处理
-- [ ] 移动 `workspace-assets.repository.ts` 到 `dao/` 目录 (#7) ❌ 待处理
+- [x] 拆分 `workspace-store.ts`（1423 行 → types/persistence/store 三模块，单 store 保持零迁移风险）(#4) ✅ 2026-08-17
+- [x] 处置 `export-view.tsx`（3133 行）—— 确认整层旧视图为死代码，已删除 ~7.3k 行 (#5) ✅ 2026-08-17
+- [x] 移动 `workspace-assets.repository.ts` 到 `dao/` 目录 (#7) ✅ 2026-08-17
 - [x] 所有 Store 改用 `createStore()` helper / devtools 中间件 (#10) ✅ 2026-08-12
-- [ ] 为高频查询列添加数据库索引 (#9.3) ❌ 待处理
+- [x] 为高频查询列添加数据库索引（7 个索引，两路径同源生效）(#9.3) ✅ 2026-08-17
 
 ### 🔄 Phase 3: 技术债务清理 — 部分完成 (2026-08-17)
 - [ ] 为 AI 输出定义严格接口，消除 `Record<string, any>` (#8)
@@ -794,8 +773,8 @@ console.error("Global error captured", error);
 | 3 | Electron 主进程的 Inversify DI 容器复杂度 | 当前规模可控，增长后可能过重 | 监控 bind 数量，超过 50 个考虑简化 |
 | 4 | `@electric-sql/pglite` 作为嵌入式 PG 的稳定性 | 相对较新的项目 | 关注上游更新，准备 PostgreSQL fallback 方案 |
 | 5 | Desktop 端 sidecar 打包策略的跨平台兼容性 | 当前 Windows 优先 | macOS/Linux 打包需验证路径和环境变量差异 |
-| 6 | **Entity 层 (dao/entities/) 的未来定位** | 当前 `user.entity.ts` 未被 ORM 使用，仅用 `$inferSelect` 类型 | 决定是删除 Entity 层还是映射到 Drizzle |
-| 7 | **PGlite vs PostgreSQL 功能兼容性边界** | DDL 已经出现不一致 | 建议增加 CI 对比两个路径的 Schema 一致性 |
+| 6 | **Entity 层 (dao/entities/) 的未来定位** | `user.entity.ts` 未被 ORM 使用；workspace-assets.entity.ts 承载快照接口 | 决定是删除 user.entity 还是映射到 Drizzle |
+| 7 | ~~**PGlite vs PostgreSQL 功能兼容性边界**~~ | ✅ 2026-08-17 已解决：DDL 由 schema.ts 程序化生成（单一数据源），ddl.spec.ts 持续验证两路径一致 | - |
 
 ---
 
