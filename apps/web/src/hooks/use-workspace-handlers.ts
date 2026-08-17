@@ -2226,13 +2226,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 						if (!options?.silent) {
 							setStatus(
 								failedJob.error
-									? `${failedJob.error} ???????/??????`
-									: "???????????????????????",
+									? `${failedJob.error}（整本分析失败，以下为已保留的部分结果）`
+									: "整本分析失败，但已保留部分结果，可在下方查看已生成内容。",
 							);
 						}
 						return failedJob;
 					}
-					throw new Error(latestJob.error || "????????");
+					throw new Error(latestJob.error || "整本分析失败，且没有可保留的部分结果。");
 				}
 			}
 
@@ -2465,7 +2465,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	async function exportBookResult(format: BookExportFormat, mode: BookExportMode) {
 		if (!bookJob?.id || !bookAnalysisResult) {
-			setStatus("?????????????????");
+			setStatus("请先完成分析后再导出结果。");
 			return;
 		}
 
