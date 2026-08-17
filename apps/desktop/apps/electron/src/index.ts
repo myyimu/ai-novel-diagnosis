@@ -33,4 +33,9 @@ const start = async (): Promise<void> => {
   app.on("second-instance", application.secondInstance);
 };
 
-void start();
+// 顶层 Promise 失败必须兜底，否则 unhandledRejection 会让进程静默挂死
+start().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error("[electron] fatal startup failure:", err);
+  app.quit();
+});

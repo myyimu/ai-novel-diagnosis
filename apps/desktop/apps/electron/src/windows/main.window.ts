@@ -58,10 +58,12 @@ export default class MainWindow extends Window {
       this.window.show();
       return;
     }
-    this.window = this.create();
-    this.window.on("close", () => {
-      if (!this.window) return;
-      this.store.set("mainBounds", this.window.getBounds());
+    const win = this.create();
+    this.window = win;
+    // 注意：基类 windowClose 先执行并把 this.window 置 null，
+    // 因此这里必须闭包捕获 win 引用，否则 bounds 永远不会保存。
+    win.on("close", () => {
+      this.store.set("mainBounds", win.getBounds());
     });
   }
 
@@ -72,11 +74,12 @@ export default class MainWindow extends Window {
   ): void {
     this.url = this.statusPageUrl(title, message, logPath);
     if (!this.window) {
-      this.window = this.create();
-      this.window.show();
-      this.window.on("close", () => {
-        if (!this.window) return;
-        this.store.set("mainBounds", this.window.getBounds());
+      const win = this.create();
+      this.window = win;
+      win.show();
+      // 闭包捕获 win：基类 windowClose 会先置空 this.window
+      win.on("close", () => {
+        this.store.set("mainBounds", win.getBounds());
       });
       return;
     }
