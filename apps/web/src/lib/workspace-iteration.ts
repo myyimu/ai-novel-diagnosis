@@ -9,8 +9,22 @@ import type {
 	StoryAuditResult,
 	WorkspaceProject,
 } from "@/stores/workspace-store";
-import { hashString } from "@/lib/workspace-cache";
-import { buildPromptAttribution } from "@ai-novel-diagnosis/ai-core";
+import {
+	buildPromptAttribution,
+	buildRevisionComparison,
+	hasComparableQuickScore,
+	hashRevisionText as hashString,
+} from "@ai-novel-diagnosis/ai-core";
+
+// 复诊迭代纯函数已下沉 ai-core（web 与 api 共用版本 ID/对比逻辑），保持原导出名，调用方零改动
+export {
+	buildRevisionComparison,
+	hasComparableQuickScore,
+	normalizeRevisionChapterTitle,
+	createRevisionVersion as createRevisionTextVersion,
+	findRevisionVersionForDraft as findRevisionTextVersionForDraft,
+	findPreviousRevisionVersion as findPreviousRevisionTextVersion,
+} from "@ai-novel-diagnosis/ai-core";
 
 export interface StoryAuditExportSnapshot {
 	schemaVersion: string;
@@ -121,47 +135,6 @@ export function createRevisionSession({
 	};
 }
 
-export function createRevisionTextVersion({
-	projectId = "default-project",
-	chapterTitle,
-	chapterText,
-	sourceSessionId,
-	previousVersion,
-	existingVersions = [],
-	now = new Date().toISOString(),
-}: {
-	projectId?: string;
-	chapterTitle: string;
-	chapterText: string;
-	sourceSessionId?: string;
-	previousVersion?: RevisionTextVersion | null;
-	existingVersions?: RevisionTextVersion[];
-	now?: string;
-}): RevisionTextVersion {
-	const text = chapterText.trim();
-	const title = chapterTitle.trim() || "未命名章节";
-	const textHash = hashString(text);
-	const versionNumber =
-		existingVersions.filter(
-			(version) =>
-				(version.projectId || "default-project") === projectId &&
-				normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title),
-		).length + 1;
-
-	return {
-		id: `version-${hashString([projectId, normalizeChapterTitle(title), textHash].join("|"))}`,
-		projectId,
-		createdAt: now,
-		chapterTitle: title,
-		versionLabel: `V${versionNumber}`,
-		textHash,
-		textLength: text.length,
-		text,
-		sourceSessionId,
-		previousVersionId: previousVersion?.id,
-	};
-}
-
 export function upsertRevisionTextVersion(
 	versions: RevisionTextVersion[],
 	version: RevisionTextVersion,
@@ -170,66 +143,12 @@ export function upsertRevisionTextVersion(
 	return [version, ...versions.filter((item) => item.id !== version.id)].slice(0, limit);
 }
 
-export function findRevisionTextVersionForDraft({
-	versions,
-	projectId = "default-project",
-	chapterTitle,
-	chapterText,
-}: {
-	versions: RevisionTextVersion[];
-	projectId?: string;
-	chapterTitle: string;
-	chapterText: string;
-}) {
-	const title = chapterTitle.trim() || "未命名章节";
-	const textHash = hashString(chapterText.trim());
-
-	return versions.find(
-		(version) =>
-			(version.projectId || "default-project") === projectId &&
-			normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title) &&
-			version.textHash === textHash,
-	);
-}
-
-export function findPreviousRevisionTextVersion({
-	versions,
-	projectId = "default-project",
-	chapterTitle,
-	chapterText,
-}: {
-	versions: RevisionTextVersion[];
-	projectId?: string;
-	chapterTitle: string;
-	chapterText: string;
-}) {
-	const title = chapterTitle.trim() || "未命名章节";
-	const textHash = hashString(chapterText.trim());
-
-	return [...versions]
-		.filter(
-			(version) =>
-				(version.projectId || "default-project") === projectId &&
-				normalizeChapterTitle(version.chapterTitle) === normalizeChapterTitle(title) &&
-				version.textHash !== textHash,
-		)
-		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-}
-
-function normalizeChapterTitle(value: string) {
-	return value.trim().replace(/\s+/g, " ") || "未命名章节";
-}
-
 export function upsertRevisionSession(
 	sessions: RevisionSession[],
 	session: RevisionSession,
 	limit = 20,
 ) {
 	return [session, ...sessions.filter((item) => item.id !== session.id)].slice(0, limit);
-}
-
-export function hasComparableQuickScore(value: number | null | undefined): value is number {
-	return typeof value === "number" && Number.isFinite(value);
 }
 
 export function formatQuickScore(value: number | null | undefined) {
@@ -505,156 +424,6 @@ export function buildRevisionHistory({
 		scoreDelta,
 		comparison,
 	};
-}
-
-export function buildRevisionComparison({
-	current,
-	previous,
-}: {
-	current: RevisionSession;
-	previous: RevisionSession;
-}) {
-	const scoreDelta = calculateScoreDelta(current, previous);
-	if (scoreDelta === null) {
-		return null;
-	}
-	const gateDelta = getGateRank(current.gateDecision) - getGateRank(previous.gateDecision);
-	const previousIssues = uniqueTextList(
-		previous.issueTitles.length ? previous.issueTitles : [previous.mainProblem],
-		8,
-	);
-	const currentIssues = uniqueTextList(
-		current.issueTitles.length ? current.issueTitles : [current.mainProblem],
-		8,
-	);
-	const repeatedIssues = currentIssues.filter((issue) => previousIssues.includes(issue));
-	const resolvedIssues = previousIssues.filter((issue) => !currentIssues.includes(issue));
-	const newIssues = currentIssues.filter((issue) => !previousIssues.includes(issue));
-	const promptOutcome = buildSinglePromptOutcome({
-		hasPreviousPrompt: Boolean(previous.nextPrompt?.trim()),
-		scoreDelta,
-		gateDelta,
-		repeatedIssueCount: repeatedIssues.length,
-		resolvedIssueCount: resolvedIssues.length,
-	});
-
-	return {
-		scoreDelta,
-		gateDelta,
-		gateChangeLabel: formatGateChange(gateDelta),
-		repeatedIssues,
-		resolvedIssues,
-		newIssues,
-		promptOutcome,
-		nextAction: buildRevisionComparisonNextAction({
-			scoreDelta,
-			gateDelta,
-			repeatedIssues,
-			resolvedIssues,
-			newIssues,
-			promptOutcome,
-		}),
-	};
-}
-
-function buildSinglePromptOutcome({
-	hasPreviousPrompt,
-	scoreDelta,
-	gateDelta,
-	repeatedIssueCount,
-	resolvedIssueCount,
-}: {
-	hasPreviousPrompt: boolean;
-	scoreDelta: number;
-	gateDelta: number;
-	repeatedIssueCount: number;
-	resolvedIssueCount: number;
-}) {
-	if (!hasPreviousPrompt) {
-		return {
-			status: "unknown" as const,
-			label: "缺少上一轮 Prompt",
-			reason: "上一版没有保存改稿 Prompt，无法判断这次修改是否由 Prompt 推动。",
-		};
-	}
-
-	if (scoreDelta >= 0.5 && gateDelta >= 0 && resolvedIssueCount > 0) {
-		return {
-			status: "effective" as const,
-			label: "上一轮 Prompt 看起来有效",
-			reason: "分数提升，Gate 没有变差，并且上一版问题有被解决的迹象。",
-		};
-	}
-
-	if (scoreDelta >= 0 && (resolvedIssueCount > 0 || repeatedIssueCount > 0)) {
-		return {
-			status: "partial" as const,
-			label: "上一轮 Prompt 部分有效",
-			reason: "结果没有明显变差，但仍有问题重复或新增，下一轮需要继续收窄约束。",
-		};
-	}
-
-	return {
-		status: "ineffective" as const,
-		label: "上一轮 Prompt 暂未证明有效",
-		reason: "分数或 Gate 没有改善，需要回到证据链重写下一轮约束。",
-	};
-}
-
-function buildRevisionComparisonNextAction({
-	scoreDelta,
-	gateDelta,
-	repeatedIssues,
-	resolvedIssues,
-	newIssues,
-	promptOutcome,
-}: {
-	scoreDelta: number;
-	gateDelta: number;
-	repeatedIssues: string[];
-	resolvedIssues: string[];
-	newIssues: string[];
-	promptOutcome: ReturnType<typeof buildSinglePromptOutcome>;
-}) {
-	if (promptOutcome.status === "effective") {
-		return "把已解决问题沉淀成方法论卡，下一轮只处理新增或剩余的最大问题。";
-	}
-
-	if (repeatedIssues.length) {
-		return `优先重改重复问题：${repeatedIssues[0]}。下一轮 Prompt 要把动作写成可检查事件。`;
-	}
-
-	if (newIssues.length && scoreDelta >= 0 && gateDelta >= 0) {
-		return `旧问题已有变化，下一轮处理新问题：${newIssues[0]}。`;
-	}
-
-	if (resolvedIssues.length && scoreDelta < 0) {
-		return "虽然旧问题有变化，但整体变弱了；检查是否为了修问题牺牲了开局承诺或章末钩子。";
-	}
-
-	return "回到上一版最大流失点，重新生成更具体的改稿 Prompt 后再复诊。";
-}
-
-function getGateRank(gate: RevisionSession["gateDecision"]) {
-	const rank: Record<string, number> = {
-		insufficient: 0,
-		discard: 0,
-		rebuild: 1,
-		revise: 2,
-		continue: 3,
-	};
-
-	return rank[gate || "revise"] ?? rank.revise;
-}
-
-function formatGateChange(delta: number) {
-	if (delta > 0) return "Gate 改善";
-	if (delta < 0) return "Gate 变差";
-	return "Gate 持平";
-}
-
-function uniqueTextList(values: string[], limit: number) {
-	return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, limit);
 }
 
 export function buildProjectExportMarkdown({
