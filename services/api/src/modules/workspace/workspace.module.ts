@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { BookModule } from "@/modules/book/book.module";
+import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
 import { WorkspaceController } from "./workspace.controller";
-import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
 import { WorkspaceService } from "./workspace.service";
 
 @Module({

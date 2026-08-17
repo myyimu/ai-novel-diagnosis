@@ -5,7 +5,8 @@ import {
   UpsertRevisionAssetsDto,
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
-import { WorkspaceAssetsRepository } from "./workspace-assets.repository";
+import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
+import type { RevisionIssueDecisionSnapshot } from "@/dao/entities/workspace-assets.entity";
 
 /**
  * Workspace service — orchestrates workspace operations.
@@ -31,7 +32,7 @@ export class WorkspaceService {
         issueDecisions: body.session.issueDecisions?.map((decision) => ({
           ...decision,
           decision:
-            decision.decision as import("./workspace-assets.repository").RevisionIssueDecisionSnapshot["decision"],
+            decision.decision as RevisionIssueDecisionSnapshot["decision"],
         })),
       },
       revisionVersions: body.revisionVersions || [],

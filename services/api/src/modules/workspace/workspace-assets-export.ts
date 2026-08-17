@@ -4,7 +4,7 @@ import type {
   StoryAuditFindingReviewSnapshot,
   RevisionTextVersionSnapshot,
   WorkspaceProjectSnapshot,
-} from "./workspace-assets.repository";
+} from "@/dao/entities/workspace-assets.entity";
 import {
   buildPromptAttribution,
   type StoryAuditResult,
