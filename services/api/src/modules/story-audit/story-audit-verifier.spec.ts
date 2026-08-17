@@ -112,6 +112,39 @@ describe("verifyStoryAuditFindings", () => {
       }),
     );
   });
+
+  it("should report verifiedCount and emit progress per candidate", async () => {
+    const verify = jest.fn(async (input) => ({
+      findingId: input.finding.id,
+      status: "verified" as const,
+      reason: "证据充分",
+      alternativeExplanations: [],
+      evidenceAnchorIds:
+        input.finding.id === "finding-3"
+          ? ["anchor-a", "missing-anchor"]
+          : ["anchor-a", "anchor-b"],
+      confidence: 0.95,
+    }));
+    const onProgress = jest.fn();
+    const storyAudit = createStoryAudit({
+      findings: [
+        createFinding({ id: "finding-1" }),
+        createFinding({ id: "finding-2" }),
+        createFinding({ id: "finding-3" }),
+      ],
+    });
+
+    const result = await verifyStoryAuditFindings(storyAudit, {
+      verifier: { verify },
+      onProgress,
+    });
+
+    expect(result.attemptedCount).toBe(3);
+    expect(result.verifiedCount).toBe(2);
+    expect(result.rejectedCount).toBe(1);
+    expect(onProgress).toHaveBeenLastCalledWith(3, 3);
+    expect(onProgress).toHaveBeenCalledTimes(3);
+  });
 });
 
 const anchorA: StoryEvidenceAnchor = {

@@ -45,6 +45,8 @@ export interface StoryAuditVerificationSummary {
   skippedCount: number;
   rejectedCount: number;
   unavailableCount: number;
+  /** Candidates that ended the pass with status "verified". */
+  verifiedCount: number;
 }
 
 const DEFAULT_MAX_CANDIDATES_PER_BOOK = 20;
@@ -55,6 +57,8 @@ export async function verifyStoryAuditFindings(
   options: {
     verifier?: StoryAuditFindingVerifier;
     maxCandidatesPerBook?: number;
+    /** Progress heartbeat for long verification passes (20 candidates can take minutes). */
+    onProgress?: (completed: number, total: number) => void | Promise<void>;
   } = {},
 ): Promise<StoryAuditVerificationSummary> {
   const maxCandidatesPerBook =
@@ -70,19 +74,21 @@ export async function verifyStoryAuditFindings(
   let attemptedCount = 0;
 
   const verifiedFindings: StoryAuditFinding[] = [];
-  for (const finding of candidates) {
+  for (const [index, finding] of candidates.entries()) {
     const findingEvidenceIds = finding.evidence.map(
       (anchor) => anchor.anchorId,
     );
     if (findingEvidenceIds.some((anchorId) => !anchorById.has(anchorId))) {
       rejectedCount += 1;
       verifiedFindings.push(markVerifierRejected(finding, "unknown-anchor"));
+      await options.onProgress?.(index + 1, candidates.length);
       continue;
     }
 
     if (!options.verifier) {
       unavailableCount += 1;
       verifiedFindings.push(markVerifierUnavailable(finding));
+      await options.onProgress?.(index + 1, candidates.length);
       continue;
     }
 
@@ -104,6 +110,7 @@ export async function verifyStoryAuditFindings(
       unavailableCount += 1;
       verifiedFindings.push(markVerifierUnavailable(finding));
     }
+    await options.onProgress?.(index + 1, candidates.length);
   }
 
   return {
@@ -115,6 +122,9 @@ export async function verifyStoryAuditFindings(
     skippedCount,
     rejectedCount,
     unavailableCount,
+    verifiedCount: verifiedFindings.filter(
+      (finding) => finding.status === "verified",
+    ).length,
   };
 }
 
