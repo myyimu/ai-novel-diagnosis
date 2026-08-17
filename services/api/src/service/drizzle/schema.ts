@@ -219,3 +219,4 @@ export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;
 export type StoryAuditFindingReviewSelect =
   typeof storyAuditFindingReviews.$inferSelect;
 export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;
+export type ModelUsageEventInsert = typeof modelUsageEvents.$inferInsert;
