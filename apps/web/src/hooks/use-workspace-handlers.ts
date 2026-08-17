@@ -3,7 +3,7 @@
 import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { type BookExportFormat, type BookExportMode } from "@/components/workspace/export-view";
+import { type BookExportFormat, type BookExportMode } from "@/types/book-export";
 import { apiUrl, type ApiEnvelope } from "@/lib/api-client";
 import {
 	diagnosisExampleOptions,
