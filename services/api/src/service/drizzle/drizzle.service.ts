@@ -212,9 +212,11 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     }
 
     // 历史修复：早期 DDL 曾把 quick_score 建为 NOT NULL，schema.ts 定义为可空
-    await this.db.execute(sql.raw(
-      'ALTER TABLE "revision_sessions" ALTER COLUMN "quick_score" DROP NOT NULL',
-    ));
+    await this.db.execute(
+      sql.raw(
+        'ALTER TABLE "revision_sessions" ALTER COLUMN "quick_score" DROP NOT NULL',
+      ),
+    );
     // 历史修复：早期数据文件可能存在 NULL 时间戳，回填后再由 NOT NULL 约束接管
     await this.db.execute(
       sql.raw('UPDATE "users" SET "updated" = now() WHERE "updated" IS NULL'),

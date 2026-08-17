@@ -174,7 +174,9 @@ describe("ddl generator", () => {
         `SELECT "indexname" FROM "pg_indexes" WHERE "schemaname" = 'public'`,
       );
       expect(
-        indexes.some((row) => row.indexname === "revision_sessions_project_id_idx"),
+        indexes.some(
+          (row) => row.indexname === "revision_sessions_project_id_idx",
+        ),
       ).toBe(true);
     });
   });
