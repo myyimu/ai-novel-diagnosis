@@ -43,7 +43,9 @@ export default class SidecarSupervisor {
     }
 
     if (this.starting) {
-      this.logger.warn("sidecar start() called while already starting — reusing in-flight startup");
+      this.logger.warn(
+        "sidecar start() called while already starting — reusing in-flight startup",
+      );
       return this.starting;
     }
 
