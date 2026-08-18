@@ -16,6 +16,7 @@ import { HealthModule } from "@/modules/health/health.module";
 import { LibraryModule } from "@/modules/library/library.module";
 import { ModelUsageModule } from "@/modules/model-usage/model-usage.module";
 import { MetricsModule } from "@/modules/metrics/metrics.module";
+import { PremiseModule } from "@/modules/premise/premise.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
 import { DrizzleModule } from "@/service/drizzle/drizzle.module";
@@ -57,6 +58,7 @@ import { AppController } from "./app.controller";
     LibraryModule,
     BookModule,
     ModelUsageModule,
+    PremiseModule,
   ],
   controllers: [AppController],
   providers: [

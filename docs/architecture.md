@@ -186,6 +186,7 @@ TXT 上传
 - `GET /api/v1/analysis/pipeline`: 返回计划中的分析流水线。
 - `POST /api/v1/analysis/preview`: 不调用真实模型，返回结构化评分预览。
 - `POST /api/v1/analysis/quick-review`: 改稿急诊。
+- `POST /api/v1/analysis/premise-review`: 立项审稿（动笔前判断故事值不值得写，产出三态判定与发动机契约重建）。
 - `POST /api/v1/analysis/provider/test`: 测试 mock 或 OpenAI-compatible Provider。
 - `POST /api/v1/analysis/provider/models`: 拉取供应商模型列表。
 - `GET /api/v1/analysis/provider/presets`: 返回模型供应商预设。
