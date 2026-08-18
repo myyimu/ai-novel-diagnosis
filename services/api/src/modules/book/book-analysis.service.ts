@@ -10,7 +10,7 @@ import {
   asText,
   asTextList,
   clampNumber,
-} from "@/modules/analysis/shared/coercion";
+} from "@/shared/utils/coercion";
 import { AnalyzeBookDto } from "@/modules/analysis/dto/analyze-book.dto";
 import { PreprocessBookDto } from "@/modules/analysis/dto/preprocess-book.dto";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";

@@ -38,7 +38,7 @@ import {
   rubricJsonSchema,
   scoreJsonSchema,
 } from "./analysis-json-schemas";
-import { asText, asTextList, clampNumber } from "./shared/coercion";
+import { asText, asTextList, clampNumber } from "@/shared/utils/coercion";
 
 const baseRubricMetrics = [
   {
