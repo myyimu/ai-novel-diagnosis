@@ -3,6 +3,7 @@ export * from "./metrics";
 export * from "./preview";
 export * from "./prompt-attribution";
 export * from "./revision-iteration";
+export * from "./premise-review";
 export * from "./prompts";
 export * from "./story-audit";
 export * from "./story-craft";
