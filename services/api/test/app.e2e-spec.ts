@@ -24,7 +24,7 @@ describe("AppController (e2e)", () => {
       .get("/")
       .expect(200)
       .expect((res) => {
-        expect(res.body.data).toHaveProperty("name", "NestJS Template API");
+        expect(res.body.data).toHaveProperty("name", "AI网文诊断台 API");
         expect(res.body.data).toHaveProperty("version");
       });
   });

@@ -5,5 +5,9 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@ai-novel-diagnosis/ai-core$": "<rootDir>/../../../packages/ai-core/src/index.ts"
   }
 }
