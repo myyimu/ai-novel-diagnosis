@@ -6,11 +6,7 @@ import {
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
-import {
-  asText,
-  asTextList,
-  clampNumber,
-} from "@/shared/utils/coercion";
+import { asText, asTextList, clampNumber } from "@/shared/utils/coercion";
 import { AnalyzeBookDto } from "@/modules/analysis/dto/analyze-book.dto";
 import { PreprocessBookDto } from "@/modules/analysis/dto/preprocess-book.dto";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
