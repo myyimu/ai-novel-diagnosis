@@ -36,7 +36,7 @@ NEXT_PUBLIC_USE_THREE_COLUMN_LAYOUT=true
 - 诊断：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`
 - 项目：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export`
 - 研究：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`
-- 设置：`/settings/provider`、`/settings/dashboard`、`/settings/history`
+- 设置：`/settings/provider`（模型配置与模型用量）
 
 旧视图名到新路由的映射由 `src/lib/workspace-routes.ts` 维护；`/project/health` 是项目资产页签的专用路由，由 `ProjectAssetTabs.tsx` 维护。
 

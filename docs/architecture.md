@@ -34,13 +34,12 @@ AI网文诊断台是本地部署、证据驱动的编辑写作教练。架构必
 - 诊断工作区 `/diagnose`：`/diagnose/quick` 承接低门槛编辑初筛；`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence` 承接进阶标准和证据检查，但不能独立完成改稿闭环。
 - 项目工作区 `/project`：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export` 管理正文版本、作者判断、修改计划、故事体检、复诊记录、经验证的方法和导出资产，是核心价值承载区。
 - 研究工作区 `/research`：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials` 承接整书拆解、样本对比、套路沉淀和研究资料。
-- 设置工作区 `/settings`：`/settings/provider`、`/settings/dashboard`、`/settings/history` 管理模型供应商、诊断看板和历史任务。
+- 设置工作区 `/settings`：`/settings/provider` 管理模型供应商与模型用量。
 
-兼容路由策略：
+路由策略：
 
-- `/`：进入快速诊断。
-- `/critique`、`/book`、`/library`、`/history`、`/export`、`/model`：保留旧入口，用于兼容外部链接和旧导航调用。
-- `/workspace`、`/starter`：重定向回 `/`。
+- `/`：跳转到 `/project/current`。
+- 旧入口 `/critique`、`/book`、`/library`、`/history`、`/export`、`/model`、`/workspace`、`/starter` 已移除；旧视图名到现役路由的映射由 `apps/web/src/lib/workspace-routes.ts` 维护（例如 dashboard 指回 `/project/current`）。
 
 复杂参数遵循渐进暴露原则：首屏只要求章节正文；平台画像、样本 Rubric、数据快照和研究库能力后置。
 
@@ -210,7 +209,11 @@ TXT 上传
 - `GET /api/v1/analysis/workspace/assets`: 读取项目工作区资产。
 - `POST /api/v1/analysis/workspace/projects`: 创建项目。
 - `POST /api/v1/analysis/workspace/revision-assets`: 保存复诊和方法论资产。
+- `PATCH /api/v1/analysis/workspace/revision-sessions/:sessionId/note`: 保存复诊人工备注。
+- `POST /api/v1/analysis/workspace/revision-sessions/:sessionId/retest`: 服务端复诊：对 pending 会话以 to 版本正文重新诊断，就地更新会话并返回对比与 Prompt 归因。
 - `GET /api/v1/analysis/workspace/projects/:projectId/export`: 导出项目资产包。
+- `GET /api/v1/analysis/model-usage/events`: 查询模型用量事件（可按 jobId 过滤）。
+- `GET /api/v1/analysis/model-usage/summary`: 模型用量汇总（tokens、请求数、成功率）。
 - `GET /api/v1/analysis/research/library`: 读取持久化研究库资产。
 - `POST /api/v1/analysis/research/compare`: 多书横向对比。
 - `POST /api/v1/analysis/research/ask`: 基于研究库证据回答问题。

@@ -75,7 +75,7 @@ implementation_plan: ./implementation-plan.md
 | `/project/current?chapter=...` | 章节证据复核 | 从体检问题跳回原文，显示成对证据和人物/事件状态 |
 | `/project/revisions` | 修改与复诊 | 保存 V1/V2 正文、实际采用项，并记录问题是已修复、保留为作者意图、误报、复发还是待处理 |
 | `/project/export` | 交付 | 导出 Markdown 与 JSON 故事体检报告 |
-| `/settings/dashboard` | 跨任务趋势 | 只放覆盖率、人工采纳/误报、问题解决/复发和无法判断趋势，不放某一本书的结构图或质量总分 |
+| `/settings/provider` | 模型配置与用量 | 供应商配置、模型用量汇总与最近请求记录（原 `/settings/dashboard` 已下线，跨任务趋势看板由 `/project/current` 承接） |
 
 `/project/health` 应成为“我的书籍”下的二级入口，排序建议为：
 

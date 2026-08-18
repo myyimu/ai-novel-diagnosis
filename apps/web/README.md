@@ -9,9 +9,9 @@
 - 诊断工作区：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`，覆盖快速诊断、深度质检、评分报告和证据链。
 - 项目工作区：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export`，覆盖正文版本、作者决定、修改计划、故事体检、复诊、经验证的方法和导出资产。
 - 研究工作区：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`，覆盖整书拆解、样本对比、套路沉淀和研究资料。
-- 设置工作区：`/settings/provider`、`/settings/dashboard`、`/settings/history`，覆盖模型配置、诊断看板和历史任务。
+- 设置工作区：`/settings/provider`，覆盖模型配置与模型用量。
 
-`/` 会进入快速诊断。`/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等旧路径仍保留为兼容入口。
+`/` 会跳转到 `/project/current`。旧视图名到现役路由的映射由 `src/lib/workspace-routes.ts` 维护；`/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等旧路径已移除。
 
 ## 代码结构
 

@@ -10,8 +10,7 @@
 
 ```text
 apps/desktop/
-├── apps/electron/          # Electron 主进程、窗口、IPC、sidecar 编排和打包脚本
-├── packages/preload/       # preload API 与 IPC 通道契约
+├── apps/electron/          # Electron 主进程、窗口、sidecar 编排和打包脚本
 ├── package.json            # 桌面工作区命令
 └── pnpm-workspace.yaml     # 桌面内部 workspace
 ```
@@ -21,7 +20,6 @@ apps/desktop/
 - `apps/electron/src/services/sidecar-supervisor.ts`: 打包模式下启动 API 与 Web sidecar。
 - `apps/electron/src/services/env.ts`: sidecar 环境变量，API 默认 `127.0.0.1:3001`，Web 默认 `127.0.0.1:3000`。
 - `apps/electron/script/assemble-sidecars.mjs`: 构建外层 `ai-core`、`api`、`web`，组装 sidecars 和内嵌 Node 运行时。
-- `packages/preload/src`: 暴露给页面的 `window.electron` API。
 
 ## 本地开发
 
@@ -49,7 +47,7 @@ pnpm --filter desktop pack
 
 ## 维护原则
 
-- UI 逻辑放在 `apps/web`，桌面端只负责窗口、IPC、sidecar 生命周期和打包。
-- preload 只暴露明确的 IPC 契约，不直接泄露 Node/Electron 能力给页面。
+- UI 逻辑放在 `apps/web`，桌面端只负责窗口、sidecar 生命周期和打包。
+- 桌面端不向页面暴露任何 IPC/preload 通道（`contextIsolation` 开启、`nodeIntegration` 关闭）；页面与 API sidecar 之间只走 HTTP。
 - 打包模式下 API 绑定 loopback 地址，避免桌面 sidecar 暴露到局域网。
-- 不在 Electron/IPC 层复制诊断状态、正文版本或方法库；这些对象由 Web/API 的统一契约负责。
+- 不在 Electron 层复制诊断状态、正文版本或方法库；这些对象由 Web/API 的统一契约负责。

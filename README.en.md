@@ -175,7 +175,7 @@ When you already have a complete TXT file or multiple samples, move into full-bo
 Upload a full TXT -> preview chapter split -> run Map-Reduce analysis -> review the relationship graph -> export character/world/continuation assets
 ```
 
-The current UI is organized into four workspaces: `/diagnose` for chapter diagnosis, with `/diagnose/quick`, `/diagnose/deep`, `/diagnose/score`, and `/diagnose/evidence`; `/project` for current projects, retests, methodology cards, and export; `/research` for full-book analysis, sample comparison, pattern study, and research materials; and `/settings` for model providers, dashboards, and history. `/` opens quick diagnosis. Older routes such as `/critique`, `/book`, `/library`, `/history`, `/export`, and `/model` remain as compatibility entry points.
+The current UI is organized into four workspaces: `/diagnose` for chapter diagnosis, with `/diagnose/quick`, `/diagnose/deep`, `/diagnose/score`, and `/diagnose/evidence`; `/project` for current projects, retests, methodology cards, export, and health, with `/project/current`, `/project/revisions`, `/project/methodology`, `/project/export`, and `/project/health`; `/research` for full-book analysis, sample comparison, pattern study, and research materials, with `/research/book`, `/research/compare`, `/research/patterns`, and `/research/materials`; and `/settings` for model providers, with `/settings/provider`. Visiting `/` redirects to `/project/current`. The legacy compatibility routes (`/critique`, `/book`, `/library`, `/history`, `/export`, `/model`) have been removed.
 
 ## Core Capabilities
 
@@ -398,6 +398,8 @@ pnpm run doctor
 ```
 
 `check` runs lint and formatting checks for each project. Formatting is scoped to code and config files to avoid rewriting One CLI generated `CLAUDE.md` / `AGENTS.md` files.
+
+`pnpm -F api test:e2e` runs the API golden path over the real HTTP layer (create project → upload a full book → quick review → server-side retest → export) against an isolated temporary PGlite instance; no external database is required.
 
 `container:prepare` builds web / api and writes the production artifacts needed by One CLI project-directory Docker contexts into `.one-container`. The directory is temporary and ignored by Git.
 

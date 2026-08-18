@@ -218,7 +218,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 拆书导览 -> 关系故事线 -> 图谱复核 -> 导出阅读报告/写作资产
 ```
 
-当前页面入口按四个工作区组织：`/diagnose` 是诊断工作区，包含 `/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`；`/project` 是项目工作区，包含 `/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`；`/research` 是研究工作区，包含 `/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`；`/settings` 是设置工作区，包含 `/settings/provider`、`/settings/dashboard`、`/settings/history`。`/` 会进入快速诊断；`/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等旧入口仍保留用于兼容。
+当前页面入口按四个工作区组织：`/diagnose` 是诊断工作区，包含 `/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`；`/project` 是项目工作区，包含 `/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`、`/project/health`；`/research` 是研究工作区，包含 `/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`；`/settings` 是设置工作区，包含 `/settings/provider`。访问 `/` 会直接跳转到 `/project/current`；旧的 `/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等兼容入口已移除。
 
 ## 主要能力
 
@@ -480,6 +480,8 @@ pnpm run doctor
 ```
 
 `check` 会运行各项目的 lint 和格式检查；格式检查只覆盖代码和配置文件，避免修改 One CLI 生成的 `CLAUDE.md` / `AGENTS.md`。
+
+`pnpm -F api test:e2e` 在真实 HTTP 层跑 API 金路径（建项目 → 上传整书 → 快速点评 → 服务端复诊 → 导出），使用隔离的临时 PGlite 实例，不需要外部数据库。
 
 `container:prepare` 会先构建 web / api，再把 One CLI 项目目录 Docker context 需要的生产产物生成到 `.one-container`。该目录是临时产物，不提交。
 
