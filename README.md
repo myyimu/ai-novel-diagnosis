@@ -218,7 +218,7 @@ _界面仍在快速迭代中，请以当前版本实际页面为准。_
 上传整本 TXT -> 切章预览 -> Map-Reduce 拆解 -> 拆书导览 -> 关系故事线 -> 图谱复核 -> 导出阅读报告/写作资产
 ```
 
-当前页面入口按四个工作区组织：`/diagnose` 是诊断工作区，包含 `/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`；`/project` 是项目工作区，包含 `/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`、`/project/health`；`/research` 是研究工作区，包含 `/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`；`/settings` 是设置工作区，包含 `/settings/provider`。访问 `/` 会直接跳转到 `/project/current`；旧的 `/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等兼容入口已移除。
+当前页面入口按四个工作区组织：`/diagnose` 是诊断工作区，包含 `/diagnose/idea`（立项审稿）、`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`；`/project` 是项目工作区，包含 `/project/current`、`/project/revisions`、`/project/methodology`、`/project/export`、`/project/health`；`/research` 是研究工作区，包含 `/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`；`/settings` 是设置工作区，包含 `/settings/provider`。访问 `/` 会直接跳转到 `/project/current`；旧的 `/critique`、`/book`、`/library`、`/history`、`/export`、`/model` 等兼容入口已移除。
 
 ## 主要能力
 

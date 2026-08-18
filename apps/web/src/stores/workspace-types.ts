@@ -5,6 +5,7 @@ import type {
 	MethodologyCard,
 	ProviderKind,
 	ProviderPresetId,
+	PremiseReviewResult,
 	QuickReviewInputKind,
 	QuickReviewResult,
 	RubricMetric,
@@ -17,6 +18,7 @@ import type {
 export type {
 	ChapterPosition,
 	MethodologyCard,
+	PremiseReviewResult,
 	ProviderKind,
 	ProviderPresetId,
 	QuickReviewInputKind,

@@ -42,7 +42,7 @@ last_updated: 2026-08-18
 
 | 阶段 | 回答的问题 | 完成产物（进病历） | 数据判定 | 路由归宿 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| ① 立项 | 这本书值得写吗 | 作者确认的发动机契约 | `engineCard.status === "confirmed"` | `/diagnose/idea`（规划） | 未实现（链头 P0） |
+| ① 立项 | 这本书值得写吗 | 作者确认的发动机契约 | `engineCard.status === "confirmed"` | `/diagnose/idea` | 审稿页已上线（P0）；发动机卡落库与作者确认属 P1 |
 | ② 结构 | 怎么安排章节 | 章节合同 | 有章节合同 | 暂空 | 后置到 P1，轴上留虚位 |
 | ③ 正文与初诊 | 写得好不好 | 诊断会话 + 证据 + 作者决定 | 存在任意 `RevisionSession` | `/diagnose/quick` 等 + `/project/health` | 已有 |
 | ④ 版本与复诊 | 改进了吗 | V2 + completed 复诊 + 对比 | `session.retestStatus` 走完 pending→completed | `/project/revisions` | 已有（服务端复诊） |
@@ -69,7 +69,8 @@ nextAction 阶梯（从最早未清项开始）：
 约束：
 
 - 阶段②恒为 `available: false`，不参与待办阶梯，P1 落地后接入。
-- 立项审稿未上线时（`premiseReviewEnabled` 缺省），阶段①不产生待办，避免指向不存在的路由。
+- 立项审稿闭环未落库前（`premiseReviewEnabled` 缺省），阶段①不产生待办：审稿页已上线，
+  但发动机卡尚无持久化，开启开关会让所有存量书籍永远停在"待审稿"。发动机卡落库后再开启。
 - 禁止用估算公式伪造旅程进度（如"资产数 × 系数"）；进度只能来自上表的数据判定。
 
 ## 5. 导航映射
@@ -107,6 +108,9 @@ nextAction 阶梯（从最早未清项开始）：
 ## 7. 实施现状
 
 - 已实现：`deriveBookStage` 纯函数 + 测试（`apps/web/src/lib/book-stage.ts`）；
-  书籍卡片上的阶段轨 UI（替换原估算进度条）。
-- 待实现：阶段①立项审稿（链头 P0，`PremiseReviewResult` 契约下沉 ai-core）；
-  阶段②结构设计（P1）；导出 Markdown 增加"故事发动机"节。
+  书籍卡片上的阶段轨 UI（替换原估算进度条）；
+  阶段①立项审稿（P0）——`PremiseReviewResult` 契约（ai-core）、
+  `POST /analysis/premise-review` 端点（两层俗套复核：原文引文定位 + LLM 二审）、
+  `/diagnose/idea` 审稿页与工作台入口卡。
+- 待实现：发动机卡持久化与作者确认面板（阶段①闭环，之后才打开
+  `premiseReviewEnabled`）；阶段②结构设计（P1）；导出 Markdown 增加"故事发动机"节。

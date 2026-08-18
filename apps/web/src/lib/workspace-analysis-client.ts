@@ -5,6 +5,7 @@ import type {
 	BookUploadPreview,
 	MethodologyCard,
 	PersistedResearchLibrary,
+	PremiseReviewResult,
 	ProjectMethodologyCard,
 	ProviderForm,
 	StoryAuditProfile,
@@ -367,6 +368,22 @@ export function requestQuickReview({
 		mustKeepMechanisms: quickReviewMustKeepMechanisms?.trim() || undefined,
 		targetReaderPleasures: quickReviewTargetReaderPleasures?.trim() || undefined,
 		includeMethodologyCards: Boolean(includeMethodologyCards),
+	});
+}
+
+export function requestPremiseReview({
+	provider,
+	premiseText,
+	genre,
+}: {
+	provider: ProviderForm;
+	premiseText: string;
+	genre?: string;
+}) {
+	return postJson<PremiseReviewResult>("/analysis/premise-review", {
+		provider,
+		premiseText: premiseText.trim(),
+		genre: genre?.trim() || undefined,
 	});
 }
 

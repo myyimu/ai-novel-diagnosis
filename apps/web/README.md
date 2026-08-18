@@ -6,7 +6,7 @@
 
 ## 主要视图
 
-- 诊断工作区：`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`，覆盖快速诊断、深度质检、评分报告和证据链。
+- 诊断工作区：`/diagnose/idea`、`/diagnose/quick`、`/diagnose/deep`、`/diagnose/score`、`/diagnose/evidence`，覆盖立项审稿、快速诊断、深度质检、评分报告和证据链。
 - 项目工作区：`/project/current`、`/project/health`、`/project/revisions`、`/project/methodology`、`/project/export`，覆盖正文版本、作者决定、修改计划、故事体检、复诊、经验证的方法和导出资产。
 - 研究工作区：`/research/book`、`/research/compare`、`/research/patterns`、`/research/materials`，覆盖整书拆解、样本对比、套路沉淀和研究资料。
 - 设置工作区：`/settings/provider`，覆盖模型配置与模型用量。

@@ -194,7 +194,12 @@ export function ProjectCurrentPage() {
 				</section>
 
 				<section className="mb-4 rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
-					<div className="grid gap-3 p-5 md:grid-cols-2">
+					<div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+						<EntryCard
+							title="立项审稿"
+							description="动笔之前先审这个故事值不值得写：三态判定、四层审计和俗套证据。"
+							onClick={() => router.push("/diagnose/idea")}
+						/>
 						<EntryCard
 							title="快速诊断"
 							description="粘贴一章正文，先得到最大流失点、正文证据和可复制修改指令。"
