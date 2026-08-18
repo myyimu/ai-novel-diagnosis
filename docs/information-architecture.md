@@ -109,7 +109,8 @@ nextAction 阶梯（从最早未清项开始）：
 
 - 已实现：`deriveBookStage` 纯函数 + 测试（`apps/web/src/lib/book-stage.ts`）；
   书籍卡片上的阶段轨 UI（替换原估算进度条）；
-  阶段①立项审稿（P0）——`PremiseReviewResult` 契约（ai-core）、
+  阶段①立项审稿（P0，设计决策见 [`premise-review.md`](./premise-review.md)）——
+  `PremiseReviewResult` 契约（ai-core）、
   `POST /analysis/premise-review` 端点（两层俗套复核：原文引文定位 + LLM 二审）、
   `/diagnose/idea` 审稿页与工作台入口卡。
 - 待实现：发动机卡持久化与作者确认面板（阶段①闭环，之后才打开
