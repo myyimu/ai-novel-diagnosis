@@ -70,6 +70,11 @@ export interface PremiseClicheFinding {
   suggestion?: string;
   /** Same lifecycle as story-audit findings; author decisions land in P1. */
   status: "candidate" | "verified" | "needs_human" | "dismissed";
+  /**
+   * Server-side annotation of the verification outcome for this finding
+   * (quote check / second pass), mirroring story-audit's ruleIds markers.
+   */
+  verificationNote?: string;
 }
 
 /** The three sanctioned upgrade orientations. */
