@@ -102,6 +102,49 @@ describe("research-library helpers", () => {
 		expect(graph.summary).toContain("图谱节点");
 	});
 
+	it("maps every edge endpoint onto the generated node ids and drops dangling edges", () => {
+		const graph = buildResearchGraph({
+			...book,
+			characters: [
+				{
+					sourceName: "林凡",
+					role: "protagonist",
+					archetype: "隐忍反击者",
+					desire: "查明旧案",
+					relationshipFunction: "承载压迫和反击",
+					names: ["林凡", "小凡"],
+				},
+			],
+			relationships: {
+				...book.relationships,
+				edges: [
+					{
+						source: "小凡",
+						target: "评审会",
+						label: "压迫",
+						tension: "资格被剥夺",
+					},
+					{
+						source: "小凡",
+						target: "神秘人",
+						label: "悬空关系",
+						tension: "没有对应节点",
+					},
+				],
+			},
+		});
+
+		const nodeIds = new Set(graph.nodes.map((node) => node.id));
+		expect(graph.edges).toHaveLength(1);
+		expect(graph.edges[0].source).toBe("character-林凡");
+		expect(graph.edges[0].target).toBe("faction-评审会");
+		for (const edge of graph.edges) {
+			expect(nodeIds.has(edge.source)).toBe(true);
+			expect(nodeIds.has(edge.target)).toBe(true);
+		}
+		expect(graph.summary).toContain("已过滤 1 条");
+	});
+
 	it("turns scoring output into explainable evidence chain", () => {
 		const chain = buildScoreEvidenceChain({
 			scores: [

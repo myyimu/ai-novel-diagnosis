@@ -47,6 +47,7 @@ export type BookAnalysisLike = {
 		archetype: string;
 		desire: string;
 		relationshipFunction: string;
+		names?: string[];
 	}>;
 	worldbuilding: {
 		locations: Array<{ name: string; function: string; originalizationNote: string }>;
@@ -214,25 +215,60 @@ export function buildResearchGraph(result?: BookAnalysisLike | null) {
 		})),
 	];
 
-	const edges: ResearchGraphEdge[] = result.relationships.edges.map((edge, index) => ({
-		id: `relationship-${index}`,
-		source: edge.source,
-		target: edge.target,
-		label: edge.relation?.join("、") || edge.label,
-		detail: [
-			edge.tension,
-			edge.weight ? `强度 ${edge.weight}/10` : "",
-			typeof edge.positivity === "number" ? `情绪 ${edge.positivity}` : "",
-			edge.evidence?.[0] ? `证据：${edge.evidence[0]}` : "",
-		]
-			.filter(Boolean)
-			.join("；"),
-	}));
+	// Edges reference raw entity names while node ids carry a type prefix, so
+	// resolve every endpoint through a name -> node id index (characters keep
+	// their alias names reachable); unresolvable edges are dropped and counted.
+	const nameToNodeId = new Map<string, string>();
+	const claimName = (name: string, nodeId: string) => {
+		if (!nameToNodeId.has(name)) {
+			nameToNodeId.set(name, nodeId);
+		}
+	};
+	for (const character of result.characters) {
+		const nodeId = `character-${normalizeId(character.sourceName)}`;
+		claimName(character.sourceName, nodeId);
+		for (const alias of character.names ?? []) {
+			claimName(alias, nodeId);
+		}
+	}
+	for (const location of result.worldbuilding.locations) {
+		claimName(location.name, `location-${normalizeId(location.name)}`);
+	}
+	for (const faction of result.worldbuilding.factions) {
+		claimName(faction.name, `faction-${normalizeId(faction.name)}`);
+	}
+
+	let droppedEdgeCount = 0;
+	const edges: ResearchGraphEdge[] = [];
+	for (const [index, edge] of result.relationships.edges.entries()) {
+		const source = nameToNodeId.get(edge.source);
+		const target = nameToNodeId.get(edge.target);
+		if (!source || !target) {
+			droppedEdgeCount += 1;
+			continue;
+		}
+		edges.push({
+			id: `relationship-${index}`,
+			source,
+			target,
+			label: edge.relation?.join("、") || edge.label,
+			detail: [
+				edge.tension,
+				edge.weight ? `强度 ${edge.weight}/10` : "",
+				typeof edge.positivity === "number" ? `情绪 ${edge.positivity}` : "",
+				edge.evidence?.[0] ? `证据：${edge.evidence[0]}` : "",
+			]
+				.filter(Boolean)
+				.join("；"),
+		});
+	}
 
 	return {
 		nodes,
 		edges,
-		summary: `${nodes.length} 个图谱节点，${edges.length} 条人物关系边，已绑定来源类型。`,
+		summary:
+			`${nodes.length} 个图谱节点，${edges.length} 条人物关系边，已绑定来源类型。` +
+			(droppedEdgeCount > 0 ? `已过滤 ${droppedEdgeCount} 条找不到节点的关系边。` : ""),
 	};
 }
 
