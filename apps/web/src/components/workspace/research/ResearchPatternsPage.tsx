@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
@@ -7,12 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Network, ArrowLeft, Users, TrendingUp } from "lucide-react";
+import { buildResearchGraph } from "@/lib/research-library";
+import { ResearchGraphView } from "./ResearchGraphView";
 import { ResearchWorkspaceShell } from "./ResearchWorkspaceShell";
 
 export function ResearchPatternsPage() {
 	const router = useRouter();
 
 	const { bookAnalysisResult } = useWorkspaceHandlers("book");
+
+	const graph = useMemo(() => buildResearchGraph(bookAnalysisResult), [bookAnalysisResult]);
 
 	const handleBackToBook = () => {
 		router.push("/research/book");
@@ -54,26 +59,11 @@ export function ResearchPatternsPage() {
 								<CardDescription>基于整书内容分析的人物关系网络</CardDescription>
 							</CardHeader>
 							<CardContent className="space-y-4">
-								<div className="p-6 rounded-lg border bg-card flex flex-col items-center justify-center min-h-[200px]">
-									<Network className="w-12 h-12 text-muted-foreground mb-4" />
-									<p className="text-sm text-muted-foreground text-center">
-										人物关系图谱可视化将在这里显示
-									</p>
-									<div className="mt-4 grid grid-cols-2 gap-4 text-center">
-										<div className="p-3 rounded border bg-background">
-											<p className="text-lg font-semibold">主要人物</p>
-											<p className="text-xs text-muted-foreground">
-												{bookAnalysisResult?.characters?.length || 0} 人
-											</p>
-										</div>
-										<div className="p-3 rounded border bg-background">
-											<p className="text-lg font-semibold">关系链接</p>
-											<p className="text-xs text-muted-foreground">
-												分析人物关系
-											</p>
-										</div>
-									</div>
-								</div>
+								<ResearchGraphView
+									nodes={graph.nodes}
+									edges={graph.edges}
+									caption={graph.summary}
+								/>
 
 								{bookAnalysisResult?.characters &&
 									bookAnalysisResult.characters.length > 0 && (
