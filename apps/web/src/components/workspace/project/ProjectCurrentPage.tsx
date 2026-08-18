@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { BookStageRail } from "@/components/workspace/project/BookStageRail";
 import {
 	RedesignTopButton,
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
+import { deriveBookStage } from "@/lib/book-stage";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { diagnosisExampleOptions } from "@/lib/diagnosis-examples";
 import { requestParagraphRewrites } from "@/lib/workspace-analysis-client";
@@ -113,7 +115,14 @@ export function ProjectCurrentPage() {
 	const revisionCount = projectRevisionSessions.length;
 	const methodologyCount = projectMethodologyCards.length;
 	const totalAssets = revisionCount + methodologyCount;
-	const completion = Math.min(100, totalAssets ? 42 + totalAssets * 12 : 18);
+	const stageSummary = useMemo(
+		() =>
+			deriveBookStage({
+				sessions: projectRevisionSessions,
+				methodologyCardCount: methodologyCount,
+			}),
+		[projectRevisionSessions, methodologyCount],
+	);
 	const activeProjectRouteId = activeProjectId || activeProject?.id || "default-project";
 	const activeChapterSeed = [
 		activeProjectRouteId,
@@ -229,12 +238,7 @@ export function ProjectCurrentPage() {
 							<p className="min-h-10 text-xs leading-5 text-[#69707d]">
 								查看和管理书籍的章节诊断、修改方案和修改效果。
 							</p>
-							<div className="mt-4 h-[7px] overflow-hidden rounded-full bg-[#edf0f3]">
-								<div
-									className="h-full rounded-full bg-[#ff5a1f]"
-									style={{ width: `${completion}%` }}
-								/>
-							</div>
+							<BookStageRail summary={stageSummary} onNavigate={router.push} />
 							<div className="mt-3 grid grid-cols-3 gap-2">
 								<MiniStat label="章节" value="1" />
 								<MiniStat label="修改效果" value={String(revisionCount)} />
