@@ -365,8 +365,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		selectedResearchJobIds,
 		setSelectedResearchJobIds,
 		comparisonFocus,
+		setComparisonFocus,
+		researchComparison,
 		setResearchComparison,
 		researchQuestion,
+		setResearchQuestion,
+		researchQaResult,
 		setResearchQaResult,
 		quickReviewCache,
 		setQuickReviewCache,
@@ -2432,6 +2436,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	function toggleResearchSample(jobId: string) {
+		if (!selectedResearchJobIds.includes(jobId) && selectedResearchJobIds.length >= 8) {
+			setStatus("最多选择 8 本样本进行对比。");
+			return;
+		}
 		setSelectedResearchJobIds((current) =>
 			current.includes(jobId)
 				? current.filter((item) => item !== jobId)
@@ -2809,6 +2817,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		researchReadiness,
 		researchSources,
 		persistedResearchLibrary,
+		selectedResearchJobIds,
+		comparisonFocus,
+		setComparisonFocus,
+		researchQuestion,
+		setResearchQuestion,
+		researchComparison,
+		researchQaResult,
 		beginnerLearningDigest,
 
 		/* handlers */
