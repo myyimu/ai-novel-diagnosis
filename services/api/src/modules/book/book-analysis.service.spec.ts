@@ -1,4 +1,8 @@
 ﻿import { BadRequestException } from "@nestjs/common";
+import type {
+  StoryAuditFinding,
+  StoryAuditResult,
+} from "@ai-novel-diagnosis/ai-core";
 import { StoryAuditService } from "../story-audit/story-audit.service";
 import { BookAnalysisService } from "./book-analysis.service";
 
@@ -12,6 +16,7 @@ function createBookService(options?: {
   };
   bookUploads?: { readNormalizedText?: jest.Mock };
   textPreprocessor?: { preprocess: jest.Mock };
+  llmVerifier?: { forProvider: jest.Mock };
 }) {
   return new BookAnalysisService(
     (options?.textPreprocessor ?? {}) as never,
@@ -21,6 +26,7 @@ function createBookService(options?: {
     (options?.persistence ?? {}) as never,
     {} as never,
     new StoryAuditService(),
+    (options?.llmVerifier ?? { forProvider: jest.fn() }) as never,
   );
 }
 
@@ -125,6 +131,7 @@ describe("BookAnalysisService", () => {
       {} as never,
       {} as never,
       new StoryAuditService(),
+      { forProvider: jest.fn() } as never,
     );
 
     await service.getBookAnalysisJob("job-1", { includeResult: false });
@@ -584,6 +591,7 @@ describe("BookAnalysisService", () => {
       {} as never,
       {} as never,
       new StoryAuditService(),
+      { forProvider: jest.fn() } as never,
     );
 
     const job = await service.createBookAnalysisJob({
@@ -618,6 +626,141 @@ describe("BookAnalysisService", () => {
       expect.objectContaining({
         scopeId: "book",
       }),
+    );
+  });
+
+  it("should skip the LLM verifier for mock providers and record a zero verification summary", async () => {
+    const textPreprocessor = {
+      preprocess: jest.fn(() => ({
+        chapters: [
+          {
+            id: "ch-1",
+            order: 1,
+            title: "第一章",
+            text: "主角进入考场，发现考官是仇人。",
+            splitBy: "heading",
+            charCount: 16,
+            wordCount: 16,
+            startOffset: 0,
+            endOffset: 16,
+          },
+        ],
+        cleaning: {
+          rawLength: 16,
+          cleanedLength: 16,
+          removedNoise: [],
+          paragraphCount: 1,
+        },
+      })),
+    };
+    const bookJobs = {
+      create: jest.fn(
+        async (
+          _summary: unknown,
+          processor: (jobId: string) => Promise<unknown>,
+        ) => {
+          await processor("job-mock-2");
+          return {
+            id: "job-mock-2",
+            type: "book-map-reduce-analysis",
+            status: "queued",
+          };
+        },
+      ),
+      markRunning: jest.fn(),
+      updateProgress: jest.fn(),
+      setPreprocessing: jest.fn(),
+      recordChapterMap: jest.fn(),
+      updatePartialPlan: jest.fn(),
+      complete: jest.fn(),
+      readChapterMaps: jest.fn(async () => []),
+      get: jest.fn(async () => ({ id: "job-mock-2", status: "queued" })),
+    };
+    const llmVerifier = { forProvider: jest.fn() };
+
+    const service = new BookAnalysisService(
+      textPreprocessor as never,
+      bookJobs as never,
+      {} as never,
+      { chat: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      new StoryAuditService(),
+      llmVerifier as never,
+    );
+
+    await service.createBookAnalysisJob({
+      provider: { kind: "mock" },
+      title: "测试书",
+      genre: "xuanhuan",
+      text: "主角进入考场，发现考官是仇人。",
+      purpose: "own-draft",
+    });
+
+    const completedResult = bookJobs.complete.mock.calls[0]?.[1] as {
+      storyAudit: {
+        verification: {
+          attemptedCount: number;
+          skippedCount: number;
+          rejectedCount: number;
+          unavailableCount: number;
+          verifiedCount: number;
+        };
+      };
+    };
+    expect(llmVerifier.forProvider).not.toHaveBeenCalled();
+    expect(completedResult.storyAudit.verification).toEqual({
+      attemptedCount: 0,
+      skippedCount: 0,
+      rejectedCount: 0,
+      unavailableCount: 0,
+      verifiedCount: 0,
+    });
+  });
+
+  it("should run the LLM verifier for real providers and merge the verification summary", async () => {
+    const verify = jest.fn(async () => ({
+      findingId: "finding-1",
+      status: "verified" as const,
+      reason: "两条证据互相印证。",
+      alternativeExplanations: [],
+      evidenceAnchorIds: ["anchor-a", "anchor-b"],
+      confidence: 0.95,
+    }));
+    const forProvider = jest.fn(() => ({ verify }));
+    const service = createBookService({ llmVerifier: { forProvider } });
+    const provider = {
+      kind: "openai-compatible",
+      preset: "custom",
+      baseUrl: "https://example.test/v1",
+      apiKey: "sk-test",
+      model: "test-model",
+    };
+    const onProgress = jest.fn();
+
+    const result = await (
+      service as unknown as {
+        runStoryAuditVerification: (
+          storyAudit: StoryAuditResult,
+          provider: unknown,
+          onProgress?: unknown,
+        ) => Promise<StoryAuditResult>;
+      }
+    ).runStoryAuditVerification(buildAuditFixture(), provider, onProgress);
+
+    expect(forProvider).toHaveBeenCalledWith(provider);
+    expect(result.findings[0]).toEqual(
+      expect.objectContaining({ status: "verified" }),
+    );
+    expect(result.verification).toEqual({
+      attemptedCount: 1,
+      skippedCount: 0,
+      rejectedCount: 0,
+      unavailableCount: 0,
+      verifiedCount: 1,
+    });
+    expect(onProgress).toHaveBeenLastCalledWith(
+      expect.objectContaining({ stage: "verify", current: 1, total: 1 }),
     );
   });
 
@@ -817,6 +960,7 @@ describe("BookAnalysisService", () => {
         {} as never,
         bookExports as never,
         new StoryAuditService(),
+        { forProvider: jest.fn() } as never,
       );
 
       const result = await service.distillBookSkill({
@@ -848,6 +992,7 @@ describe("BookAnalysisService", () => {
         {} as never,
         {} as never,
         new StoryAuditService(),
+        { forProvider: jest.fn() } as never,
       );
 
       await expect(
@@ -889,6 +1034,7 @@ describe("BookAnalysisService", () => {
         {} as never,
         {} as never,
         new StoryAuditService(),
+        { forProvider: jest.fn() } as never,
       );
 
       await expect(
@@ -901,3 +1047,68 @@ describe("BookAnalysisService", () => {
     });
   });
 });
+
+function buildAuditFixture(): StoryAuditResult {
+  const finding: StoryAuditFinding = {
+    id: "finding-1",
+    category: "timeline_conflict",
+    severity: "high",
+    status: "candidate",
+    title: "时间矛盾候选",
+    claim: "两个事件互相先于对方。",
+    evidence: [
+      {
+        anchorId: "anchor-a",
+        chapterId: "ch-1",
+        chapterOrder: 1,
+        quote: "主角收到密信",
+        startOffset: 0,
+        endOffset: 6,
+        source: "text",
+      },
+      {
+        anchorId: "anchor-b",
+        chapterId: "ch-2",
+        chapterOrder: 2,
+        quote: "主角进入密室",
+        startOffset: 10,
+        endOffset: 16,
+        source: "text",
+      },
+    ],
+    relatedFactIds: [],
+    relatedEventIds: [],
+    ruleIds: ["temporal-before-cycle"],
+    alternativeExplanations: [],
+    confidence: 0.76,
+  };
+  return {
+    schemaVersion: "story-audit.v1",
+    auditId: "job-1:story-audit.v1",
+    projectId: "project-1",
+    bookJobId: "job-1",
+    generatedAt: "2026-08-17T00:00:00.000Z",
+    coverage: {
+      analyzedChapterIds: ["ch-1", "ch-2"],
+      totalChapterCount: 2,
+      isPartial: false,
+      sceneExtractionRate: 1,
+      evidenceValidationRate: 1,
+    },
+    scenes: [],
+    events: [],
+    facts: [],
+    characterStates: [],
+    findings: [finding],
+    metrics: { dialogue: [] },
+    views: {
+      temporalGraph: {
+        eventIds: [],
+        relationEdges: [],
+        conflictCandidateIds: [],
+      },
+      plotlineMatrix: [],
+      setupPayoffEdges: [],
+    },
+  };
+}

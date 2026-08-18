@@ -565,7 +565,7 @@ export interface BookAnalysisJob {
 		profiles?: StoryAuditProfile[];
 	};
 	progress: {
-		stage: "queued" | "preprocess" | "map" | "reduce" | "succeeded" | "failed";
+		stage: "queued" | "preprocess" | "map" | "reduce" | "verify" | "succeeded" | "failed";
 		current: number;
 		total: number;
 		message: string;

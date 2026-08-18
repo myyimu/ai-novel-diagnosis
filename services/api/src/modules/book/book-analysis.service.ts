@@ -1,5 +1,8 @@
 ﻿import { BadRequestException, Injectable } from "@nestjs/common";
-import { type StoryAuditProfile } from "@ai-novel-diagnosis/ai-core";
+import {
+  type StoryAuditProfile,
+  type StoryAuditResult,
+} from "@ai-novel-diagnosis/ai-core";
 import { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { parseJsonWithRepair } from "@/modules/ai-provider/json-repair";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
@@ -22,7 +25,9 @@ import {
   type BookExportMode,
 } from "./book-export.service";
 import { BookUploadService, type UploadedTxtFile } from "./book-upload.service";
+import { StoryAuditLlmVerifier } from "../story-audit/story-audit-llm-verifier";
 import { StoryAuditService } from "../story-audit/story-audit.service";
+import { verifyStoryAuditFindings } from "../story-audit/story-audit-verifier";
 import {
   BookPreprocessResult,
   ChapterSegment,
@@ -106,6 +111,7 @@ export class BookAnalysisService {
     private readonly persistence: AnalysisPersistenceRepository,
     private readonly bookExports: BookExportService,
     private readonly storyAudit: StoryAuditService,
+    private readonly storyAuditLlmVerifier: StoryAuditLlmVerifier,
   ) {}
 
   async analyzeBook(_input: AnalyzeBookDto) {
@@ -447,6 +453,43 @@ export class BookAnalysisService {
     return { purpose, profiles };
   }
 
+  /**
+   * Second pass over story-audit finding candidates. Real providers get the
+   * LLM verifier; mock inputs (tests, partial previews) keep rule candidates
+   * and only record the "not yet verified" summary.
+   */
+  private async runStoryAuditVerification(
+    storyAudit: StoryAuditResult,
+    provider: ProviderConfigDto,
+    onProgress?: (progress: BookAnalysisJobProgress) => void | Promise<void>,
+  ): Promise<StoryAuditResult> {
+    const verifier =
+      provider.kind === "mock"
+        ? undefined
+        : this.storyAuditLlmVerifier.forProvider(provider);
+    const verification = await verifyStoryAuditFindings(storyAudit, {
+      verifier,
+      onProgress: (current, total) =>
+        onProgress?.({
+          stage: "verify",
+          current,
+          total,
+          message: `已完成 ${current}/${total} 条候选复核。`,
+        }),
+    });
+    return {
+      ...storyAudit,
+      findings: verification.findings,
+      verification: {
+        attemptedCount: verification.attemptedCount,
+        skippedCount: verification.skippedCount,
+        rejectedCount: verification.rejectedCount,
+        unavailableCount: verification.unavailableCount,
+        verifiedCount: verification.verifiedCount,
+      },
+    };
+  }
+
   async createBookAnalysisJobFromUpload(input: {
     uploadId: string;
     provider: ProviderConfigDto;
@@ -766,7 +809,7 @@ export class BookAnalysisService {
           );
     const normalized = this.normalizeBookAnalysisResult(input, reduced);
     const storyAuditInput = this.resolveStoryAuditInput(input);
-    const storyAudit =
+    let storyAudit =
       storyAuditInput.purpose === "own-draft" &&
       storyAuditInput.profiles.length > 0
         ? this.storyAudit.buildStoryAudit({
@@ -776,6 +819,13 @@ export class BookAnalysisService {
             totalChapterCount: chapters.length,
           })
         : undefined;
+    if (storyAudit) {
+      storyAudit = await this.runStoryAuditVerification(
+        storyAudit,
+        input.provider,
+        onProgress,
+      );
+    }
 
     return {
       ...normalized,
@@ -839,7 +889,7 @@ export class BookAnalysisService {
       ...partial,
     }) as Record<string, unknown>;
     const storyAuditInput = this.resolveStoryAuditInput(job.inputSummary);
-    const storyAudit =
+    let storyAudit =
       storyAuditInput.purpose === "own-draft" &&
       storyAuditInput.profiles.length > 0
         ? this.storyAudit.buildStoryAudit({
@@ -850,6 +900,15 @@ export class BookAnalysisService {
             totalChapterCount: job.partialResult.totalChapters,
           })
         : undefined;
+    if (storyAudit) {
+      // Partial previews rebuild on every poll; the provider here is always
+      // the mock placeholder, so this only records the "not yet verified"
+      // summary without any LLM calls.
+      storyAudit = await this.runStoryAuditVerification(
+        storyAudit,
+        input.provider,
+      );
+    }
 
     return {
       ...normalized,
