@@ -16,7 +16,8 @@
 - [`architecture.md`](./architecture.md)：系统边界、数据流和工作区结构。
 - [`quick-diagnosis-v3-execution-spec.md`](./quick-diagnosis-v3-execution-spec.md)：快速诊断的输入、模型输出、确定性后处理和兼容策略。
 - [`information-architecture.md`](./information-architecture.md)：以书为锚的旅程模型——锚对象、五阶段轴、派生规则与放置规则。
-- [`premise-review.md`](./premise-review.md)：立项审稿（阶段①）P0 落成记录——设计决策与理由、数据流、P1 路线。
+- [`premise-review.md`](./premise-review.md)：立项审稿（阶段①）P0 + P1 落成记录——设计决策与理由、数据流。
+- [`p2-direction.md`](./p2-direction.md)：P2 方向——教师姿态、过程可见性与会诊制度的战略沉淀与任务路线。
 
 ### 第三层：故事体检协议与实施记录
 
