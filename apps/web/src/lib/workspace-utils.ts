@@ -407,6 +407,19 @@ export function getBookJobProgressDetail(
 	};
 }
 
+/**
+ * 最近完成章节的可读标签（P2-T2 过程可见性）。
+ * 只描述管线真实上报的章节事件，没有事件时返回 null——不估算、不占位。
+ */
+export function getLastCompletedChapterLabel(job: BookAnalysisJob | null): string | null {
+	const chapter = job?.partialResult?.lastCompletedChapter;
+	if (!chapter) {
+		return null;
+	}
+
+	return `${chapter.title}（${chapter.phase === "deep" ? "深拆" : "轻索引"}）`;
+}
+
 /* ──────────── option lists ──────────── */
 
 export const competitionLevelOptions = [

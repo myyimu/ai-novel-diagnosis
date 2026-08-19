@@ -598,6 +598,12 @@ export interface BookAnalysisJob {
 		outlineCount?: number;
 		deepTargetOrders?: number[];
 		deepCompletedCount?: number;
+		lastCompletedChapter?: {
+			order: number;
+			title: string;
+			phase: "outline" | "deep";
+			completedAt: string;
+		};
 	};
 	result?: BookAnalysisResult;
 	error?: string;

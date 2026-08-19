@@ -2252,6 +2252,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		try {
 			for (let attempt = 0; attempt < (options?.maxAttempts ?? 120); attempt += 1) {
+				if (activeBookPollJobIdRef.current !== jobId) {
+					// 用户已打断跟随（dismissRunningBookJob）：任务在服务端继续，这里静默停止轮询。
+					return null;
+				}
 				await wait(1000);
 				const latestJob = await readJobSnapshot(false);
 				if (!latestJob) {
@@ -2315,6 +2319,24 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				activeBookPollJobIdRef.current = null;
 			}
 		}
+	}
+
+	/**
+	 * 打断跟随（P2-T2 过程可见性）：停止轮询并收起运行中的任务卡。
+	 * 诚实边界——本地 API 没有取消端点，任务会在服务端继续跑完；
+	 * 完成后可从历史任务重新打开，也可以现在就带新参数重新发起。
+	 */
+	function dismissRunningBookJob() {
+		if (!bookJob?.id) {
+			return;
+		}
+		if (bookJob.status !== "queued" && bookJob.status !== "running") {
+			return;
+		}
+
+		activeBookPollJobIdRef.current = null;
+		setBookJob(null);
+		setStatus("已停止跟随这次整本分析（任务仍在后台继续），完成后可从历史任务重新打开。");
 	}
 
 	async function uploadBookForPreview(manageLoading = true) {
@@ -2863,6 +2885,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		scoreChapter,
 		analyzeBook,
 		resumeBookAnalysis,
+		dismissRunningBookJob,
 		uploadBookForPreview,
 		loadHistory,
 		deleteHistoryJob,

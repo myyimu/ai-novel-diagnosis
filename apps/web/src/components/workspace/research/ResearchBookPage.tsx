@@ -10,6 +10,7 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
+import { getLastCompletedChapterLabel } from "@/lib/workspace-utils";
 import {
 	countLikelyChapterHeadings,
 	looksLikeMarkdownText,
@@ -33,6 +34,7 @@ export function ResearchBookPage() {
 		loading,
 		providerLabel,
 		analyzeBook,
+		dismissRunningBookJob,
 		setBookText,
 		uploadBookForPreview,
 		readBookFile,
@@ -76,6 +78,7 @@ export function ResearchBookPage() {
 	};
 
 	const isJobRunning = bookJob?.status === "queued" || bookJob?.status === "running";
+	const lastCompletedLabel = getLastCompletedChapterLabel(bookJob);
 	const isPreviewing = loading === "upload";
 	const hasInput = Boolean(bookFile || bookText.trim());
 	const hasJob = Boolean(bookJob?.id);
@@ -323,6 +326,17 @@ export function ResearchBookPage() {
 								</p>
 								<p className="text-sm text-[#6f7782]">{bookStatusText}</p>
 							</div>
+							{isJobRunning ? (
+								<Button
+									variant="outline"
+									size="sm"
+									className="shrink-0"
+									onClick={dismissRunningBookJob}
+									title="停止在页面上跟随进度；任务会在后台继续跑完，之后可从历史任务重新打开。"
+								>
+									不再等待
+								</Button>
+							) : null}
 						</div>
 						{bookProgressDetail ? (
 							<div className="mt-4 border-t border-[#e4e7eb] pt-3">
@@ -339,6 +353,37 @@ export function ResearchBookPage() {
 										style={{ width: `${bookProgressDetail.outline.percent}%` }}
 									/>
 								</div>
+								{bookProgressDetail.deep.total > 0 ? (
+									<div className="mt-3">
+										<div className="mb-2 flex items-center justify-between text-xs">
+											<span>重点章节深拆</span>
+											<span>
+												{bookProgressDetail.deep.current} /{" "}
+												{bookProgressDetail.deep.total} 片段
+											</span>
+										</div>
+										<div className="h-2 rounded-full bg-[#edf0f3]">
+											<div
+												className="h-full rounded-full bg-[#16885b]"
+												style={{
+													width: `${bookProgressDetail.deep.percent}%`,
+												}}
+											/>
+										</div>
+									</div>
+								) : null}
+								{lastCompletedLabel ? (
+									<p className="mt-3 text-xs text-[#6f7782]">
+										最近完成：{lastCompletedLabel}
+										<span className="ml-1 text-[10px] text-[#9aa1ab]">
+											（只显示已完成的章节，完成一个更新一个）
+										</span>
+									</p>
+								) : isJobRunning ? (
+									<p className="mt-3 text-xs text-[#9aa1ab]">
+										正在等待第一个章节片段完成，完成后在这里逐个更新。
+									</p>
+								) : null}
 							</div>
 						) : null}
 					</section>
