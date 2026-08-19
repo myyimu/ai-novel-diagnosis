@@ -590,6 +590,62 @@ describe("workspace iteration assets", () => {
 		expect(markdown).not.toContain("版本二正文");
 	});
 
+	it("renders the engine card section when a confirmed card exists", () => {
+		const project: WorkspaceProject = {
+			id: "project-engine",
+			name: "发动机测试项目",
+			createdAt: "2026-08-18T00:00:00.000Z",
+			updatedAt: "2026-08-18T02:00:00.000Z",
+		};
+		const markdown = buildProjectExportMarkdown({
+			project,
+			revisionSessions: [],
+			methodologyCards: [],
+			engineCard: {
+				projectId: project.id,
+				status: "confirmed",
+				premiseSummary: "一个重生复仇兼流量收割的故事。",
+				coreConflict: "主角想揭穿背叛者，而背叛者掌握他的舆论生死。",
+				protagonistDesire: "避开前世的每一个遗憾。",
+				opposingForce: "掌握流量与资源的背叛者们。",
+				irreducibilityTest: "换成职场背景后两难仍然成立。",
+				readerHookQuestion: "他这次会先原谅还是先揭穿？",
+				engineVerdict: "fixable",
+				reviewId: "review-1",
+				confirmedAt: "2026-08-18T02:00:00.000Z",
+				updatedAt: "2026-08-18T02:00:00.000Z",
+			},
+			generatedAt: "2026-08-18T03:00:00.000Z",
+		});
+
+		expect(markdown).toContain("- 故事发动机：已确认");
+		expect(markdown).toContain("## 故事发动机");
+		expect(markdown.indexOf("## 故事发动机")).toBeGreaterThan(markdown.indexOf("## 项目概览"));
+		expect(markdown).toContain("- 状态：已确认");
+		expect(markdown).toContain("- 审稿判定：值得写，但先修这几处");
+		expect(markdown).toContain("> 一个重生复仇兼流量收割的故事。");
+		expect(markdown).toContain("- 核心冲突：主角想揭穿背叛者，而背叛者掌握他的舆论生死。");
+		expect(markdown).toContain("- 读者钩子问题：他这次会先原谅还是先揭穿？");
+	});
+
+	it("keeps the engine section as a placeholder when no card is saved", () => {
+		const project: WorkspaceProject = {
+			id: "project-engine",
+			name: "发动机测试项目",
+			createdAt: "2026-08-18T00:00:00.000Z",
+			updatedAt: "2026-08-18T02:00:00.000Z",
+		};
+		const markdown = buildProjectExportMarkdown({
+			project,
+			revisionSessions: [],
+			methodologyCards: [],
+			generatedAt: "2026-08-18T03:00:00.000Z",
+		});
+
+		expect(markdown).toContain("- 故事发动机：暂无");
+		expect(markdown).toContain("暂无发动机卡（这本书尚未走立项审稿确认）。");
+	});
+
 	it("builds a project export JSON package without revision full text", () => {
 		const project: WorkspaceProject = {
 			id: "project-a",

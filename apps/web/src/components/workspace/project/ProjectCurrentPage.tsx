@@ -37,6 +37,7 @@ export function ProjectCurrentPage() {
 		activeProjectId,
 		projectRevisionSessions,
 		projectMethodologyCards,
+		projectEngineCard,
 		exportProjectMarkdown,
 		providerLabel,
 		provider,
@@ -120,8 +121,10 @@ export function ProjectCurrentPage() {
 			deriveBookStage({
 				sessions: projectRevisionSessions,
 				methodologyCardCount: methodologyCount,
+				engineCardStatus: projectEngineCard?.status,
+				premiseReviewEnabled: true,
 			}),
-		[projectRevisionSessions, methodologyCount],
+		[projectRevisionSessions, methodologyCount, projectEngineCard?.status],
 	);
 	const activeProjectRouteId = activeProjectId || activeProject?.id || "default-project";
 	const activeChapterSeed = [

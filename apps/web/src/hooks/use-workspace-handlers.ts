@@ -695,8 +695,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	async function exportProjectMarkdown() {
 		const storyAudit = resolveProjectStoryAuditResult();
-		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
-			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
+		if (
+			!projectRevisionSessions.length &&
+			!projectMethodologyCards.length &&
+			!storyAudit &&
+			!projectEngineCard
+		) {
+			setStatus("当前书籍还没有可导出的修改效果、方法论卡、故事体检摘要或发动机卡。");
 			return;
 		}
 
@@ -736,6 +741,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			methodologyCards: projectMethodologyCards,
 			storyAudit,
 			storyAuditFindingReviews,
+			engineCard: projectEngineCard,
 		});
 		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
 			.toISOString()
