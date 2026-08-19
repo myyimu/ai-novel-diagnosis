@@ -146,7 +146,7 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   验证：ai-core typecheck/lint/test(58)/build；api typecheck/lint/test(323)；
   web check/test(126)/build。提交 `4dd4611`（契约）、`29fb833`（端点）、`8a63cf2`（面板）。
 
-### P2-T2 过程可见性（黑箱等待 → 事件级透明）
+### P2-T2 过程可见性（黑箱等待 → 事件级透明）——首批落地（2026-08-19）
 
 - **做什么**：① book 分析的 `partialResult` 增补逐章初核发现（过机械锚定后才入）；
   ② web 渐进渲染初核列表（candidate 徽章，复核后升级/划掉）；③ premise 等待 modal 换成
@@ -156,6 +156,16 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
 - **验收**：界面上的每个进度项都对应管线真实事件；未过锚定的发现零展示；
   初核态与复核态视觉可区分且被拒时披露。
 - **刻意不做**：token 流式（§1.5）；等待期间的自由对话（§1.5）。
+- **落成记录（首批：③④ + 章节级真实事件）**：premise 等待 modal 换成四层检验教学清单
+  （`PREMISE_LAYER_META` 的问题文案），明示"这是检验维度不是实时进度"、保留诚实的已等待秒数，
+  不伪造任何步骤完成事件；api `partialResult` 新增 `lastCompletedChapter`
+  （order/title/phase/completedAt），只在章节 map 真正完成时写入；web 运行卡新增
+  深拆进度条与"最近完成"行（只消费该真实事件，无事件时明说等待中），并以
+  "不再等待"按钮打断跟随——轮询静默停止、文案披露任务仍在服务端继续、可从历史任务重开。
+  验证：api typecheck/lint/test(324)；web check/test(130)/build。
+  提交 `2914da6`（等待 modal）、`b40bf3b`（lastCompletedChapter）、`edbd1ff`（渲染与打断）。
+  **未完**：①②（逐章初核发现的渐进渲染与 candidate/复核视觉区分）延后到下一批次——
+  需要先把每章 map 产物里过机械锚定的发现挑出来进 `partialResult`，属深水区改动。
 
 ### P2-T3 立项引导对话（教师姿态旗舰）
 
