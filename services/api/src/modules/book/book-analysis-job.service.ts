@@ -55,6 +55,16 @@ export interface BookAnalysisPartialResult {
   outlineCount?: number;
   deepTargetOrders?: number[];
   deepCompletedCount?: number;
+  /**
+   * Most recent chapter segment that actually finished mapping (process
+   * visibility). Recorded only from real pipeline events — never estimated.
+   */
+  lastCompletedChapter?: {
+    order: number;
+    title: string;
+    phase: "outline" | "deep";
+    completedAt: string;
+  };
 }
 
 export interface BookAnalysisJobSnapshot {
@@ -339,6 +349,11 @@ export class BookAnalysisJobService implements OnModuleInit {
       outlineCount: input.outlineCount,
       deepTargetOrders: input.deepTargetOrders,
       deepCompletedCount: input.deepCompletedCount,
+      lastCompletedChapter: this.describeCompletedChapter(
+        input.chapterMap,
+        input.phase,
+        now,
+      ),
     };
     job.updatedAt = now;
     await this.repository.updateJob(input.jobId, {
@@ -598,6 +613,7 @@ export class BookAnalysisJobService implements OnModuleInit {
             outlineCount: job.partialResult.outlineCount,
             deepTargetOrders: job.partialResult.deepTargetOrders,
             deepCompletedCount: job.partialResult.deepCompletedCount,
+            lastCompletedChapter: job.partialResult.lastCompletedChapter,
           }
         : undefined,
     };
@@ -613,5 +629,30 @@ export class BookAnalysisJobService implements OnModuleInit {
           : `ch-${String(fallbackOrder).padStart(4, "0")}`;
 
     return rawId.replace(/[^a-zA-Z0-9._-]/g, "-");
+  }
+
+  /** Narrows a chapter map payload into the real-event summary shown in progress. */
+  private describeCompletedChapter(
+    chapterMap: unknown,
+    phase: "outline" | "deep" | undefined,
+    completedAt: string,
+  ): BookAnalysisPartialResult["lastCompletedChapter"] {
+    const source = chapterMap as {
+      order?: unknown;
+      title?: unknown;
+      analysisDepth?: unknown;
+    };
+    const order = typeof source?.order === "number" ? source.order : 0;
+    const title =
+      typeof source?.title === "string" && source.title.trim()
+        ? source.title.trim()
+        : `第 ${order} 章`;
+
+    return {
+      order,
+      title,
+      phase: phase ?? (source?.analysisDepth === "deep" ? "deep" : "outline"),
+      completedAt,
+    };
   }
 }

@@ -50,6 +50,78 @@ describe("BookAnalysisJobService", () => {
     ).toBe(4);
   });
 
+  it("records the last completed chapter from real map events and reuses it in snapshots", async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), "book-job-storage-"));
+    const artifactDir = await mkdtemp(join(tmpdir(), "book-job-artifact-"));
+    const configService = {
+      get: jest.fn((key: string) => {
+        if (key === "analysis.storageDir") return storageDir;
+        if (key === "analysis.artifactDir") return artifactDir;
+        return undefined;
+      }),
+    };
+    const service = new BookAnalysisJobService(
+      createRepositoryMock() as never,
+      configService as never,
+    );
+    const internal = service as unknown as {
+      jobs: Map<string, Record<string, unknown>>;
+    };
+    internal.jobs.set(VALID_JOB_ID, {
+      id: VALID_JOB_ID,
+      type: "book-map-reduce-analysis",
+      status: "running",
+      createdAt: "2026-06-20T00:00:00.000Z",
+      updatedAt: "2026-06-20T00:00:00.000Z",
+      inputSummary: { title: "测试书", genre: "other", textLength: 1200 },
+      progress: { stage: "map", current: 2, total: 10, message: "processing" },
+    });
+
+    try {
+      await service.recordChapterMap({
+        jobId: VALID_JOB_ID,
+        chapterMap: { chapterId: "ch-2", order: 2, analysisDepth: "outline" },
+        mapCount: 2,
+        totalChapters: 10,
+        phase: "outline",
+      });
+      let snapshot = await service.get(VALID_JOB_ID, { includeResult: false });
+      expect(snapshot.partialResult?.lastCompletedChapter).toEqual({
+        order: 2,
+        title: "第 2 章",
+        phase: "outline",
+        completedAt: expect.any(String),
+      });
+
+      await service.recordChapterMap({
+        jobId: VALID_JOB_ID,
+        chapterMap: {
+          chapterId: "ch-5",
+          order: 5,
+          title: "第五章 风起",
+          analysisDepth: "deep",
+        },
+        mapCount: 11,
+        totalChapters: 10,
+        phase: "deep",
+        deepTargetOrders: [1, 5],
+        deepCompletedCount: 2,
+      });
+      snapshot = await service.get(VALID_JOB_ID, { includeResult: false });
+      expect(snapshot.partialResult?.lastCompletedChapter).toEqual({
+        order: 5,
+        title: "第五章 风起",
+        phase: "deep",
+        completedAt: expect.any(String),
+      });
+    } finally {
+      await Promise.all([
+        rm(storageDir, { recursive: true, force: true }),
+        rm(artifactDir, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
   it("omits heavy chapter map payloads from job snapshots", () => {
     const service = new BookAnalysisJobService(
       {
