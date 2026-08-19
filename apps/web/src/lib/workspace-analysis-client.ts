@@ -5,6 +5,8 @@ import type {
 	BookUploadPreview,
 	MethodologyCard,
 	PersistedResearchLibrary,
+	PremiseEngineCard,
+	PremiseFindingReview,
 	PremiseReviewResult,
 	ProjectMethodologyCard,
 	ProviderForm,
@@ -520,6 +522,8 @@ export interface WorkspaceAssetsPayload {
 	revisionSessions: RevisionSession[];
 	revisionVersions: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
+	/** 阶段①发动机卡；旧版 api 缺省该字段。 */
+	premiseEngineCards?: PremiseEngineCard[];
 }
 
 export function readWorkspaceAssets() {
@@ -600,6 +604,26 @@ export function readStoryAuditFindingReviews(projectId: string) {
 
 export function upsertStoryAuditFindingReview(review: StoryAuditFindingReview) {
 	return postJson<StoryAuditFindingReview>("/analysis/workspace/story-audit/reviews", review);
+}
+
+export function readPremiseEngineCard(projectId: string) {
+	return getJson<{ engineCard: PremiseEngineCard | null }>(
+		`/analysis/workspace/premise/engine-card/${encodeURIComponent(projectId)}`,
+	);
+}
+
+export function upsertPremiseEngineCard(card: PremiseEngineCard) {
+	return postJson<PremiseEngineCard>("/analysis/workspace/premise/engine-card", card);
+}
+
+export function readPremiseFindingReviews(projectId: string) {
+	return getJson<PremiseFindingReview[]>(
+		`/analysis/workspace/premise/reviews/${encodeURIComponent(projectId)}`,
+	);
+}
+
+export function upsertPremiseFindingReview(review: PremiseFindingReview) {
+	return postJson<PremiseFindingReview>("/analysis/workspace/premise/reviews", review);
 }
 
 export function uploadBookPreview({

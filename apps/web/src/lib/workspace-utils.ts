@@ -1,4 +1,4 @@
-import type { ProjectMethodologyCard } from "@/stores/workspace-store";
+import type { PremiseEngineCard, ProjectMethodologyCard } from "@/stores/workspace-store";
 import type { BookAnalysisJob } from "@/stores/workspace-store";
 import { parseList } from "@/lib/workspace-analysis-client";
 import type { ReferenceProfileResult } from "@/lib/workspace-analysis-client";
@@ -78,6 +78,19 @@ export function mergeMethodologyCards(
 	}
 
 	return result;
+}
+
+/** 发动机卡按 projectId 一书一卡；服务端版本优先于本地。 */
+export function mergeEngineCards(
+	serverItems: PremiseEngineCard[],
+	localItems: PremiseEngineCard[],
+) {
+	const byProject = new Map(localItems.map((card) => [card.projectId, card]));
+	for (const card of serverItems) {
+		byProject.set(card.projectId, card);
+	}
+
+	return [...byProject.values()];
 }
 
 /* ──────────── async / network helpers ──────────── */

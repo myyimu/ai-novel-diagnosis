@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { PremiseReviewCompose } from "./PremiseReviewCompose";
-import type { PremiseReviewResult } from "@ai-novel-diagnosis/ai-core";
+import type {
+	PremiseEngineCard,
+	PremiseFindingReview,
+	PremiseReviewResult,
+} from "@ai-novel-diagnosis/ai-core";
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({
@@ -12,6 +16,7 @@ vi.mock("next/navigation", () => ({
 
 const premiseReviewResult = {
 	schemaVersion: "premise-review.v1",
+	reviewId: "review-1",
 	premiseSummary: "一个重生复仇兼流量收割的故事。",
 	coreConflict: "主角想揭穿背叛者，而背叛者掌握他的舆论生死。",
 	protagonistDesire: "避开前世的每一个遗憾。",
@@ -80,6 +85,38 @@ const premiseReviewResult = {
 	},
 } satisfies PremiseReviewResult;
 
+const premiseContractDraft = {
+	premiseSummary: premiseReviewResult.premiseSummary,
+	coreConflict: premiseReviewResult.coreConflict,
+	protagonistDesire: premiseReviewResult.protagonistDesire,
+	opposingForce: premiseReviewResult.opposingForce,
+	irreducibilityTest: premiseReviewResult.irreducibilityTest,
+	readerHookQuestion: premiseReviewResult.readerHookQuestion,
+};
+
+const savedEngineCard: PremiseEngineCard = {
+	projectId: "default-project",
+	status: "confirmed",
+	premiseSummary: premiseReviewResult.premiseSummary,
+	coreConflict: premiseReviewResult.coreConflict,
+	protagonistDesire: premiseReviewResult.protagonistDesire,
+	opposingForce: premiseReviewResult.opposingForce,
+	irreducibilityTest: premiseReviewResult.irreducibilityTest,
+	readerHookQuestion: premiseReviewResult.readerHookQuestion,
+	engineVerdict: "fixable",
+	reviewId: "review-1",
+	confirmedAt: "2026-08-18T08:00:00.000Z",
+	updatedAt: "2026-08-18T08:00:00.000Z",
+};
+
+const savedFindingReview: PremiseFindingReview = {
+	projectId: "default-project",
+	reviewId: "review-1",
+	findingId: "cliche-1",
+	reviewState: "author_intent",
+	updatedAt: "2026-08-18T08:00:00.000Z",
+};
+
 function baseProps(overrides: Partial<Parameters<typeof PremiseReviewCompose>[0]> = {}) {
 	return {
 		providerLabel: "本地演示",
@@ -94,6 +131,16 @@ function baseProps(overrides: Partial<Parameters<typeof PremiseReviewCompose>[0]
 		result: null,
 		onRunReview: () => {},
 		onWriteFirstChapter: () => {},
+		targetProjectName: "测试作品",
+		contract: null,
+		onContractChange: () => {},
+		engineCard: null,
+		isSavingCard: false,
+		cardError: null,
+		onSaveCard: () => {},
+		findingReviews: [],
+		isSavingReview: false,
+		onReviewFinding: () => {},
 		...overrides,
 	};
 }
@@ -111,15 +158,25 @@ describe("PremiseReviewCompose", () => {
 		expect(html).toContain("演示模型只返回占位结构");
 	});
 
-	it("renders the verdict banner, engine contract and audit layers for a result", () => {
+	it("renders the verdict banner, audit layers and editable engine card for a result", () => {
 		const html = renderToStaticMarkup(
-			<PremiseReviewCompose {...baseProps({ result: premiseReviewResult })} />,
+			<PremiseReviewCompose
+				{...baseProps({
+					result: premiseReviewResult,
+					contract: premiseContractDraft,
+				})}
+			/>,
 		);
 
 		expect(html).toContain("值得写，但先修这几处");
 		expect(html).toContain("发动机成立，但阻力需要从被动遗憾改为主动对抗");
-		expect(html).toContain("故事发动机契约");
+		expect(html).toContain("发动机卡（编辑的重述，可改写后确认）");
+		expect(html).toContain("故事概述（编辑重述）");
 		expect(html).toContain("主角想揭穿背叛者，而背叛者掌握他的舆论生死");
+		expect(html).toContain("保存为草稿");
+		expect(html).toContain("确认发动机契约");
+		expect(html).toContain("复制契约");
+		expect(html).toContain("核心冲突为必填");
 		expect(html).toContain("四层审计");
 		expect(html).toContain("故事发动机");
 		expect(html).toContain("不可替代性");
@@ -130,6 +187,81 @@ describe("PremiseReviewCompose", () => {
 		expect(html).toContain("已复核");
 		expect(html).toContain("情感");
 		expect(html).toContain("1 条已确认");
+	});
+
+	it("shows the saved engine card status chip with the project name in the note", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose
+				{...baseProps({
+					contract: premiseContractDraft,
+					engineCard: savedEngineCard,
+				})}
+			/>,
+		);
+
+		expect(html).toContain("当前保存状态：已确认");
+		expect(html).toContain("重新保存会覆盖已存的卡片");
+		expect(html).toContain("《测试作品》");
+	});
+
+	it("renders the four author decision actions with the current state highlighted", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose
+				{...baseProps({
+					result: premiseReviewResult,
+					contract: premiseContractDraft,
+					findingReviews: [savedFindingReview],
+				})}
+			/>,
+		);
+
+		expect(html).toContain("你的判定：");
+		expect(html).toContain("确认俗套");
+		expect(html).toContain("作者意图");
+		expect(html).toContain("误报");
+		expect(html).toContain("搁置");
+	});
+
+	it("disables decision actions when the result carries no reviewId", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose
+				{...baseProps({
+					result: { ...premiseReviewResult, reviewId: undefined },
+					contract: premiseContractDraft,
+				})}
+			/>,
+		);
+
+		expect(html).toContain("你的判定：");
+		expect(html).toMatch(/<button[^>]*disabled[^>]*>\s*确认俗套/);
+	});
+
+	it("shows the engine card editor standalone when returning without a result", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose
+				{...baseProps({
+					contract: premiseContractDraft,
+					engineCard: savedEngineCard,
+				})}
+			/>,
+		);
+
+		expect(html).toContain("发动机卡（编辑的重述，可改写后确认）");
+		expect(html).toContain("确认发动机契约");
+	});
+
+	it("shows the card error banner inside the editor", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose
+				{...baseProps({
+					result: premiseReviewResult,
+					contract: premiseContractDraft,
+					cardError: "发动机卡保存失败，请稍后重试。",
+				})}
+			/>,
+		);
+
+		expect(html).toContain("发动机卡保存失败");
 	});
 
 	it("discloses when a finding's quotes were rejected server-side", () => {
@@ -152,6 +284,7 @@ describe("PremiseReviewCompose", () => {
 		);
 
 		expect(html).toContain("未能在你的原文中定位");
+		expect(html).not.toContain("你的判定：");
 	});
 
 	it("renders the error banner without a result", () => {
@@ -161,6 +294,6 @@ describe("PremiseReviewCompose", () => {
 
 		expect(html).toContain("审稿未完成");
 		expect(html).toContain("模型连接失败");
-		expect(html).not.toContain("故事发动机契约");
+		expect(html).not.toContain("发动机卡（编辑的重述");
 	});
 });

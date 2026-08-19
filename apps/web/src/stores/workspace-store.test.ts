@@ -100,6 +100,7 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		revisionSessions: [],
 		revisionVersions: [],
 		methodologyCards: [],
+		engineCards: [],
 		...overrides,
 	};
 }

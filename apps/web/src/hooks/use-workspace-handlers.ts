@@ -101,6 +101,7 @@ import {
 	downloadBlob,
 	downloadText,
 	mergeById,
+	mergeEngineCards,
 	mergeMethodologyCards,
 	wait,
 	isTransientFetchError,
@@ -380,6 +381,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setRevisionVersions,
 		methodologyCards,
 		setMethodologyCards,
+		engineCards,
+		setEngineCards,
 		rubricCache,
 		setRubricCache,
 		scoreCache,
@@ -450,6 +453,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	const projectRevisionVersions = revisionVersions.filter(
 		(version) => (version.projectId || "default-project") === activeProjectId,
 	);
+	const projectEngineCard =
+		engineCards.find((card) => card.projectId === activeProjectId) ?? null;
 
 	/* ──────────── timer effect ──────────── */
 
@@ -506,7 +511,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			assets.revisionSessions.length ||
 			assets.revisionVersions?.length ||
 			0 ||
-			assets.methodologyCards.length;
+			assets.methodologyCards.length ||
+			assets.premiseEngineCards?.length;
 		if (!hasAssets) {
 			return;
 		}
@@ -515,6 +521,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setRevisionSessions((current) => mergeById(assets.revisionSessions, current));
 		setRevisionVersions((current) => mergeById(assets.revisionVersions || [], current));
 		setMethodologyCards((current) => mergeMethodologyCards(assets.methodologyCards, current));
+		setEngineCards((current) => mergeEngineCards(assets.premiseEngineCards || [], current));
 		setActiveProjectId((current) => {
 			const mergedProjects = mergeById(assets.projects, projects);
 			return mergedProjects.some((project) => project.id === current)
@@ -2667,6 +2674,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		projectRevisionSessions,
 		projectRevisionVersions,
 		projectMethodologyCards,
+		projectEngineCard,
+		setEngineCards,
 		projectStoryAuditResult: resolveProjectStoryAuditResult(),
 		newProjectName,
 		setNewProjectName,

@@ -84,6 +84,7 @@ const persistableWorkspaceKeys = [
 	"revisionSessions",
 	"revisionVersions",
 	"methodologyCards",
+	"engineCards",
 ] as const satisfies Array<keyof WorkspaceStoreState>;
 
 export type PersistedWorkspaceState = Pick<

@@ -9,13 +9,30 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import {
+	PREMISE_ENGINE_CARD_STATUS_LABELS,
+	PREMISE_FINDING_REVIEW_STATE_LABELS,
 	PREMISE_LAYER_META,
 	PREMISE_REVIEW_LAYERS,
 	PREMISE_UPGRADE_ORIENTATION_LABELS,
+	type PremiseEngineCard,
+	type PremiseFindingReview,
+	type PremiseFindingReviewState,
 	type PremiseReviewResult,
 	type PremiseReviewVerdict,
 } from "@ai-novel-diagnosis/ai-core";
-import { Clipboard, Loader2, PenLine, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Clipboard, FileCheck2, Loader2, PenLine, ShieldCheck, TriangleAlert } from "lucide-react";
+
+/** The editable engine-card draft: the six restated contract lines. */
+export interface PremiseContractDraft {
+	premiseSummary: string;
+	coreConflict: string;
+	protagonistDesire: string;
+	opposingForce: string;
+	irreducibilityTest: string;
+	readerHookQuestion: string;
+}
+
+export type PremiseFindingDecision = Exclude<PremiseFindingReviewState, "unreviewed">;
 
 export interface PremiseReviewComposeProps {
 	providerLabel: string;
@@ -30,6 +47,17 @@ export interface PremiseReviewComposeProps {
 	result: PremiseReviewResult | null;
 	onRunReview: () => void;
 	onWriteFirstChapter: () => void;
+	/* —— 阶段①闭环：发动机卡与俗套判定（P1） —— */
+	targetProjectName: string;
+	contract: PremiseContractDraft | null;
+	onContractChange: (field: keyof PremiseContractDraft, value: string) => void;
+	engineCard: PremiseEngineCard | null;
+	isSavingCard: boolean;
+	cardError: string | null;
+	onSaveCard: (status: "draft" | "confirmed") => void;
+	findingReviews: PremiseFindingReview[];
+	isSavingReview: boolean;
+	onReviewFinding: (findingId: string, reviewState: PremiseFindingDecision) => void;
 }
 
 const genreOptions = [
@@ -93,6 +121,25 @@ const severityLabels: Record<string, string> = {
 	low: "低",
 };
 
+/** 作者对俗套点的四个动作（搁置之外没有第五种编辑决定）。 */
+const findingDecisionOptions: PremiseFindingDecision[] = [
+	"confirmed",
+	"author_intent",
+	"false_positive",
+	"deferred",
+];
+
+const contractFields: Array<{
+	key: keyof PremiseContractDraft;
+	label: string;
+}> = [
+	{ key: "coreConflict", label: "核心冲突" },
+	{ key: "protagonistDesire", label: "主角欲望" },
+	{ key: "opposingForce", label: "对立阻力" },
+	{ key: "irreducibilityTest", label: "不可替代性测试" },
+	{ key: "readerHookQuestion", label: "读者钩子问题" },
+];
+
 export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 	const {
 		providerLabel,
@@ -107,11 +154,24 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 		result,
 		onRunReview,
 		onWriteFirstChapter,
+		targetProjectName,
+		contract,
+		onContractChange,
+		engineCard,
+		isSavingCard,
+		cardError,
+		onSaveCard,
+		findingReviews,
+		isSavingReview,
+		onReviewFinding,
 	} = props;
 
 	const charCount = premiseText.trim().length;
 	const canRun = !isReviewing && charCount >= 20 && charCount <= 4000;
-	const engineContractText = useMemo(() => buildEngineContractText(result), [result]);
+	const reviewByFindingId = useMemo(
+		() => new Map(findingReviews.map((review) => [review.findingId, review])),
+		[findingReviews],
+	);
 
 	return (
 		<RedesignWorkspaceShell
@@ -217,7 +277,7 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 									<ShieldCheck className="size-4" />
 									{isMockProvider
 										? "演示模型只返回占位结构，连接真实模型后才有编辑判断。"
-										: "审稿结论只保存在当前页面，不会写入书籍病历。"}
+										: "审稿结论不会自动保存；确认发动机卡后才写入书籍病历。"}
 								</div>
 								<Button
 									onClick={onRunReview}
@@ -322,9 +382,30 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 				{result ? (
 					<PremiseReviewResultSection
 						result={result}
-						engineContractText={engineContractText}
 						onWriteFirstChapter={onWriteFirstChapter}
+						targetProjectName={targetProjectName}
+						contract={contract}
+						onContractChange={onContractChange}
+						engineCard={engineCard}
+						isSavingCard={isSavingCard}
+						cardError={cardError}
+						onSaveCard={onSaveCard}
+						reviewByFindingId={reviewByFindingId}
+						isSavingReview={isSavingReview}
+						onReviewFinding={onReviewFinding}
 					/>
+				) : contract && engineCard ? (
+					<section className="mt-[22px]">
+						<EngineCardEditor
+							contract={contract}
+							onContractChange={onContractChange}
+							engineCard={engineCard}
+							isSaving={isSavingCard}
+							error={cardError}
+							onSave={onSaveCard}
+							targetProjectName={targetProjectName}
+						/>
+					</section>
 				) : null}
 			</div>
 
@@ -353,12 +434,30 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 
 function PremiseReviewResultSection({
 	result,
-	engineContractText,
 	onWriteFirstChapter,
+	targetProjectName,
+	contract,
+	onContractChange,
+	engineCard,
+	isSavingCard,
+	cardError,
+	onSaveCard,
+	reviewByFindingId,
+	isSavingReview,
+	onReviewFinding,
 }: {
 	result: PremiseReviewResult;
-	engineContractText: string;
 	onWriteFirstChapter: () => void;
+	targetProjectName: string;
+	contract: PremiseContractDraft | null;
+	onContractChange: (field: keyof PremiseContractDraft, value: string) => void;
+	engineCard: PremiseEngineCard | null;
+	isSavingCard: boolean;
+	cardError: string | null;
+	onSaveCard: (status: "draft" | "confirmed") => void;
+	reviewByFindingId: Map<string, PremiseFindingReview>;
+	isSavingReview: boolean;
+	onReviewFinding: (findingId: string, reviewState: PremiseFindingDecision) => void;
 }) {
 	const meta = verdictMeta[result.engineVerdict];
 
@@ -388,49 +487,17 @@ function PremiseReviewResultSection({
 
 			<div className="grid items-start gap-5 [grid-template-columns:minmax(0,1fr)_340px] max-[1100px]:grid-cols-1">
 				<div className="grid gap-3.5">
-					<SectionCard
-						title="故事发动机契约"
-						subtitle="编辑对你故事的重述——写偏了随时回来对照。"
-						action={
-							<Button
-								variant="outline"
-								className="rounded-[9px] border-[#d8dbe0]"
-								onClick={() => {
-									void navigator.clipboard?.writeText(engineContractText);
-								}}
-							>
-								<Clipboard className="mr-2 size-4" />
-								复制契约
-							</Button>
-						}
-					>
-						<p className="m-0 rounded-[10px] bg-[#f7f8fa] px-3.5 py-3 text-[13px] leading-6 text-[#464d57]">
-							{result.premiseSummary}
-						</p>
-						<div className="mt-3 grid gap-2.5">
-							{(
-								[
-									["核心冲突", result.coreConflict],
-									["主角欲望", result.protagonistDesire],
-									["对立阻力", result.opposingForce],
-									["不可替代性测试", result.irreducibilityTest],
-									["读者钩子问题", result.readerHookQuestion],
-								] as const
-							).map(([label, value]) => (
-								<div
-									key={label}
-									className="rounded-[10px] border border-[#e6e8eb] px-3.5 py-2.5"
-								>
-									<span className="block text-[11px] text-[#69707d]">
-										{label}
-									</span>
-									<strong className="mt-0.5 block text-[13px] font-normal leading-6">
-										{value || "（编辑未填写）"}
-									</strong>
-								</div>
-							))}
-						</div>
-					</SectionCard>
+					{contract ? (
+						<EngineCardEditor
+							contract={contract}
+							onContractChange={onContractChange}
+							engineCard={engineCard}
+							isSaving={isSavingCard}
+							error={cardError}
+							onSave={onSaveCard}
+							targetProjectName={targetProjectName}
+						/>
+					) : null}
 
 					<SectionCard
 						title="四层审计"
@@ -548,6 +615,17 @@ function PremiseReviewResultSection({
 												{finding.verificationNote}
 											</p>
 										) : null}
+										{finding.evidence.length ? (
+											<FindingDecisionRow
+												findingId={finding.id}
+												current={
+													reviewByFindingId.get(finding.id)
+														?.reviewState ?? null
+												}
+												disabled={isSavingReview || !result.reviewId}
+												onReview={onReviewFinding}
+											/>
+										) : null}
 									</article>
 								))}
 							</div>
@@ -613,11 +691,156 @@ function PremiseReviewResultSection({
 						</div>
 					</div>
 					<div className="rounded-[11px] border border-[#e6e8eb] bg-white px-3.5 py-[13px] text-xs leading-5 text-[#69707d]">
-						本页结论暂不写入书籍病历；发动机卡的确认与保存属于下一步（阶段①闭环）。
+						确认后的发动机卡进入《{targetProjectName}》的病历与阶段轨（阶段①达成）；
+						俗套点判定随本次审稿记录保存，可在导出包中反查。
 					</div>
 				</aside>
 			</div>
 		</section>
+	);
+}
+
+function EngineCardEditor({
+	contract,
+	onContractChange,
+	engineCard,
+	isSaving,
+	error,
+	onSave,
+	targetProjectName,
+}: {
+	contract: PremiseContractDraft;
+	onContractChange: (field: keyof PremiseContractDraft, value: string) => void;
+	engineCard: PremiseEngineCard | null;
+	isSaving: boolean;
+	error: string | null;
+	onSave: (status: "draft" | "confirmed") => void;
+	targetProjectName: string;
+}) {
+	const canSave = contract.coreConflict.trim().length > 0 && !isSaving;
+	const copyText = buildEngineContractText(contract);
+
+	return (
+		<SectionCard
+			title="发动机卡（编辑的重述，可改写后确认）"
+			subtitle={`写偏了随时回来对照；确认后写入《${targetProjectName}》的病历，成为阶段①的达成依据。`}
+			action={
+				<Button
+					variant="outline"
+					className="rounded-[9px] border-[#d8dbe0]"
+					onClick={() => {
+						void navigator.clipboard?.writeText(copyText);
+					}}
+				>
+					<Clipboard className="mr-2 size-4" />
+					复制契约
+				</Button>
+			}
+		>
+			{engineCard ? (
+				<div
+					className={`mb-3 flex flex-wrap items-center gap-2 rounded-[10px] px-3 py-2 text-xs ${
+						engineCard.status === "confirmed"
+							? "bg-[#e6f6ec] text-[#1f6b3a]"
+							: "bg-[#f7f8fa] text-[#69707d]"
+					}`}
+				>
+					<FileCheck2 className="size-4" />
+					<span>
+						当前保存状态：{PREMISE_ENGINE_CARD_STATUS_LABELS[engineCard.status]}
+						{engineCard.status === "confirmed" && engineCard.confirmedAt
+							? `（${new Date(engineCard.confirmedAt).toLocaleString("zh-CN")} 确认）`
+							: ""}
+					</span>
+					<span className="text-[11px] opacity-70">重新保存会覆盖已存的卡片。</span>
+				</div>
+			) : null}
+
+			<label className="grid gap-[7px]">
+				<span className="text-xs font-bold text-[#4d535d]">故事概述（编辑重述）</span>
+				<textarea
+					value={contract.premiseSummary}
+					onChange={(event) => onContractChange("premiseSummary", event.target.value)}
+					className="min-h-[72px] w-full resize-y rounded-[10px] border border-[#d8dbe0] bg-white px-3 py-2 text-[13px] leading-6 outline-none focus:border-[#ff8b5f]"
+				/>
+			</label>
+			<div className="mt-3 grid gap-2.5">
+				{contractFields.map((field) => (
+					<label key={field.key} className="grid gap-[6px]">
+						<span className="text-[11px] font-bold text-[#69707d]">{field.label}</span>
+						<textarea
+							value={contract[field.key]}
+							onChange={(event) => onContractChange(field.key, event.target.value)}
+							className="min-h-[52px] w-full resize-y rounded-[10px] border border-[#d8dbe0] bg-white px-3 py-2 text-[13px] leading-6 outline-none focus:border-[#ff8b5f]"
+						/>
+					</label>
+				))}
+			</div>
+
+			{error ? (
+				<p className="mt-3 rounded-[10px] border border-[#f0c3c2] bg-[#fff0f0] px-3 py-2 text-xs leading-5 text-[#a82f2d]">
+					{error}
+				</p>
+			) : null}
+
+			<div className="mt-4 flex flex-wrap items-center gap-2.5">
+				<Button
+					variant="outline"
+					className="rounded-[9px] border-[#d8dbe0]"
+					disabled={!canSave}
+					onClick={() => onSave("draft")}
+				>
+					{isSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+					保存为草稿
+				</Button>
+				<Button
+					className="rounded-[9px] bg-[#ff5a1f] font-bold text-white hover:bg-[#e84b13]"
+					disabled={!canSave}
+					onClick={() => onSave("confirmed")}
+				>
+					{isSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+					确认发动机契约
+				</Button>
+				<span className="text-[11px] leading-5 text-[#69707d]">
+					核心冲突为必填；确认动作可以随时重做（改写后再确认会覆盖）。
+				</span>
+			</div>
+		</SectionCard>
+	);
+}
+
+function FindingDecisionRow({
+	findingId,
+	current,
+	disabled,
+	onReview,
+}: {
+	findingId: string;
+	current: PremiseFindingReviewState | null;
+	disabled: boolean;
+	onReview: (findingId: string, reviewState: PremiseFindingDecision) => void;
+}) {
+	return (
+		<div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-[#eceef1] pt-3">
+			<span className="text-[11px] font-bold text-[#69707d]">你的判定：</span>
+			{findingDecisionOptions.map((state) => (
+				<Button
+					key={state}
+					type="button"
+					variant={current === state ? "default" : "outline"}
+					disabled={disabled}
+					onClick={() => onReview(findingId, state)}
+					className="min-h-8 rounded-md px-2.5 text-xs"
+				>
+					{PREMISE_FINDING_REVIEW_STATE_LABELS[state]}
+				</Button>
+			))}
+			{current ? (
+				<span className="rounded-full bg-primary px-[9px] py-1 text-[11px] font-bold text-primary-foreground">
+					{PREMISE_FINDING_REVIEW_STATE_LABELS[current]}
+				</span>
+			) : null}
+		</div>
 	);
 }
 
@@ -653,17 +876,17 @@ function SectionCard({
 	);
 }
 
-function buildEngineContractText(result: PremiseReviewResult | null): string {
-	if (!result) {
+function buildEngineContractText(contract: PremiseContractDraft | null): string {
+	if (!contract) {
 		return "";
 	}
 
 	return [
 		"【故事发动机契约】",
-		`核心冲突：${result.coreConflict}`,
-		`主角欲望：${result.protagonistDesire}`,
-		`对立阻力：${result.opposingForce}`,
-		`不可替代性测试：${result.irreducibilityTest}`,
-		`读者钩子问题：${result.readerHookQuestion}`,
+		`核心冲突：${contract.coreConflict}`,
+		`主角欲望：${contract.protagonistDesire}`,
+		`对立阻力：${contract.opposingForce}`,
+		`不可替代性测试：${contract.irreducibilityTest}`,
+		`读者钩子问题：${contract.readerHookQuestion}`,
 	].join("\n");
 }

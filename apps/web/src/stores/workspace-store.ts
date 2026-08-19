@@ -16,6 +16,7 @@ import {
 	type CachedScoreResult,
 	type ChapterPosition,
 	type PersistedResearchLibrary,
+	type PremiseEngineCard,
 	type ProjectMethodologyCard,
 	type ProviderConfigHistoryEntry,
 	type ProviderConnectionState,
@@ -131,6 +132,7 @@ export interface WorkspaceStoreState {
 	revisionSessions: RevisionSession[];
 	revisionVersions: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
+	engineCards: PremiseEngineCard[];
 }
 
 interface WorkspaceStoreActions {
@@ -211,6 +213,7 @@ interface WorkspaceStoreActions {
 	setRevisionSessions: StoreSetter<RevisionSession[]>;
 	setRevisionVersions: StoreSetter<RevisionTextVersion[]>;
 	setMethodologyCards: StoreSetter<ProjectMethodologyCard[]>;
+	setEngineCards: StoreSetter<PremiseEngineCard[]>;
 }
 
 export type WorkspaceStore = WorkspaceStoreState & WorkspaceStoreActions;
@@ -293,6 +296,7 @@ const initialWorkspaceState: WorkspaceStoreState = {
 	revisionSessions: [],
 	revisionVersions: [],
 	methodologyCards: [],
+	engineCards: [],
 };
 
 const localSettingsStorageKey = "ai-novel-diagnosis-local-settings";
@@ -394,6 +398,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 					setRevisionSessions: makeSetter("revisionSessions"),
 					setRevisionVersions: makeSetter("revisionVersions"),
 					setMethodologyCards: makeSetter("methodologyCards"),
+					setEngineCards: makeSetter("engineCards"),
 				};
 			},
 			{
