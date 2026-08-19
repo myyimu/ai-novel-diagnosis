@@ -160,6 +160,22 @@ describe("PremiseReviewCompose", () => {
 		expect(html).toContain("演示模型只返回占位结构");
 	});
 
+	it("teaches the four audit layers in the wait modal without faking progress", () => {
+		const html = renderToStaticMarkup(
+			<PremiseReviewCompose {...baseProps({ isReviewing: true, elapsedSeconds: 12 })} />,
+		);
+
+		expect(html).toContain("正在审稿");
+		expect(html).toContain("已等待 12");
+		expect(html).toContain("等待时先看：编辑会检验这四层");
+		expect(html).toContain("故事发动机");
+		expect(html).toContain("欲望与障碍持续对撞，能否自己产出情节");
+		expect(html).toContain("主角想要什么，是否具体且强烈");
+		expect(html).toContain("谁在阻止，压力是否持续升级");
+		expect(html).toContain("换掉全部设定后故事是否仍然成立");
+		expect(html).toContain("不是实时进度");
+	});
+
 	it("renders the verdict banner, audit layers and editable engine card for a result", () => {
 		const html = renderToStaticMarkup(
 			<PremiseReviewCompose

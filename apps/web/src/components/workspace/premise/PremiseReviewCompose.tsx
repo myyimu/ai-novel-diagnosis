@@ -427,7 +427,7 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 
 			{isReviewing ? (
 				<div className="fixed inset-0 z-50 grid place-items-center bg-[#f6f7f9]/90 backdrop-blur-sm">
-					<div className="w-[min(390px,calc(100%_-_30px))] rounded-[14px] border border-[#e6e8eb] bg-white p-[22px] shadow-[0_12px_34px_rgba(22,27,34,.07)]">
+					<div className="max-h-[86vh] w-[min(440px,calc(100%_-_30px))] overflow-y-auto rounded-[14px] border border-[#e6e8eb] bg-white p-[22px] shadow-[0_12px_34px_rgba(22,27,34,.07)]">
 						<h3 className="mb-[11px] text-base font-bold">正在审稿</h3>
 						<div className="flex items-start gap-3 rounded-[11px] border border-[#d8e2f6] bg-[#edf4ff] p-3 text-xs leading-5 text-[#405a85]">
 							<Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
@@ -437,10 +437,36 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 								</strong>
 								<span className="mt-0.5 block">
 									已等待 {elapsedSeconds}{" "}
-									秒。四层审计和俗套复核完成后会在这里展示。
+									秒。审稿是一次完整的模型调用，中间没有可展示的分步结果——完成后一次性给出。
 								</span>
 							</div>
 						</div>
+						<p className="mb-2 mt-3.5 text-xs font-bold text-[#4d535d]">
+							等待时先看：编辑会检验这四层
+						</p>
+						<div className="grid gap-1.5">
+							{PREMISE_REVIEW_LAYERS.map((key, index) => (
+								<div
+									key={key}
+									className="flex items-start gap-2.5 rounded-[10px] border border-[#eceef1] bg-[#f7f8fa] px-3 py-2 text-xs leading-5"
+								>
+									<span className="grid size-5 shrink-0 place-items-center rounded-full bg-[#eef4ff] text-[11px] font-extrabold text-[#2f6feb]">
+										{index + 1}
+									</span>
+									<div>
+										<strong className="text-[#303640]">
+											{PREMISE_LAYER_META[key].label}
+										</strong>
+										<span className="block text-[#69707d]">
+											{PREMISE_LAYER_META[key].question}
+										</span>
+									</div>
+								</div>
+							))}
+						</div>
+						<p className="mt-3 text-[11px] leading-5 text-[#9aa1ab]">
+							这份清单是审稿的检验维度，不是实时进度；每层的结论要等审稿完成才可靠。
+						</p>
 					</div>
 				</div>
 			) : null}
