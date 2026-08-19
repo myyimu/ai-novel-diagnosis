@@ -21,6 +21,8 @@ import {
 	type PremiseReviewVerdict,
 } from "@ai-novel-diagnosis/ai-core";
 import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { PremiseDialoguePanel } from "@/components/workspace/premise/PremiseDialoguePanel";
+import type { PremiseDialogueContractForm } from "@/lib/workspace-analysis-client";
 import { buildPremiseReviewQaReport } from "@/lib/report-qa-text";
 import type { ProviderForm } from "@/stores/workspace-store";
 import { Clipboard, FileCheck2, Loader2, PenLine, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -53,6 +55,9 @@ export interface PremiseReviewComposeProps {
 	onRunReview: () => void;
 	onWriteFirstChapter: () => void;
 	/* —— 阶段①闭环：发动机卡与俗套判定（P1） —— */
+	/** 引导对话（T3）按项目归档，作者亲笔契约可带回发动机卡。 */
+	projectId: string;
+	onAdoptDialogueContract: (contract: PremiseDialogueContractForm) => void;
 	targetProjectName: string;
 	contract: PremiseContractDraft | null;
 	onContractChange: (field: keyof PremiseContractDraft, value: string) => void;
@@ -160,6 +165,8 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 		result,
 		onRunReview,
 		onWriteFirstChapter,
+		projectId,
+		onAdoptDialogueContract,
 		targetProjectName,
 		contract,
 		onContractChange,
@@ -400,6 +407,14 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 							reviewByFindingId={reviewByFindingId}
 							isSavingReview={isSavingReview}
 							onReviewFinding={onReviewFinding}
+						/>
+						<PremiseDialoguePanel
+							provider={provider}
+							projectId={projectId}
+							premiseText={premiseText}
+							genre={genre || undefined}
+							review={result}
+							onAdoptContract={onAdoptDialogueContract}
 						/>
 						<section className="mt-[22px]">
 							<ReportQaPanel

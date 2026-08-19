@@ -1,5 +1,10 @@
 import { deleteJson, getJson, patchJson, postForm, postJson } from "@/lib/api-client";
 import type {
+	PremiseContractFields,
+	PremiseDialogueSessionState,
+	PremiseLayerAssessment,
+} from "@ai-novel-diagnosis/ai-core";
+import type {
 	BookAnalysisJob,
 	BookAnalysisPurpose,
 	BookUploadPreview,
@@ -744,5 +749,122 @@ export function requestReportQa({
 		reportKind,
 		report,
 		sourceText: sourceText?.trim() || undefined,
+	});
+}
+
+/* —— 立项引导对话（T3）：多轮会话端点，轮次编排与锚定校验全在服务端 —— */
+
+/** 服务端返回的对话会话记录（时间戳经 JSON 序列化为 ISO 字符串）。 */
+export interface PremiseDialogueSessionPayload {
+	id: string;
+	projectId: string;
+	createdAt: string;
+	updatedAt: string;
+	layers: PremiseLayerAssessment[];
+	editorContract: PremiseContractFields;
+	session: PremiseDialogueSessionState;
+}
+
+export interface PremiseDialogueContractForm {
+	premiseSummary: string;
+	coreConflict: string;
+	protagonistDesire: string;
+	opposingForce: string;
+	irreducibilityTest: string;
+	readerHookQuestion: string;
+}
+
+const PREMISE_DIALOGUE_BASE = "/analysis/workspace/premise-dialogue";
+
+export function startPremiseDialogue({
+	provider,
+	projectId,
+	premiseText,
+	genre,
+	review,
+}: {
+	provider: ProviderForm;
+	projectId: string;
+	premiseText: string;
+	genre?: string;
+	review: PremiseReviewResult;
+}) {
+	return postJson<PremiseDialogueSessionPayload>(PREMISE_DIALOGUE_BASE, {
+		provider,
+		projectId,
+		premiseText: premiseText.trim(),
+		genre: genre?.trim() || undefined,
+		review,
+	});
+}
+
+export function getPremiseDialogue(sessionId: string) {
+	return getJson<PremiseDialogueSessionPayload>(`${PREMISE_DIALOGUE_BASE}/${sessionId}`);
+}
+
+export function answerPremiseDialogue({
+	sessionId,
+	provider,
+	answer,
+}: {
+	sessionId: string;
+	provider: ProviderForm;
+	answer: string;
+}) {
+	return postJson<PremiseDialogueSessionPayload>(`${PREMISE_DIALOGUE_BASE}/${sessionId}/answer`, {
+		provider,
+		answer: answer.trim(),
+	});
+}
+
+export function retryPremiseDialogueJudge({
+	sessionId,
+	provider,
+}: {
+	sessionId: string;
+	provider: ProviderForm;
+}) {
+	return postJson<PremiseDialogueSessionPayload>(`${PREMISE_DIALOGUE_BASE}/${sessionId}/judge`, {
+		provider,
+	});
+}
+
+export function advancePremiseDialogue({
+	sessionId,
+	provider,
+}: {
+	sessionId: string;
+	provider: ProviderForm;
+}) {
+	return postJson<PremiseDialogueSessionPayload>(`${PREMISE_DIALOGUE_BASE}/${sessionId}/next`, {
+		provider,
+	});
+}
+
+export function finishPremiseDialogue(sessionId: string) {
+	return postJson<PremiseDialogueSessionPayload>(
+		`${PREMISE_DIALOGUE_BASE}/${sessionId}/finish`,
+		{},
+	);
+}
+
+export function submitPremiseDialogueContract({
+	sessionId,
+	provider,
+	contract,
+	requestReview,
+}: {
+	sessionId: string;
+	provider: ProviderForm;
+	contract: PremiseDialogueContractForm;
+	requestReview: boolean;
+}) {
+	return postJson<{
+		record: PremiseDialogueSessionPayload;
+		contractReviewNotice?: string;
+	}>(`${PREMISE_DIALOGUE_BASE}/${sessionId}/contract`, {
+		provider,
+		requestReview,
+		...contract,
 	});
 }

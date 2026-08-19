@@ -10,6 +10,7 @@ import {
 	requestPremiseReview,
 	upsertPremiseEngineCard,
 	upsertPremiseFindingReview,
+	type PremiseDialogueContractForm,
 } from "@/lib/workspace-analysis-client";
 import type {
 	PremiseEngineCard,
@@ -211,6 +212,11 @@ export function PremiseReviewPage() {
 		router.push("/diagnose/quick");
 	};
 
+	/* 引导对话收束后，作者亲笔契约回填发动机卡草稿（覆盖编辑重述，亲笔优先）。 */
+	const adoptDialogueContract = (dialogueContract: PremiseDialogueContractForm) => {
+		setContract({ ...dialogueContract });
+	};
+
 	return (
 		<PremiseReviewCompose
 			providerLabel={handlers.providerLabel}
@@ -228,6 +234,8 @@ export function PremiseReviewPage() {
 				void runReview();
 			}}
 			onWriteFirstChapter={writeFirstChapter}
+			projectId={projectId}
+			onAdoptDialogueContract={adoptDialogueContract}
 			targetProjectName={handlers.activeProject?.name ?? "当前作品"}
 			contract={contract}
 			onContractChange={changeContract}

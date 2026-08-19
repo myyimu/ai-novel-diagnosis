@@ -133,6 +133,8 @@ function baseProps(overrides: Partial<Parameters<typeof PremiseReviewCompose>[0]
 		result: null,
 		onRunReview: () => {},
 		onWriteFirstChapter: () => {},
+		projectId: "default-project",
+		onAdoptDialogueContract: () => {},
 		targetProjectName: "测试作品",
 		contract: null,
 		onContractChange: () => {},
