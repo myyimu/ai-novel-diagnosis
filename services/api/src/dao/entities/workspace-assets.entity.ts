@@ -1,5 +1,16 @@
 // Workspace 资产的领域快照类型：repository 对外返回的实体契约。
 // 时间字段统一为 ISO 字符串，数组字段为 JSON 反序列化后的纯数据。
+//
+// 立项审稿资产（发动机卡 / 俗套复核）的形状与 ai-core 契约完全同构，
+// 直接别名复用，避免第二份手写定义漂移。
+import type { PremiseEngineCard } from "@ai-novel-diagnosis/ai-core";
+
+export type {
+  PremiseEngineCard,
+  PremiseEngineCardStatus,
+  PremiseFindingReview,
+  PremiseFindingReviewState,
+} from "@ai-novel-diagnosis/ai-core";
 
 export interface WorkspaceProjectSnapshot {
   id: string;
@@ -80,6 +91,8 @@ export interface WorkspaceAssetsSnapshot {
   revisionSessions: RevisionSessionSnapshot[];
   revisionVersions: RevisionTextVersionSnapshot[];
   methodologyCards: ProjectMethodologyCardSnapshot[];
+  /** 阶段①发动机卡，0..1 per project；缺省为空数组（旧客户端可忽略）。 */
+  premiseEngineCards: PremiseEngineCard[];
 }
 
 export type StoryAuditFindingReviewState =

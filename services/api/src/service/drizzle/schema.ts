@@ -207,6 +207,42 @@ export const storyAuditFindingReviews = pgTable(
   ],
 );
 
+export const premiseEngineCards = pgTable("premise_engine_cards", {
+  projectId: text("project_id").primaryKey(),
+  status: varchar("status", { length: 32 }).notNull().default("draft"),
+  premiseSummary: text("premise_summary").notNull(),
+  coreConflict: text("core_conflict").notNull(),
+  protagonistDesire: text("protagonist_desire").notNull(),
+  opposingForce: text("opposing_force").notNull(),
+  irreducibilityTest: text("irreducibility_test").notNull(),
+  readerHookQuestion: text("reader_hook_question").notNull(),
+  engineVerdict: varchar("engine_verdict", { length: 32 }).notNull(),
+  genre: varchar("genre", { length: 64 }),
+  reviewId: text("review_id"),
+  confirmedAt: timestamp("confirmed_at", { precision: 3 }),
+  createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+});
+
+export const premiseFindingReviews = pgTable(
+  "premise_finding_reviews",
+  {
+    projectId: text("project_id").notNull(),
+    reviewId: text("review_id").notNull(),
+    findingId: text("finding_id").notNull(),
+    reviewState: varchar("review_state", { length: 64 }).notNull(),
+    note: text("note"),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("premise_finding_reviews_unique").on(
+      table.projectId,
+      table.reviewId,
+      table.findingId,
+    ),
+  ],
+);
+
 export type AnalysisUploadSelect = typeof analysisUploads.$inferSelect;
 export type AnalysisUploadInsert = typeof analysisUploads.$inferInsert;
 export type BookAnalysisJobSelect = typeof bookAnalysisJobs.$inferSelect;
@@ -218,5 +254,8 @@ export type RevisionTextVersionSelect =
 export type MethodologyCardSelect = typeof methodologyCards.$inferSelect;
 export type StoryAuditFindingReviewSelect =
   typeof storyAuditFindingReviews.$inferSelect;
+export type PremiseEngineCardSelect = typeof premiseEngineCards.$inferSelect;
+export type PremiseFindingReviewSelect =
+  typeof premiseFindingReviews.$inferSelect;
 export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;
 export type ModelUsageEventInsert = typeof modelUsageEvents.$inferInsert;

@@ -3,17 +3,24 @@ import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { DrizzleService } from "@/service/drizzle/drizzle.service";
 import {
   methodologyCards,
+  premiseEngineCards,
+  premiseFindingReviews,
   revisionSessions,
   revisionTextVersions,
   storyAuditFindingReviews,
   workspaceProjects,
   type MethodologyCardSelect,
+  type PremiseEngineCardSelect,
+  type PremiseFindingReviewSelect,
   type RevisionSessionSelect,
   type RevisionTextVersionSelect,
   type StoryAuditFindingReviewSelect,
   type WorkspaceProjectSelect,
 } from "@/service/drizzle/schema";
 import type {
+  PremiseEngineCard,
+  PremiseFindingReview,
+  PremiseFindingReviewState,
   ProjectMethodologyCardSnapshot,
   RevisionIssueDecisionSnapshot,
   RevisionSessionSnapshot,
@@ -29,24 +36,29 @@ export class WorkspaceAssetsRepository {
   constructor(private readonly drizzle: DrizzleService) {}
 
   async listAssets(): Promise<WorkspaceAssetsSnapshot> {
-    const [projects, sessions, versions, cards] = await Promise.all([
-      this.drizzle.db
-        .select()
-        .from(workspaceProjects)
-        .orderBy(desc(workspaceProjects.updatedAt)),
-      this.drizzle.db
-        .select()
-        .from(revisionSessions)
-        .orderBy(desc(revisionSessions.createdAt)),
-      this.drizzle.db
-        .select()
-        .from(revisionTextVersions)
-        .orderBy(desc(revisionTextVersions.createdAt)),
-      this.drizzle.db
-        .select()
-        .from(methodologyCards)
-        .orderBy(desc(methodologyCards.lastSeenAt)),
-    ]);
+    const [projects, sessions, versions, cards, engineCards] =
+      await Promise.all([
+        this.drizzle.db
+          .select()
+          .from(workspaceProjects)
+          .orderBy(desc(workspaceProjects.updatedAt)),
+        this.drizzle.db
+          .select()
+          .from(revisionSessions)
+          .orderBy(desc(revisionSessions.createdAt)),
+        this.drizzle.db
+          .select()
+          .from(revisionTextVersions)
+          .orderBy(desc(revisionTextVersions.createdAt)),
+        this.drizzle.db
+          .select()
+          .from(methodologyCards)
+          .orderBy(desc(methodologyCards.lastSeenAt)),
+        this.drizzle.db
+          .select()
+          .from(premiseEngineCards)
+          .orderBy(desc(premiseEngineCards.updatedAt)),
+      ]);
 
     return {
       projects: projects.map((row) => this.projectSnapshot(row)),
@@ -57,6 +69,9 @@ export class WorkspaceAssetsRepository {
         this.revisionTextVersionSnapshot(row),
       ),
       methodologyCards: cards.map((row) => this.methodologyCardSnapshot(row)),
+      premiseEngineCards: engineCards.map((row) =>
+        this.premiseEngineCardSnapshot(row),
+      ),
     };
   }
 
@@ -351,6 +366,111 @@ export class WorkspaceAssetsRepository {
     return this.storyAuditFindingReviewSnapshot(row);
   }
 
+  async findEngineCardByProject(
+    projectId: string,
+  ): Promise<PremiseEngineCard | null> {
+    const [row] = await this.drizzle.db
+      .select()
+      .from(premiseEngineCards)
+      .where(eq(premiseEngineCards.projectId, projectId))
+      .limit(1);
+
+    return row ? this.premiseEngineCardSnapshot(row) : null;
+  }
+
+  async upsertEngineCard(card: PremiseEngineCard): Promise<PremiseEngineCard> {
+    const updatedAt = toDate(card.updatedAt, new Date());
+    const confirmedAt = card.confirmedAt
+      ? toDate(card.confirmedAt, updatedAt)
+      : null;
+    const [row] = await this.drizzle.db
+      .insert(premiseEngineCards)
+      .values({
+        projectId: card.projectId,
+        status: card.status,
+        premiseSummary: card.premiseSummary,
+        coreConflict: card.coreConflict,
+        protagonistDesire: card.protagonistDesire,
+        opposingForce: card.opposingForce,
+        irreducibilityTest: card.irreducibilityTest,
+        readerHookQuestion: card.readerHookQuestion,
+        engineVerdict: card.engineVerdict,
+        genre: card.genre,
+        reviewId: card.reviewId,
+        confirmedAt,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: premiseEngineCards.projectId,
+        set: {
+          status: card.status,
+          premiseSummary: card.premiseSummary,
+          coreConflict: card.coreConflict,
+          protagonistDesire: card.protagonistDesire,
+          opposingForce: card.opposingForce,
+          irreducibilityTest: card.irreducibilityTest,
+          readerHookQuestion: card.readerHookQuestion,
+          engineVerdict: card.engineVerdict,
+          genre: card.genre,
+          reviewId: card.reviewId,
+          confirmedAt,
+          updatedAt,
+        },
+      })
+      .returning();
+
+    return this.premiseEngineCardSnapshot(row);
+  }
+
+  async listPremiseFindingReviews(input: {
+    projectId: string;
+    reviewId?: string;
+  }): Promise<PremiseFindingReview[]> {
+    const conditions = [eq(premiseFindingReviews.projectId, input.projectId)];
+    if (input.reviewId) {
+      conditions.push(eq(premiseFindingReviews.reviewId, input.reviewId));
+    }
+
+    const rows = await this.drizzle.db
+      .select()
+      .from(premiseFindingReviews)
+      .where(and(...conditions))
+      .orderBy(desc(premiseFindingReviews.updatedAt));
+
+    return rows.map((row) => this.premiseFindingReviewSnapshot(row));
+  }
+
+  async upsertPremiseFindingReview(
+    review: PremiseFindingReview,
+  ): Promise<PremiseFindingReview> {
+    const updatedAt = toDate(review.updatedAt, new Date());
+    const [row] = await this.drizzle.db
+      .insert(premiseFindingReviews)
+      .values({
+        projectId: review.projectId,
+        reviewId: review.reviewId,
+        findingId: review.findingId,
+        reviewState: review.reviewState,
+        note: review.note,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [
+          premiseFindingReviews.projectId,
+          premiseFindingReviews.reviewId,
+          premiseFindingReviews.findingId,
+        ],
+        set: {
+          reviewState: review.reviewState,
+          note: review.note,
+          updatedAt,
+        },
+      })
+      .returning();
+
+    return this.premiseFindingReviewSnapshot(row);
+  }
+
   async readProjectPackage(projectId: string) {
     const [project] = await this.drizzle.db
       .select()
@@ -362,7 +482,7 @@ export class WorkspaceAssetsRepository {
       throw new NotFoundException(`Workspace project not found: ${projectId}`);
     }
 
-    const [sessions, versions, cards] = await Promise.all([
+    const [sessions, versions, cards, engineCards] = await Promise.all([
       this.drizzle.db
         .select()
         .from(revisionSessions)
@@ -378,6 +498,11 @@ export class WorkspaceAssetsRepository {
         .from(methodologyCards)
         .where(eq(methodologyCards.projectId, projectId))
         .orderBy(desc(methodologyCards.occurrenceCount)),
+      this.drizzle.db
+        .select()
+        .from(premiseEngineCards)
+        .where(eq(premiseEngineCards.projectId, projectId))
+        .limit(1),
     ]);
 
     return {
@@ -389,6 +514,9 @@ export class WorkspaceAssetsRepository {
         this.revisionTextVersionSnapshot(row),
       ),
       methodologyCards: cards.map((row) => this.methodologyCardSnapshot(row)),
+      engineCard: engineCards[0]
+        ? this.premiseEngineCardSnapshot(engineCards[0])
+        : null,
     };
   }
 
@@ -563,6 +691,39 @@ export class WorkspaceAssetsRepository {
       auditId: row.auditId,
       findingId: row.findingId,
       reviewState: row.reviewState as StoryAuditFindingReviewState,
+      note: row.note ?? undefined,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private premiseEngineCardSnapshot(
+    row: PremiseEngineCardSelect,
+  ): PremiseEngineCard {
+    return {
+      projectId: row.projectId,
+      status: row.status === "confirmed" ? "confirmed" : "draft",
+      premiseSummary: row.premiseSummary,
+      coreConflict: row.coreConflict,
+      protagonistDesire: row.protagonistDesire,
+      opposingForce: row.opposingForce,
+      irreducibilityTest: row.irreducibilityTest,
+      readerHookQuestion: row.readerHookQuestion,
+      engineVerdict: row.engineVerdict as PremiseEngineCard["engineVerdict"],
+      genre: row.genre ?? undefined,
+      reviewId: row.reviewId ?? undefined,
+      confirmedAt: row.confirmedAt?.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private premiseFindingReviewSnapshot(
+    row: PremiseFindingReviewSelect,
+  ): PremiseFindingReview {
+    return {
+      projectId: row.projectId,
+      reviewId: row.reviewId,
+      findingId: row.findingId,
+      reviewState: row.reviewState as PremiseFindingReviewState,
       note: row.note ?? undefined,
       updatedAt: row.updatedAt.toISOString(),
     };

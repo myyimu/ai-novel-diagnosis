@@ -3,13 +3,18 @@ import { BookModule } from "@/modules/book/book.module";
 import { AnalysisModule } from "@/modules/analysis/analysis.module";
 import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
 import { WorkspaceController } from "./workspace.controller";
+import { PremiseAssetsController } from "./premise-assets.controller";
 import { RevisionRetestController } from "./revision-retest.controller";
 import { RevisionRetestService } from "./revision-retest.service";
 import { WorkspaceService } from "./workspace.service";
 
 @Module({
   imports: [BookModule, AnalysisModule],
-  controllers: [WorkspaceController, RevisionRetestController],
+  controllers: [
+    WorkspaceController,
+    PremiseAssetsController,
+    RevisionRetestController,
+  ],
   providers: [
     WorkspaceAssetsRepository,
     WorkspaceService,

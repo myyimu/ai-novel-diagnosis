@@ -116,6 +116,8 @@ describe("PremiseReviewService", () => {
     expect(result.oneLineVerdict).toContain("演示");
     expect(result.layers).toHaveLength(4);
     expect(result.verification).toBeUndefined();
+    // Every review run carries a server-stamped id for later decision persistence.
+    expect(result.reviewId).toEqual(expect.any(String));
     // Demo evidence quotes the author's own text so the UI path stays honest.
     for (const finding of result.clicheFindings) {
       for (const quote of finding.evidence) {
@@ -132,6 +134,7 @@ describe("PremiseReviewService", () => {
 
     expect(chat).toHaveBeenCalledTimes(1);
     expect(result.engineVerdict).toBe("fixable");
+    expect(result.reviewId).toEqual(expect.any(String));
     expect(result.coreConflict).toContain("背叛者");
     expect(result.layers.map((layer) => layer.layer)).toEqual([
       "engine",

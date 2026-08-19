@@ -5,6 +5,10 @@ import {
   UpsertRevisionAssetsDto,
   UpsertWorkspaceProjectDto,
 } from "./dto/workspace-assets.dto";
+import {
+  UpsertPremiseEngineCardDto,
+  UpsertPremiseFindingReviewDto,
+} from "./dto/premise-assets.dto";
 import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
 import type { RevisionIssueDecisionSnapshot } from "@/dao/entities/workspace-assets.entity";
 
@@ -68,5 +72,48 @@ export class WorkspaceService {
 
   async readProjectPackage(projectId: string) {
     return this.workspaceAssets.readProjectPackage(projectId);
+  }
+
+  async readEngineCard(projectId: string) {
+    return this.workspaceAssets.findEngineCardByProject(projectId);
+  }
+
+  async upsertEngineCard(body: UpsertPremiseEngineCardDto) {
+    return this.workspaceAssets.upsertEngineCard({
+      projectId: body.projectId,
+      status: body.status,
+      premiseSummary: body.premiseSummary,
+      coreConflict: body.coreConflict,
+      protagonistDesire: body.protagonistDesire,
+      opposingForce: body.opposingForce,
+      irreducibilityTest: body.irreducibilityTest,
+      readerHookQuestion: body.readerHookQuestion,
+      engineVerdict: body.engineVerdict,
+      genre: body.genre,
+      reviewId: body.reviewId,
+      confirmedAt:
+        body.status === "confirmed"
+          ? (body.confirmedAt ?? new Date().toISOString())
+          : undefined,
+      updatedAt: body.updatedAt,
+    });
+  }
+
+  async listPremiseFindingReviews(params: {
+    projectId: string;
+    reviewId?: string;
+  }) {
+    return this.workspaceAssets.listPremiseFindingReviews(params);
+  }
+
+  async upsertPremiseFindingReview(body: UpsertPremiseFindingReviewDto) {
+    return this.workspaceAssets.upsertPremiseFindingReview({
+      projectId: body.projectId,
+      reviewId: body.reviewId,
+      findingId: body.findingId,
+      reviewState: body.reviewState,
+      note: body.note,
+      updatedAt: body.updatedAt ?? new Date().toISOString(),
+    });
   }
 }

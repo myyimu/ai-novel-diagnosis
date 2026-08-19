@@ -56,7 +56,7 @@ export class PremiseReviewService {
         },
         "premise review served in demo mode",
       );
-      return this.mockReview(input);
+      return { ...this.mockReview(input), reviewId };
     }
 
     const content = await this.modelProviders.chat(
@@ -107,6 +107,7 @@ export class PremiseReviewService {
 
     return {
       ...result,
+      reviewId,
       clicheFindings: verification.clicheFindings,
       verification: {
         attemptedCount: verification.attemptedCount,
