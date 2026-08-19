@@ -1,6 +1,6 @@
-# 立项审稿（阶段①）P0 落成记录
+# 立项审稿（阶段①）P0 + P1 落成记录
 
-状态：2026-08-18 的实施与验收记录。P0（契约 + 端点 + 审稿页）已落地并通过全部质量门；P1（发动机卡落库与作者确认面板）待实施。当前代码状态以实际实现和测试为准。
+状态：P0（契约 + 端点 + 审稿页）2026-08-18 落地；P1（发动机卡落库 + 作者决策面板 + 阶段轨开关 + 导出补节）2026-08-19 落地，均通过全部质量门。当前代码状态以实际实现和测试为准。
 适用范围：`packages/ai-core`、`services/api`、`apps/web`
 目标读者：负责继续实现本项目的开发者或代码模型
 
@@ -14,9 +14,11 @@
 | `PremiseReviewResult` 契约 | 已落地 | `packages/ai-core/src/premise-review.ts`（含 changeset） |
 | 审稿端点 + 两层俗套复核 | 已落地 | `services/api/src/modules/premise/` |
 | 审稿页 + 工作台入口卡 | 已落地 | `apps/web/src/app/diagnose/idea` + `PremiseReviewCompose` |
-| 发动机卡落库 / 作者确认面板 | 待实施（P1） | 见 §6 |
+| 发动机卡落库 + 作者确认面板 | 已落地（P1） | 见 §5 |
+| 俗套点作者决策面板 | 已落地（P1） | 见 §5 |
+| 阶段轨开关 + 导出补节 | 已落地（P1） | 见 §5 |
 
-已通过验证命令（2026-08-18）：
+已通过验证命令（P0，2026-08-18）：
 
 ```text
 pnpm -F @ai-novel-diagnosis/ai-core typecheck / lint / test (52) / build
@@ -25,6 +27,16 @@ pnpm -F web check / test (108) / build（路由表含 /diagnose/idea）
 ```
 
 对应提交：`60b7871`（契约）、`df12ffa`（verificationNote）、`f2fc087`（coercion 下沉）、`9ed5a66`（端点）、`d500eef`（页面）。
+
+已通过验证命令（P1，2026-08-19）：
+
+```text
+pnpm -F @ai-novel-diagnosis/ai-core typecheck / lint / test (55) / build
+pnpm -F api typecheck / lint / test (311)
+pnpm -F web check / test (115) / build
+```
+
+对应提交：`8398665`（ai-core 卡契约）、`d80336d`（api 持久化与端点）、`31dc03f`（api 导出补节）、`27e897a`（web 确认闭环）、`56047b3`（web 阶段轨与导出）。
 
 ## 1. 这个功能为什么存在
 
@@ -130,9 +142,9 @@ mock provider 返回的审稿结果全部字段自称"演示数据"，`oneLineVe
 - **为什么不用 book-analysis 的 job 系统**：job 为"整书多阶段、分钟级"设计；
   立项审稿输入 ≤4000 字、单阶段、单次调用，异步化只增加轮询复杂度没有任何收益。
 
-### 2.9 P0 不落库，阶段轨开关保持关闭
+### 2.9 P0 不落库，阶段轨开关保持关闭（P1 已解除）
 
-审稿结果只存在于页面 local state；`deriveBookStage` 的 `premiseReviewEnabled` 缺省 false，
+P0 阶段审稿结果只存在于页面 local state；`deriveBookStage` 的 `premiseReviewEnabled` 缺省 false，
 阶段①在轨上仍是虚位（工作台通过入口卡提供可发现性）。
 
 - **为什么结果不落库**：P0 要验证的是**判断质量**（提示词是否真给出有用的编辑决定），
@@ -140,6 +152,9 @@ mock provider 返回的审稿结果全部字段自称"演示数据"，`oneLineVe
 - **为什么开关不开**：轨的里程碑判定是 `engineCard.status === "confirmed"`——没有发动机卡落库，
   就没有任何途径把阶段①标记为达成；此时打开开关等于让所有存量书籍（包括复诊到一半的）
   永远停在"先审这个故事值不值得写"。这是 [`information-architecture.md`](./information-architecture.md) §4 记录的约束。
+- **P1 状态**：前置条件已满足（发动机卡可落库可确认），`ProjectCurrentPage` 调
+  `deriveBookStage` 时传入 `premiseReviewEnabled: true` 与 `engineCardStatus`，
+  阶段①正式产生待办与里程碑。
 
 ### 2.10 契约下沉 ai-core，复核编排留在 api
 
@@ -175,18 +190,34 @@ UI 渲染的每个状态都有出处：三态横幅（verdict）、五条契约�
 
 - 不替作者扩写灵感或生成大纲（那是写手，见 §1.3）。
 - 不承诺市场成功：三态判定是编辑工艺判断，不预测流量/签约（doctrine 可信度排序）。
-- 不在 P0 写入书籍病历：结果不进会话、不进导出、不影响阶段轨。
-- 俗套判定的作者决策（确认/作者意图/误报/搁置）未上线——字段已预留
-  （`status` 四态 + `verificationNote`），P1 接面板。
+- 不替作者保管判断：审稿结果本身不落库，落库的只有作者确认后的发动机卡与作者自己的
+  俗套判定——编辑的判断交给作者裁决后才成为病历资产。
+- 俗套判定没有"编辑撤回"动作：作者侧四态（确认俗套/作者意图/误报/搁置）是终态语义，
+  重新审稿（新 reviewId）会开启新一轮判定，旧判定按 reviewId 隔离不被覆盖。
 
-## 5. P1 路线（闭环阶段①）
+## 5. P1 落成记录（闭环阶段①）
 
-1. **发动机卡落库**：作者在审稿页确认（或编辑后确认）契约五条 → 存为书的发动机卡
-   （`engineCard.status: draft|confirmed`），进病历。
-2. **作者决策面板**：俗套点逐条 确认/作者意图/误报/搁置（复用 story-audit finding review 的形状）。
-3. **打开轨开关**：`premiseReviewEnabled = true`，阶段①开始产生待办与里程碑
-   （开启条件即 §2.9：发动机卡存在可确认的落点）。
-4. **导出补节**：导出 Markdown 增加"故事发动机"节（IA 文档已登记）。
+P1 于 2026-08-19 落地，四个子项及关键设计决策：
+
+1. **发动机卡落库**：作者在审稿页编辑（预填编辑重述）后以 `draft`/`confirmed` 两种动作保存。
+   - 契约类型 `PremiseEngineCard` 在 ai-core（与 story-audit 快照同构：api 的 repository 直接
+     alias ai-core 类型，不复制定义）。
+   - 每书 0..1 张：`projectId` 主键 + `onConflictDoUpdate` upsert（区别于 story-audit
+     finding review 的三列复合键）——重述会随重审更新，确认动作可重做（改写后再确认即覆盖）。
+   - 端点在独立 `PremiseAssetsController`（`analysis/workspace/premise/*`），避免撑爆
+     workspace.controller 的 ≤50 行纪律。
+   - 确认时服务端补 `confirmedAt`（已有则保留，支持草稿→确认→改写→再确认不丢首次时间）。
+2. **作者决策面板**：每条俗套点下方四个动作（确认俗套/作者意图/误报/搁置），形状复用
+   story-audit finding review。
+   - `PremiseReviewResult.reviewId`（服务端每次审稿盖 uuid，镜像 `StoryAuditResult#auditId`）：
+     决策按 `(projectId, reviewId, findingId)` 复合唯一落库，重审永不混淆两轮判定。
+   - 引文被服务端剔除的 finding 不渲染决策行——没有可反驳证据的判定不允许作者背书。
+   - 无 reviewId 的旧结果决策行禁用（灰置而非隐藏，披露"这一轮不能判"）。
+3. **打开轨开关**：`ProjectCurrentPage` 传 `premiseReviewEnabled: true` +
+   `engineCardStatus: projectEngineCard?.status`，阶段①达成判定 = 存在 confirmed 卡。
+4. **导出补节**：api（`buildWorkspaceProjectMarkdown`）与 web（`buildProjectExportMarkdown`）
+   双侧导出均新增「## 故事发动机」节——状态/审稿判定/题材/确认时间 + 概述引文 + 契约五条；
+   无卡时输出占位文案，节序固定在项目概览之后、故事体检之前。
 
 ## 6. 维护规则
 

@@ -1,8 +1,8 @@
 ---
 title: 信息架构：以书为锚的旅程模型
 status: authoritative（从属于 product-doctrine.md，冲突时以产品教义为准）
-version: 0.1.0
-last_updated: 2026-08-18
+version: 0.2.0
+last_updated: 2026-08-19
 ---
 
 # 信息架构：以书为锚的旅程模型
@@ -31,18 +31,20 @@ last_updated: 2026-08-18
         ┌──────────┬─────────┼──────────┬───────────┐
         │          │         │          │           │
  发动机契约     诊疗记录    版本      故事体检     方法论卡
-（规划中,①）  Session   Version   StoryAudit  MethodologyCard
+  EngineCard  Session   Version   StoryAudit  MethodologyCard
   0..1        1..N      1..N      0..1        1..N
-              retestStatus  V1/V2   (via bookJobId)
+  draft/      retestStatus  V1/V2   (via bookJobId)
+  confirmed   +俗套判定(按reviewId)
 ```
 
-当前只有"发动机契约"是规划中的新对象（立项审稿的产物，见阶段①），其余对象均已落库。
+全部对象均已落库。发动机契约（`PremiseEngineCard`，每书 0..1 张，P1 落地）与俗套点作者判定
+（`PremiseFindingReview`，按 reviewId 隔离轮次）是阶段①的产物，详见 [`premise-review.md`](./premise-review.md)。
 
 ## 3. 旅程阶段轴
 
 | 阶段 | 回答的问题 | 完成产物（进病历） | 数据判定 | 路由归宿 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| ① 立项 | 这本书值得写吗 | 作者确认的发动机契约 | `engineCard.status === "confirmed"` | `/diagnose/idea` | 审稿页已上线（P0）；发动机卡落库与作者确认属 P1 |
+| ① 立项 | 这本书值得写吗 | 作者确认的发动机契约 | `engineCard.status === "confirmed"` | `/diagnose/idea` | 已有（P0 审稿 + P1 卡落库/确认面板，轨开关已打开） |
 | ② 结构 | 怎么安排章节 | 章节合同 | 有章节合同 | 暂空 | 后置到 P1，轴上留虚位 |
 | ③ 正文与初诊 | 写得好不好 | 诊断会话 + 证据 + 作者决定 | 存在任意 `RevisionSession` | `/diagnose/quick` 等 + `/project/health` | 已有 |
 | ④ 版本与复诊 | 改进了吗 | V2 + completed 复诊 + 对比 | `session.retestStatus` 走完 pending→completed | `/project/revisions` | 已有（服务端复诊） |
@@ -69,8 +71,10 @@ nextAction 阶梯（从最早未清项开始）：
 约束：
 
 - 阶段②恒为 `available: false`，不参与待办阶梯，P1 落地后接入。
-- 立项审稿闭环未落库前（`premiseReviewEnabled` 缺省），阶段①不产生待办：审稿页已上线，
-  但发动机卡尚无持久化，开启开关会让所有存量书籍永远停在"待审稿"。发动机卡落库后再开启。
+- `premiseReviewEnabled` 已随 P1 打开（`ProjectCurrentPage` 传 `engineCardStatus`）。
+  该开关曾经关闭的原因：里程碑判定是 `engineCard.status === "confirmed"`，
+  发动机卡没有落库时打开开关会让所有存量书籍永远停在"待审稿"。开关语义保留——
+  若未来需要临时下线立项审稿，回退为 false 即可让阶段①回到虚位。
 - 禁止用估算公式伪造旅程进度（如"资产数 × 系数"）；进度只能来自上表的数据判定。
 
 ## 5. 导航映射
@@ -108,10 +112,12 @@ nextAction 阶梯（从最早未清项开始）：
 ## 7. 实施现状
 
 - 已实现：`deriveBookStage` 纯函数 + 测试（`apps/web/src/lib/book-stage.ts`）；
-  书籍卡片上的阶段轨 UI（替换原估算进度条）；
-  阶段①立项审稿（P0，设计决策见 [`premise-review.md`](./premise-review.md)）——
+  书籍卡片上的阶段轨 UI（替换原估算进度条），`premiseReviewEnabled` 已打开；
+  阶段①立项审稿全链路（P0 + P1，设计决策见 [`premise-review.md`](./premise-review.md)）——
   `PremiseReviewResult` 契约（ai-core）、
   `POST /analysis/premise-review` 端点（两层俗套复核：原文引文定位 + LLM 二审）、
-  `/diagnose/idea` 审稿页与工作台入口卡。
-- 待实现：发动机卡持久化与作者确认面板（阶段①闭环，之后才打开
-  `premiseReviewEnabled`）；阶段②结构设计（P1）；导出 Markdown 增加"故事发动机"节。
+  `/diagnose/idea` 审稿页与工作台入口卡、
+  发动机卡落库（`premise_engine_cards` 表 + `analysis/workspace/premise/*` 端点 +
+  确认面板）、俗套点作者决策面板（`premise_finding_reviews` 表，按 reviewId 隔离轮次）、
+  导出 Markdown「故事发动机」节（api 与 web 双侧）。
+- 待实现：阶段②结构设计（轴上留虚位）。
