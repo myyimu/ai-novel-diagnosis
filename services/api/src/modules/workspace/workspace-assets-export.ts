@@ -1,4 +1,5 @@
 import type {
+  PremiseEngineCard,
   ProjectMethodologyCardSnapshot,
   RevisionSessionSnapshot,
   StoryAuditFindingReviewSnapshot,
@@ -6,6 +7,8 @@ import type {
   WorkspaceProjectSnapshot,
 } from "@/dao/entities/workspace-assets.entity";
 import {
+  PREMISE_ENGINE_CARD_STATUS_LABELS,
+  PREMISE_VERDICT_LABELS,
   buildPromptAttribution,
   type StoryAuditResult,
 } from "@ai-novel-diagnosis/ai-core";
@@ -59,6 +62,7 @@ export function buildWorkspaceProjectMarkdown(input: {
   revisionSessions: RevisionSessionSnapshot[];
   revisionVersions?: RevisionTextVersionSnapshot[];
   methodologyCards: ProjectMethodologyCardSnapshot[];
+  engineCard?: PremiseEngineCard | null;
   storyAudit?: StoryAuditResult | null;
   storyAuditFindingReviews?: StoryAuditFindingReviewSnapshot[];
   generatedAt?: string;
@@ -106,6 +110,7 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- 方法论卡：${cards.length}`,
     `- Prompt 模板：${promptCards.length}`,
     `- 故事体检：${storyAuditExport ? "已包含摘要" : "暂无"}`,
+    `- 故事发动机：${input.engineCard ? PREMISE_ENGINE_CARD_STATUS_LABELS[input.engineCard.status] : "暂无"}`,
     "",
     "## 项目概览",
     "",
@@ -116,6 +121,8 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- 常见问题：${commonIssues.join("、") || "暂无"}`,
     "",
   ];
+
+  appendEngineCardMarkdown(lines, input.engineCard || null);
 
   appendStoryAuditMarkdown(lines, storyAuditExport);
 
@@ -234,6 +241,34 @@ export function buildWorkspaceProjectMarkdown(input: {
   }
 
   return `${lines.join("\n").trim()}\n`;
+}
+
+function appendEngineCardMarkdown(
+  lines: string[],
+  engineCard: PremiseEngineCard | null,
+) {
+  lines.push("## 故事发动机", "");
+
+  if (!engineCard) {
+    lines.push("暂无发动机卡（这本书尚未走立项审稿确认）。", "");
+    return;
+  }
+
+  lines.push(
+    `- 状态：${PREMISE_ENGINE_CARD_STATUS_LABELS[engineCard.status]}`,
+    `- 审稿判定：${PREMISE_VERDICT_LABELS[engineCard.engineVerdict]}`,
+    `- 题材：${engineCard.genre || "未指定"}`,
+    `- 确认时间：${engineCard.confirmedAt ? formatDateTime(engineCard.confirmedAt) : "尚未确认"}`,
+    "",
+    `> ${escapeMarkdown(engineCard.premiseSummary)}`,
+    "",
+    `- 核心冲突：${engineCard.coreConflict}`,
+    `- 主角欲望：${engineCard.protagonistDesire}`,
+    `- 对立阻力：${engineCard.opposingForce}`,
+    `- 不可替代性测试：${engineCard.irreducibilityTest}`,
+    `- 读者钩子问题：${engineCard.readerHookQuestion}`,
+    "",
+  );
 }
 
 function buildStoryAuditExportSnapshot({

@@ -265,4 +265,65 @@ describe("buildWorkspaceProjectMarkdown", () => {
     expect(markdown).toContain("信息不足，暂不评分");
     expect(markdown).not.toContain("0/10");
   });
+
+  it("exports the story engine section from a confirmed engine card", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      engineCard: {
+        projectId: "project-a",
+        status: "confirmed",
+        premiseSummary: "一个少年用禁忌力量向灭门仇人复仇的故事。",
+        coreConflict: "主角想复仇，而仇人是唯一能救他妹妹的人。",
+        protagonistDesire: "救妹妹，且不放弃复仇。",
+        opposingForce: "仇人的救命之恩与宗门的追杀令。",
+        irreducibilityTest: "换成现代都市背景后两难依然成立。",
+        readerHookQuestion: "他会在救人与复仇之间选哪一边？",
+        engineVerdict: "fixable",
+        genre: "xuanhuan",
+        reviewId: "premise-review-42",
+        confirmedAt: "2026-08-19T08:00:00.000Z",
+        updatedAt: "2026-08-19T08:00:00.000Z",
+      },
+      generatedAt: "2026-08-19T09:00:00.000Z",
+    });
+
+    expect(markdown).toContain("故事发动机：已确认");
+    expect(markdown).toContain("## 故事发动机");
+    // The engine section sits between 项目概览 and the diagnosis records.
+    expect(markdown.indexOf("## 故事发动机")).toBeGreaterThan(
+      markdown.indexOf("## 项目概览"),
+    );
+    expect(markdown).toContain("状态：已确认");
+    expect(markdown).toContain("审稿判定：值得写，但先修这几处");
+    expect(markdown).toContain(
+      "核心冲突：主角想复仇，而仇人是唯一能救他妹妹的人。",
+    );
+    expect(markdown).toContain("读者钩子问题：他会在救人与复仇之间选哪一边？");
+  });
+
+  it("reports the story engine section as absent without an engine card", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-08-19T09:00:00.000Z",
+    });
+
+    expect(markdown).toContain("故事发动机：暂无");
+    expect(markdown).toContain("暂无发动机卡（这本书尚未走立项审稿确认）。");
+  });
 });
