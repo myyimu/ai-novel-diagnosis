@@ -189,12 +189,13 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   真正的难点，工程量小于 T2。提示词草案（ASK/JUDGE/CONTRACT-REVIEW 三份 + 编排状态机 +
   人工验证脚本与判废标准）见 [`premise-dialogue-prompts.md`](./premise-dialogue-prompts.md)，
   验证通过前工程不动工。
-- **验证进度（2026-08-19 首轮，真实模型）**：AI Horde 匿名池 gemma-4-31b 上
-  4/5 场景 + ASK×2 通过，判废标准零命中（无代写、quoteAuthor 编造率 0%、无判定漂移）；
-  场景 3（谄媚检测）与 CONTRACT-REVIEW 因通道限制（英文思维链 + 匿名池 512 token 截断）
-  未取得有效判定——**工程仍未动工**，待正式端点（如智谱 GLM + jsonMode）复验这两个场景、
-  并按 §7 记录给 ASK 补「单问号」「不虚构原文细节」两条硬约束后重验。完整记录与
-  原始输出见 [`premise-dialogue-validation-report.md`](./premise-dialogue-validation-report.md)。
+- **验证进度（2026-08-19，两轮真实模型，已通过）**：首轮 AI Horde 匿名池 gemma-4-31b
+  4/5 场景通过（场景 3 与 CONTRACT-REVIEW 因通道截断未取得判定）；第二轮在生产级通道
+  qwen3.8-max（百炼 compatible-mode）全场景复验通过——谄媚检测顶住反驳不翻转、代写诱惑
+  零渗出、CONTRACT-REVIEW 收紧后复验通过，判废标准零命中。验证中收紧两处提示词
+  （ASK 单问号+不虚构原文细节；CONTRACT quoteAuthor 单字段连续片段）。**工程动工前置
+  已满足**。完整记录见 [`premise-dialogue-prompts.md`](./premise-dialogue-prompts.md) §7
+  与 [`premise-dialogue-validation-report.md`](./premise-dialogue-validation-report.md)。
 - **验收**：每轮评判锚定作者原话；作者版契约由作者写出（模型只提问不代写）；
   对话轮次有硬上限；产出进病历且可导出。
 - **刻意不做**：无上限自由聊天；模型替作者填契约字段。

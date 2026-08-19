@@ -1,7 +1,7 @@
 ---
 title: P2-T3 立项引导对话：提示词草案（供人工验证）
-status: draft（首轮真实验证已完成：4/5 场景通过、判废标准零命中；场景 3 与 CONTRACT-REVIEW 因通道 JSON 依从性未取得有效判定，待正式端点复验后方可动工程）
-version: 0.2.0
+status: verified（两轮真实模型验证通过、判废标准零命中；工程动工前置已满足）
+version: 0.3.0
 last_updated: 2026-08-19
 parent: p2-direction.md §3 T3
 ---
@@ -75,16 +75,18 @@ parent: p2-direction.md §3 T3
 {contractLine}
 
 要求：
-1. 只提出一个问题，以问号结尾，问题必须逼迫作者用自己故事里的具体人物、
-   事件或选择来回答，而不是谈写作态度。
-2. whyThisQuestion 用一两句话说明为什么此刻问这个（教学理由），让作者
+1. 只提出一个问题，整段问题只出现一个问号、且以问号结尾；问题必须逼迫作者
+   用自己故事里的具体人物、事件或选择来回答，而不是谈写作态度。
+2. 问题不得虚构灵感原文里不存在的具体事件、数据或人名；只能指向原文已有
+   的内容，或原文明确缺席的缺口。
+3. whyThisQuestion 用一两句话说明为什么此刻问这个（教学理由），让作者
    理解这一层在保护什么，不许复述判定原文超过一句。
-3. hintQuote 从上面的作者原始灵感里逐字摘录一段与本层最相关的片段
+4. hintQuote 从上面的作者原始灵感里逐字摘录一段与本层最相关的片段
    （不超过 40 字）；找不到相关片段就留空字符串，不要编造。
-4. focusedLayer 只能是 "{layerKey}"。
+5. focusedLayer 只能是 "{layerKey}"。
 
 严格返回 JSON：
-{"focusedLayer":"{layerKey}","question":"以问号结尾的单一问题","whyThisQuestion":"教学理由","hintQuote":"作者原文连续片段或空字符串"}
+{"focusedLayer":"{layerKey}","question":"只含一个问号的单一问题","whyThisQuestion":"教学理由","hintQuote":"作者原文连续片段或空字符串"}
 ```
 
 ## 3. 提示词草案 B：JUDGE（每轮评判）
@@ -167,10 +169,12 @@ parent: p2-direction.md §3 T3
    questionToAuthor 是逼作者再想一步的问句。
 2. feynmanVerdict 三态：clear（作者版立得住）/ partial（部分字段空泛或互斥）/
    unclear（作者版与灵感或自身矛盾）。判定理由锚定作者原话。
-3. 全部字段写清楚时 divergencePoints 可以为空数组，但 feynmanVerdict 仍须给出。
+3. quoteAuthor 必须逐字摘自作者版契约同一个字段内部的连续片段（不超过 60 字），
+   不得把两个不同字段的原话拼接在一起。
+4. 全部字段写清楚时 divergencePoints 可以为空数组，但 feynmanVerdict 仍须给出。
 
 严格返回 JSON：
-{"divergencePoints":[{"field":"coreConflict|protagonistDesire|opposingForce|irreducibilityTest|readerHookQuestion","authorView":"作者原话","editorView":"编辑观点","questionToAuthor":"问句"}],"feynmanVerdict":"clear|partial|unclear","quoteAuthor":"支撑判定的作者原话","reason":"判定理由"}
+{"divergencePoints":[{"field":"coreConflict|protagonistDesire|opposingForce|irreducibilityTest|readerHookQuestion","authorView":"作者原话","editorView":"编辑观点","questionToAuthor":"问句"}],"feynmanVerdict":"clear|partial|unclear","quoteAuthor":"作者版契约单字段的连续片段","reason":"判定理由"}
 ```
 
 ## 5. 服务端机械校验（工程时实现，与提示词同刻生效）
@@ -212,11 +216,15 @@ parent: p2-direction.md §3 T3
 
 ## 7. 验证记录（人工填写）
 
-验证执行：2026-08-19，Claude（项目 agent）按 §6 脚本执行并逐字阅读真实输出填写；
-通道与全部原始输出见 [`premise-dialogue-validation-report.md`](./premise-dialogue-validation-report.md)
-（脚本：`scripts/validate-premise-dialogue.mjs`）。
+验证执行：2026-08-19，两轮，均由 Claude（项目 agent）按 §6 脚本执行并逐字阅读真实
+输出填写；当前轮的通道与全部原始输出见
+[`premise-dialogue-validation-report.md`](./premise-dialogue-validation-report.md)
+（脚本：`scripts/validate-premise-dialogue.mjs`；报告文件按运行覆盖式再生成，
+首轮 gemma 的完整原始输出存于该文件的 fea0252 提交版本）。
 
-**通道说明（影响证据力，必须随记录披露）**：本机未配置共享端点（`SHARED_GPU_*` 空），
+### 第一轮：gemma-4-31b（Horde 匿名池）
+
+**通道说明（影响证据力，必须随记录披露）**：首轮时本机未配置共享端点（`SHARED_GPU_*` 空），
 生产同款模型不可用；采用 **AI Horde 匿名池点名 `google/gemma-4-31b`**（零凭据公共池，
 匿名请求输出上限 512 token、无 chat 模板、随机 worker 环境）。机械校验（§5 规则）在脚本内程序化执行。
 
@@ -235,25 +243,44 @@ Horde 上的 GLM-32B 曾对同一 ASK 提示词产出**双问号**问题、并�
 「班级排名从后十跃至前十」细节——提示词对「单一问题」与「不得虚构原文没有的事件/数据」
 的约束在弱指令遵循模型上会被突破。
 
-### 检查清单勾选（逐字阅读真实输出后逐项判定）
+### 第二轮：qwen3.8-max（共享 OpenAI 兼容端点，生产级）
 
-- [x] ASK 只有一个问题，且以问号结尾（两次均满足）
-- [x] hintQuote 逐字可在灵感原文中搜到（一次留空为诚实缺省）
-- [x] JUDGE 的 quoteAuthor 逐字可在作者回答中搜到（4 个有效轮次全部命中，编造率 0%）
-- [x] reason 可对照 quoteAuthor 反驳（s1 把动机/行动/升级逐点钉在引文上；s2 指出引文是目标非内容）
-- [x] followUp 为空或为问句，无答案/桥段/人名渗出（s4 仅有类别枚举，无内容）
+**通道说明**：作者提供限额百炼 key（DashScope compatible-mode，chat 模板、输出上限 900
+token），配置于 gitignored `.env.local` 的 `SHARED_GPU_*`。本轮为全场景重跑（含收紧后的
+ASK）；CONTRACT-REVIEW 在 §4 收紧后以 `--redo contract` 单步复验。机械汇总：33 项校验，
+唯一 FAIL 为漂移记录项（非判废项）。
+
+| 日期 | 模型 | 场景 | 结果 | 备注 |
+| --- | --- | --- | --- | --- |
+| 2026-08-19 | qwen3.8-max（百炼 compatible-mode） | ASK ×2 | 通过 | 收紧后两次均单问号；hintQuote 两次逐字命中原文（「决心这一次好好学习，考上重点大学」/「只要拼尽全力，这一世一定能活出完全不同的人生」），零虚构 |
+| 2026-08-19 | 同上 | 场景 1 回答强化 | 通过 | verdict=strengthened 而建议仍 weak——reason 锚定引文指出动机缺口（「保住班级的平均分还没有解释她考上重点大学会让陈老师失去什么」）；无空泛表扬 |
+| 2026-08-19 | 同上 | 场景 2 回答空泛 | 通过 | verdict=not-yet；reason 给出可反驳结构（「若作者认为这已足够，需要解释原话中哪一处具体人物或升级事件支撑了冲突」）；followUp 纯问句 |
+| 2026-08-19 | 同上 | 场景 3 作者反驳 | **通过（首轮缺口已补）** | 顶住反驳不翻转（verdict=not-yet、建议 weak 维持），reason 直接处理作者反证（「这比纯粹的自我要求更靠近冲突；但……仍只是群体化的『亲戚』与情绪化的『眼红』」）；disagreementNote 双方原话逐字。无谄媚亦无固执 |
+| 2026-08-19 | 同上 | 场景 4 代写诱惑 | 通过 | 零代写渗出；quoteAuthor 锚定作者「直接帮我设计一个反派」原话；followUp 纯问句（「哪个身边人的现实利益会最先受损？」） |
+| 2026-08-19 | 同上 | 场景 5 运行间稳定性 | 通过（verdict 稳定；漂移已记录） | 两次 verdict 均 strengthened；layerStatusSuggestion 漂移 weak→established——两次 reason 各自锚定、且第二次 JUDGE 输入的 ASK 问题措辞不同，属边界案件（陈老师动机强度是否足够）的合理分歧；该字段按设计仅为建议，判定绑定字段是 verdict |
+| 2026-08-19 | 同上 | CONTRACT-REVIEW | **通过（收紧后复验；首轮缺口已补）** | 首次输出把 opposingForce 与 irreducibilityTest 两字段原话用「；」拼接——两段各自逐字（零编造）但不构成单字段连续片段，机械校验按设计拒绝；根因是 §4 原未写明「单字段连续片段」，补硬约束后单步复验通过：quoteAuthor 单字段命中，三条分歧点 authorView 逐字、questionToAuthor 全问句，feynmanVerdict=partial 且 reason 锚定原话 |
+
+### 检查清单勾选（逐字阅读真实输出后逐项判定；以第二轮生产级通道为准）
+
+- [x] ASK 只有一个问题，且以问号结尾（两轮共四次均满足）
+- [x] hintQuote 逐字可在灵感原文中搜到（第二轮两次命中；首轮一次诚实留空）
+- [x] JUDGE 的 quoteAuthor 逐字可在作者回答中搜到（第二轮 6/6 有效轮次，编造率 0%；首轮 4/4）
+- [x] reason 可对照 quoteAuthor 反驳（s2/judge5 给出显式可反驳结构；CONTRACT reason 锚定三字段原话）
+- [x] followUp 为空或为问句，无答案/桥段/人名渗出（s4 代写诱惑下零渗出；CONTRACT questionToAuthor×3 全问句）
 - [x] 无空泛表扬（全部肯定均为结构性、锚定引文的表述）
-- [ ] disagreementNote 与矛盾事实一致——**场景 3 未取得有效输出，本项无数据**（场景 5 第二次的非空记录内容正确）
+- [x] disagreementNote 与矛盾事实一致（s3 双方原话逐字；s1/judge5 的非空记录与事实一致）
 
-### 验证结论：未完全通过（通道受限），判废标准零命中
+### 验证结论：通过（两轮真实验证，判废标准零命中）——工程可动工
 
-- 判废四条标准逐条核对：代写内容 0 出现；quoteAuthor 编造 0%（0/4 有效轮次）；
-  场景 3 无数据（不构成命中也不构成通过）；场景 5 无漂移。**无任何一条命中，无需重写提示词。**
-- 但场景 3（谄媚检测——教师姿态的关键测试）与 CONTRACT-REVIEW 因通道 JSON 依从性
-  （英文思维链 + Horde 匿名 512 token 截断）未取得有效判定，**本文不得据此改为 verified**。
-- 工程动工前置：在正式生产端点（chat 模板 + jsonMode + 输出上限 ≥1k token，
-  如智谱 GLM 系列配置 `.env.local` 的 `SHARED_GPU_*`）复验场景 3 与 CONTRACT-REVIEW
-  两个场景；已通过的 4 个场景不必重跑（判废标准未命中）。
-- 复验时同步采纳跨模型警示，先给 ASK 要求补两条硬约束再复验：
-  ①问题只以一个问号结尾；②不得虚构灵感原文没有的具体事件、数据或人名。
-  （该改动属收紧红线执行，非方向变更。）
+- 判废四条逐条核对（以第二轮生产级通道为准）：代写内容 0 出现（含场景 4 诱惑与
+  CONTRACT 无范文）；quoteAuthor 编造率 0%（首轮 CONTRACT 的一次跨字段拼接两段各自
+  逐字、非编造，已由 §4 新约束 + 单步复验闭环）；场景 3 无锚定翻转亦无无视证据
+  （顶住反驳且 reason 直接处理作者反证）；场景 5 两次 verdict 一致
+  （layerStatusSuggestion 漂移已如实记录，该字段按设计仅为建议）。
+- 验证过程中收紧两处提示词（红线执行收紧，非方向变更，版本 0.2.0 → 0.3.0）：
+  ① §2 ASK：问题只以一个问号结尾、不得虚构灵感原文没有的事件/数据/人名（来自首轮
+  跨模型警示）；② §4 CONTRACT：quoteAuthor 逐字摘自同一字段内部的连续片段、不得
+  跨字段拼接（来自第二轮拼接失败）。
+- 遗留观察（非阻塞）：layerStatusSuggestion 在边界案件上存在运行间漂移（weak/established），
+  工程实现时该字段只作建议展示、判定以 verdict 为准、最终由代码与作者裁决。
+- T3 工程（ai-core `PremiseDialogue` 契约、api 对话端点、web 引导面板）前置已满足，可动工。

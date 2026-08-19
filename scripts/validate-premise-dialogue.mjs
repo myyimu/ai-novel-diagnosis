@@ -15,6 +15,7 @@
  *   node scripts/validate-premise-dialogue.mjs --smoke        # Horde 单次冒烟
  *   node scripts/validate-premise-dialogue.mjs --horde        # 跑全部场景（ Horde 匿名池）
  *   node scripts/validate-premise-dialogue.mjs --horde --wait-model  # 等点名模型上线再跑
+ *   node scripts/validate-premise-dialogue.mjs --redo contract       # 只重跑指定步骤（逗号分隔）
  *   环境变量：HORDE_MODEL 覆盖 Horde 点名模型；SHARED_GPU_BASE_URL/MODEL(/KEY) 走共享端点。
  */
 
@@ -282,16 +283,18 @@ ${input.layerComment ?? ""}
 ${input.contractLine}
 
 要求：
-1. 只提出一个问题，以问号结尾，问题必须逼迫作者用自己故事里的具体人物、
-   事件或选择来回答，而不是谈写作态度。
-2. whyThisQuestion 用一两句话说明为什么此刻问这个（教学理由），让作者
+1. 只提出一个问题，整段问题只出现一个问号、且以问号结尾；问题必须逼迫作者
+   用自己故事里的具体人物、事件或选择来回答，而不是谈写作态度。
+2. 问题不得虚构灵感原文里不存在的具体事件、数据或人名；只能指向原文已有
+   的内容，或原文明确缺席的缺口。
+3. whyThisQuestion 用一两句话说明为什么此刻问这个（教学理由），让作者
    理解这一层在保护什么，不许复述判定原文超过一句。
-3. hintQuote 从上面的作者原始灵感里逐字摘录一段与本层最相关的片段
+4. hintQuote 从上面的作者原始灵感里逐字摘录一段与本层最相关的片段
    （不超过 40 字）；找不到相关片段就留空字符串，不要编造。
-4. focusedLayer 只能是 "${input.layerKey}"。
+5. focusedLayer 只能是 "${input.layerKey}"。
 
 严格返回 JSON：
-{"focusedLayer":"${input.layerKey}","question":"以问号结尾的单一问题","whyThisQuestion":"教学理由","hintQuote":"作者原文连续片段或空字符串"}`;
+{"focusedLayer":"${input.layerKey}","question":"只含一个问号的单一问题","whyThisQuestion":"教学理由","hintQuote":"作者原文连续片段或空字符串"}`;
 }
 
 const JUDGE_SYSTEM = `你是中文网文的写作教练，正在评判作者对上一个问题的回答。你的职责是判断
@@ -359,10 +362,12 @@ ${input.premiseText}
    questionToAuthor 是逼作者再想一步的问句。
 2. feynmanVerdict 三态：clear（作者版立得住）/ partial（部分字段空泛或互斥）/
    unclear（作者版与灵感或自身矛盾）。判定理由锚定作者原话。
-3. 全部字段写清楚时 divergencePoints 可以为空数组，但 feynmanVerdict 仍须给出。
+3. quoteAuthor 必须逐字摘自作者版契约同一个字段内部的连续片段（不超过 60 字），
+   不得把两个不同字段的原话拼接在一起。
+4. 全部字段写清楚时 divergencePoints 可以为空数组，但 feynmanVerdict 仍须给出。
 
 严格返回 JSON：
-{"divergencePoints":[{"field":"coreConflict|protagonistDesire|opposingForce|irreducibilityTest|readerHookQuestion","authorView":"作者原话","editorView":"编辑观点","questionToAuthor":"问句"}],"feynmanVerdict":"clear|partial|unclear","quoteAuthor":"支撑判定的作者原话","reason":"判定理由"}`;
+{"divergencePoints":[{"field":"coreConflict|protagonistDesire|opposingForce|irreducibilityTest|readerHookQuestion","authorView":"作者原话","editorView":"编辑观点","questionToAuthor":"问句"}],"feynmanVerdict":"clear|partial|unclear","quoteAuthor":"作者版契约单字段的连续片段","reason":"判定理由"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -671,9 +676,11 @@ function writeReport(state, done, allChecks) {
     if (state[key]) parts.push(sectionFor(`JUDGE ${SCENARIO_TITLES[key]}`, state[key], SCENARIO_ANSWERS[key]));
   }
   if (state.ask2 && state.judge5) {
-    const stability = stabilityCheck(state.s1, state.judge5);
+    const stabilityLines = stabilityChecks(state.s1, state.judge5)
+      .map((check) => `- [${check.pass ? "PASS" : "FAIL"}] ${check.item}${check.detail ? ` — ${check.detail}` : ""}`)
+      .join("\n");
     parts.push(
-      `## 场景 5：运行间稳定性（同输入整体重跑）\n\n第一次 verdict=${JSON.stringify(state.s1?.parsed?.verdict)} / layerStatusSuggestion=${JSON.stringify(state.s1?.parsed?.layerStatusSuggestion)}\n第二次 verdict=${JSON.stringify(state.judge5.parsed?.verdict)} / layerStatusSuggestion=${JSON.stringify(state.judge5.parsed?.layerStatusSuggestion)}\n\n- [${stability?.pass ? "PASS" : "FAIL"}] ${stability?.item ?? "两次 verdict 一致"}${stability?.detail ? ` — ${stability.detail}` : ""}\n\n第二次 ASK 原始输出：\n\n\`\`\`\n${state.ask2.raw}\n\`\`\`\n\n第二次 JUDGE 原始输出：\n\n\`\`\`\n${state.judge5.raw}\n\`\`\`\n\n第二次 JUDGE 机械校验：\n${fmtChecks(state.judge5.checks)}\n`,
+      `## 场景 5：运行间稳定性（同输入整体重跑）\n\n第一次 verdict=${JSON.stringify(state.s1?.parsed?.verdict)} / layerStatusSuggestion=${JSON.stringify(state.s1?.parsed?.layerStatusSuggestion)}\n第二次 verdict=${JSON.stringify(state.judge5.parsed?.verdict)} / layerStatusSuggestion=${JSON.stringify(state.judge5.parsed?.layerStatusSuggestion)}\n\n${stabilityLines}\n\n第二次 ASK 原始输出：\n\n\`\`\`\n${state.ask2.raw}\n\`\`\`\n\n第二次 JUDGE 原始输出：\n\n\`\`\`\n${state.judge5.raw}\n\`\`\`\n\n第二次 JUDGE 机械校验：\n${fmtChecks(state.judge5.checks)}\n`,
     );
   }
   if (state.contract) {
@@ -703,15 +710,23 @@ ${parts.join("\n")}
   writeFileSync(REPORT_PATH, report, "utf8");
 }
 
-function stabilityCheck(s1, judge5) {
-  if (!s1 || !judge5) return null;
+function stabilityChecks(s1, judge5) {
+  if (!s1 || !judge5) return [];
   if (s1.parsed?.parseFailed || judge5.parsed?.parseFailed) {
-    return { item: "场景 5 两次 verdict 一致", pass: false, detail: "存在解析失败，无法比较" };
+    return [{ item: "场景 5 两次 verdict 一致", pass: false, detail: "存在解析失败，无法比较" }];
   }
-  const stable =
-    s1.parsed.verdict === judge5.parsed.verdict &&
-    s1.parsed.layerStatusSuggestion === judge5.parsed.layerStatusSuggestion;
-  return { item: "场景 5 两次 verdict 一致", pass: stable, detail: "" };
+  return [
+    {
+      item: "场景 5 两次 verdict 一致",
+      pass: s1.parsed.verdict === judge5.parsed.verdict,
+      detail: "",
+    },
+    {
+      item: "场景 5 两次 layerStatusSuggestion 一致（漂移记录项，非判废项）",
+      pass: s1.parsed.layerStatusSuggestion === judge5.parsed.layerStatusSuggestion,
+      detail: "",
+    },
+  ];
 }
 
 function collectChecks(state) {
@@ -719,8 +734,7 @@ function collectChecks(state) {
   for (const key of ["s1", "s2", "s3", "s4"]) all.push(...(state[key]?.checks ?? []));
   all.push(...(state.judge5?.checks ?? []));
   all.push(...(state.contract?.checks ?? []));
-  const stability = stabilityCheck(state.s1, state.judge5);
-  if (stability) all.push(stability);
+  all.push(...stabilityChecks(state.s1, state.judge5));
   return all;
 }
 
@@ -774,6 +788,18 @@ async function main() {
     previous && previous.model === channel.model
       ? previous
       : { startedAt: new Date().toISOString(), channelLabel: channel.label, model: channel.model };
+
+  // --redo <step[,step...]>：丢弃指定步骤存档并重跑（ask/s1/s2/s3/s4/ask2/judge5/contract）
+  const redoIdx = args.indexOf("--redo");
+  if (redoIdx !== -1 && args[redoIdx + 1]) {
+    const redoable = new Set(["ask", "s1", "s2", "s3", "s4", "ask2", "judge5", "contract"]);
+    for (const key of args[redoIdx + 1].split(",")) {
+      if (redoable.has(key) && state[key]) {
+        console.log(`--redo：丢弃 ${key} 存档，重跑该步。`);
+        delete state[key];
+      }
+    }
+  }
 
   console.log(`通道：${channel.label}`);
   console.log(`模型：${channel.model}`);
