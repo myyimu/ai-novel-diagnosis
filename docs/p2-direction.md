@@ -186,7 +186,9 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
 - **落点**：ai-core `PremiseDialogue` 契约 + changeset；api 对话表 + 端点（挂 reviewId）；
   web 引导模式面板 + 作者版契约渲染。
 - **前置**：问题库提示词质量必须先人工验几轮（premise-review.md §6 纪律）——这是本路线
-  真正的难点，工程量小于 T2。
+  真正的难点，工程量小于 T2。提示词草案（ASK/JUDGE/CONTRACT-REVIEW 三份 + 编排状态机 +
+  人工验证脚本与判废标准）见 [`premise-dialogue-prompts.md`](./premise-dialogue-prompts.md)，
+  验证通过前工程不动工。
 - **验收**：每轮评判锚定作者原话；作者版契约由作者写出（模型只提问不代写）；
   对话轮次有硬上限；产出进病历且可导出。
 - **刻意不做**：无上限自由聊天；模型替作者填契约字段。
