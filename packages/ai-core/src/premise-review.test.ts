@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  PREMISE_ENGINE_CARD_STATUS_LABELS,
+  PREMISE_FINDING_REVIEW_STATE_LABELS,
+  PREMISE_FINDING_REVIEW_STATES,
   PREMISE_LAYER_META,
   PREMISE_REVIEW_LAYERS,
   PREMISE_UPGRADE_ORIENTATION_LABELS,
+  PREMISE_VERDICT_LABELS,
   type PremiseClicheFinding,
+  type PremiseEngineCard,
+  type PremiseFindingReview,
   type PremiseLayerAssessment,
   type PremiseReviewResult,
   type PremiseUpgradeDirection,
@@ -116,5 +122,54 @@ describe("premise review contract", () => {
     expect(Object.keys(PREMISE_UPGRADE_ORIENTATION_LABELS)).toContain(direction.orientation);
     expect(direction.changedConflict.length).toBeGreaterThan(0);
     expect(direction.preservedElements?.length).toBeGreaterThan(0);
+  });
+
+  it("should carry a server-stamped reviewId so decisions key on the exact run", () => {
+    const withId = result({ reviewId: "premise-review-42" });
+
+    expect(withId.reviewId).toBe("premise-review-42");
+    expect(result().reviewId).toBeUndefined();
+  });
+
+  it("should build an engine card from a confirmed contract with status labels", () => {
+    const source = result({ reviewId: "premise-review-42" });
+    const card: PremiseEngineCard = {
+      projectId: "project-1",
+      status: "confirmed",
+      premiseSummary: source.premiseSummary,
+      coreConflict: source.coreConflict,
+      protagonistDesire: source.protagonistDesire,
+      opposingForce: source.opposingForce,
+      irreducibilityTest: source.irreducibilityTest,
+      readerHookQuestion: source.readerHookQuestion,
+      engineVerdict: source.engineVerdict,
+      reviewId: source.reviewId,
+      confirmedAt: "2026-08-19T00:00:00.000Z",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    };
+
+    expect(PREMISE_ENGINE_CARD_STATUS_LABELS[card.status]).toBe("已确认");
+    expect(PREMISE_VERDICT_LABELS[card.engineVerdict]).toBe("值得写，但先修这几处");
+    expect(card.coreConflict).toBe(source.coreConflict);
+  });
+
+  it("should keep finding review states on the four author actions plus the default", () => {
+    expect(PREMISE_FINDING_REVIEW_STATES).toEqual([
+      "unreviewed",
+      "confirmed",
+      "author_intent",
+      "false_positive",
+      "deferred",
+    ]);
+
+    const review: PremiseFindingReview = {
+      projectId: "project-1",
+      reviewId: "premise-review-42",
+      findingId: "cliche-1",
+      reviewState: "author_intent",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    };
+
+    expect(PREMISE_FINDING_REVIEW_STATE_LABELS[review.reviewState]).toBe("作者意图");
   });
 });

@@ -77,6 +77,13 @@ export interface PremiseClicheFinding {
   verificationNote?: string;
 }
 
+/** Chinese labels for the three-state verdict, shared by web UI and api export. */
+export const PREMISE_VERDICT_LABELS: Record<PremiseReviewVerdict, string> = {
+  solid: "值得写",
+  fixable: "值得写，但先修这几处",
+  "not-worth-writing": "暂不值得写",
+};
+
 /** The three sanctioned upgrade orientations. */
 export type PremiseUpgradeOrientation = "emotion" | "intrigue" | "war";
 
@@ -114,6 +121,13 @@ export interface PremiseUpgradeDirection {
 export interface PremiseReviewResult {
   schemaVersion: PremiseReviewSchemaVersion;
 
+  /**
+   * Server-stamped id of this review run (mirrors StoryAuditResult#auditId).
+   * Author decisions on clicheFindings key on it, so re-reviews never mix
+   * decisions from different runs. Absent on legacy payloads.
+   */
+  reviewId?: string;
+
   /* —— 发动机契约重建（作者确认后成为发动机卡） —— */
   /** Neutral one-paragraph restatement of what the premise actually promises. */
   premiseSummary: string;
@@ -146,4 +160,73 @@ export interface PremiseReviewResult {
     unavailableCount: number;
     verifiedCount: number;
   };
+}
+
+/**
+ * Lifecycle of the engine card: "draft" while the author is still editing the
+ * restated contract, "confirmed" once they sign it — the stage-① milestone
+ * (`deriveBookStage` reads exactly this status).
+ */
+export type PremiseEngineCardStatus = "draft" | "confirmed";
+
+export const PREMISE_ENGINE_CARD_STATUS_LABELS: Record<PremiseEngineCardStatus, string> = {
+  draft: "草稿",
+  confirmed: "已确认",
+};
+
+/**
+ * The book's engine card (0..1 per project): the author-confirmed restatement
+ * of the story engine produced by a premise review. Persisted into the book's
+ * medical record; every later chapter can be checked against it.
+ */
+export interface PremiseEngineCard {
+  /** Anchors the card to one book; also the upsert key. */
+  projectId: string;
+  status: PremiseEngineCardStatus;
+  premiseSummary: string;
+  coreConflict: string;
+  protagonistDesire: string;
+  opposingForce: string;
+  irreducibilityTest: string;
+  readerHookQuestion: string;
+  /** The verdict the review carried when the contract was saved (provenance). */
+  engineVerdict: PremiseReviewVerdict;
+  genre?: string;
+  /** Which review run produced this contract. */
+  reviewId?: string;
+  confirmedAt?: string;
+  updatedAt: string;
+}
+
+/** Author decision states for one cliché finding, mirroring story-audit review. */
+export const PREMISE_FINDING_REVIEW_STATES = [
+  "unreviewed",
+  "confirmed",
+  "author_intent",
+  "false_positive",
+  "deferred",
+] as const;
+
+export type PremiseFindingReviewState = (typeof PREMISE_FINDING_REVIEW_STATES)[number];
+
+export const PREMISE_FINDING_REVIEW_STATE_LABELS: Record<PremiseFindingReviewState, string> = {
+  unreviewed: "未处理",
+  confirmed: "确认俗套",
+  author_intent: "作者意图",
+  false_positive: "误报",
+  deferred: "搁置",
+};
+
+/**
+ * One persisted author decision on a cliché finding. Keyed by
+ * (projectId, reviewId, findingId) so decisions stay attached to the exact
+ * review run that produced them.
+ */
+export interface PremiseFindingReview {
+  projectId: string;
+  reviewId: string;
+  findingId: string;
+  reviewState: PremiseFindingReviewState;
+  note?: string;
+  updatedAt: string;
 }
