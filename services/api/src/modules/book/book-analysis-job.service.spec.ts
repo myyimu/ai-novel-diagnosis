@@ -92,6 +92,8 @@ describe("BookAnalysisJobService", () => {
         phase: "outline",
         completedAt: expect.any(String),
       });
+      // 红线：这一章没有任何机械锚定的原文摘录，不得产生初核卡。
+      expect(snapshot.partialResult?.candidateChapterCards).toEqual([]);
 
       await service.recordChapterMap({
         jobId: VALID_JOB_ID,
@@ -100,6 +102,18 @@ describe("BookAnalysisJobService", () => {
           order: 5,
           title: "第五章 风起",
           analysisDepth: "deep",
+          summary: "主角拿到病历，与仇人第一次正面冲突。",
+          sourceAnchors: [
+            {
+              anchorId: "ch-5-anchor-1",
+              label: "关键证据",
+              quote: "他攥着那张缴费单。",
+              startOffset: 120,
+              endOffset: 131,
+            },
+          ],
+          sourceRiskSignals: ["重生记忆无代价"],
+          foreshadowingSetups: ["妹妹的病历来源不明"],
         },
         mapCount: 11,
         totalChapters: 10,
@@ -114,6 +128,21 @@ describe("BookAnalysisJobService", () => {
         phase: "deep",
         completedAt: expect.any(String),
       });
+      expect(snapshot.partialResult?.candidateChapterCards).toEqual([
+        {
+          chapterId: "ch-5",
+          order: 5,
+          title: "第五章 风起",
+          depth: "deep",
+          completedAt: expect.any(String),
+          summary: "主角拿到病历，与仇人第一次正面冲突。",
+          anchoredQuotes: [
+            { quote: "他攥着那张缴费单。", startOffset: 120, endOffset: 131 },
+          ],
+          riskSignals: ["重生记忆无代价"],
+          setupSignals: ["妹妹的病历来源不明"],
+        },
+      ]);
     } finally {
       await Promise.all([
         rm(storageDir, { recursive: true, force: true }),

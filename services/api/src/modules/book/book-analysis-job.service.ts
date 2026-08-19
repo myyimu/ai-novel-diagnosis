@@ -17,6 +17,11 @@ import {
 import { join, sep } from "node:path";
 import { AnalysisPersistenceRepository } from "./analysis-persistence.repository";
 import {
+  buildChapterCandidateCard,
+  mergeChapterCandidateCards,
+  type ChapterCandidateCard,
+} from "./chapter-candidate-cards";
+import {
   validateJobId,
   resolveSafePath,
 } from "../../shared/utils/path-sanitizer";
@@ -65,6 +70,12 @@ export interface BookAnalysisPartialResult {
     phase: "outline" | "deep";
     completedAt: string;
   };
+  /**
+   * 逐章初核卡（P2-T2 深水区）：map 每章完成时提取，只有携带机械锚定
+   * 原文摘录的章节才入列。信号与锚点为章级关系，未逐条锚定——展示层
+   * 必须分栏标注。深拆覆盖同章轻索引卡，最多保留最近完成的 80 张。
+   */
+  candidateChapterCards?: ChapterCandidateCard[];
 }
 
 export interface BookAnalysisJobSnapshot {
@@ -354,6 +365,10 @@ export class BookAnalysisJobService implements OnModuleInit {
         input.phase,
         now,
       ),
+      candidateChapterCards: mergeChapterCandidateCards(
+        job.partialResult?.candidateChapterCards ?? [],
+        buildChapterCandidateCard(input.chapterMap, now),
+      ),
     };
     job.updatedAt = now;
     await this.repository.updateJob(input.jobId, {
@@ -614,6 +629,7 @@ export class BookAnalysisJobService implements OnModuleInit {
             deepTargetOrders: job.partialResult.deepTargetOrders,
             deepCompletedCount: job.partialResult.deepCompletedCount,
             lastCompletedChapter: job.partialResult.lastCompletedChapter,
+            candidateChapterCards: job.partialResult.candidateChapterCards,
           }
         : undefined,
     };
