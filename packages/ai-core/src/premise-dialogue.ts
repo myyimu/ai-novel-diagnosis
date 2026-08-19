@@ -608,8 +608,13 @@ export interface PremiseDialogueTurnRecord {
   ask: PremiseDialogueAskRecord;
   authorAnswer?: string;
   judge?: PremiseDialogueJudgeRecord;
-  /** Set when the server rejected the judgment for failing the anchoring check. */
-  judgeRejected?: { reason: "quote-not-found" };
+  /**
+   * Set when the server rejected the judgment: "quote-not-found" = the
+   * anchoring check failed (§5, final — the judgment is discarded);
+   * "model-failed" = the model call or output coercion failed (retryable
+   * via a dedicated re-judge call).
+   */
+  judgeRejected?: { reason: "quote-not-found" | "model-failed" };
 }
 
 export type PremiseDialogueSessionStatus = "active" | "collecting" | "completed";
