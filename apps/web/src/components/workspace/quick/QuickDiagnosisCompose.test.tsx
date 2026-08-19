@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { QuickDiagnosisCompose } from "./QuickDiagnosisCompose";
 import type { PlatformFitResult } from "@/lib/workspace-analysis-client";
 import type { ProjectMethodologyCard, QuickReviewResult } from "@/stores/workspace-store";
+import { defaultProvider } from "@/stores/workspace-types";
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({
@@ -12,7 +13,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const baseHandlers = {
-	provider: { kind: "mock" as const, model: "" },
+	provider: defaultProvider,
 	providerLabel: "本地演示",
 	isBackendFreeProvider: true,
 	loading: null,

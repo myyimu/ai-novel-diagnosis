@@ -10,6 +10,8 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
+import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { buildQuickReviewQaReport } from "@/lib/report-qa-text";
 import type { PlatformFitResult } from "@/lib/workspace-analysis-client";
 import {
 	looksLikeMarkdownText,
@@ -18,6 +20,7 @@ import {
 } from "@/lib/pasted-text";
 import type {
 	ChapterPosition,
+	ProviderForm,
 	QuickReviewResult,
 	WorkspaceProject,
 } from "@/stores/workspace-store";
@@ -26,7 +29,7 @@ import { CheckCircle2, Clipboard, Loader2, ShieldCheck, TriangleAlert } from "lu
 type QuickIssue = NonNullable<QuickReviewResult["issues"]>[number];
 
 interface QuickDiagnosisHandlers {
-	provider: { kind: "mock" | "openai-compatible"; model: string };
+	provider: ProviderForm;
 	providerLabel: string;
 	isBackendFreeProvider: boolean;
 	loading: import("@/hooks/use-workspace-handlers").LoadingState;
@@ -626,22 +629,32 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 				) : null}
 
 				{handlers.quickReviewResult ? (
-					<ResultSection
-						result={handlers.quickReviewResult}
-						issues={issues}
-						fixes={fixes}
-						quickScore={quickScore}
-						confidence={confidence}
-						focusValue={focusValue}
-						rewritePrompt={rewritePrompt}
-						revisionCount={handlers.projectRevisionSessions.length}
-						methodologyCount={handlers.projectMethodologyCards.length}
-						platformFit={handlers.quickReviewPlatformFit}
-						isAnalyzingPlatformFit={handlers.loading === "platform-fit"}
-						onAnalyzePlatformFit={handlers.analyzeQuickReviewPlatformFit}
-						isGeneratingMethodology={handlers.loading === "methodology"}
-						onGenerateMethodology={handlers.generateQuickReviewMethodology}
-					/>
+					<>
+						<ResultSection
+							result={handlers.quickReviewResult}
+							issues={issues}
+							fixes={fixes}
+							quickScore={quickScore}
+							confidence={confidence}
+							focusValue={focusValue}
+							rewritePrompt={rewritePrompt}
+							revisionCount={handlers.projectRevisionSessions.length}
+							methodologyCount={handlers.projectMethodologyCards.length}
+							platformFit={handlers.quickReviewPlatformFit}
+							isAnalyzingPlatformFit={handlers.loading === "platform-fit"}
+							onAnalyzePlatformFit={handlers.analyzeQuickReviewPlatformFit}
+							isGeneratingMethodology={handlers.loading === "methodology"}
+							onGenerateMethodology={handlers.generateQuickReviewMethodology}
+						/>
+						<section className="mt-[22px]">
+							<ReportQaPanel
+								provider={handlers.provider}
+								reportKind="quick-review"
+								report={buildQuickReviewQaReport(handlers.quickReviewResult)}
+								sourceText={handlers.chapterText}
+							/>
+						</section>
+					</>
 				) : null}
 			</div>
 

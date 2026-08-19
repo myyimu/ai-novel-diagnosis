@@ -20,6 +20,9 @@ import {
 	type PremiseReviewResult,
 	type PremiseReviewVerdict,
 } from "@ai-novel-diagnosis/ai-core";
+import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { buildPremiseReviewQaReport } from "@/lib/report-qa-text";
+import type { ProviderForm } from "@/stores/workspace-store";
 import { Clipboard, FileCheck2, Loader2, PenLine, ShieldCheck, TriangleAlert } from "lucide-react";
 
 /** The editable engine-card draft: the six restated contract lines. */
@@ -37,6 +40,8 @@ export type PremiseFindingDecision = Exclude<PremiseFindingReviewState, "unrevie
 export interface PremiseReviewComposeProps {
 	providerLabel: string;
 	isMockProvider: boolean;
+	/** 报告问答（P2-T1）用当前供应商发起无状态提问。 */
+	provider: ProviderForm;
 	premiseText: string;
 	onPremiseTextChange: (value: string) => void;
 	genre: string;
@@ -144,6 +149,7 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 	const {
 		providerLabel,
 		isMockProvider,
+		provider,
 		premiseText,
 		onPremiseTextChange,
 		genre,
@@ -380,20 +386,30 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 				) : null}
 
 				{result ? (
-					<PremiseReviewResultSection
-						result={result}
-						onWriteFirstChapter={onWriteFirstChapter}
-						targetProjectName={targetProjectName}
-						contract={contract}
-						onContractChange={onContractChange}
-						engineCard={engineCard}
-						isSavingCard={isSavingCard}
-						cardError={cardError}
-						onSaveCard={onSaveCard}
-						reviewByFindingId={reviewByFindingId}
-						isSavingReview={isSavingReview}
-						onReviewFinding={onReviewFinding}
-					/>
+					<>
+						<PremiseReviewResultSection
+							result={result}
+							onWriteFirstChapter={onWriteFirstChapter}
+							targetProjectName={targetProjectName}
+							contract={contract}
+							onContractChange={onContractChange}
+							engineCard={engineCard}
+							isSavingCard={isSavingCard}
+							cardError={cardError}
+							onSaveCard={onSaveCard}
+							reviewByFindingId={reviewByFindingId}
+							isSavingReview={isSavingReview}
+							onReviewFinding={onReviewFinding}
+						/>
+						<section className="mt-[22px]">
+							<ReportQaPanel
+								provider={provider}
+								reportKind="premise-review"
+								report={buildPremiseReviewQaReport(result)}
+								sourceText={premiseText}
+							/>
+						</section>
+					</>
 				) : contract && engineCard ? (
 					<section className="mt-[22px]">
 						<EngineCardEditor

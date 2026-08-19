@@ -13,6 +13,8 @@ import type {
 	StoryAuditProfile,
 	QuickReviewInputKind,
 	QuickReviewResult,
+	ReportQaReportKind,
+	ReportQaResult,
 	ResearchComparisonResult,
 	ResearchQaResult,
 	RevisionSession,
@@ -716,5 +718,31 @@ export function askResearchLibrary({
 		question,
 		jobIds,
 		answerMode: "beginner",
+	});
+}
+
+/**
+ * 报告问答：无状态端点——报告内容由客户端携带，回答与引用不落库。
+ * 引用锚定（子串校验）在服务端完成，此处只负责发送。
+ */
+export function requestReportQa({
+	provider,
+	question,
+	reportKind,
+	report,
+	sourceText,
+}: {
+	provider: ProviderForm;
+	question: string;
+	reportKind: ReportQaReportKind;
+	report: string;
+	sourceText?: string;
+}) {
+	return postJson<ReportQaResult>("/analysis/report-qa", {
+		provider,
+		question: question.trim(),
+		reportKind,
+		report,
+		sourceText: sourceText?.trim() || undefined,
 	});
 }

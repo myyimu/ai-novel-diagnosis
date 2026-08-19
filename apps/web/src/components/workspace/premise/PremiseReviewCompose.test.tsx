@@ -7,6 +7,7 @@ import type {
 	PremiseFindingReview,
 	PremiseReviewResult,
 } from "@ai-novel-diagnosis/ai-core";
+import { defaultProvider } from "@/stores/workspace-types";
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({
@@ -121,6 +122,7 @@ function baseProps(overrides: Partial<Parameters<typeof PremiseReviewCompose>[0]
 	return {
 		providerLabel: "本地演示",
 		isMockProvider: true,
+		provider: defaultProvider,
 		premiseText: "",
 		onPremiseTextChange: () => {},
 		genre: "",

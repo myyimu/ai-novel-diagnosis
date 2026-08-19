@@ -21,6 +21,8 @@ import {
 	RedesignWorkspaceShell,
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
+import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { buildStoryAuditQaReport } from "@/lib/report-qa-text";
 import {
 	readBookAnalysisJob,
 	readStoryAuditFindingReviews,
@@ -84,6 +86,7 @@ export function ProjectHealthPage() {
 		projectRevisionSessions,
 		projectMethodologyCards,
 		providerLabel,
+		provider,
 		bookAnalysisResult,
 		bookJob,
 		setChapterTitle,
@@ -302,6 +305,11 @@ export function ProjectHealthPage() {
 								onPlanRevision={planFindingRevision}
 							/>
 						</div>
+						<ReportQaPanel
+							provider={provider}
+							reportKind="story-audit"
+							report={buildStoryAuditQaReport(storyAudit)}
+						/>
 					</div>
 				) : (
 					<EmptyHealthState

@@ -215,6 +215,7 @@ export function PremiseReviewPage() {
 		<PremiseReviewCompose
 			providerLabel={handlers.providerLabel}
 			isMockProvider={handlers.provider.kind === "mock"}
+			provider={handlers.provider}
 			premiseText={premiseText}
 			onPremiseTextChange={setPremiseText}
 			genre={genre}
