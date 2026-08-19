@@ -17,6 +17,7 @@ import { LibraryModule } from "@/modules/library/library.module";
 import { ModelUsageModule } from "@/modules/model-usage/model-usage.module";
 import { MetricsModule } from "@/modules/metrics/metrics.module";
 import { PremiseModule } from "@/modules/premise/premise.module";
+import { PremiseDialogueModule } from "@/modules/premise-dialogue/premise-dialogue.module";
 import { ReportQaModule } from "@/modules/report-qa/report-qa.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
@@ -60,6 +61,7 @@ import { AppController } from "./app.controller";
     BookModule,
     ModelUsageModule,
     PremiseModule,
+    PremiseDialogueModule,
     ReportQaModule,
   ],
   controllers: [AppController],

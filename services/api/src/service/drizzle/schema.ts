@@ -243,6 +243,28 @@ export const premiseFindingReviews = pgTable(
   ],
 );
 
+export const premiseDialogueSessions = pgTable(
+  "premise_dialogue_sessions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    reviewId: text("review_id").notNull(),
+    genre: text("genre"),
+    premiseText: text("premise_text").notNull(),
+    // jsonb 载荷（layers / editorContract / turns / authorContract / contractReview）
+    // 的类型化映射在 PremiseDialogueRepository 完成，与本文件其余表一致。
+    layersState: jsonb("layers_state").notNull(),
+    editorContract: jsonb("editor_contract").notNull(),
+    turns: jsonb("turns").notNull().default([]),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    authorContract: jsonb("author_contract"),
+    contractReview: jsonb("contract_review"),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  },
+  (table) => [index("premise_dialogue_sessions_project_idx").on(table.projectId)],
+);
+
 export type AnalysisUploadSelect = typeof analysisUploads.$inferSelect;
 export type AnalysisUploadInsert = typeof analysisUploads.$inferInsert;
 export type BookAnalysisJobSelect = typeof bookAnalysisJobs.$inferSelect;
@@ -259,3 +281,7 @@ export type PremiseFindingReviewSelect =
   typeof premiseFindingReviews.$inferSelect;
 export type ModelUsageEventSelect = typeof modelUsageEvents.$inferSelect;
 export type ModelUsageEventInsert = typeof modelUsageEvents.$inferInsert;
+export type PremiseDialogueSessionSelect =
+  typeof premiseDialogueSessions.$inferSelect;
+export type PremiseDialogueSessionInsert =
+  typeof premiseDialogueSessions.$inferInsert;
