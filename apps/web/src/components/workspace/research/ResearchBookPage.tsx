@@ -11,6 +11,7 @@ import {
 } from "@/components/workspace/RedesignWorkspaceShell";
 import { useWorkspaceHandlers } from "@/hooks/use-workspace-handlers";
 import { getLastCompletedChapterLabel } from "@/lib/workspace-utils";
+import { ChapterCandidateCardList } from "./ChapterCandidateCardList";
 import {
 	countLikelyChapterHeadings,
 	looksLikeMarkdownText,
@@ -384,6 +385,13 @@ export function ResearchBookPage() {
 										正在等待第一个章节片段完成，完成后在这里逐个更新。
 									</p>
 								) : null}
+							</div>
+						) : null}
+						{bookJob?.partialResult?.candidateChapterCards?.length ? (
+							<div className="mt-4 border-t border-[#e4e7eb] pt-3">
+								<ChapterCandidateCardList
+									cards={bookJob.partialResult.candidateChapterCards}
+								/>
 							</div>
 						) : null}
 					</section>

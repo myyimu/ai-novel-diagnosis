@@ -604,6 +604,21 @@ export interface BookAnalysisJob {
 			phase: "outline" | "deep";
 			completedAt: string;
 		};
+		candidateChapterCards?: Array<{
+			chapterId: string;
+			order: number;
+			title: string;
+			depth: "outline" | "deep";
+			completedAt: string;
+			summary?: string;
+			anchoredQuotes: Array<{
+				quote: string;
+				startOffset: number;
+				endOffset: number;
+			}>;
+			riskSignals: string[];
+			setupSignals: string[];
+		}>;
 	};
 	result?: BookAnalysisResult;
 	error?: string;
