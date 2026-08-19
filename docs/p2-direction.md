@@ -199,6 +199,17 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
 - **验收**：每轮评判锚定作者原话；作者版契约由作者写出（模型只提问不代写）；
   对话轮次有硬上限；产出进病历且可导出。
 - **刻意不做**：无上限自由聊天；模型替作者填契约字段。
+- **落成记录（2026-08-19，已落地）**：三层全部落地。ai-core `premise-dialogue.ts`
+  （层选择状态机 missing→weak/confidence 升序、三轮硬上限、三组 prompt 构建、
+  quoteAuthor 子串锚定与拒绝语义：quote-not-found 终局 / model-failed 可重试，
+  87 项测试）；api `premise-dialogue` 模块（`analysis/workspace/premise-dialogue`
+  下 start/get/answer/judge/next/finish/contract 七端点、`premise_dialogue_sessions`
+  表 jsonb 落库、mock 短路按构造即可锚定，spec 覆盖锚定拒绝/拼接拒绝/硬上限收束）；
+  web `PremiseDialoguePanel`（问题/作答/评判流、分歧高亮、被拒评判如实展示、
+  契约六字段刻意留空、可选费曼点评含 droppedPointCount 披露、亲笔契约可回填发动机卡）。
+  验证：ai-core typecheck/lint/test(87)/build；api typecheck/lint/test(52 套 357 例)；
+  web check/test(140)/build。提交 `880bb5f`、`51aad98`、`a0c26f5`、`b085cd5`。
+  导出入病历未包含对话记录（验收条款最后一项）——随 T4/W4 导出统一收口。
 
 ### P2-T4 会诊与分歧披露（多视角）
 
