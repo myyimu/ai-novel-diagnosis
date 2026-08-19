@@ -146,7 +146,7 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   验证：ai-core typecheck/lint/test(58)/build；api typecheck/lint/test(323)；
   web check/test(126)/build。提交 `4dd4611`（契约）、`29fb833`（端点）、`8a63cf2`（面板）。
 
-### P2-T2 过程可见性（黑箱等待 → 事件级透明）——首批落地（2026-08-19）
+### P2-T2 过程可见性（黑箱等待 → 事件级透明）——已落地（2026-08-19）
 
 - **做什么**：① book 分析的 `partialResult` 增补逐章初核发现（过机械锚定后才入）；
   ② web 渐进渲染初核列表（candidate 徽章，复核后升级/划掉）；③ premise 等待 modal 换成
@@ -164,8 +164,19 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   "不再等待"按钮打断跟随——轮询静默停止、文案披露任务仍在服务端继续、可从历史任务重开。
   验证：api typecheck/lint/test(324)；web check/test(130)/build。
   提交 `2914da6`（等待 modal）、`b40bf3b`（lastCompletedChapter）、`edbd1ff`（渲染与打断）。
-  **未完**：①②（逐章初核发现的渐进渲染与 candidate/复核视觉区分）延后到下一批次——
-  需要先把每章 map 产物里过机械锚定的发现挑出来进 `partialResult`，属深水区改动。
+- **落成记录（深水区：①②逐章初核）**：map 每章完成时从该章 map 产物提取「章节初核卡」
+  进 `partialResult.candidateChapterCards`——锚定摘录（map 归一化时已过 `locateQuoteRange`
+  机械校验，不命中即丢弃）+ 未复核的一句话摘要 + 风险/伏笔信号（各封顶 2 条）。
+  **红线执行在章级**：没有任何锚定原文的章节一张卡都不出；且信号与锚点是章级关系、
+  非逐条锚定——卡内分栏存放，web 渲染（`ChapterCandidateCardList`，最近完成在前、
+  只渲染最近 12 章并披露截断）把两者分开标注，「初核」徽章与体检报告里的
+  candidate/verified 状态视觉可区分，复核计数（含被拒）在体检报告中披露。
+  深拆完成覆盖同章轻索引卡；服务端只保留最近 80 张以约束持久化体积。
+  诚实边界：初核卡与体检报告的最终发现是两种对象（章级信号 vs 跨章判定），
+  不做逐条"升级/划掉"映射，界面明示"复核以体检报告为准"。
+  逐信号锚定需升级 map schema（给信号配 quote 引用），留作后续。
+  验证：api typecheck/lint/test(330)；web check/test(134)/build。
+  提交 `1b2db16`（初核卡提取与入列）、`0994a44`（渐进渲染）。
 
 ### P2-T3 立项引导对话（教师姿态旗舰）
 
