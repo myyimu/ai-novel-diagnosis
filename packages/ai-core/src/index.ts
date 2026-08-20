@@ -4,6 +4,7 @@ export * from "./preview";
 export * from "./prompt-attribution";
 export * from "./report-qa";
 export * from "./revision-iteration";
+export * from "./premise-consult";
 export * from "./premise-dialogue";
 export * from "./premise-review";
 export * from "./prompts";
