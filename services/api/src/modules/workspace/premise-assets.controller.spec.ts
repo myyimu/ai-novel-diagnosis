@@ -147,13 +147,18 @@ describe("PremiseAssetsController", () => {
 });
 
 describe("WorkspaceService premise assets", () => {
+  function makeService(repository: Record<string, jest.Mock>) {
+    return new WorkspaceService(
+      repository as unknown as WorkspaceAssetsRepository,
+      {} as never,
+    );
+  }
+
   it("should stamp confirmedAt when a card is confirmed without one", async () => {
     const repository = {
       upsertEngineCard: jest.fn(async (card: PremiseEngineCard) => card),
     };
-    const service = new WorkspaceService(
-      repository as unknown as WorkspaceAssetsRepository,
-    );
+    const service = makeService(repository);
 
     await service.upsertEngineCard({
       ...engineCardBody,
@@ -171,9 +176,7 @@ describe("WorkspaceService premise assets", () => {
     const repository = {
       upsertEngineCard: jest.fn(async (card: PremiseEngineCard) => card),
     };
-    const service = new WorkspaceService(
-      repository as unknown as WorkspaceAssetsRepository,
-    );
+    const service = makeService(repository);
 
     await service.upsertEngineCard({
       ...engineCardBody,
@@ -191,9 +194,7 @@ describe("WorkspaceService premise assets", () => {
     const repository = {
       upsertPremiseFindingReview: jest.fn(async (review) => review),
     };
-    const service = new WorkspaceService(
-      repository as unknown as WorkspaceAssetsRepository,
-    );
+    const service = makeService(repository);
 
     await service.upsertPremiseFindingReview({
       projectId: "project-1",

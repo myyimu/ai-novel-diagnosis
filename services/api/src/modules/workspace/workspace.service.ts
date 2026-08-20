@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import {
   UpdateRevisionNoteDto,
   UpsertStoryAuditFindingReviewDto,
@@ -9,7 +9,9 @@ import {
   UpsertPremiseEngineCardDto,
   UpsertPremiseFindingReviewDto,
 } from "./dto/premise-assets.dto";
+import { UpdateDivergenceNoteDto } from "./dto/consultation-assets.dto";
 import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
+import { ConsultationRecordsRepository } from "@/dao/repositories/consultation-records.repository";
 import type { RevisionIssueDecisionSnapshot } from "@/dao/entities/workspace-assets.entity";
 
 /**
@@ -18,7 +20,10 @@ import type { RevisionIssueDecisionSnapshot } from "@/dao/entities/workspace-ass
  */
 @Injectable()
 export class WorkspaceService {
-  constructor(private readonly workspaceAssets: WorkspaceAssetsRepository) {}
+  constructor(
+    private readonly workspaceAssets: WorkspaceAssetsRepository,
+    private readonly consultationRecords: ConsultationRecordsRepository,
+  ) {}
 
   async listAssets() {
     return this.workspaceAssets.listAssets();
@@ -115,5 +120,30 @@ export class WorkspaceService {
       note: body.note,
       updatedAt: body.updatedAt ?? new Date().toISOString(),
     });
+  }
+
+  async listPremiseConsults(projectId: string) {
+    return this.consultationRecords.listPremiseConsultsByProject(projectId);
+  }
+
+  async listReportDivergences(projectId: string) {
+    return this.consultationRecords.listReportDivergencesByProject(projectId);
+  }
+
+  /** Persist the author's adjudication note; the detection itself is immutable. */
+  async updateReportDivergenceNote(
+    recordId: string,
+    body: UpdateDivergenceNoteDto,
+  ) {
+    const record = await this.consultationRecords.updateReportDivergenceNote(
+      recordId,
+      body.note,
+    );
+    if (!record) {
+      throw new NotFoundException(
+        `分歧记录 ${recordId} 不存在（只有真实模型检测且带项目号的记录才会落库）。`,
+      );
+    }
+    return record;
   }
 }
