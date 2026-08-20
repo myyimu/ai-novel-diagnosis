@@ -299,6 +299,15 @@ const DEFAULT_PROVIDER_TIMEOUT_MS = 600_000;
 const MAX_ERROR_BODY_LENGTH = 1_000;
 const DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS = 8_192;
 
+// Transient HTTP statuses worth an automatic retry: provider overload
+// (429/503), upstream gateway hiccups (500/502/504). Auth/validation 4xx are
+// not in this set — retrying those just burns another doomed request.
+const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
+const DEFAULT_TRANSIENT_RETRY_MAX = 2;
+const DEFAULT_TRANSIENT_RETRY_BASE_DELAY_MS = 2_000;
+// Respect Retry-After when the provider sends one, but never sleep forever.
+const TRANSIENT_RETRY_DELAY_CAP_MS = 60_000;
+
 // Test-mode budgets: /provider/test must return fast so authors get clear
 // feedback. The shared-gpu path skips the polling loop entirely — submission
 // success is enough to validate the queue accepted our call.
@@ -405,6 +414,24 @@ export class ModelProviderService {
     return Number.isFinite(raw) && raw! > 0
       ? raw!
       : DEFAULT_LENGTH_RETRY_MAX_OUTPUT_TOKENS;
+  }
+
+  /** Reads transient-retry budget from ConfigService (not process.env). */
+  private getConfiguredTransientRetryMax(): number {
+    const raw = this.configService.get<number>("provider.transientRetryMax");
+    return Number.isFinite(raw) && raw! >= 0
+      ? Math.floor(raw!)
+      : DEFAULT_TRANSIENT_RETRY_MAX;
+  }
+
+  /** Reads transient-retry backoff base from ConfigService (not process.env). */
+  private getConfiguredTransientRetryBaseDelayMs(): number {
+    const raw = this.configService.get<number>(
+      "provider.transientRetryBaseDelayMs",
+    );
+    return Number.isFinite(raw) && raw! >= 0
+      ? Math.floor(raw!)
+      : DEFAULT_TRANSIENT_RETRY_BASE_DELAY_MS;
   }
 
   /** Reads shared GPU config from ConfigService (not process.env directly). */
@@ -670,36 +697,45 @@ export class ModelProviderService {
     headers["content-type"] = "application/json";
 
     // Each HTTP attempt gets its own usage event, so retries (json-schema
-    // fallback, length-truncation) surface as separate rows via metadata.attempt.
-    const requestStartedAt = Date.now();
-    const attempt = hasRetriedLength ? "length-retry" : "initial";
-    const response = await this.fetchWithTimeout(
-      url,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      },
-      options.testMode ? TEST_MODE_TIMEOUT_MS : undefined,
-    ).catch((error: unknown) => {
-      this.recordModelUsage({
-        provider,
-        messages,
-        requestMs: Date.now() - requestStartedAt,
-        success: false,
-        error,
-        usageMeta: options.usageMeta,
-        attempt,
-      });
-      throw error;
-    });
+    // fallback, length-truncation, transient 429/5xx) surface as separate
+    // rows via metadata.attempt.
+    const { response, transientRetryCount, finalAttemptStartedAt } =
+      await this.fetchChatCompletionWithTransientRetry(
+        url,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        },
+        options,
+        { provider, messages, baseAttempt: hasRetriedLength ? "length-retry" : "initial" },
+      );
+    const requestStartedAt = finalAttemptStartedAt;
+    const attempt =
+      transientRetryCount > 0
+        ? `transient-retry-${transientRetryCount}`
+        : hasRetriedLength
+          ? "length-retry"
+          : "initial";
 
     if (!response.ok) {
       const errorText = await response.text();
+      const retryHint =
+        transientRetryCount > 0
+          ? `（已自动重试 ${transientRetryCount} 次仍失败，可稍后手动重试或切换模型）`
+          : "";
       const message = `Provider request failed: ${response.status} ${errorText.slice(
         0,
         MAX_ERROR_BODY_LENGTH,
-      )}`;
+      )}${retryHint}`;
+      // 429/5xx already burned the transient-retry budget above, so the
+      // json_schema fallback only fires when the provider actually rejected
+      // the format itself (non-transient 4xx) — retrying an overloaded
+      // provider without json_schema would just waste another call.
+      const shouldFallBackToJsonMode =
+        options.jsonSchema &&
+        body.response_format &&
+        !TRANSIENT_HTTP_STATUSES.has(response.status);
       this.recordModelUsage({
         provider,
         messages,
@@ -707,12 +743,9 @@ export class ModelProviderService {
         success: false,
         error: message,
         usageMeta: options.usageMeta,
-        attempt:
-          options.jsonSchema && body.response_format
-            ? "json-schema-fallback"
-            : attempt,
+        attempt: shouldFallBackToJsonMode ? "json-schema-fallback" : attempt,
       });
-      if (options.jsonSchema && body.response_format) {
+      if (shouldFallBackToJsonMode) {
         return this.callOpenAICompatible(provider, messages, {
           ...options,
           jsonSchema: undefined,
@@ -879,6 +912,159 @@ export class ModelProviderService {
     return (
       this.lengthRetryMaxOutputTokens(options) > (options.maxOutputTokens ?? 0)
     );
+  }
+
+  /**
+   * POST /chat/completions with automatic retry on transient failures
+   * (429/5xx overload, network resets). Timeouts are NOT retried — a call
+   * that already exhausted the 10-minute queue budget should surface to the
+   * author instead of silently doubling the wait. Usage rows are recorded for
+   * every abandoned attempt; the final response (ok or not) is handed back
+   * for the caller's existing bookkeeping, so each HTTP attempt still maps to
+   * exactly one usage event.
+   */
+  private async fetchChatCompletionWithTransientRetry(
+    url: string,
+    init: RequestInit,
+    options: ProviderChatOptions,
+    context: {
+      provider: ProviderConfigDto;
+      messages: ProviderMessage[];
+      baseAttempt: string;
+    },
+  ): Promise<{
+    response: Response;
+    transientRetryCount: number;
+    finalAttemptStartedAt: number;
+  }> {
+    const maxRetries = options.testMode
+      ? 0
+      : this.getConfiguredTransientRetryMax();
+    const baseDelayMs = this.getConfiguredTransientRetryBaseDelayMs();
+
+    for (let attemptIndex = 0; ; attemptIndex += 1) {
+      const attemptStartedAt = Date.now();
+      const attemptLabel =
+        attemptIndex === 0
+          ? context.baseAttempt
+          : `transient-retry-${attemptIndex}`;
+
+      let response: Response;
+      try {
+        response = await this.fetchWithTimeout(
+          url,
+          init,
+          options.testMode ? TEST_MODE_TIMEOUT_MS : undefined,
+        );
+      } catch (error) {
+        // Network-level failure. fetchWithTimeout converts its own timeouts
+        // to BadRequestException — those are exhausted queue waits, not
+        // jitter, so they surface immediately instead of retrying.
+        this.recordModelUsage({
+          provider: context.provider,
+          messages: context.messages,
+          requestMs: Date.now() - attemptStartedAt,
+          success: false,
+          error,
+          usageMeta: options.usageMeta,
+          attempt: attemptLabel,
+        });
+        if (
+          error instanceof BadRequestException ||
+          attemptIndex >= maxRetries
+        ) {
+          throw error;
+        }
+        const delayMs = Math.min(
+          baseDelayMs * 2 ** attemptIndex,
+          TRANSIENT_RETRY_DELAY_CAP_MS,
+        );
+        this.logger.warn(
+          {
+            action: "provider.request.transient_retry",
+            kind: "network-error",
+            attempt: attemptIndex + 1,
+            maxRetries,
+            delayMs,
+            message: toUsageErrorText(error),
+          },
+          "Provider network error, retrying",
+        );
+        await this.sleep(delayMs);
+        continue;
+      }
+
+      if (
+        response.ok ||
+        attemptIndex >= maxRetries ||
+        !TRANSIENT_HTTP_STATUSES.has(response.status)
+      ) {
+        return {
+          response,
+          transientRetryCount: attemptIndex,
+          finalAttemptStartedAt: attemptStartedAt,
+        };
+      }
+
+      const errorText = await response.text();
+      const message = `Provider request failed: ${response.status} ${errorText.slice(
+        0,
+        MAX_ERROR_BODY_LENGTH,
+      )}`;
+      this.recordModelUsage({
+        provider: context.provider,
+        messages: context.messages,
+        requestMs: Date.now() - attemptStartedAt,
+        success: false,
+        error: message,
+        usageMeta: options.usageMeta,
+        attempt: attemptLabel,
+      });
+      const delayMs = this.resolveTransientRetryDelayMs(
+        response,
+        baseDelayMs,
+        attemptIndex,
+      );
+      this.logger.warn(
+        {
+          action: "provider.request.transient_retry",
+          status: response.status,
+          attempt: attemptIndex + 1,
+          maxRetries,
+          delayMs,
+        },
+        "Provider transient failure, retrying",
+      );
+      await this.sleep(delayMs);
+    }
+  }
+
+  /**
+   * Backoff before the next transient retry: honor Retry-After when the
+   * provider sends a usable one (clamped to at least the configured base and
+   * at most the cap), otherwise exponential from the base delay.
+   */
+  private resolveTransientRetryDelayMs(
+    response: Response,
+    baseDelayMs: number,
+    attemptIndex: number,
+  ): number {
+    const retryAfterSeconds = Number(response.headers?.get("retry-after"));
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return Math.min(
+        Math.max(retryAfterSeconds * 1000, baseDelayMs),
+        TRANSIENT_RETRY_DELAY_CAP_MS,
+      );
+    }
+
+    return Math.min(
+      baseDelayMs * 2 ** attemptIndex,
+      TRANSIENT_RETRY_DELAY_CAP_MS,
+    );
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private buildOpenAICompatibleHeaders(provider: ProviderConfigDto) {

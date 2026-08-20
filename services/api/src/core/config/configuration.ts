@@ -84,7 +84,12 @@ export const throttlerConfig = registerAs("throttler", () => ({
 }));
 
 /** AI model provider configuration */
-export const providerConfig = registerAs("provider", () => ({
+export const providerConfig = registerAs("provider", () => {
+  const transientRetryMax = Number(process.env.PROVIDER_TRANSIENT_RETRY_MAX);
+  const transientRetryBaseDelayMs = Number(
+    process.env.PROVIDER_TRANSIENT_RETRY_BASE_DELAY_MS,
+  );
+  return {
   requestTimeoutMs: parseInt(
     process.env.PROVIDER_REQUEST_TIMEOUT_MS || "120000",
     10,
@@ -93,6 +98,14 @@ export const providerConfig = registerAs("provider", () => ({
     process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS || "16384",
     10,
   ),
+  // Transient provider failures (429/5xx/network jitter) are auto-retried with
+  // exponential backoff. Set PROVIDER_TRANSIENT_RETRY_MAX=0 to disable.
+  transientRetryMax: Number.isFinite(transientRetryMax)
+    ? Math.max(0, Math.floor(transientRetryMax))
+    : 2,
+  transientRetryBaseDelayMs: Number.isFinite(transientRetryBaseDelayMs)
+    ? Math.max(0, Math.floor(transientRetryBaseDelayMs))
+    : 2000,
   sharedGpu: {
     baseUrl: process.env.SHARED_GPU_BASE_URL?.trim() || null,
     apiKey: process.env.SHARED_GPU_API_KEY?.trim() || null,
@@ -105,7 +118,8 @@ export const providerConfig = registerAs("provider", () => ({
     process.env.SHARED_GPU_ANONYMOUS_API_KEY?.trim() || "0000000000",
   enableOpenaiCompatJsonSchema:
     process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true",
-}));
+  };
+});
 
 /** Logging configuration */
 export const loggingConfig = registerAs("logging", () => ({

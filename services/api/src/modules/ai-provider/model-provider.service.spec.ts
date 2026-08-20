@@ -166,7 +166,9 @@ describe("ModelProviderService shared-gpu fallback", () => {
 
     const usageRepository = createStubUsageRepository();
     const service = new ModelProviderService(
-      createMockConfigService(),
+      // Transient retries are covered by dedicated tests below; keep this
+      // one single-attempt so its assertions stay about usage bookkeeping.
+      createMockConfigService({ "provider.transientRetryMax": 0 }),
       usageRepository,
     );
     await expect(
@@ -191,6 +193,206 @@ describe("ModelProviderService shared-gpu fallback", () => {
         error: "Provider request failed: 503 upstream exploded",
       }),
     );
+  });
+
+  it("retries transient 429 responses and succeeds on the next attempt", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () =>
+          '{"error":{"code":"1305","message":"该模型当前访问量过大，请您稍后再试"}}',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '{"ok":true}' } }],
+        }),
+      });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = createStubUsageRepository();
+    const service = new ModelProviderService(
+      createMockConfigService({ "provider.transientRetryBaseDelayMs": 0 }),
+      usageRepository,
+    );
+    const result = await service.chat(
+      {
+        preset: "qwen",
+        kind: "openai-compatible",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        apiKey: "sk-test",
+        model: "qwen-plus",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "请返回 JSON" }],
+    );
+
+    expect(result).toBe('{"ok":true}');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The abandoned 429 attempt gets its own usage row...
+    expect(usageRepository.insertUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining("429"),
+        metadata: expect.objectContaining({ attempt: "initial" }),
+      }),
+    );
+    // ...and the successful retry is labeled as the retry attempt.
+    expect(usageRepository.insertUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        metadata: expect.objectContaining({ attempt: "transient-retry-1" }),
+      }),
+    );
+  });
+
+  it("stops after the transient retry budget and surfaces the provider error", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => "too busy",
+    });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = createStubUsageRepository();
+    const service = new ModelProviderService(
+      createMockConfigService({ "provider.transientRetryBaseDelayMs": 0 }),
+      usageRepository,
+    );
+
+    await expect(
+      service.chat(
+        {
+          preset: "qwen",
+          kind: "openai-compatible",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          apiKey: "sk-test",
+          model: "qwen-plus",
+          temperature: 0.2,
+          jsonMode: false,
+        },
+        [{ role: "user", content: "请返回 JSON" }],
+      ),
+    ).rejects.toThrow(/已自动重试 2 次仍失败/);
+
+    // initial + transient-retry-1 + final transient-retry-2 row.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(usageRepository.insertUsageEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry non-transient 4xx provider failures", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => "bad request",
+    });
+    global.fetch = fetchMock as never;
+
+    const usageRepository = createStubUsageRepository();
+    const service = new ModelProviderService(
+      createMockConfigService({ "provider.transientRetryBaseDelayMs": 0 }),
+      usageRepository,
+    );
+
+    await expect(
+      service.chat(
+        {
+          preset: "qwen",
+          kind: "openai-compatible",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          apiKey: "sk-test",
+          model: "qwen-plus",
+          temperature: 0.2,
+          jsonMode: false,
+        },
+        [{ role: "user", content: "请返回 JSON" }],
+      ),
+    ).rejects.toThrow("Provider request failed: 400 bad request");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry transient failures in test mode", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => "too busy",
+    });
+    global.fetch = fetchMock as never;
+
+    const service = new ModelProviderService(
+      createMockConfigService({ "provider.transientRetryBaseDelayMs": 0 }),
+      createStubUsageRepository(),
+    );
+
+    await expect(
+      service.chat(
+        {
+          preset: "qwen",
+          kind: "openai-compatible",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          apiKey: "sk-test",
+          model: "qwen-plus",
+          temperature: 0.2,
+          jsonMode: false,
+        },
+        [{ role: "user", content: "请返回 JSON" }],
+        { testMode: true },
+      ),
+    ).rejects.toThrow("Provider request failed: 429");
+    // /provider/test must stay fast — one attempt, no backoff.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors Retry-After when the provider sends one", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ "retry-after": "3" }),
+        text: async () => "too busy",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '{"ok":true}' } }],
+        }),
+      });
+    global.fetch = fetchMock as never;
+    const setTimeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation(((
+        callback: (...args: unknown[]) => void,
+      ) => {
+        callback();
+        return 0 as never;
+      }) as unknown as typeof setTimeout);
+
+    const service = new ModelProviderService(
+      createMockConfigService({ "provider.transientRetryBaseDelayMs": 1000 }),
+      createStubUsageRepository(),
+    );
+    const result = await service.chat(
+      {
+        preset: "qwen",
+        kind: "openai-compatible",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        apiKey: "sk-test",
+        model: "qwen-plus",
+        temperature: 0.2,
+        jsonMode: false,
+      },
+      [{ role: "user", content: "请返回 JSON" }],
+    );
+
+    expect(result).toBe('{"ok":true}');
+    // The backoff sleep waited 3s (Retry-After) rather than the 1s base.
+    expect(
+      setTimeoutSpy.mock.calls.some(([, delay]) => delay === 3000),
+    ).toBe(true);
   });
 
   it("keeps the chat result when the usage insert itself fails", async () => {
