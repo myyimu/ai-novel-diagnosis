@@ -41,6 +41,11 @@ export interface ReportDivergenceResult {
   mode: "mock" | "model";
   chapterTitle: string;
   divergences: ReportDivergencePoint[];
+  /**
+   * Set by the API layer when this result was persisted into a project's
+   * medical record; absent for unpersisted (or demo-mode) detections.
+   */
+  recordId?: string;
   /** Points dropped because a quote missed its report or the question was not a question. */
   droppedPointCount: number;
   /** Present when the model reports no direct contradictions — an honest finding, not silence. */

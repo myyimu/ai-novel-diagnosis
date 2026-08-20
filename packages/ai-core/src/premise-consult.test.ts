@@ -198,6 +198,29 @@ describe("buildPremiseConsultResult", () => {
     ]);
     expect(result.comparison.droppedEvidenceCount).toBe(1);
   });
+
+  it("never fabricates a recordId — persistence is the API layer's claim to make", () => {
+    const result = buildPremiseConsultResult({
+      consultId: "consult-1",
+      mode: "model",
+      trigger: "low-evidence",
+      original: {
+        verdict: "fixable",
+        oneLineVerdict: "欲望可以更具体。",
+        layers: FOUR_LAYERS,
+      },
+      second: {
+        verdict: "fixable",
+        oneLineVerdict: "同意可修，但冲突更强。",
+        layers: FOUR_LAYERS,
+        strongestArgument: "欲望自带代价。",
+        evidence: [],
+      },
+      droppedEvidenceCount: 0,
+    });
+
+    expect(result.recordId).toBeUndefined();
+  });
 });
 
 describe("buildPremiseSecondReviewPrompt", () => {

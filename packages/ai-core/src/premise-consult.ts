@@ -154,6 +154,11 @@ export interface PremiseConsultResult {
   consultId: string;
   mode: "mock" | "model";
   trigger: PremiseConsultTrigger;
+  /**
+   * Set by the API layer when this result was persisted into a project's
+   * medical record; absent for unpersisted (or demo-mode) consultations.
+   */
+  recordId?: string;
   /** The original verdict this consultation is presented against. */
   original: {
     verdict: PremiseReviewVerdict;
