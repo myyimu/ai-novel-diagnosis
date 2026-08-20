@@ -12,6 +12,7 @@ import {
 import { UpdateDivergenceNoteDto } from "./dto/consultation-assets.dto";
 import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
 import { ConsultationRecordsRepository } from "@/dao/repositories/consultation-records.repository";
+import { PremiseDialogueRepository } from "@/dao/repositories/premise-dialogue.repository";
 import type { RevisionIssueDecisionSnapshot } from "@/dao/entities/workspace-assets.entity";
 
 /**
@@ -23,6 +24,7 @@ export class WorkspaceService {
   constructor(
     private readonly workspaceAssets: WorkspaceAssetsRepository,
     private readonly consultationRecords: ConsultationRecordsRepository,
+    private readonly premiseDialogue: PremiseDialogueRepository,
   ) {}
 
   async listAssets() {
@@ -75,8 +77,26 @@ export class WorkspaceService {
     });
   }
 
+  /**
+   * The full medical-record package for one project: workspace assets plus the
+   * T3/T4 consultation history (premise consults, dialogue sessions, report
+   * divergences) so the export can render the complete诊断过程.
+   */
   async readProjectPackage(projectId: string) {
-    return this.workspaceAssets.readProjectPackage(projectId);
+    const [assets, premiseConsults, reportDivergences, dialogueSessions] =
+      await Promise.all([
+        this.workspaceAssets.readProjectPackage(projectId),
+        this.consultationRecords.listPremiseConsultsByProject(projectId),
+        this.consultationRecords.listReportDivergencesByProject(projectId),
+        this.premiseDialogue.listByProject(projectId),
+      ]);
+
+    return {
+      ...assets,
+      premiseConsults,
+      reportDivergences,
+      premiseDialogueSessions: dialogueSessions,
+    };
   }
 
   async readEngineCard(projectId: string) {

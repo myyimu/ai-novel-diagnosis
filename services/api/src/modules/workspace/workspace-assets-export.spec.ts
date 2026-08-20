@@ -326,4 +326,211 @@ describe("buildWorkspaceProjectMarkdown", () => {
     expect(markdown).toContain("故事发动机：暂无");
     expect(markdown).toContain("暂无发动机卡（这本书尚未走立项审稿确认）。");
   });
+
+  it("exports premise consults with both verdicts side by side and the dropped count", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-08-20T09:00:00.000Z",
+      premiseConsults: [
+        {
+          id: "consult-1",
+          projectId: "project-a",
+          trigger: "author-disagrees",
+          mode: "model",
+          verdictRelation: "opposite",
+          createdAt: new Date("2026-08-20T08:00:00.000Z"),
+          updatedAt: new Date("2026-08-20T08:00:00.000Z"),
+          result: {
+            schemaVersion: "premise-consult.v1",
+            consultId: "consult-1",
+            mode: "model",
+            trigger: "author-disagrees",
+            original: {
+              verdict: "not-worth-writing",
+              oneLineVerdict: "欲望空泛，冲突缺位。",
+              layers: [],
+            },
+            second: {
+              verdict: "solid",
+              oneLineVerdict: "欲望具体且自带代价。",
+              layers: [],
+              strongestArgument: "前世记忆是资产也是把柄。",
+              evidence: [],
+            },
+            comparison: {
+              verdictRelation: "opposite",
+              layerComparisons: [
+                {
+                  layer: "engine",
+                  originalStatus: "missing",
+                  secondStatus: "established",
+                  agrees: false,
+                },
+                {
+                  layer: "desire",
+                  originalStatus: "weak",
+                  secondStatus: "weak",
+                  agrees: true,
+                },
+              ],
+              droppedEvidenceCount: 2,
+            },
+          },
+        },
+      ],
+    });
+
+    expect(markdown).toContain("立项会诊：1 次");
+    expect(markdown).toContain("## 立项会诊记录");
+    expect(markdown).toContain("作者不服，申请第二审稿人");
+    expect(markdown).toContain("两位审稿人结论相反（由程序比对，非模型叙述）");
+    expect(markdown).toContain("暂不值得写 — 欲望空泛，冲突缺位。");
+    expect(markdown).toContain("值得写 — 欲望具体且自带代价。");
+    expect(markdown).toContain("分歧审计层：1/2");
+    expect(markdown).toContain("丢弃引文：2 条（未能在原文锚定，不算数）");
+    expect(markdown).toContain("最强成立论证：前世记忆是资产也是把柄。");
+  });
+
+  it("exports premise dialogue sessions with rejected-judgment counts", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-08-20T09:00:00.000Z",
+      premiseDialogueSessions: [
+        {
+          id: "dialogue-1",
+          projectId: "project-a",
+          createdAt: new Date("2026-08-20T07:00:00.000Z"),
+          updatedAt: new Date("2026-08-20T08:00:00.000Z"),
+          layers: [],
+          editorContract: {} as never,
+          session: {
+            schemaVersion: "premise-dialogue.v1",
+            projectId: "project-a",
+            reviewId: "review-1",
+            premiseText: "主角重生回高三。",
+            turns: [
+              {
+                round: 1,
+                layer: "engine",
+                ask: {} as never,
+                authorAnswer: "复仇与流量的对撞。",
+                judgeRejected: { reason: "quote-not-found" },
+              },
+              { round: 2, layer: "desire", ask: {} as never },
+            ],
+            status: "completed",
+            authorContract: {
+              premiseSummary: "重生少女用流量反杀背叛者。",
+            } as never,
+          },
+        } as never,
+      ],
+    });
+
+    expect(markdown).toContain("立项对话：1 个会话");
+    expect(markdown).toContain("## 立项对话");
+    expect(markdown).toContain("已完成");
+    expect(markdown).toContain("对话轮次：2");
+    expect(markdown).toContain("已回答轮次：1");
+    expect(markdown).toContain(
+      "被拒判定：1（引文未锚定或模型失败，判定已丢弃）",
+    );
+    expect(markdown).toContain("作者契约：已确认");
+    expect(markdown).toContain("契约摘要：重生少女用流量反杀背叛者。");
+  });
+
+  it("exports report divergences with anchored quotes and the author's adjudication", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-08-20T09:00:00.000Z",
+      reportDivergences: [
+        {
+          id: "divergence-1",
+          projectId: "project-a",
+          chapterTitle: "第三章 对峙",
+          mode: "model",
+          divergenceCount: 1,
+          authorNote: "我信体检：这章确实拖，下一版砍掉两段回忆。",
+          createdAt: new Date("2026-08-20T08:00:00.000Z"),
+          updatedAt: new Date("2026-08-20T08:00:00.000Z"),
+          result: {
+            schemaVersion: "report-divergence.v1",
+            divergenceId: "divergence-1",
+            mode: "model",
+            chapterTitle: "第三章 对峙",
+            divergences: [
+              {
+                id: "divergence-1",
+                topic: "节奏",
+                quickReviewQuote: "节奏紧凑，没有明显拖沓",
+                storyAuditQuote: "第三章节奏拖沓",
+                explanation: "快诊认为紧凑，体检认为拖沓。",
+                questionForAuthor: "你自己读起来拖吗？",
+              },
+            ],
+            droppedPointCount: 1,
+          },
+        },
+      ],
+    });
+
+    expect(markdown).toContain("报告会诊：1 次");
+    expect(markdown).toContain("## 报告会诊记录");
+    expect(markdown).toContain("直接矛盾：1 条；未锚定丢弃：1 条（不算数）");
+    expect(markdown).toContain("矛盾 · 节奏");
+    expect(markdown).toContain("快诊报告说：「节奏紧凑，没有明显拖沓」");
+    expect(markdown).toContain("体检报告说：「第三章节奏拖沓」");
+    expect(markdown).toContain("交给作者的问题：你自己读起来拖吗？");
+    expect(markdown).toContain(
+      "作者裁决：我信体检：这章确实拖，下一版砍掉两段回忆。",
+    );
+  });
+
+  it("reports the consultation sections honestly as empty when a project has none", () => {
+    const markdown = buildWorkspaceProjectMarkdown({
+      project: {
+        id: "project-a",
+        name: "退婚流测试项目",
+        createdAt: "2026-06-24T00:00:00.000Z",
+        updatedAt: "2026-06-24T02:00:00.000Z",
+      },
+      revisionSessions: [],
+      revisionVersions: [],
+      methodologyCards: [],
+      generatedAt: "2026-08-20T09:00:00.000Z",
+    });
+
+    expect(markdown).toContain("立项会诊：0 次");
+    expect(markdown).toContain(
+      "暂无立项会诊记录（只有真实模型的会诊会落库，演示模式不进病历）。",
+    );
+    expect(markdown).toContain("暂无立项对话记录。");
+    expect(markdown).toContain(
+      "暂无报告会诊记录（只有真实模型的检测会落库，演示模式不进病历）。",
+    );
+  });
 });

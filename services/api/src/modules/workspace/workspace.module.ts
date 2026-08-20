@@ -3,6 +3,7 @@ import { BookModule } from "@/modules/book/book.module";
 import { AnalysisModule } from "@/modules/analysis/analysis.module";
 import { WorkspaceAssetsRepository } from "@/dao/repositories/workspace-assets.repository";
 import { ConsultationRecordsRepository } from "@/dao/repositories/consultation-records.repository";
+import { PremiseDialogueRepository } from "@/dao/repositories/premise-dialogue.repository";
 import { WorkspaceController } from "./workspace.controller";
 import { PremiseAssetsController } from "./premise-assets.controller";
 import { ConsultationAssetsController } from "./consultation-assets.controller";
@@ -21,6 +22,7 @@ import { WorkspaceService } from "./workspace.service";
   providers: [
     WorkspaceAssetsRepository,
     ConsultationRecordsRepository,
+    PremiseDialogueRepository,
     WorkspaceService,
     RevisionRetestService,
   ],

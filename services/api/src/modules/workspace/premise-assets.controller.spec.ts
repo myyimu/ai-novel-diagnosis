@@ -151,6 +151,7 @@ describe("WorkspaceService premise assets", () => {
     return new WorkspaceService(
       repository as unknown as WorkspaceAssetsRepository,
       {} as never,
+      {} as never,
     );
   }
 

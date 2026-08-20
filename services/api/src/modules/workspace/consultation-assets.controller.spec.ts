@@ -144,6 +144,7 @@ describe("WorkspaceService consultation records", () => {
     const service = new WorkspaceService(
       {} as never,
       consultationRecords as never,
+      {} as never,
     );
 
     await expect(
@@ -164,6 +165,7 @@ describe("WorkspaceService consultation records", () => {
     const service = new WorkspaceService(
       {} as never,
       consultationRecords as never,
+      {} as never,
     );
 
     const record = await service.updateReportDivergenceNote("divergence-1", {

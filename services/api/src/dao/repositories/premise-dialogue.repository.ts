@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type {
   PremiseAuthorContract,
   PremiseContractFields,
@@ -42,7 +42,9 @@ export interface UpdatePremiseDialogueSessionData {
   turns?: PremiseDialogueTurnRecord[];
   status?: PremiseDialogueSessionStatus;
   authorContract?: PremiseAuthorContract | null;
-  contractReview?: (PremiseDialogueContractReviewOutput & { droppedPointCount?: number }) | null;
+  contractReview?:
+    | (PremiseDialogueContractReviewOutput & { droppedPointCount?: number })
+    | null;
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -61,8 +63,8 @@ export class PremiseDialogueRepository {
     data: CreatePremiseDialogueSessionData,
   ): Promise<PremiseDialogueSessionRecord> {
     const now = new Date();
-    const [row] = await this.drizzle
-      .db.insert(premiseDialogueSessions)
+    const [row] = await this.drizzle.db
+      .insert(premiseDialogueSessions)
       .values({
         id: data.id,
         projectId: data.session.projectId,
@@ -83,27 +85,41 @@ export class PremiseDialogueRepository {
   }
 
   async findById(id: string): Promise<PremiseDialogueSessionRecord | null> {
-    const [row] = await this.drizzle
-      .db.select()
+    const [row] = await this.drizzle.db
+      .select()
       .from(premiseDialogueSessions)
       .where(eq(premiseDialogueSessions.id, id))
       .limit(1);
     return row ? this.toRecord(row) : null;
   }
 
+  /** All sessions of one project, most recently updated first. */
+  async listByProject(
+    projectId: string,
+  ): Promise<PremiseDialogueSessionRecord[]> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(premiseDialogueSessions)
+      .where(eq(premiseDialogueSessions.projectId, projectId))
+      .orderBy(desc(premiseDialogueSessions.updatedAt));
+    return rows.map((row) => this.toRecord(row));
+  }
+
   async update(
     id: string,
     patch: UpdatePremiseDialogueSessionData,
   ): Promise<PremiseDialogueSessionRecord | null> {
-    const [row] = await this.drizzle
-      .db.update(premiseDialogueSessions)
+    const [row] = await this.drizzle.db
+      .update(premiseDialogueSessions)
       .set({ ...patch, updatedAt: new Date() })
       .where(eq(premiseDialogueSessions.id, id))
       .returning();
     return row ? this.toRecord(row) : null;
   }
 
-  private toRecord(row: PremiseDialogueSessionSelect): PremiseDialogueSessionRecord {
+  private toRecord(
+    row: PremiseDialogueSessionSelect,
+  ): PremiseDialogueSessionRecord {
     return {
       id: row.id,
       projectId: row.projectId,
@@ -123,9 +139,11 @@ export class PremiseDialogueRepository {
           ? asRecord<PremiseAuthorContract>(row.authorContract)
           : undefined,
         contractReview: row.contractReview
-          ? asRecord<PremiseDialogueContractReviewOutput & { droppedPointCount?: number }>(
-              row.contractReview,
-            )
+          ? asRecord<
+              PremiseDialogueContractReviewOutput & {
+                droppedPointCount?: number;
+              }
+            >(row.contractReview)
           : undefined,
       },
     };

@@ -6,9 +6,16 @@ import type {
   RevisionTextVersionSnapshot,
   WorkspaceProjectSnapshot,
 } from "@/dao/entities/workspace-assets.entity";
+import type {
+  PremiseConsultRecord,
+  ReportDivergenceRecord,
+} from "@/dao/repositories/consultation-records.repository";
+import type { PremiseDialogueSessionRecord } from "@/dao/repositories/premise-dialogue.repository";
 import {
+  PREMISE_CONSULT_TRIGGER_LABELS,
   PREMISE_ENGINE_CARD_STATUS_LABELS,
   PREMISE_VERDICT_LABELS,
+  PREMISE_VERDICT_RELATION_LABELS,
   buildPromptAttribution,
   type StoryAuditResult,
 } from "@ai-novel-diagnosis/ai-core";
@@ -65,6 +72,9 @@ export function buildWorkspaceProjectMarkdown(input: {
   engineCard?: PremiseEngineCard | null;
   storyAudit?: StoryAuditResult | null;
   storyAuditFindingReviews?: StoryAuditFindingReviewSnapshot[];
+  premiseConsults?: PremiseConsultRecord[];
+  reportDivergences?: ReportDivergenceRecord[];
+  premiseDialogueSessions?: PremiseDialogueSessionRecord[];
   generatedAt?: string;
 }) {
   const sessions = [...input.revisionSessions].sort(
@@ -111,6 +121,9 @@ export function buildWorkspaceProjectMarkdown(input: {
     `- Prompt 模板：${promptCards.length}`,
     `- 故事体检：${storyAuditExport ? "已包含摘要" : "暂无"}`,
     `- 故事发动机：${input.engineCard ? PREMISE_ENGINE_CARD_STATUS_LABELS[input.engineCard.status] : "暂无"}`,
+    `- 立项会诊：${input.premiseConsults?.length || 0} 次`,
+    `- 立项对话：${input.premiseDialogueSessions?.length || 0} 个会话`,
+    `- 报告会诊：${input.reportDivergences?.length || 0} 次`,
     "",
     "## 项目概览",
     "",
@@ -124,7 +137,13 @@ export function buildWorkspaceProjectMarkdown(input: {
 
   appendEngineCardMarkdown(lines, input.engineCard || null);
 
+  appendPremiseConsultsMarkdown(lines, input.premiseConsults || []);
+
+  appendPremiseDialogueMarkdown(lines, input.premiseDialogueSessions || []);
+
   appendStoryAuditMarkdown(lines, storyAuditExport);
+
+  appendReportDivergencesMarkdown(lines, input.reportDivergences || []);
 
   lines.push("## 复诊轨迹", "");
 
@@ -269,6 +288,126 @@ function appendEngineCardMarkdown(
     `- 读者钩子问题：${engineCard.readerHookQuestion}`,
     "",
   );
+}
+
+function appendPremiseConsultsMarkdown(
+  lines: string[],
+  consults: PremiseConsultRecord[],
+) {
+  lines.push("## 立项会诊记录", "");
+
+  if (!consults.length) {
+    lines.push(
+      "暂无立项会诊记录（只有真实模型的会诊会落库，演示模式不进病历）。",
+      "",
+    );
+    return;
+  }
+
+  consults.forEach((record, index) => {
+    const result = record.result;
+    lines.push(
+      `### ${index + 1}. ${formatDateTime(record.createdAt.toISOString())} · ${PREMISE_CONSULT_TRIGGER_LABELS[record.trigger]}`,
+      "",
+      `- 判定关系：${PREMISE_VERDICT_RELATION_LABELS[record.verdictRelation]}（由程序比对，非模型叙述）`,
+      `- 第一审（先找理由拒绝）：${PREMISE_VERDICT_LABELS[result.original.verdict]} — ${result.original.oneLineVerdict}`,
+      `- 第二审（最强成立论证）：${PREMISE_VERDICT_LABELS[result.second.verdict]} — ${result.second.oneLineVerdict}`,
+      `- 分歧审计层：${result.comparison.layerComparisons.filter((item) => !item.agrees).length}/${result.comparison.layerComparisons.length}`,
+      `- 丢弃引文：${result.comparison.droppedEvidenceCount} 条（未能在原文锚定，不算数）`,
+      "",
+    );
+
+    if (result.second.strongestArgument?.trim()) {
+      lines.push(
+        `> 最强成立论证：${escapeMarkdown(result.second.strongestArgument)}`,
+        "",
+      );
+    }
+  });
+}
+
+const DIALOGUE_STATUS_LABELS: Record<string, string> = {
+  active: "进行中",
+  collecting: "收集作者契约",
+  completed: "已完成",
+};
+
+function appendPremiseDialogueMarkdown(
+  lines: string[],
+  sessions: PremiseDialogueSessionRecord[],
+) {
+  lines.push("## 立项对话", "");
+
+  if (!sessions.length) {
+    lines.push("暂无立项对话记录。", "");
+    return;
+  }
+
+  sessions.forEach((record, index) => {
+    lines.push(
+      `### ${index + 1}. ${formatDateTime(record.updatedAt.toISOString())} · ${DIALOGUE_STATUS_LABELS[record.session.status] ?? record.session.status}`,
+      "",
+      `- 会话：${record.id}`,
+      `- 对话轮次：${record.session.turns.length}`,
+      `- 已回答轮次：${record.session.turns.filter((turn) => turn.authorAnswer?.trim()).length}`,
+      `- 被拒判定：${record.session.turns.filter((turn) => turn.judgeRejected).length}（引文未锚定或模型失败，判定已丢弃）`,
+      `- 作者契约：${record.session.authorContract ? "已确认" : "未确认"}`,
+      "",
+    );
+
+    if (record.session.authorContract) {
+      lines.push(
+        `- 契约摘要：${escapeMarkdown(record.session.authorContract.premiseSummary)}`,
+        "",
+      );
+    }
+  });
+}
+
+function appendReportDivergencesMarkdown(
+  lines: string[],
+  divergences: ReportDivergenceRecord[],
+) {
+  lines.push("## 报告会诊记录", "");
+
+  if (!divergences.length) {
+    lines.push(
+      "暂无报告会诊记录（只有真实模型的检测会落库，演示模式不进病历）。",
+      "",
+    );
+    return;
+  }
+
+  divergences.forEach((record, index) => {
+    const result = record.result;
+    lines.push(
+      `### ${index + 1}. ${formatDateTime(record.createdAt.toISOString())} · ${escapeMarkdown(record.chapterTitle)}`,
+      "",
+      `- 直接矛盾：${result.divergences.length} 条；未锚定丢弃：${result.droppedPointCount} 条（不算数）`,
+      "",
+    );
+
+    if (!result.divergences.length && result.agreementNote?.trim()) {
+      lines.push(`> ${escapeMarkdown(result.agreementNote)}`, "");
+    }
+
+    result.divergences.forEach((point) => {
+      lines.push(
+        `#### 矛盾 · ${escapeMarkdown(point.topic)}`,
+        "",
+        `- 快诊报告说：「${escapeMarkdown(point.quickReviewQuote)}」`,
+        `- 体检报告说：「${escapeMarkdown(point.storyAuditQuote)}」`,
+        `- 交给作者的问题：${point.questionForAuthor}`,
+        "",
+      );
+    });
+
+    if (record.authorNote?.trim()) {
+      lines.push(`- 作者裁决：${record.authorNote.trim()}`, "");
+    } else {
+      lines.push("- 作者裁决：未记录", "");
+    }
+  });
 }
 
 function buildStoryAuditExportSnapshot({
