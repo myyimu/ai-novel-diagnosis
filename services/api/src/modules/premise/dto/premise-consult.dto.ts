@@ -55,7 +55,10 @@ export class PremiseConsultOriginalDto {
   @MaxLength(600)
   oneLineVerdict!: string;
 
-  @ApiProperty({ type: [PremiseConsultLayerDto], description: "Exactly four layer assessments." })
+  @ApiProperty({
+    type: [PremiseConsultLayerDto],
+    description: "Exactly four layer assessments.",
+  })
   @IsArray()
   @ArrayMinSize(4)
   @ArrayMaxSize(4)
@@ -66,8 +69,10 @@ export class PremiseConsultOriginalDto {
 
 export class PremiseConsultDto {
   @ApiProperty({
-    description: "The same premise text the first review judged (20-4000 chars).",
-    example: "主角重生回高三，带着前世记忆避开所有遗憾，顺便收割全网流量成为顶流。",
+    description:
+      "The same premise text the first review judged (20-4000 chars).",
+    example:
+      "主角重生回高三，带着前世记忆避开所有遗憾，顺便收割全网流量成为顶流。",
   })
   @IsString()
   @MinLength(20)
@@ -80,6 +85,15 @@ export class PremiseConsultDto {
   @MaxLength(32)
   genre?: string;
 
+  @ApiPropertyOptional({
+    description:
+      "Project id. When present (and the provider is a real model), the consult is persisted into the project's medical record and the response carries recordId.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  projectId?: string;
+
   @ApiProperty({
     enum: ["author-disagrees", "low-evidence"],
     description:
@@ -90,7 +104,8 @@ export class PremiseConsultDto {
 
   @ApiProperty({
     type: PremiseConsultOriginalDto,
-    description: "Snapshot of the first review this consultation is presented against.",
+    description:
+      "Snapshot of the first review this consultation is presented against.",
   })
   @ValidateNested()
   @Type(() => PremiseConsultOriginalDto)

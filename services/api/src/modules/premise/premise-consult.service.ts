@@ -19,6 +19,7 @@ import {
   ModelProviderService,
   type ProviderMessage,
 } from "@/modules/ai-provider/model-provider.service";
+import { ConsultationRecordsRepository } from "@/dao/repositories/consultation-records.repository";
 import { PremiseConsultDto } from "./dto/premise-consult.dto";
 import { premiseSecondReviewJsonSchema } from "./premise-json-schemas";
 
@@ -27,12 +28,19 @@ import { premiseSecondReviewJsonSchema } from "./premise-json-schemas";
  * editorial stance re-reviews the premise, then the verdict relation is
  * computed in code and presented side by side — the original verdict is never
  * overwritten and disagreements are never silently resolved.
+ *
+ * Real-model consultations with a projectId are persisted as medical-record
+ * entries (demo runs never enter the record). A persistence failure warns but
+ * does not block: the author already paid for the consult and sees the result.
  */
 @Injectable()
 export class PremiseConsultService {
   private readonly logger = new Logger(PremiseConsultService.name);
 
-  constructor(private readonly modelProviders: ModelProviderService) {}
+  constructor(
+    private readonly modelProviders: ModelProviderService,
+    private readonly consultationRecords: ConsultationRecordsRepository,
+  ) {}
 
   async consult(input: PremiseConsultDto): Promise<PremiseConsultResult> {
     const provider = this.resolveProvider(input.provider);
@@ -48,7 +56,13 @@ export class PremiseConsultService {
         },
         "premise consult served in demo mode",
       );
-      return this.assembleResult(input, consultId, "mock", this.mockSecondReview(input), 0);
+      return this.assembleResult(
+        input,
+        consultId,
+        "mock",
+        this.mockSecondReview(input),
+        0,
+      );
     }
 
     const bundle = buildPremiseSecondReviewPrompt({
@@ -86,7 +100,10 @@ export class PremiseConsultService {
       );
     }
 
-    const anchored = anchorPremiseSecondReviewEvidence(second.evidence, input.premiseText);
+    const anchored = anchorPremiseSecondReviewEvidence(
+      second.evidence,
+      input.premiseText,
+    );
     this.logger.log(
       {
         action: "premise.consult",
@@ -98,13 +115,58 @@ export class PremiseConsultService {
       "premise consult completed",
     );
 
-    return this.assembleResult(
+    return this.persistIfNeeded(
       input,
-      consultId,
-      "model",
-      { ...second, evidence: anchored.evidence },
-      anchored.droppedEvidenceCount,
+      this.assembleResult(
+        input,
+        consultId,
+        "model",
+        { ...second, evidence: anchored.evidence },
+        anchored.droppedEvidenceCount,
+      ),
     );
+  }
+
+  /**
+   * Persist a real-model consult into the project's medical record. The
+   * record stores the exact result the author saw, so the病历 can never
+   * drift from what was presented. Failures warn (model-usage precedent)
+   * — the consult itself was already paid for and must still reach the author.
+   */
+  private async persistIfNeeded(
+    input: PremiseConsultDto,
+    result: PremiseConsultResult,
+  ): Promise<PremiseConsultResult> {
+    if (!input.projectId) {
+      return result;
+    }
+
+    try {
+      const record = await this.consultationRecords.insertPremiseConsult({
+        projectId: input.projectId,
+        result,
+      });
+      this.logger.log(
+        {
+          action: "premise.consult.persisted",
+          projectId: input.projectId,
+          recordId: record.id,
+          verdictRelation: record.verdictRelation,
+        },
+        "premise consult recorded in project history",
+      );
+      return { ...result, recordId: record.id };
+    } catch (error) {
+      this.logger.warn(
+        {
+          action: "premise.consult.persist_failed",
+          projectId: input.projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "premise consult result returned but NOT persisted — the medical record is missing this consult",
+      );
+      return result;
+    }
   }
 
   private assembleResult(
@@ -146,7 +208,9 @@ export class PremiseConsultService {
   }
 
   /** Demo-mode placeholder: anchored by construction, never a real judgment. */
-  private mockSecondReview(input: PremiseConsultDto): PremiseSecondReviewOutput {
+  private mockSecondReview(
+    input: PremiseConsultDto,
+  ): PremiseSecondReviewOutput {
     const quote = input.premiseText.slice(0, 24);
 
     return {
@@ -162,7 +226,9 @@ export class PremiseConsultService {
       })),
       strongestArgument:
         "演示数据：最强成立论证需要真实模型从作者原文中构建，此处不代写、不占位成真判断。",
-      evidence: quote ? [{ quote, note: "输入开头，仅用于验证引文锚定结构。" }] : [],
+      evidence: quote
+        ? [{ quote, note: "输入开头，仅用于验证引文锚定结构。" }]
+        : [],
     };
   }
 }

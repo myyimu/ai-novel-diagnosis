@@ -262,7 +262,9 @@ export const premiseDialogueSessions = pgTable(
     createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
   },
-  (table) => [index("premise_dialogue_sessions_project_idx").on(table.projectId)],
+  (table) => [
+    index("premise_dialogue_sessions_project_idx").on(table.projectId),
+  ],
 );
 
 export type AnalysisUploadSelect = typeof analysisUploads.$inferSelect;
@@ -285,3 +287,45 @@ export type PremiseDialogueSessionSelect =
   typeof premiseDialogueSessions.$inferSelect;
 export type PremiseDialogueSessionInsert =
   typeof premiseDialogueSessions.$inferInsert;
+
+// 立项会诊记录：只落真实模型会诊（mode = model）；演示模式不进病历。
+// result jsonb 内是完整 PremiseConsultResult（两方判定 + 程序比对），
+// 类型化列只保留列表与导出需要的检索面。
+export const premiseConsults = pgTable(
+  "premise_consults",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    trigger: varchar("trigger", { length: 32 }).notNull(),
+    mode: varchar("mode", { length: 16 }).notNull(),
+    verdictRelation: varchar("verdict_relation", { length: 32 }).notNull(),
+    result: jsonb("result").notNull(),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  },
+  (table) => [index("premise_consults_project_idx").on(table.projectId)],
+);
+
+// 报告会诊记录：快诊 × 体检矛盾检测的落库副本 + 作者裁决备注。
+export const reportDivergences = pgTable(
+  "report_divergences",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    chapterTitle: text("chapter_title").notNull(),
+    mode: varchar("mode", { length: 16 }).notNull(),
+    divergenceCount: integer("divergence_count").notNull(),
+    result: jsonb("result").notNull(),
+    authorNote: text("author_note"),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { precision: 3 }).notNull(),
+  },
+  (table) => [index("report_divergences_project_idx").on(table.projectId)],
+);
+
+export type PremiseConsultRecordSelect = typeof premiseConsults.$inferSelect;
+export type PremiseConsultRecordInsert = typeof premiseConsults.$inferInsert;
+export type ReportDivergenceRecordSelect =
+  typeof reportDivergences.$inferSelect;
+export type ReportDivergenceRecordInsert =
+  typeof reportDivergences.$inferInsert;

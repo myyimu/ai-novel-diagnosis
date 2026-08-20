@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { ProviderConfigDto } from "@/modules/ai-provider/dto/provider-config.dto";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
+import { ConsultationRecordsRepository } from "@/dao/repositories/consultation-records.repository";
 import { PremiseConsultService } from "./premise-consult.service";
 import type { PremiseConsultDto } from "./dto/premise-consult.dto";
 
@@ -12,13 +13,30 @@ const mockProvider: ProviderConfigDto = { kind: "mock" };
 const realProvider: ProviderConfigDto = { kind: "openai-compatible" };
 
 const originalLayers = [
-  { layer: "engine", status: "missing", statement: "欲望空泛。", confidence: 0.3 },
-  { layer: "desire", status: "weak", statement: "避开所有遗憾。", confidence: 0.8 },
+  {
+    layer: "engine",
+    status: "missing",
+    statement: "欲望空泛。",
+    confidence: 0.3,
+  },
+  {
+    layer: "desire",
+    status: "weak",
+    statement: "避开所有遗憾。",
+    confidence: 0.8,
+  },
   { layer: "conflict", status: "missing", statement: "", confidence: 0.2 },
-  { layer: "irreducibility", status: "established", statement: "两难独立于设定。", confidence: 0.75 },
+  {
+    layer: "irreducibility",
+    status: "established",
+    statement: "两难独立于设定。",
+    confidence: 0.75,
+  },
 ];
 
-function makeDto(overrides: Partial<PremiseConsultDto> = {}): PremiseConsultDto {
+function makeDto(
+  overrides: Partial<PremiseConsultDto> = {},
+): PremiseConsultDto {
   return {
     premiseText,
     genre: "都市重生",
@@ -37,8 +55,18 @@ function secondReviewJson(overrides: Record<string, unknown> = {}) {
     verdict: "solid",
     oneLineVerdict: "欲望具体且自带代价，值得写。",
     layers: [
-      { layer: "engine", status: "established", statement: "复仇与流量的对撞。", confidence: 0.9 },
-      { layer: "desire", status: "established", statement: "避开所有遗憾。", confidence: 0.85 },
+      {
+        layer: "engine",
+        status: "established",
+        statement: "复仇与流量的对撞。",
+        confidence: 0.9,
+      },
+      {
+        layer: "desire",
+        status: "established",
+        statement: "避开所有遗憾。",
+        confidence: 0.85,
+      },
       {
         layer: "conflict",
         status: "established",
@@ -64,13 +92,19 @@ function secondReviewJson(overrides: Record<string, unknown> = {}) {
 describe("PremiseConsultService", () => {
   let service: PremiseConsultService;
   let chat: jest.Mock;
+  let insertPremiseConsult: jest.Mock;
 
   beforeEach(async () => {
     chat = jest.fn();
+    insertPremiseConsult = jest.fn();
     const module = await Test.createTestingModule({
       providers: [
         PremiseConsultService,
         { provide: ModelProviderService, useValue: { chat } },
+        {
+          provide: ConsultationRecordsRepository,
+          useValue: { insertPremiseConsult },
+        },
       ],
     }).compile();
     service = module.get(PremiseConsultService);
@@ -116,20 +150,22 @@ describe("PremiseConsultService", () => {
 
   it("should throw BadRequest when the second review misses an audit layer", async () => {
     chat.mockResolvedValue(
-      secondReviewJson({ layers: JSON.parse(secondReviewJson()).layers.slice(0, 3) }),
+      secondReviewJson({
+        layers: JSON.parse(secondReviewJson()).layers.slice(0, 3),
+      }),
     );
 
-    await expect(service.consult(makeDto({ provider: realProvider }))).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.consult(makeDto({ provider: realProvider })),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("should throw BadRequest when both raw and repaired outputs stay unparseable", async () => {
     chat.mockResolvedValue("这不是 JSON");
 
-    await expect(service.consult(makeDto({ provider: realProvider }))).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.consult(makeDto({ provider: realProvider })),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(chat).toHaveBeenCalledTimes(2);
   });
 
@@ -142,5 +178,50 @@ describe("PremiseConsultService", () => {
       preset: "shared-gpu",
       kind: "openai-compatible",
     });
+  });
+
+  it("should persist the exact presented result and attach recordId when projectId is given for a real provider", async () => {
+    chat.mockResolvedValue(secondReviewJson());
+    insertPremiseConsult.mockResolvedValue({
+      id: "record-1",
+      projectId: "project-1",
+      verdictRelation: "opposite",
+    });
+
+    const result = await service.consult(
+      makeDto({ provider: realProvider, projectId: "project-1" }),
+    );
+
+    expect(insertPremiseConsult).toHaveBeenCalledWith({
+      projectId: "project-1",
+      result: expect.objectContaining({ consultId: result.consultId }),
+    });
+    expect(result.recordId).toBe("record-1");
+    // The persisted payload is the exact result the author saw — comparison included.
+    const persisted = insertPremiseConsult.mock.calls[0][0].result;
+    expect(persisted.comparison.verdictRelation).toBe("opposite");
+    expect(persisted.second.evidence).toEqual([
+      { quote: "带着前世记忆避开所有遗憾", note: "欲望具体" },
+    ]);
+  });
+
+  it("should never persist demo-mode consults into the medical record", async () => {
+    await service.consult(
+      makeDto({ provider: mockProvider, projectId: "project-1" }),
+    );
+
+    expect(insertPremiseConsult).not.toHaveBeenCalled();
+  });
+
+  it("should still return the consult when persistence fails, without recordId", async () => {
+    chat.mockResolvedValue(secondReviewJson());
+    insertPremiseConsult.mockRejectedValue(new Error("pglite unavailable"));
+
+    const result = await service.consult(
+      makeDto({ provider: realProvider, projectId: "project-1" }),
+    );
+
+    expect(result.mode).toBe("model");
+    expect(result.recordId).toBeUndefined();
   });
 });
