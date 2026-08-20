@@ -1,5 +1,11 @@
 import type { NextRequest } from "next/server";
 
+import {
+	resolveProxyTimeoutMessage,
+	resolveProxyTimeoutMs,
+	resolveProxyUnavailableMessage,
+} from "./proxy-timeout";
+
 const HOP_BY_HOP_HEADERS = new Set([
 	"connection",
 	"content-length",
@@ -12,13 +18,6 @@ const HOP_BY_HOP_HEADERS = new Set([
 	"upgrade",
 ]);
 
-const PROVIDER_TEST_TIMEOUT_MS = 20_000;
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
-const MODEL_UPSTREAM_TIMEOUT_MS = readPositiveIntegerEnv(
-	process.env.API_MODEL_PROXY_TIMEOUT_MS,
-	600_000,
-);
-
 export const maxDuration = 600;
 
 type RouteContext = {
@@ -30,15 +29,6 @@ type RouteContext = {
 type ProxyRequestInit = RequestInit & {
 	duplex?: "half";
 };
-
-function readPositiveIntegerEnv(value: string | undefined, fallback: number) {
-	if (!value) {
-		return fallback;
-	}
-
-	const parsed = Number(value);
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 function getApiBaseUrl() {
 	return (process.env.API_INTERNAL_BASE_URL ?? "http://localhost:3001/api/v1").replace(
@@ -75,56 +65,6 @@ function buildProxyTimeoutError(message = "request timeout") {
 
 function isAbortError(error: unknown): error is DOMException {
 	return error instanceof DOMException && error.name === "AbortError";
-}
-
-function isProviderTestPath(path: string[]) {
-	return (
-		path.length >= 3 && path[0] === "analysis" && path[1] === "provider" && path[2] === "test"
-	);
-}
-
-function isModelBackedAnalysisPath(path: string[]) {
-	if (path[0] !== "analysis") {
-		return false;
-	}
-
-	if (path[1] === "provider") {
-		return false;
-	}
-
-	return ["quick-review", "reference", "rubric", "score", "research", "book"].includes(path[1]);
-}
-
-function resolveProxyTimeoutMs(path: string[]) {
-	if (isProviderTestPath(path)) {
-		return PROVIDER_TEST_TIMEOUT_MS;
-	}
-
-	if (isModelBackedAnalysisPath(path)) {
-		return MODEL_UPSTREAM_TIMEOUT_MS;
-	}
-
-	return DEFAULT_UPSTREAM_TIMEOUT_MS;
-}
-
-function resolveProxyTimeoutMessage(path: string[]) {
-	if (isProviderTestPath(path)) {
-		return "Provider test timed out, please check API service reachability or retry later";
-	}
-
-	if (isModelBackedAnalysisPath(path)) {
-		return "当前模型可能在排队，可稍后重试或切换。";
-	}
-
-	return "Request timed out, please retry later";
-}
-
-function resolveProxyUnavailableMessage(path: string[]) {
-	if (isProviderTestPath(path)) {
-		return "Provider test proxy failed. Check network or server status";
-	}
-
-	return "本地 API 服务暂时不可用，可能正在启动或重启。请稍候重试。";
 }
 
 async function proxy(request: NextRequest, context: RouteContext) {
