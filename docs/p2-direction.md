@@ -221,6 +221,23 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   提示不是正确概率——会诊触发条件必须按此措辞）。
 - **验收**：分歧不静默消解，作者能看到两方各自锚定的证据；会诊结果不覆盖原判定而是并列。
 - **刻意不做**：agent 间自主协商（§1.4）；会诊结论自动裁决。
+- **落成记录（2026-08-20，已落地）**：两个子任务三层全部落地。① premise 会诊：
+  ai-core `premise-consult.ts`（盲审第二审稿人——立场与"先找理由拒绝"相反、负责最强
+  成立论证但四层不放水；比对纯代码：verdict 关系 agree/adjacent/opposite + 四层逐层
+  对照，不经模型叙述；证据子串锚定丢弃计数；`suggestPremiseConsult` 低证据阈值 0.4
+  且措辞按 doctrine"证据完整度非正确率"）；api `POST /analysis/premise-consult`
+  （无状态，客户端携带原判定快照，constrained JSON + 修复一次，mock 短路按构造锚定）；
+  web `PremiseConsultPanel`（双触发入口"我不服/证据不足"、双栏判定并列、层对照表、
+  droppedEvidenceCount 披露、原判定永不覆盖）。② 报告分歧：ai-core
+  `report-divergence.ts`（只认直接矛盾——"一方提到另一方没提"不算分歧；每条矛盾
+  双引必须分别逐字锚定两份报告文本，问号收尾交回作者；空数组=如实"无直接矛盾"，
+  与解析失败可区分）；api `POST /analysis/report-divergence`（报告文本客户端携带，
+  解析失败抛可重试错误而非伪装成"无矛盾"）；web `ReportDivergencePanel`（快诊页
+  在项目绑定体检结果时渲染，两报告原话并列 + 交给作者的问句 + 丢弃披露）。
+  验证：ai-core typecheck/lint/test(105)/build；api typecheck/lint/test(56 套 375 例)；
+  web check/test(150)/build。提交 `c894313`、`a6284b0`、`2775f22`、`6d6454c`、
+  `ac0d642`、`a2b933a`。会诊结果均不落库（与 T1 报告问答同一无状态口径），分歧的
+  作者裁决未持久化——随 T5/W4 病历与导出收口统一处理。
 
 ### P2-T5 成长视图与自检（毕业率指标落地）
 
