@@ -105,3 +105,28 @@ export const premiseReviewJsonSchema = objectSchema(
     "upgradeDirections",
   ],
 );
+
+/** Constrained output shape for the blind second reviewer (premise consult). */
+export const premiseSecondReviewJsonSchema = objectSchema(
+  {
+    verdict: {
+      type: "string",
+      enum: ["solid", "fixable", "not-worth-writing"],
+    },
+    oneLineVerdict: stringSchema,
+    layers: {
+      type: "array",
+      items: layerAssessmentSchema,
+      minItems: 4,
+      maxItems: 4,
+    },
+    strongestArgument: stringSchema,
+    evidence: {
+      type: "array",
+      items: evidenceQuoteSchema,
+      maxItems: 5,
+    },
+  },
+  ["verdict", "oneLineVerdict", "layers", "strongestArgument", "evidence"],
+);
+
