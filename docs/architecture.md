@@ -189,6 +189,9 @@ TXT 上传
 - `POST /api/v1/analysis/premise-review`: 立项审稿（动笔前判断故事值不值得写，产出三态判定与发动机契约重建）。
 - `POST /api/v1/analysis/premise-consult`: 立项会诊（盲审第二审稿人以相反立场重审，程序比对两审判定并列呈现，不覆盖原判定）。
 - `POST /api/v1/analysis/report-divergence`: 报告会诊（检测快诊报告与整书体检报告对同一章的直接矛盾结论，以问句交回作者裁决）。
+- `GET /api/v1/analysis/workspace/premise-consults/:projectId`: 读项目的立项会诊病历（只有真实模型会诊落库，演示模式不进病历）。
+- `GET /api/v1/analysis/workspace/report-divergences/:projectId`: 读项目的报告分歧病历（含作者裁决备注）。
+- `PATCH /api/v1/analysis/workspace/report-divergences/:recordId/note`: 追记作者对分歧的裁决备注（只写 note，落库的检测结果不可改写）。
 - `POST /api/v1/analysis/provider/test`: 测试 mock 或 OpenAI-compatible Provider。
 - `POST /api/v1/analysis/provider/models`: 拉取供应商模型列表。
 - `GET /api/v1/analysis/provider/presets`: 返回模型供应商预设。

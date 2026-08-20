@@ -209,7 +209,9 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   契约六字段刻意留空、可选费曼点评含 droppedPointCount 披露、亲笔契约可回填发动机卡）。
   验证：ai-core typecheck/lint/test(87)/build；api typecheck/lint/test(52 套 357 例)；
   web check/test(140)/build。提交 `880bb5f`、`51aad98`、`a0c26f5`、`b085cd5`。
-  导出入病历未包含对话记录（验收条款最后一项）——随 T4/W4 导出统一收口。
+  导出入病历未包含对话记录（验收条款最后一项）——已于 2026-08-20 收口：导出新增
+  "立项引导对话"一节，按会话呈现状态/轮次/被拒评判计数/作者契约确认与摘要
+  （提交 `2e5a994`）。
 
 ### P2-T4 会诊与分歧披露（多视角）
 
@@ -237,7 +239,15 @@ agent 对话天然脱锚（协商产物是模型间互引的文本，恰恰产�
   验证：ai-core typecheck/lint/test(105)/build；api typecheck/lint/test(56 套 375 例)；
   web check/test(150)/build。提交 `c894313`、`a6284b0`、`2775f22`、`6d6454c`、
   `ac0d642`、`a2b933a`。会诊结果均不落库（与 T1 报告问答同一无状态口径），分歧的
-  作者裁决未持久化——随 T5/W4 病历与导出收口统一处理。
+  作者裁决未持久化——已于 2026-08-20 收口：`premise_consults` / `report_divergences`
+  两表只落真实模型（mode=model）且带项目号的结果，落库的是作者看到的原样结果
+  （判定/引文/程序比对一并冻结，病历不漂移）；演示模式永不进病历；落库失败
+  warn 不阻断（结果照常返回，只是无 recordId）。读取走
+  `GET workspace/premise-consults|report-divergences/:projectId`；作者裁决经
+  `PATCH report-divergences/:recordId/note` 只写备注，检测结果本身不可改写。
+  导出新增"立项会诊 / 报告会诊"两节随项目包一并导出（含丢弃引文计数与
+  未记录裁决的如实标注）；web 两面板带项目号发起，凭 recordId 提示已入病历
+  并提供裁决表单。提交 `fd86ad6`、`4e74754`、`afaddba`、`2e5a994`、`dbe9a90`。
 
 ### P2-T5 成长视图与自检（毕业率指标落地）
 
