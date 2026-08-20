@@ -11,6 +11,7 @@ import {
 } from "@/components/workspace/RedesignWorkspaceShell";
 import type { DiagnosisExampleOption } from "@/lib/diagnosis-examples";
 import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { ReportDivergencePanel } from "@/components/workspace/quick/ReportDivergencePanel";
 import { buildQuickReviewQaReport } from "@/lib/report-qa-text";
 import type { PlatformFitResult } from "@/lib/workspace-analysis-client";
 import {
@@ -49,6 +50,8 @@ interface QuickDiagnosisHandlers {
 	chapterText: string;
 	chapterTitle: string;
 	activeProject?: WorkspaceProject;
+	/** 报告会诊（T4-②）：当前项目绑定书籍的故事体检结果，有才渲染会诊面板。 */
+	projectStoryAuditResult?: import("@/stores/workspace-store").StoryAuditResult | null;
 	projectRevisionSessions: import("@/stores/workspace-store").RevisionSession[];
 	projectMethodologyCards: import("@/stores/workspace-store").ProjectMethodologyCard[];
 	bookTitle: string;
@@ -646,6 +649,13 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 							isGeneratingMethodology={handlers.loading === "methodology"}
 							onGenerateMethodology={handlers.generateQuickReviewMethodology}
 						/>
+						{handlers.projectStoryAuditResult ? (
+							<ReportDivergencePanel
+								provider={handlers.provider}
+								quickReviewResult={handlers.quickReviewResult}
+								storyAudit={handlers.projectStoryAuditResult}
+							/>
+						) : null}
 						<section className="mt-[22px]">
 							<ReportQaPanel
 								provider={handlers.provider}

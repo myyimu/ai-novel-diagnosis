@@ -4,6 +4,7 @@ import type {
 	PremiseContractFields,
 	PremiseDialogueSessionState,
 	PremiseLayerAssessment,
+	ReportDivergenceResult,
 } from "@ai-novel-diagnosis/ai-core";
 import type {
 	BookAnalysisJob,
@@ -423,6 +424,27 @@ export function requestPremiseConsult({
 		genre: genre?.trim() || undefined,
 		trigger,
 		original,
+	});
+}
+
+export interface ReportDivergenceForm {
+	provider: ProviderForm;
+	chapterTitle: string;
+	quickReviewReport: string;
+	storyAuditReport: string;
+}
+
+export function requestReportDivergence({
+	provider,
+	chapterTitle,
+	quickReviewReport,
+	storyAuditReport,
+}: ReportDivergenceForm) {
+	return postJson<ReportDivergenceResult>("/analysis/report-divergence", {
+		provider,
+		chapterTitle,
+		quickReviewReport,
+		storyAuditReport,
 	});
 }
 
