@@ -59,6 +59,8 @@ API: http://127.0.0.1:3001/api/v1
 - A clear diagnosis of the biggest first-chapter drop-off risk: opening, hook, emotion, pacing, setup, or market promise.
 - An evidence-backed editorial hypothesis about text signals that may affect willingness to continue.
 - A copyable revision prompt: concrete instructions you can pass to a writing AI, not vague critique.
+- A second-opinion consultation: when you disagree or the evidence is thin, summon an independent second reviewer with the opposite stance; both verdicts and their evidence are shown side by side and you adjudicate.
+- Free-form follow-up questions on any diagnosis report: answers must cite evidence and anchors inside the report, or openly say they cannot answer.
 - A versioned retest loop: preserve before/after text and compare resolved, recurring, and newly introduced issues instead of relying on a score alone.
 - Advanced assets: reference-sample rubrics, full-book character/world analysis, relationship graphs, timelines, and export packs.
 
@@ -163,6 +165,12 @@ For first-time users, start with the shortest loop:
 Paste a chapter -> inspect evidence -> confirm or reject issues -> save a revision plan -> create V2 -> run an independent retest -> decide whether the lesson should be retained
 ```
 
+If all you have is a one-line idea, run premise review first:
+
+```text
+Paste the story premise -> four-layer review -> summon a second reviewer if you disagree -> refine the premise in guided dialogue -> start writing
+```
+
 When you need a deeper critique, move into the advanced workflow:
 
 ```text
@@ -178,6 +186,13 @@ Upload a full TXT -> preview chapter split -> run Map-Reduce analysis -> review 
 The current UI is organized into four workspaces: `/diagnose` for chapter diagnosis, with `/diagnose/idea` (premise review), `/diagnose/quick`, `/diagnose/deep`, `/diagnose/score`, and `/diagnose/evidence`; `/project` for current projects, retests, methodology cards, export, and health, with `/project/current`, `/project/revisions`, `/project/methodology`, `/project/export`, and `/project/health`; `/research` for full-book analysis, sample comparison, pattern study, and research materials, with `/research/book`, `/research/compare`, `/research/patterns`, and `/research/materials`; and `/settings` for model providers, with `/settings/provider`. Visiting `/` redirects to `/project/current`. The legacy compatibility routes (`/critique`, `/book`, `/library`, `/history`, `/export`, `/model`) have been removed.
 
 ## Core Capabilities
+
+Premise review and multi-perspective consultation:
+
+- Before drafting, review the story premise across four layers — story engine, protagonist desire, sustained conflict, and irreducibility — with checkable evidence, a three-state verdict (worth writing / fixable / not worth writing), and a guided dialogue to refine it.
+- When you disagree or the thinnest layer lacks evidence, summon a second reviewer with the opposite stance: layers are compared as agree / adjacent / opposite, both rationales are shown side by side, and divergence is never silently resolved.
+- When chapter triage and the full-story audit contradict each other on the same chapter, the divergence is surfaced explicitly with both report quotes, and the author adjudicates with a note.
+- Consultations, divergences, and adjudications are stored in the project medical record exactly as the author saw them (demo mode never enters the record) and included in the export pack.
 
 First-chapter triage:
 
@@ -226,6 +241,8 @@ The app provides public/shared model entry points by default and also supports B
 - Alibaba Cloud Bailian / Tongyi Qianwen.
 - Ollama local models.
 - Custom OpenAI-compatible endpoints.
+
+Transient provider failures (429 rate limits, 5xx) are retried automatically with backoff — 2 attempts by default, exponential from 2s, honoring Retry-After. Timeouts and auth errors are not retried. Configure via `PROVIDER_TRANSIENT_RETRY_MAX` and `PROVIDER_TRANSIENT_RETRY_BASE_DELAY_MS`.
 
 ## Local Development
 
@@ -412,7 +429,7 @@ pnpm run doctor
 - This is an Alpha / MVP project. Outputs are evidence-backed editorial hypotheses, not independently validated objective measurements.
 - `quickScore` summarizes issue severity for compatibility; `confidence` summarizes evidence/context sufficiency. Neither is a quality score or calibrated probability of correctness.
 - A repeated cached result or same-model self-review does not demonstrate that a revision worked; product-effect claims require independent editor labels and controlled before/after evaluation.
-- Revision text versions and human review states for story-audit findings are persisted. Per-issue decisions for chapter triage, actual adoption tracking, and a complete independent retest remain under development; missing objects must not be presented as evidence that a revision worked.
+- Revision text versions, human review states for story-audit findings, and consultation/divergence records with author adjudications are persisted (the medical record only stores real-model results; demo mode never enters it). Per-issue decisions for chapter triage, actual adoption tracking, and a complete independent retest remain under development; missing objects must not be presented as evidence that a revision worked.
 - Partial results are persisted, and failed/interrupted full-book jobs have a basic resume path. More granular partial export and persisted graph-review corrections are still being iterated.
 - Relationship graphs support local manual corrections and correction-aware JSON export, but correction records are not yet stored as a separate database entity.
 - For real PostgreSQL deployments, use committed Drizzle migrations. Generate a new migration after schema changes, then run `pnpm --filter api db:migrate`.
