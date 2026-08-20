@@ -53,6 +53,20 @@ export function ProjectCurrentPage() {
 		saveQuickReviewIssueDecisions,
 	} = useWorkspaceHandlers("overview");
 
+	/* 所有 hooks 必须在 ?chapter= 提前返回之前调用——否则带参/无参两次渲染钩子数不一致，React 直接崩溃。 */
+	const revisionCount = projectRevisionSessions.length;
+	const methodologyCount = projectMethodologyCards.length;
+	const stageSummary = useMemo(
+		() =>
+			deriveBookStage({
+				sessions: projectRevisionSessions,
+				methodologyCardCount: methodologyCount,
+				engineCardStatus: projectEngineCard?.status,
+				premiseReviewEnabled: true,
+			}),
+		[projectRevisionSessions, methodologyCount, projectEngineCard?.status],
+	);
+
 	const chapterId = searchParams.get("chapter");
 	if (chapterId) {
 		const requestedProjectId =
@@ -113,19 +127,7 @@ export function ProjectCurrentPage() {
 		);
 	}
 
-	const revisionCount = projectRevisionSessions.length;
-	const methodologyCount = projectMethodologyCards.length;
 	const totalAssets = revisionCount + methodologyCount;
-	const stageSummary = useMemo(
-		() =>
-			deriveBookStage({
-				sessions: projectRevisionSessions,
-				methodologyCardCount: methodologyCount,
-				engineCardStatus: projectEngineCard?.status,
-				premiseReviewEnabled: true,
-			}),
-		[projectRevisionSessions, methodologyCount, projectEngineCard?.status],
-	);
 	const activeProjectRouteId = activeProjectId || activeProject?.id || "default-project";
 	const activeChapterSeed = [
 		activeProjectRouteId,
