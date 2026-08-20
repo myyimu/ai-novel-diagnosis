@@ -21,6 +21,7 @@ import {
 	type PremiseReviewVerdict,
 } from "@ai-novel-diagnosis/ai-core";
 import { ReportQaPanel } from "@/components/workspace/report-qa/ReportQaPanel";
+import { PremiseConsultPanel } from "@/components/workspace/premise/PremiseConsultPanel";
 import { PremiseDialoguePanel } from "@/components/workspace/premise/PremiseDialoguePanel";
 import type { PremiseDialogueContractForm } from "@/lib/workspace-analysis-client";
 import { buildPremiseReviewQaReport } from "@/lib/report-qa-text";
@@ -407,6 +408,12 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 							reviewByFindingId={reviewByFindingId}
 							isSavingReview={isSavingReview}
 							onReviewFinding={onReviewFinding}
+						/>
+						<PremiseConsultPanel
+							provider={provider}
+							premiseText={premiseText}
+							genre={genre || undefined}
+							review={result}
 						/>
 						<PremiseDialoguePanel
 							provider={provider}

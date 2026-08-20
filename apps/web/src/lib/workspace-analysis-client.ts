@@ -1,5 +1,6 @@
 import { deleteJson, getJson, patchJson, postForm, postJson } from "@/lib/api-client";
 import type {
+	PremiseConsultResult,
 	PremiseContractFields,
 	PremiseDialogueSessionState,
 	PremiseLayerAssessment,
@@ -393,6 +394,35 @@ export function requestPremiseReview({
 		provider,
 		premiseText: premiseText.trim(),
 		genre: genre?.trim() || undefined,
+	});
+}
+
+export interface PremiseConsultForm {
+	provider: ProviderForm;
+	premiseText: string;
+	genre?: string;
+	/** author-disagrees = 作者不服；low-evidence = 证据完整度低（非正确率）。 */
+	trigger: "author-disagrees" | "low-evidence";
+	original: {
+		verdict: PremiseReviewResult["engineVerdict"];
+		oneLineVerdict: string;
+		layers: PremiseLayerAssessment[];
+	};
+}
+
+export function requestPremiseConsult({
+	provider,
+	premiseText,
+	genre,
+	trigger,
+	original,
+}: PremiseConsultForm) {
+	return postJson<PremiseConsultResult>("/analysis/premise-consult", {
+		provider,
+		premiseText: premiseText.trim(),
+		genre: genre?.trim() || undefined,
+		trigger,
+		original,
 	});
 }
 
