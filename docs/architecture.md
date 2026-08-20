@@ -187,6 +187,8 @@ TXT 上传
 - `POST /api/v1/analysis/preview`: 不调用真实模型，返回结构化评分预览。
 - `POST /api/v1/analysis/quick-review`: 改稿急诊。
 - `POST /api/v1/analysis/premise-review`: 立项审稿（动笔前判断故事值不值得写，产出三态判定与发动机契约重建）。
+- `POST /api/v1/analysis/premise-consult`: 立项会诊（盲审第二审稿人以相反立场重审，程序比对两审判定并列呈现，不覆盖原判定）。
+- `POST /api/v1/analysis/report-divergence`: 报告会诊（检测快诊报告与整书体检报告对同一章的直接矛盾结论，以问句交回作者裁决）。
 - `POST /api/v1/analysis/provider/test`: 测试 mock 或 OpenAI-compatible Provider。
 - `POST /api/v1/analysis/provider/models`: 拉取供应商模型列表。
 - `GET /api/v1/analysis/provider/presets`: 返回模型供应商预设。
