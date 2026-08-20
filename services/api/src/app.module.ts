@@ -18,6 +18,7 @@ import { ModelUsageModule } from "@/modules/model-usage/model-usage.module";
 import { MetricsModule } from "@/modules/metrics/metrics.module";
 import { PremiseModule } from "@/modules/premise/premise.module";
 import { PremiseDialogueModule } from "@/modules/premise-dialogue/premise-dialogue.module";
+import { ReportDivergenceModule } from "@/modules/report-divergence/report-divergence.module";
 import { ReportQaModule } from "@/modules/report-qa/report-qa.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
@@ -63,6 +64,7 @@ import { AppController } from "./app.controller";
     PremiseModule,
     PremiseDialogueModule,
     ReportQaModule,
+    ReportDivergenceModule,
   ],
   controllers: [AppController],
   providers: [
