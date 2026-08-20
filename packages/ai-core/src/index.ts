@@ -2,6 +2,7 @@ export * from "./dialogue-statistics";
 export * from "./metrics";
 export * from "./preview";
 export * from "./prompt-attribution";
+export * from "./report-divergence";
 export * from "./report-qa";
 export * from "./revision-iteration";
 export * from "./premise-consult";
