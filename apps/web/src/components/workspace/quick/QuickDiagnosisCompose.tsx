@@ -652,6 +652,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 						{handlers.projectStoryAuditResult ? (
 							<ReportDivergencePanel
 								provider={handlers.provider}
+								projectId={handlers.activeProject?.id}
 								quickReviewResult={handlers.quickReviewResult}
 								storyAudit={handlers.projectStoryAuditResult}
 							/>

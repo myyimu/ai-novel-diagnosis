@@ -411,6 +411,7 @@ export function PremiseReviewCompose(props: PremiseReviewComposeProps) {
 						/>
 						<PremiseConsultPanel
 							provider={provider}
+							projectId={projectId}
 							premiseText={premiseText}
 							genre={genre || undefined}
 							review={result}

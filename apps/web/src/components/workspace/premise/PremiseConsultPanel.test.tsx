@@ -166,4 +166,14 @@ describe("ConsultResultView", () => {
 		expect(html).toContain("演示模式");
 		expect(html).toContain("不代表真实编辑判断");
 	});
+
+	it("confirms the consult entered the project record only when recordId is present", () => {
+		const persisted = renderToStaticMarkup(
+			<ConsultResultView result={{ ...consultResult, recordId: "record-1" }} />,
+		);
+		const unpersisted = renderToStaticMarkup(<ConsultResultView result={consultResult} />);
+
+		expect(persisted).toContain("本次会诊已记入项目病历");
+		expect(unpersisted).not.toContain("本次会诊已记入项目病历");
+	});
 });

@@ -9,9 +9,12 @@ import type {
 } from "@ai-novel-diagnosis/ai-core";
 import { Button } from "@/components/ui/button";
 import { buildQuickReviewQaReport, buildStoryAuditQaReport } from "@/lib/report-qa-text";
-import { requestReportDivergence } from "@/lib/workspace-analysis-client";
+import {
+	requestReportDivergence,
+	updateReportDivergenceNote,
+} from "@/lib/workspace-analysis-client";
 import type { ProviderForm, StoryAuditResult } from "@/stores/workspace-store";
-import { GitCompareArrows, Loader2, TriangleAlert } from "lucide-react";
+import { GitCompareArrows, Loader2, NotebookPen, TriangleAlert } from "lucide-react";
 
 /**
  * 报告会诊面板（T4-②）：同一章的快诊报告 × 整书体检报告矛盾检测。
@@ -19,19 +22,27 @@ import { GitCompareArrows, Loader2, TriangleAlert } from "lucide-react";
  * 收尾交回作者）、两份报告并列引用且都保留原样（不互相覆盖）、
  * 未锚定的分歧点被服务端丢弃并如实计数、矛盾不静默：检测到几条就
  * 摆几条，一条都没有时也如实说明"未发现直接矛盾"。
+ * 带项目号时真实模型检测会记入项目病历，作者的裁决备注可随后写回。
  */
 export function ReportDivergencePanel({
 	provider,
+	projectId,
 	quickReviewResult,
 	storyAudit,
 }: {
 	provider: ProviderForm;
+	/** 带项目号时真实模型检测会记入项目病历（返回 recordId）。 */
+	projectId?: string;
 	quickReviewResult: QuickReviewResult;
 	storyAudit: StoryAuditResult;
 }) {
 	const [result, setResult] = useState<ReportDivergenceResult | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [noteText, setNoteText] = useState("");
+	const [savedNote, setSavedNote] = useState<string | null>(null);
+	const [savingNote, setSavingNote] = useState(false);
+	const [noteError, setNoteError] = useState<string | null>(null);
 
 	const quickReviewReport = useMemo(
 		() => buildQuickReviewQaReport(quickReviewResult),
@@ -47,6 +58,9 @@ export function ReportDivergencePanel({
 			fingerprintRef.current = fingerprint;
 			setResult(null);
 			setError(null);
+			setNoteText("");
+			setSavedNote(null);
+			setNoteError(null);
 		}
 	}, [quickReviewResult.title, quickReviewResult.quickScore]);
 
@@ -55,12 +69,16 @@ export function ReportDivergencePanel({
 		setError(null);
 		requestReportDivergence({
 			provider,
+			projectId,
 			chapterTitle: quickReviewResult.title,
 			quickReviewReport,
 			storyAuditReport,
 		})
 			.then((next) => {
 				setResult(next);
+				setNoteText("");
+				setSavedNote(null);
+				setNoteError(null);
 			})
 			.catch((requestError: unknown) => {
 				setError(
@@ -71,6 +89,28 @@ export function ReportDivergencePanel({
 			})
 			.finally(() => {
 				setBusy(false);
+			});
+	};
+
+	const saveNote = () => {
+		if (!result?.recordId) return;
+		const note = noteText.trim();
+		if (!note) return;
+		setSavingNote(true);
+		setNoteError(null);
+		updateReportDivergenceNote(result.recordId, note)
+			.then((record) => {
+				setSavedNote(record.authorNote);
+			})
+			.catch((requestError: unknown) => {
+				setNoteError(
+					requestError instanceof Error
+						? requestError.message
+						: "裁决保存失败，请稍后重试。",
+				);
+			})
+			.finally(() => {
+				setSavingNote(false);
 			});
 	};
 
@@ -114,8 +154,81 @@ export function ReportDivergencePanel({
 						</Button>
 					</div>
 				) : (
-					<DivergenceResultView result={result} />
+					<>
+						<DivergenceResultView result={result} />
+						{result.recordId ? (
+							<AdjudicationNoteSection
+								noteText={noteText}
+								onNoteChange={setNoteText}
+								onSave={saveNote}
+								saving={savingNote}
+								savedNote={savedNote}
+								error={noteError}
+							/>
+						) : null}
+					</>
 				)}
+			</div>
+		</section>
+	);
+}
+
+/**
+ * 作者裁决表单：矛盾交回作者后，作者的一句话裁决可以写进项目病历。
+ * 只保存备注——落库的检测结果本身不会被这段话改写。
+ */
+export function AdjudicationNoteSection({
+	noteText,
+	onNoteChange,
+	onSave,
+	saving,
+	savedNote,
+	error,
+}: {
+	noteText: string;
+	onNoteChange: (value: string) => void;
+	onSave: () => void;
+	saving: boolean;
+	savedNote: string | null;
+	error: string | null;
+}) {
+	return (
+		<section className="mt-4 overflow-hidden rounded-[12px] border border-[#e6e8eb]">
+			<header className="border-b border-[#e6e8eb] bg-[#fcfcfd] px-4 py-2.5 text-xs font-bold text-[#3c414b]">
+				你的裁决（可选，记入项目病历）
+			</header>
+			<div className="grid gap-2.5 p-4">
+				{savedNote ? (
+					<div className="rounded-[10px] border border-[#bfe3c8] bg-[#f0faf3] px-3.5 py-2.5 text-xs leading-5 text-[#1d7a3e]">
+						已记录：{savedNote}
+					</div>
+				) : null}
+				<textarea
+					value={noteText}
+					onChange={(event) => onNoteChange(event.target.value)}
+					placeholder="两份报告你信哪一份？打算怎么改？（例如：我信体检，这章确实拖，下一版砍掉两段回忆。）"
+					maxLength={2000}
+					className="min-h-20 w-full resize-y rounded-[9px] border border-[#d8dbe0] bg-white px-3 py-2 text-xs leading-6 text-[#3c414b] outline-none focus:border-[#ff5a1f]"
+				/>
+				{error ? <p className="m-0 text-[11px] leading-5 text-[#a82f2d]">{error}</p> : null}
+				<div className="flex items-center justify-between gap-3">
+					<span className="text-[11px] leading-5 text-[#9aa1ac]">
+						只保存这句话；上面的检测结果不会被改写。
+					</span>
+					<Button
+						onClick={onSave}
+						disabled={saving || !noteText.trim()}
+						variant="outline"
+						className="min-h-9 rounded-[9px] border-[#d8dbe0] font-bold text-[#3c414b] hover:bg-[#f7f8f9]"
+					>
+						{saving ? (
+							<Loader2 className="mr-2 size-4 animate-spin" />
+						) : (
+							<NotebookPen className="mr-2 size-4" />
+						)}
+						保存裁决
+					</Button>
+				</div>
 			</div>
 		</section>
 	);
@@ -145,6 +258,12 @@ export function DivergenceResultView({ result }: { result: ReportDivergenceResul
 				<p className="m-0 text-[11px] leading-5 text-[#955208]">
 					另有 {result.droppedPointCount}{" "}
 					条分歧未能在两份报告中同时锚定引文，已被服务端丢弃（不算数）。
+				</p>
+			) : null}
+
+			{result.recordId ? (
+				<p className="m-0 text-[11px] leading-5 text-[#1d7a3e]">
+					本次检测已记入项目病历（导出项目包时会随两方引文一并导出）。
 				</p>
 			) : null}
 

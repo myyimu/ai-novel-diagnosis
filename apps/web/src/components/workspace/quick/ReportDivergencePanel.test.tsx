@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { DivergenceResultView, ReportDivergencePanel } from "./ReportDivergencePanel";
+import {
+	AdjudicationNoteSection,
+	DivergenceResultView,
+	ReportDivergencePanel,
+} from "./ReportDivergencePanel";
 import type { QuickReviewResult, ReportDivergenceResult } from "@ai-novel-diagnosis/ai-core";
 import type { StoryAuditResult } from "@/stores/workspace-store";
 import { defaultProvider } from "@/stores/workspace-types";
@@ -147,5 +151,52 @@ describe("DivergenceResultView", () => {
 
 		expect(html).toContain("演示模式");
 		expect(html).toContain("不代表两份报告真实矛盾");
+	});
+
+	it("confirms the detection entered the project record only when recordId is present", () => {
+		const persisted = renderToStaticMarkup(
+			<DivergenceResultView result={{ ...divergenceResult, recordId: "record-1" }} />,
+		);
+		const unpersisted = renderToStaticMarkup(
+			<DivergenceResultView result={divergenceResult} />,
+		);
+
+		expect(persisted).toContain("本次检测已记入项目病历");
+		expect(unpersisted).not.toContain("本次检测已记入项目病历");
+	});
+});
+
+describe("AdjudicationNoteSection", () => {
+	it("renders the author adjudication form that only saves a note", () => {
+		const html = renderToStaticMarkup(
+			<AdjudicationNoteSection
+				noteText=""
+				onNoteChange={() => {}}
+				onSave={() => {}}
+				saving={false}
+				savedNote={null}
+				error={null}
+			/>,
+		);
+
+		expect(html).toContain("你的裁决（可选，记入项目病历）");
+		expect(html).toContain("两份报告你信哪一份？");
+		expect(html).toContain("只保存这句话；上面的检测结果不会被改写。");
+		expect(html).toContain("保存裁决");
+	});
+
+	it("shows the saved adjudication once persisted", () => {
+		const html = renderToStaticMarkup(
+			<AdjudicationNoteSection
+				noteText="我信体检：这章确实拖。"
+				onNoteChange={() => {}}
+				onSave={() => {}}
+				saving={false}
+				savedNote="我信体检：这章确实拖。"
+				error={null}
+			/>,
+		);
+
+		expect(html).toContain("已记录：我信体检：这章确实拖。");
 	});
 });

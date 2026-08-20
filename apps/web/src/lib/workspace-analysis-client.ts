@@ -404,6 +404,8 @@ export interface PremiseConsultForm {
 	genre?: string;
 	/** author-disagrees = 作者不服；low-evidence = 证据完整度低（非正确率）。 */
 	trigger: "author-disagrees" | "low-evidence";
+	/** 带项目号时真实模型会诊会记入项目病历（返回 recordId）。 */
+	projectId?: string;
 	original: {
 		verdict: PremiseReviewResult["engineVerdict"];
 		oneLineVerdict: string;
@@ -416,6 +418,7 @@ export function requestPremiseConsult({
 	premiseText,
 	genre,
 	trigger,
+	projectId,
 	original,
 }: PremiseConsultForm) {
 	return postJson<PremiseConsultResult>("/analysis/premise-consult", {
@@ -423,6 +426,7 @@ export function requestPremiseConsult({
 		premiseText: premiseText.trim(),
 		genre: genre?.trim() || undefined,
 		trigger,
+		projectId: projectId?.trim() || undefined,
 		original,
 	});
 }
@@ -432,6 +436,8 @@ export interface ReportDivergenceForm {
 	chapterTitle: string;
 	quickReviewReport: string;
 	storyAuditReport: string;
+	/** 带项目号时真实模型检测会记入项目病历（返回 recordId）。 */
+	projectId?: string;
 }
 
 export function requestReportDivergence({
@@ -439,13 +445,36 @@ export function requestReportDivergence({
 	chapterTitle,
 	quickReviewReport,
 	storyAuditReport,
+	projectId,
 }: ReportDivergenceForm) {
 	return postJson<ReportDivergenceResult>("/analysis/report-divergence", {
 		provider,
 		chapterTitle,
 		quickReviewReport,
 		storyAuditReport,
+		projectId: projectId?.trim() || undefined,
 	});
+}
+
+/** 服务端落库的一条分歧检测记录（含作者裁决备注）。 */
+export interface ReportDivergenceRecord {
+	id: string;
+	projectId: string;
+	chapterTitle: string;
+	mode: "mock" | "model";
+	divergenceCount: number;
+	result: ReportDivergenceResult;
+	authorNote: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** 作者对一次分歧检测的裁决备注：只写备注，检测结果本身不可改。 */
+export function updateReportDivergenceNote(recordId: string, note: string) {
+	return patchJson<ReportDivergenceRecord>(
+		`/analysis/workspace/report-divergences/${encodeURIComponent(recordId)}/note`,
+		{ note },
+	);
 }
 
 export interface ParagraphRewriteTarget {

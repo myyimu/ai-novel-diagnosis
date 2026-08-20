@@ -46,11 +46,14 @@ const RELATION_BANNERS: Record<string, string> = {
  */
 export function PremiseConsultPanel({
 	provider,
+	projectId,
 	premiseText,
 	genre,
 	review,
 }: {
 	provider: ProviderForm;
+	/** 带项目号时真实模型会诊会记入项目病历。 */
+	projectId?: string;
 	premiseText: string;
 	genre?: string;
 	review: PremiseReviewResult;
@@ -74,6 +77,7 @@ export function PremiseConsultPanel({
 		setError(null);
 		requestPremiseConsult({
 			provider,
+			projectId,
 			premiseText,
 			genre,
 			trigger,
@@ -247,6 +251,12 @@ export function ConsultResultView({ result }: { result: PremiseConsultResult }) 
 				<p className="m-0 text-[11px] leading-5 text-[#955208]">
 					另有 {comparison.droppedEvidenceCount}{" "}
 					条第二审稿人的引文未能在你的原文中定位，已被服务端丢弃（不算数）。
+				</p>
+			) : null}
+
+			{result.recordId ? (
+				<p className="m-0 text-[11px] leading-5 text-[#1d7a3e]">
+					本次会诊已记入项目病历（导出项目包时会随两方判定一并导出）。
 				</p>
 			) : null}
 
