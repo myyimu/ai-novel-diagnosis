@@ -6,14 +6,25 @@ import { PremiseConsultController } from "./premise-consult.controller";
 import { PremiseConsultService } from "./premise-consult.service";
 
 const validBody = {
-  premiseText: "主角重生回高三，带着前世记忆避开所有遗憾，顺便收割全网流量成为顶流。",
+  premiseText:
+    "主角重生回高三，带着前世记忆避开所有遗憾，顺便收割全网流量成为顶流。",
   trigger: "author-disagrees",
   original: {
     verdict: "not-worth-writing",
     oneLineVerdict: "欲望空泛，冲突缺位。",
     layers: [
-      { layer: "engine", status: "missing", statement: "欲望空泛。", confidence: 0.3 },
-      { layer: "desire", status: "weak", statement: "避开所有遗憾。", confidence: 0.8 },
+      {
+        layer: "engine",
+        status: "missing",
+        statement: "欲望空泛。",
+        confidence: 0.3,
+      },
+      {
+        layer: "desire",
+        status: "weak",
+        statement: "避开所有遗憾。",
+        confidence: 0.8,
+      },
       { layer: "conflict", status: "missing", statement: "", confidence: 0.2 },
       {
         layer: "irreducibility",
@@ -43,7 +54,9 @@ describe("PremiseConsultController", () => {
     }).compile();
 
     app = module.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ transform: true, whitelist: true }),
+    );
     await app.init();
   });
 
@@ -79,7 +92,10 @@ describe("PremiseConsultController", () => {
       .post("/analysis/premise-consult")
       .send({
         ...validBody,
-        original: { ...validBody.original, layers: validBody.original.layers.slice(0, 3) },
+        original: {
+          ...validBody.original,
+          layers: validBody.original.layers.slice(0, 3),
+        },
       })
       .expect(400);
 

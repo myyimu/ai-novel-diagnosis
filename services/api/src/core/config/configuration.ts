@@ -90,34 +90,34 @@ export const providerConfig = registerAs("provider", () => {
     process.env.PROVIDER_TRANSIENT_RETRY_BASE_DELAY_MS,
   );
   return {
-  requestTimeoutMs: parseInt(
-    process.env.PROVIDER_REQUEST_TIMEOUT_MS || "120000",
-    10,
-  ),
-  lengthRetryMaxOutputTokens: parseInt(
-    process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS || "16384",
-    10,
-  ),
-  // Transient provider failures (429/5xx/network jitter) are auto-retried with
-  // exponential backoff. Set PROVIDER_TRANSIENT_RETRY_MAX=0 to disable.
-  transientRetryMax: Number.isFinite(transientRetryMax)
-    ? Math.max(0, Math.floor(transientRetryMax))
-    : 2,
-  transientRetryBaseDelayMs: Number.isFinite(transientRetryBaseDelayMs)
-    ? Math.max(0, Math.floor(transientRetryBaseDelayMs))
-    : 2000,
-  sharedGpu: {
-    baseUrl: process.env.SHARED_GPU_BASE_URL?.trim() || null,
-    apiKey: process.env.SHARED_GPU_API_KEY?.trim() || null,
-    model: process.env.SHARED_GPU_MODEL?.trim() || null,
-    jsonMode: process.env.SHARED_GPU_JSON_MODE === "true",
-  },
-  // AI Horde 匿名池 key（官方公开文档值，非机密）。提取为配置项
-  // 便于部署时替换为注册用户 key 以获得更高优先级。
-  sharedGpuAnonymousApiKey:
-    process.env.SHARED_GPU_ANONYMOUS_API_KEY?.trim() || "0000000000",
-  enableOpenaiCompatJsonSchema:
-    process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true",
+    requestTimeoutMs: parseInt(
+      process.env.PROVIDER_REQUEST_TIMEOUT_MS || "120000",
+      10,
+    ),
+    lengthRetryMaxOutputTokens: parseInt(
+      process.env.PROVIDER_LENGTH_RETRY_MAX_OUTPUT_TOKENS || "16384",
+      10,
+    ),
+    // Transient provider failures (429/5xx/network jitter) are auto-retried with
+    // exponential backoff. Set PROVIDER_TRANSIENT_RETRY_MAX=0 to disable.
+    transientRetryMax: Number.isFinite(transientRetryMax)
+      ? Math.max(0, Math.floor(transientRetryMax))
+      : 2,
+    transientRetryBaseDelayMs: Number.isFinite(transientRetryBaseDelayMs)
+      ? Math.max(0, Math.floor(transientRetryBaseDelayMs))
+      : 2000,
+    sharedGpu: {
+      baseUrl: process.env.SHARED_GPU_BASE_URL?.trim() || null,
+      apiKey: process.env.SHARED_GPU_API_KEY?.trim() || null,
+      model: process.env.SHARED_GPU_MODEL?.trim() || null,
+      jsonMode: process.env.SHARED_GPU_JSON_MODE === "true",
+    },
+    // AI Horde 匿名池 key（官方公开文档值，非机密）。提取为配置项
+    // 便于部署时替换为注册用户 key 以获得更高优先级。
+    sharedGpuAnonymousApiKey:
+      process.env.SHARED_GPU_ANONYMOUS_API_KEY?.trim() || "0000000000",
+    enableOpenaiCompatJsonSchema:
+      process.env.ENABLE_OPENAI_COMPAT_JSON_SCHEMA === "true",
   };
 });
 

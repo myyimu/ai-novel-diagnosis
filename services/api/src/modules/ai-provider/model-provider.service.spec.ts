@@ -362,14 +362,12 @@ describe("ModelProviderService shared-gpu fallback", () => {
         }),
       });
     global.fetch = fetchMock as never;
-    const setTimeoutSpy = jest
-      .spyOn(global, "setTimeout")
-      .mockImplementation(((
-        callback: (...args: unknown[]) => void,
-      ) => {
-        callback();
-        return 0 as never;
-      }) as unknown as typeof setTimeout);
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
+      callback: (...args: unknown[]) => void,
+    ) => {
+      callback();
+      return 0 as never;
+    }) as unknown as typeof setTimeout);
 
     const service = new ModelProviderService(
       createMockConfigService({ "provider.transientRetryBaseDelayMs": 1000 }),
@@ -390,9 +388,9 @@ describe("ModelProviderService shared-gpu fallback", () => {
 
     expect(result).toBe('{"ok":true}');
     // The backoff sleep waited 3s (Retry-After) rather than the 1s base.
-    expect(
-      setTimeoutSpy.mock.calls.some(([, delay]) => delay === 3000),
-    ).toBe(true);
+    expect(setTimeoutSpy.mock.calls.some(([, delay]) => delay === 3000)).toBe(
+      true,
+    );
   });
 
   it("keeps the chat result when the usage insert itself fails", async () => {

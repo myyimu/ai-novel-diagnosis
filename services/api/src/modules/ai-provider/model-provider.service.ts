@@ -708,7 +708,11 @@ export class ModelProviderService {
           body: JSON.stringify(body),
         },
         options,
-        { provider, messages, baseAttempt: hasRetriedLength ? "length-retry" : "initial" },
+        {
+          provider,
+          messages,
+          baseAttempt: hasRetriedLength ? "length-retry" : "initial",
+        },
       );
     const requestStartedAt = finalAttemptStartedAt;
     const attempt =

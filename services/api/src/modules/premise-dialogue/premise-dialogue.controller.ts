@@ -13,9 +13,13 @@ export class PremiseDialogueController {
   @HttpCode(200)
   @Public()
   @ApiOperation({
-    summary: "Start a guided premise dialogue session (立项引导对话) and generate the first ask",
+    summary:
+      "Start a guided premise dialogue session (立项引导对话) and generate the first ask",
   })
-  @ApiResponse({ status: 200, description: "The created session with its first question" })
+  @ApiResponse({
+    status: 200,
+    description: "The created session with its first question",
+  })
   start(@Body() body: StartPremiseDialogueDto) {
     return this.dialogue.startSession(body);
   }

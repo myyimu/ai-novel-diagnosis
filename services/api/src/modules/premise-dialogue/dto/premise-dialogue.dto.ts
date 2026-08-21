@@ -19,7 +19,8 @@ export class StartPremiseDialogueDto {
   projectId!: string;
 
   @ApiProperty({
-    description: "The author's raw premise (same text submitted to premise-review).",
+    description:
+      "The author's raw premise (same text submitted to premise-review).",
   })
   @IsString()
   @MinLength(20)
@@ -47,7 +48,9 @@ export class StartPremiseDialogueDto {
 }
 
 export class AnswerPremiseDialogueDto {
-  @ApiProperty({ description: "The author's free-text answer to the current question." })
+  @ApiProperty({
+    description: "The author's free-text answer to the current question.",
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(4000)

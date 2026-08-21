@@ -16,7 +16,9 @@ const AUDIT_REPORT = `【故事体检报告】
 1. 第三章节奏拖沓（类别 pacing，严重度高）
    证据：chapter-3 第 3 章：连续四段没有推进新信息`;
 
-function point(overrides: Partial<Parameters<typeof anchorReportDivergencePoints>[0][number]> = {}) {
+function point(
+  overrides: Partial<Parameters<typeof anchorReportDivergencePoints>[0][number]> = {},
+) {
   return {
     id: "divergence-1",
     topic: "节奏",

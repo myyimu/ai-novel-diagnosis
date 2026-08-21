@@ -12,11 +12,7 @@ export const REPORT_QA_SOURCE_KIND_LABELS: Record<ReportQaSourceKind, string> = 
 };
 
 /** The diagnosis report kinds that carry a QA entry. */
-export const REPORT_QA_REPORT_KINDS = [
-  "quick-review",
-  "premise-review",
-  "story-audit",
-] as const;
+export const REPORT_QA_REPORT_KINDS = ["quick-review", "premise-review", "story-audit"] as const;
 
 export type ReportQaReportKind = (typeof REPORT_QA_REPORT_KINDS)[number];
 

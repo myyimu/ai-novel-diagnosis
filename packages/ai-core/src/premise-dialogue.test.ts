@@ -74,10 +74,7 @@ describe("selectPremiseDialogueLayer", () => {
   });
 
   it("breaks confidence ties by the canonical layer axis order", () => {
-    const layers = [
-      assessment("conflict", "weak", 0.5),
-      assessment("engine", "weak", 0.5),
-    ];
+    const layers = [assessment("conflict", "weak", 0.5), assessment("engine", "weak", 0.5)];
     const selection = selectPremiseDialogueLayer(layers, [], 0);
     expect(selection.layer).toBe("engine");
   });
@@ -96,10 +93,7 @@ describe("selectPremiseDialogueLayer", () => {
   });
 
   it("collects when every askable layer has been asked or is established", () => {
-    const layers = [
-      assessment("engine", "established", 0.9),
-      assessment("conflict", "weak", 0.5),
-    ];
+    const layers = [assessment("engine", "established", 0.9), assessment("conflict", "weak", 0.5)];
     const selection = selectPremiseDialogueLayer(layers, ["conflict"], 1);
     expect(selection.phase).toBe("collect");
   });
@@ -121,7 +115,12 @@ describe("selectPremiseDialogueLayer", () => {
         {
           round: 1,
           layer: "conflict" as const,
-          ask: { question: "谁在阻止她？", whyThisQuestion: "理由", hintQuote: "", hintQuoteStatus: "empty" as const },
+          ask: {
+            question: "谁在阻止她？",
+            whyThisQuestion: "理由",
+            hintQuote: "",
+            hintQuoteStatus: "empty" as const,
+          },
         },
       ],
     };
@@ -162,7 +161,12 @@ describe("anchorPremiseAskOutput", () => {
 
   it("treats an empty hintQuote as the honest default", () => {
     const result = anchorPremiseAskOutput(
-      { focusedLayer: "conflict", question: "谁在阻止她？", whyThisQuestion: "理由", hintQuote: "" },
+      {
+        focusedLayer: "conflict",
+        question: "谁在阻止她？",
+        whyThisQuestion: "理由",
+        hintQuote: "",
+      },
       PREMISE_TEXT,
     );
     expect(result.hintQuoteStatus).toBe("empty");
@@ -186,7 +190,12 @@ describe("anchorPremiseAskOutput", () => {
 
   it("flags a question that does not end with a question mark as unusable", () => {
     const result = anchorPremiseAskOutput(
-      { focusedLayer: "conflict", question: "请谈谈你的写作态度。", whyThisQuestion: "理由", hintQuote: "" },
+      {
+        focusedLayer: "conflict",
+        question: "请谈谈你的写作态度。",
+        whyThisQuestion: "理由",
+        hintQuote: "",
+      },
       PREMISE_TEXT,
     );
     expect(result.questionUsable).toBe(false);
@@ -337,10 +346,29 @@ describe("parsePremiseDialogue outputs", () => {
         whyThisQuestion: "理由",
         hintQuote: "",
       }),
-    ).toEqual({ focusedLayer: "conflict", question: "谁在阻止她？", whyThisQuestion: "理由", hintQuote: "" });
-    expect(parsePremiseDialogueAskOutput({ focusedLayer: "pacing", question: "?", whyThisQuestion: "", hintQuote: "" })).toBeNull();
+    ).toEqual({
+      focusedLayer: "conflict",
+      question: "谁在阻止她？",
+      whyThisQuestion: "理由",
+      hintQuote: "",
+    });
+    expect(
+      parsePremiseDialogueAskOutput({
+        focusedLayer: "pacing",
+        question: "?",
+        whyThisQuestion: "",
+        hintQuote: "",
+      }),
+    ).toBeNull();
     expect(parsePremiseDialogueAskOutput("不是对象")).toBeNull();
-    expect(parsePremiseDialogueAskOutput({ focusedLayer: "conflict", question: 1, whyThisQuestion: "", hintQuote: "" })).toBeNull();
+    expect(
+      parsePremiseDialogueAskOutput({
+        focusedLayer: "conflict",
+        question: 1,
+        whyThisQuestion: "",
+        hintQuote: "",
+      }),
+    ).toBeNull();
   });
 
   it("parses a valid judge output and rejects bad verdict enums", () => {
@@ -354,7 +382,9 @@ describe("parsePremiseDialogue outputs", () => {
     };
     expect(parsePremiseDialogueJudgeOutput(judge)).toEqual(judge);
     expect(parsePremiseDialogueJudgeOutput({ ...judge, verdict: "great" })).toBeNull();
-    expect(parsePremiseDialogueJudgeOutput({ ...judge, layerStatusSuggestion: "solid" })).toBeNull();
+    expect(
+      parsePremiseDialogueJudgeOutput({ ...judge, layerStatusSuggestion: "solid" }),
+    ).toBeNull();
     expect(parsePremiseDialogueJudgeOutput({ ...judge, followUp: undefined })).toBeNull();
   });
 
@@ -377,7 +407,14 @@ describe("parsePremiseDialogue outputs", () => {
     });
     expect(parsed).not.toBeNull();
     expect(parsed?.divergencePoints).toHaveLength(1);
-    expect(parsePremiseDialogueContractReviewOutput({ divergencePoints: [], feynmanVerdict: "maybe", quoteAuthor: "x", reason: "y" })).toBeNull();
+    expect(
+      parsePremiseDialogueContractReviewOutput({
+        divergencePoints: [],
+        feynmanVerdict: "maybe",
+        quoteAuthor: "x",
+        reason: "y",
+      }),
+    ).toBeNull();
     expect(parsePremiseDialogueContractReviewOutput(null)).toBeNull();
   });
 });
@@ -449,9 +486,17 @@ describe("premise dialogue prompt pack (v0.3.0 validated)", () => {
   });
 
   it("maps each layer to its most relevant contract line", () => {
-    expect(premiseContractLineForLayer("engine", EDITOR_CONTRACT)).toBe(EDITOR_CONTRACT.coreConflict);
-    expect(premiseContractLineForLayer("desire", EDITOR_CONTRACT)).toBe(EDITOR_CONTRACT.protagonistDesire);
-    expect(premiseContractLineForLayer("conflict", EDITOR_CONTRACT)).toBe(EDITOR_CONTRACT.opposingForce);
-    expect(premiseContractLineForLayer("irreducibility", EDITOR_CONTRACT)).toBe(EDITOR_CONTRACT.irreducibilityTest);
+    expect(premiseContractLineForLayer("engine", EDITOR_CONTRACT)).toBe(
+      EDITOR_CONTRACT.coreConflict,
+    );
+    expect(premiseContractLineForLayer("desire", EDITOR_CONTRACT)).toBe(
+      EDITOR_CONTRACT.protagonistDesire,
+    );
+    expect(premiseContractLineForLayer("conflict", EDITOR_CONTRACT)).toBe(
+      EDITOR_CONTRACT.opposingForce,
+    );
+    expect(premiseContractLineForLayer("irreducibility", EDITOR_CONTRACT)).toBe(
+      EDITOR_CONTRACT.irreducibilityTest,
+    );
   });
 });

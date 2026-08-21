@@ -263,8 +263,8 @@ export function anchorPremiseContractReviewOutput(
   review: PremiseDialogueContractReviewOutput,
   authorContract: PremiseContractFields,
 ): AnchoredPremiseContractReview {
-  const fieldHit = Object.values(authorContract).some((value) =>
-    Boolean(review.quoteAuthor) && value.includes(review.quoteAuthor),
+  const fieldHit = Object.values(authorContract).some(
+    (value) => Boolean(review.quoteAuthor) && value.includes(review.quoteAuthor),
   );
   if (!fieldHit) {
     return { status: "rejected", reason: "quote-not-found" };
@@ -446,8 +446,7 @@ export function buildPremiseDialogueAskPrompt(input: PremiseDialogueAskPromptInp
   const commentLine = input.layerComment ? `\n${input.layerComment}` : "";
   return {
     id: "premise-dialogue-ask.v1",
-    responseContract:
-      'Return JSON with focusedLayer, question, whyThisQuestion, hintQuote.',
+    responseContract: "Return JSON with focusedLayer, question, whyThisQuestion, hintQuote.",
     messages: [
       { role: "system", content: ASK_SYSTEM },
       {
@@ -489,7 +488,9 @@ export interface PremiseDialogueJudgePromptInput {
 }
 
 /** Build the JUDGE (per-round judgment) prompt — validated pack v0.3.0. */
-export function buildPremiseDialogueJudgePrompt(input: PremiseDialogueJudgePromptInput): PromptBundle {
+export function buildPremiseDialogueJudgePrompt(
+  input: PremiseDialogueJudgePromptInput,
+): PromptBundle {
   const meta = PREMISE_LAYER_META[input.layer];
   return {
     id: "premise-dialogue-judge.v1",
@@ -541,8 +542,7 @@ export function buildPremiseDialogueContractReviewPrompt(
   const field = (label: string, value: string) => `${label}：${value}`;
   return {
     id: "premise-dialogue-contract.v1",
-    responseContract:
-      "Return JSON with divergencePoints[], feynmanVerdict, quoteAuthor, reason.",
+    responseContract: "Return JSON with divergencePoints[], feynmanVerdict, quoteAuthor, reason.",
     messages: [
       { role: "system", content: CONTRACT_SYSTEM },
       {

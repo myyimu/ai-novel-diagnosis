@@ -129,4 +129,3 @@ export const premiseSecondReviewJsonSchema = objectSchema(
   },
   ["verdict", "oneLineVerdict", "layers", "strongestArgument", "evidence"],
 );
-

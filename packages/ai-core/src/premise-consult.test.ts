@@ -57,7 +57,9 @@ describe("comparePremiseLayers", () => {
   it("compares in canonical layer order and flags the differing layer", () => {
     const original = FOUR_LAYERS;
     const second = original.map((assessment) =>
-      assessment.layer === "engine" ? { ...assessment, status: "established" as const } : assessment,
+      assessment.layer === "engine"
+        ? { ...assessment, status: "established" as const }
+        : assessment,
     );
 
     const comparisons = comparePremiseLayers(original, second);
@@ -128,7 +130,9 @@ describe("parsePremiseSecondReviewOutput", () => {
   });
 
   it("returns null when a layer is missing, duplicated, or carries a bad enum", () => {
-    expect(parsePremiseSecondReviewOutput({ ...validPayload, layers: FOUR_LAYERS.slice(1) })).toBeNull();
+    expect(
+      parsePremiseSecondReviewOutput({ ...validPayload, layers: FOUR_LAYERS.slice(1) }),
+    ).toBeNull();
     expect(
       parsePremiseSecondReviewOutput({
         ...validPayload,
@@ -167,9 +171,7 @@ describe("buildPremiseConsultResult", () => {
       verdict: "not-worth-writing" as const,
       oneLineVerdict: "欲望空泛，冲突缺位。",
       layers: FOUR_LAYERS.map((assessment) =>
-        assessment.layer === "engine"
-          ? { ...assessment, status: "missing" as const }
-          : assessment,
+        assessment.layer === "engine" ? { ...assessment, status: "missing" as const } : assessment,
       ),
     };
     const second = {

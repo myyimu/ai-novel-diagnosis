@@ -39,12 +39,19 @@ const anchoredMap = {
     "复仇桥段与常见都市文高度重合",
     "第三条不应出现",
   ],
-  foreshadowingSetups: ["妹妹的病历来源不明", "仇人的救命药承诺", "第三条伏笔不应出现"],
+  foreshadowingSetups: [
+    "妹妹的病历来源不明",
+    "仇人的救命药承诺",
+    "第三条伏笔不应出现",
+  ],
 };
 
 describe("buildChapterCandidateCard", () => {
   it("builds a card with anchored quotes and capped signals", () => {
-    const card = buildChapterCandidateCard(anchoredMap, "2026-08-19T00:00:00.000Z");
+    const card = buildChapterCandidateCard(
+      anchoredMap,
+      "2026-08-19T00:00:00.000Z",
+    );
 
     expect(card).toEqual({
       chapterId: "ch-5",
@@ -78,14 +85,18 @@ describe("buildChapterCandidateCard", () => {
         "2026-08-19T00:00:00.000Z",
       ),
     ).toBeNull();
-    expect(buildChapterCandidateCard(null, "2026-08-19T00:00:00.000Z")).toBeNull();
+    expect(
+      buildChapterCandidateCard(null, "2026-08-19T00:00:00.000Z"),
+    ).toBeNull();
   });
 
   it("falls back to plain labels when identity fields are missing", () => {
     const card = buildChapterCandidateCard(
       {
         analysisDepth: "outline",
-        sourceAnchors: [{ quote: "他攥着那张缴费单。", startOffset: 0, endOffset: 10 }],
+        sourceAnchors: [
+          { quote: "他攥着那张缴费单。", startOffset: 0, endOffset: 10 },
+        ],
       },
       "2026-08-19T00:00:00.000Z",
     );
@@ -135,10 +146,15 @@ describe("mergeChapterCandidateCards", () => {
       (item, index) => cardAt(index + 1),
     );
 
-    const merged = mergeChapterCandidateCards(cards.slice(0, -1), cards[cards.length - 1]!);
+    const merged = mergeChapterCandidateCards(
+      cards.slice(0, -1),
+      cards[cards.length - 1]!,
+    );
 
     expect(merged).toHaveLength(CHAPTER_CANDIDATE_CARD_LIMIT);
     expect(merged[0]?.order).toBe(6);
-    expect(merged[merged.length - 1]?.order).toBe(CHAPTER_CANDIDATE_CARD_LIMIT + 5);
+    expect(merged[merged.length - 1]?.order).toBe(
+      CHAPTER_CANDIDATE_CARD_LIMIT + 5,
+    );
   });
 });

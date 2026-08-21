@@ -48,16 +48,25 @@ interface NarrowedChapterMap {
   foreshadowingSetups?: unknown;
 }
 
-function narrowAnchoredQuotes(source: NarrowedChapterMap): ChapterCandidateQuote[] {
-  const anchors = Array.isArray(source.sourceAnchors) ? source.sourceAnchors : [];
+function narrowAnchoredQuotes(
+  source: NarrowedChapterMap,
+): ChapterCandidateQuote[] {
+  const anchors = Array.isArray(source.sourceAnchors)
+    ? source.sourceAnchors
+    : [];
 
   return anchors
     .map((anchor) => {
-      const item = anchor as { quote?: unknown; startOffset?: unknown; endOffset?: unknown };
+      const item = anchor as {
+        quote?: unknown;
+        startOffset?: unknown;
+        endOffset?: unknown;
+      };
       const quote = typeof item?.quote === "string" ? item.quote.trim() : "";
       return {
         quote,
-        startOffset: typeof item?.startOffset === "number" ? item.startOffset : 0,
+        startOffset:
+          typeof item?.startOffset === "number" ? item.startOffset : 0,
         endOffset: typeof item?.endOffset === "number" ? item.endOffset : 0,
       };
     })
@@ -98,8 +107,14 @@ export function buildChapterCandidateCard(
         ? source.summary.trim()
         : undefined,
     anchoredQuotes,
-    riskSignals: asTextList(source.sourceRiskSignals).slice(0, SIGNALS_PER_KIND),
-    setupSignals: asTextList(source.foreshadowingSetups).slice(0, SIGNALS_PER_KIND),
+    riskSignals: asTextList(source.sourceRiskSignals).slice(
+      0,
+      SIGNALS_PER_KIND,
+    ),
+    setupSignals: asTextList(source.foreshadowingSetups).slice(
+      0,
+      SIGNALS_PER_KIND,
+    ),
   };
 }
 

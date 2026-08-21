@@ -82,7 +82,9 @@ export class PremiseDialogueService {
   async startSession(
     input: StartPremiseDialogueDto,
   ): Promise<PremiseDialogueSessionRecord> {
-    const { layers, editorContract, reviewId } = this.normalizeReview(input.review);
+    const { layers, editorContract, reviewId } = this.normalizeReview(
+      input.review,
+    );
     const record = await this.repository.createSession({
       id: randomUUID(),
       layers,
@@ -202,8 +204,15 @@ export class PremiseDialogueService {
     }
 
     try {
-      const review = await this.callContractReview(record, authorContract, input.provider);
-      const anchored = anchorPremiseContractReviewOutput(review, authorContract);
+      const review = await this.callContractReview(
+        record,
+        authorContract,
+        input.provider,
+      );
+      const anchored = anchorPremiseContractReviewOutput(
+        review,
+        authorContract,
+      );
       if (anchored.status === "rejected") {
         updated = this.mustRecord(
           await this.repository.update(record.id, { contractReview: null }),
@@ -237,10 +246,17 @@ export class PremiseDialogueService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        { action: "premise-dialogue.contract-review", sessionId: record.id, error: message },
+        {
+          action: "premise-dialogue.contract-review",
+          sessionId: record.id,
+          error: message,
+        },
         "contract review failed; session stays completed without a review",
       );
-      return { record: updated, contractReviewNotice: "契约点评生成失败，可重新提交重试" };
+      return {
+        record: updated,
+        contractReviewNotice: "契约点评生成失败，可重新提交重试",
+      };
     }
   }
 
@@ -269,7 +285,9 @@ export class PremiseDialogueService {
     const ask = await this.callAsk(record, assessment, provider);
     const anchored = anchorPremiseAskOutput(ask, record.session.premiseText);
     if (!anchored.questionUsable) {
-      throw new BadRequestException("生成的提问未以问号结尾，已被服务端拒绝，请重试");
+      throw new BadRequestException(
+        "生成的提问未以问号结尾，已被服务端拒绝，请重试",
+      );
     }
     const turn: PremiseDialogueTurnRecord = {
       round: record.session.turns.length + 1,
@@ -282,7 +300,12 @@ export class PremiseDialogueService {
       },
     };
     this.logger.log(
-      { action: "premise-dialogue.ask", sessionId: record.id, round: turn.round, layer },
+      {
+        action: "premise-dialogue.ask",
+        sessionId: record.id,
+        round: turn.round,
+        layer,
+      },
       "ask generated",
     );
     return this.mustRecord(
@@ -312,20 +335,38 @@ export class PremiseDialogueService {
           : { ...turn, judgeRejected: { reason: "quote-not-found" } };
       if (anchored.status === "rejected") {
         this.logger.warn(
-          { action: "premise-dialogue.judge", sessionId: record.id, round: turn.round },
+          {
+            action: "premise-dialogue.judge",
+            sessionId: record.id,
+            round: turn.round,
+          },
           "judgment rejected: quoteAuthor not found in the author answer",
         );
       }
-      return this.mustRecord(await this.repository.update(record.id, { turns }), record.id);
+      return this.mustRecord(
+        await this.repository.update(record.id, { turns }),
+        record.id,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        { action: "premise-dialogue.judge", sessionId: record.id, round: turn.round, error: message },
+        {
+          action: "premise-dialogue.judge",
+          sessionId: record.id,
+          round: turn.round,
+          error: message,
+        },
         "judge call failed; recorded as retryable model-failed",
       );
       const turns = [...record.session.turns];
-      turns[turns.length - 1] = { ...turn, judgeRejected: { reason: "model-failed" } };
-      return this.mustRecord(await this.repository.update(record.id, { turns }), record.id);
+      turns[turns.length - 1] = {
+        ...turn,
+        judgeRejected: { reason: "model-failed" },
+      };
+      return this.mustRecord(
+        await this.repository.update(record.id, { turns }),
+        record.id,
+      );
     }
   }
 
@@ -354,23 +395,35 @@ export class PremiseDialogueService {
       layerStatus: assessment.status,
       layerStatement: assessment.statement,
       layerComment: assessment.comment,
-      contractLine: premiseContractLineForLayer(assessment.layer, record.editorContract),
+      contractLine: premiseContractLineForLayer(
+        assessment.layer,
+        record.editorContract,
+      ),
     });
-    const content = await this.modelProviders.chat(resolved, bundle.messages as ProviderMessage[], {
-      maxOutputTokens: 900,
-      jsonSchema: {
-        name: "premise_dialogue_ask_result",
-        schema: premiseDialogueAskJsonSchema,
+    const content = await this.modelProviders.chat(
+      resolved,
+      bundle.messages as ProviderMessage[],
+      {
+        maxOutputTokens: 900,
+        jsonSchema: {
+          name: "premise_dialogue_ask_result",
+          schema: premiseDialogueAskJsonSchema,
+        },
+        usageMeta: {
+          jobId: record.id,
+          stage: "premise-dialogue-ask",
+          component: "premise-dialogue",
+          requestKind: "diagnosis",
+        },
       },
-      usageMeta: {
-        jobId: record.id,
-        stage: "premise-dialogue-ask",
-        component: "premise-dialogue",
-        requestKind: "diagnosis",
-      },
-    });
+    );
     const parsed = parsePremiseDialogueAskOutput(
-      await parseJsonWithRepair(this.modelProviders, resolved, content, "立项引导提问"),
+      await parseJsonWithRepair(
+        this.modelProviders,
+        resolved,
+        content,
+        "立项引导提问",
+      ),
     );
     if (!parsed) {
       throw new BadRequestException("提问输出不符合契约，请重试");
@@ -404,21 +457,30 @@ export class PremiseDialogueService {
       question: turn.ask.question,
       authorAnswer: answer,
     });
-    const content = await this.modelProviders.chat(resolved, bundle.messages as ProviderMessage[], {
-      maxOutputTokens: 900,
-      jsonSchema: {
-        name: "premise_dialogue_judge_result",
-        schema: premiseDialogueJudgeJsonSchema,
+    const content = await this.modelProviders.chat(
+      resolved,
+      bundle.messages as ProviderMessage[],
+      {
+        maxOutputTokens: 900,
+        jsonSchema: {
+          name: "premise_dialogue_judge_result",
+          schema: premiseDialogueJudgeJsonSchema,
+        },
+        usageMeta: {
+          jobId: record.id,
+          stage: "premise-dialogue-judge",
+          component: "premise-dialogue",
+          requestKind: "diagnosis",
+        },
       },
-      usageMeta: {
-        jobId: record.id,
-        stage: "premise-dialogue-judge",
-        component: "premise-dialogue",
-        requestKind: "diagnosis",
-      },
-    });
+    );
     const parsed = parsePremiseDialogueJudgeOutput(
-      await parseJsonWithRepair(this.modelProviders, resolved, content, "立项引导评判"),
+      await parseJsonWithRepair(
+        this.modelProviders,
+        resolved,
+        content,
+        "立项引导评判",
+      ),
     );
     if (!parsed) {
       throw new BadRequestException("评判输出不符合契约");
@@ -453,21 +515,30 @@ export class PremiseDialogueService {
       editorContract: record.editorContract,
       authorContract,
     });
-    const content = await this.modelProviders.chat(resolved, bundle.messages as ProviderMessage[], {
-      maxOutputTokens: 900,
-      jsonSchema: {
-        name: "premise_dialogue_contract_review_result",
-        schema: premiseDialogueContractReviewJsonSchema,
+    const content = await this.modelProviders.chat(
+      resolved,
+      bundle.messages as ProviderMessage[],
+      {
+        maxOutputTokens: 900,
+        jsonSchema: {
+          name: "premise_dialogue_contract_review_result",
+          schema: premiseDialogueContractReviewJsonSchema,
+        },
+        usageMeta: {
+          jobId: record.id,
+          stage: "premise-dialogue-contract",
+          component: "premise-dialogue",
+          requestKind: "diagnosis",
+        },
       },
-      usageMeta: {
-        jobId: record.id,
-        stage: "premise-dialogue-contract",
-        component: "premise-dialogue",
-        requestKind: "diagnosis",
-      },
-    });
+    );
     const parsed = parsePremiseDialogueContractReviewOutput(
-      await parseJsonWithRepair(this.modelProviders, resolved, content, "契约费曼点评"),
+      await parseJsonWithRepair(
+        this.modelProviders,
+        resolved,
+        content,
+        "契约费曼点评",
+      ),
     );
     if (!parsed) {
       throw new BadRequestException("契约点评输出不符合契约");
@@ -477,25 +548,38 @@ export class PremiseDialogueService {
 
   /* —— 输入规整与守卫 —— */
 
-  private normalizeReview(
-    value: Record<string, unknown>,
-  ): { layers: PremiseLayerAssessment[]; editorContract: PremiseContractFields; reviewId: string } {
+  private normalizeReview(value: Record<string, unknown>): {
+    layers: PremiseLayerAssessment[];
+    editorContract: PremiseContractFields;
+    reviewId: string;
+  } {
     const reviewId = asText(value.reviewId);
     if (!reviewId) {
       throw new BadRequestException("立项审稿结果缺少 reviewId，无法锚定对话");
     }
 
     const rawLayers = value.layers;
-    if (!Array.isArray(rawLayers) || rawLayers.length !== PREMISE_REVIEW_LAYERS.length) {
-      throw new BadRequestException("立项审稿结果必须携带恰好四层的 layers 判定");
+    if (
+      !Array.isArray(rawLayers) ||
+      rawLayers.length !== PREMISE_REVIEW_LAYERS.length
+    ) {
+      throw new BadRequestException(
+        "立项审稿结果必须携带恰好四层的 layers 判定",
+      );
     }
     const layers: PremiseLayerAssessment[] = rawLayers.map((raw) => {
       const item = (raw ?? {}) as Record<string, unknown>;
       const layer = asText(item.layer) as PremiseLayerKey;
       const status = asText(item.status);
       const statement = asText(item.statement);
-      if (!PREMISE_REVIEW_LAYERS.includes(layer) || !layerStatuses.has(status) || !statement) {
-        throw new BadRequestException("立项审稿结果的 layers 判定不完整（layer/status/statement）");
+      if (
+        !PREMISE_REVIEW_LAYERS.includes(layer) ||
+        !layerStatuses.has(status) ||
+        !statement
+      ) {
+        throw new BadRequestException(
+          "立项审稿结果的 layers 判定不完整（layer/status/statement）",
+        );
       }
       return {
         layer,
@@ -525,7 +609,9 @@ export class PremiseDialogueService {
     return { preset: "shared-gpu", kind: "openai-compatible" };
   }
 
-  private async requireActive(id: string): Promise<PremiseDialogueSessionRecord> {
+  private async requireActive(
+    id: string,
+  ): Promise<PremiseDialogueSessionRecord> {
     const record = await this.getSession(id);
     if (record.session.status !== "active") {
       throw new BadRequestException("对话已收束，不能再作答或提问");

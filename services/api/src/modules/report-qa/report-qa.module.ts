@@ -4,8 +4,8 @@ import { ReportQaController } from "./report-qa.controller";
 import { ReportQaService } from "./report-qa.service";
 
 @Module({
-	imports: [AiProviderModule],
-	controllers: [ReportQaController],
-	providers: [ReportQaService],
+  imports: [AiProviderModule],
+  controllers: [ReportQaController],
+  providers: [ReportQaService],
 })
 export class ReportQaModule {}

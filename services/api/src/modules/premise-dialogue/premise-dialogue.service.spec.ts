@@ -64,10 +64,30 @@ function makeReview(): Record<string, unknown> {
   return {
     reviewId: "review-1",
     layers: [
-      { layer: "engine", status: "established", statement: "复仇动机成立", confidence: 0.9 },
-      { layer: "desire", status: "weak", statement: "欲望模糊", confidence: 0.4 },
-      { layer: "conflict", status: "missing", statement: "阻力缺位", confidence: 0.9 },
-      { layer: "irreducibility", status: "missing", statement: "设定可替换", confidence: 0.2 },
+      {
+        layer: "engine",
+        status: "established",
+        statement: "复仇动机成立",
+        confidence: 0.9,
+      },
+      {
+        layer: "desire",
+        status: "weak",
+        statement: "欲望模糊",
+        confidence: 0.4,
+      },
+      {
+        layer: "conflict",
+        status: "missing",
+        statement: "阻力缺位",
+        confidence: 0.9,
+      },
+      {
+        layer: "irreducibility",
+        status: "missing",
+        statement: "设定可替换",
+        confidence: 0.2,
+      },
     ],
     coreConflict: "重生者与命运的重逢对撞",
     protagonistDesire: "她想亲手改写高考结局",
@@ -116,7 +136,9 @@ describe("PremiseDialogueService", () => {
 
   describe("startSession", () => {
     it("should create a session and ask the weakest unasked layer when the review is valid", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
 
       expect(record.session.turns).toHaveLength(1);
       expect(record.session.turns[0].layer).toBe("irreducibility");
@@ -179,10 +201,13 @@ describe("PremiseDialogueService", () => {
 
   describe("answerTurn", () => {
     it("should persist the answer and store an anchored judgment when the quote hits the answer", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
 
       const answered = await service.answerTurn(record.id, {
-        answer: "她想考上重点大学，每天只睡四个小时背单词，把前世的遗憾一个个补回来。",
+        answer:
+          "她想考上重点大学，每天只睡四个小时背单词，把前世的遗憾一个个补回来。",
         provider: MOCK_PROVIDER,
       });
 
@@ -193,7 +218,9 @@ describe("PremiseDialogueService", () => {
     });
 
     it("should record judgeRejected quote-not-found when the quote misses the author answer", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       chat.mockResolvedValue(
         JSON.stringify({
           verdict: "strengthened",
@@ -216,21 +243,28 @@ describe("PremiseDialogueService", () => {
     });
 
     it("should throw BadRequest when there is no pending question", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await service.answerTurn(record.id, {
         answer: "第一次回答，包含足够的细节。",
         provider: MOCK_PROVIDER,
       });
 
       await expect(
-        service.answerTurn(record.id, { answer: "第二次回答。", provider: MOCK_PROVIDER }),
+        service.answerTurn(record.id, {
+          answer: "第二次回答。",
+          provider: MOCK_PROVIDER,
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
   describe("retryJudge", () => {
     it("should recover with an anchored judgment when the model failed once", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       chat
         .mockResolvedValueOnce("这不是 JSON")
         .mockResolvedValueOnce("修复后仍然不是 JSON");
@@ -238,7 +272,9 @@ describe("PremiseDialogueService", () => {
         answer: "她想考上重点大学，每天只睡四个小时背单词。",
         provider: REAL_PROVIDER,
       });
-      expect(failed.session.turns[0].judgeRejected).toEqual({ reason: "model-failed" });
+      expect(failed.session.turns[0].judgeRejected).toEqual({
+        reason: "model-failed",
+      });
 
       chat.mockResolvedValueOnce(
         JSON.stringify({
@@ -251,12 +287,16 @@ describe("PremiseDialogueService", () => {
         }),
       );
       const retried = await service.retryJudge(record.id, REAL_PROVIDER);
-      expect(retried.session.turns[0].judge?.quoteAuthor).toBe("每天只睡四个小时背单词");
+      expect(retried.session.turns[0].judge?.quoteAuthor).toBe(
+        "每天只睡四个小时背单词",
+      );
       expect(retried.session.turns[0].judgeRejected).toBeUndefined();
     });
 
     it("should throw BadRequest when the rejection is final (quote-not-found)", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       chat.mockResolvedValue(
         JSON.stringify({
           verdict: "strengthened",
@@ -272,18 +312,23 @@ describe("PremiseDialogueService", () => {
         provider: REAL_PROVIDER,
       });
 
-      await expect(service.retryJudge(record.id, REAL_PROVIDER)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.retryJudge(record.id, REAL_PROVIDER),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
   describe("next / finish (orchestration)", () => {
     it("should walk missing → missing → weak layers and collect after the hard cap of three rounds", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       expect(record.session.turns[0].layer).toBe("irreducibility");
 
-      const answer = { answer: "这一层我自己来补：具体的人物与场景。", provider: MOCK_PROVIDER };
+      const answer = {
+        answer: "这一层我自己来补：具体的人物与场景。",
+        provider: MOCK_PROVIDER,
+      };
       await service.answerTurn(record.id, answer);
       const round2 = await service.next(record.id, MOCK_PROVIDER);
       expect(round2.session.turns[1].layer).toBe("conflict");
@@ -299,19 +344,26 @@ describe("PremiseDialogueService", () => {
     });
 
     it("should throw BadRequest when advancing with an unresolved turn", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
-      await expect(service.next(record.id, MOCK_PROVIDER)).rejects.toBeInstanceOf(
-        BadRequestException,
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
       );
+      await expect(
+        service.next(record.id, MOCK_PROVIDER),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("should collect early on finish and refuse further answers", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       const finished = await service.finish(record.id);
       expect(finished.session.status).toBe("collecting");
 
       await expect(
-        service.answerTurn(record.id, { answer: "收束后不能再答。", provider: MOCK_PROVIDER }),
+        service.answerTurn(record.id, {
+          answer: "收束后不能再答。",
+          provider: MOCK_PROVIDER,
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
@@ -327,17 +379,23 @@ describe("PremiseDialogueService", () => {
     };
 
     it("should throw BadRequest when the dialogue is still active", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await expect(
         service.submitContract(record.id, { ...contractBody }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("should complete the session without a model call when review is not requested", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await service.finish(record.id);
 
-      const result = await service.submitContract(record.id, { ...contractBody });
+      const result = await service.submitContract(record.id, {
+        ...contractBody,
+      });
       expect(result.record.session.status).toBe("completed");
       expect(result.record.session.authorContract?.coreConflict).toBe(
         contractBody.coreConflict,
@@ -348,7 +406,9 @@ describe("PremiseDialogueService", () => {
     });
 
     it("should store an anchored review when the quote hits one contract field", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await service.finish(record.id);
 
       const result = await service.submitContract(record.id, {
@@ -356,13 +416,17 @@ describe("PremiseDialogueService", () => {
         requestReview: true,
         provider: MOCK_PROVIDER,
       });
-      expect(result.record.session.contractReview?.feynmanVerdict).toBe("partial");
+      expect(result.record.session.contractReview?.feynmanVerdict).toBe(
+        "partial",
+      );
       expect(result.record.session.contractReview?.droppedPointCount).toBe(0);
       expect(result.contractReviewNotice).toBeUndefined();
     });
 
     it("should reject the review with an honest notice when quoteAuthor stitches two fields", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await service.finish(record.id);
       chat.mockResolvedValue(
         JSON.stringify({
@@ -380,11 +444,15 @@ describe("PremiseDialogueService", () => {
       });
       expect(result.record.session.status).toBe("completed");
       expect(result.record.session.contractReview).toBeUndefined();
-      expect(result.contractReviewNotice).toBe("评判未能锚定原话，已被服务端拒绝");
+      expect(result.contractReviewNotice).toBe(
+        "评判未能锚定原话，已被服务端拒绝",
+      );
     });
 
     it("should return a retry notice instead of throwing when the review call fails", async () => {
-      const record = await service.startSession(makeStartDto({ provider: MOCK_PROVIDER }));
+      const record = await service.startSession(
+        makeStartDto({ provider: MOCK_PROVIDER }),
+      );
       await service.finish(record.id);
       chat.mockRejectedValue(new Error("network down"));
 
@@ -395,7 +463,9 @@ describe("PremiseDialogueService", () => {
       });
       expect(result.record.session.status).toBe("completed");
       expect(result.record.session.contractReview).toBeUndefined();
-      expect(result.contractReviewNotice).toBe("契约点评生成失败，可重新提交重试");
+      expect(result.contractReviewNotice).toBe(
+        "契约点评生成失败，可重新提交重试",
+      );
     });
   });
 });

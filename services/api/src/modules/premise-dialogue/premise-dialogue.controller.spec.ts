@@ -56,7 +56,9 @@ describe("PremiseDialogueController", () => {
     }).compile();
 
     app = module.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ transform: true, whitelist: true }),
+    );
     await app.init();
   });
 
@@ -67,7 +69,8 @@ describe("PremiseDialogueController", () => {
   it("should start a session and delegate to the service", async () => {
     const body = {
       projectId: "project-1",
-      premiseText: "主角重生回高三开学第一天，带着前世记忆她决定这次要活成自己。",
+      premiseText:
+        "主角重生回高三开学第一天，带着前世记忆她决定这次要活成自己。",
       review: { reviewId: "review-1", layers: [] },
     };
     const response = await request(app.getHttpServer())
@@ -102,13 +105,18 @@ describe("PremiseDialogueController", () => {
   it("should delegate an answer and pass the provider through", async () => {
     const response = await request(app.getHttpServer())
       .post("/analysis/workspace/premise-dialogue/session-1/answer")
-      .send({ answer: "她想考上重点大学，每天只睡四个小时。", provider: { kind: "mock" } })
+      .send({
+        answer: "她想考上重点大学，每天只睡四个小时。",
+        provider: { kind: "mock" },
+      })
       .expect(200);
 
     expect(response.body.id).toBe("session-1");
     expect(dialogue.answerTurn).toHaveBeenCalledWith(
       "session-1",
-      expect.objectContaining({ answer: "她想考上重点大学，每天只睡四个小时。" }),
+      expect.objectContaining({
+        answer: "她想考上重点大学，每天只睡四个小时。",
+      }),
     );
   });
 
