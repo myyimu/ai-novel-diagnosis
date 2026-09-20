@@ -74,7 +74,11 @@ export class TextPreprocessorService {
 
     const segments: ChapterSegment[] = [];
     const firstIndex = matches[0]?.index ?? 0;
-    if (firstIndex > 0) {
+    const preamble = text.slice(0, firstIndex).trim();
+    // A standalone book title is metadata, not a thirteen-character "chapter".
+    // Keep actual prologue prose, even when it is short.
+    const titleOnlyPreamble = /^(?:#\s+)?《[^\n》]{1,100}》$/.test(preamble);
+    if (preamble && !titleOnlyPreamble) {
       segments.push(
         this.createSegment({
           order: segments.length + 1,
