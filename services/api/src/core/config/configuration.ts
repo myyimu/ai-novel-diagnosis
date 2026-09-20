@@ -91,7 +91,8 @@ export const providerConfig = registerAs("provider", () => {
   );
   return {
     requestTimeoutMs: parseInt(
-      process.env.PROVIDER_REQUEST_TIMEOUT_MS || "120000",
+      // Match the model proxy and ModelProviderService fallback for long manuscripts.
+      process.env.PROVIDER_REQUEST_TIMEOUT_MS || "600000",
       10,
     ),
     lengthRetryMaxOutputTokens: parseInt(
