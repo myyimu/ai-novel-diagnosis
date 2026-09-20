@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { BookStageRail } from "@/components/workspace/project/BookStageRail";
+import { ChapterExperimentPanel } from "./ChapterExperimentPanel";
 import {
 	RedesignTopButton,
 	RedesignWorkspaceShell,
@@ -23,7 +24,7 @@ import * as textQuoteAnchor from "dom-anchor-text-quote";
 import { BookOpen, Download, FileText, FolderOpen, Lightbulb, Loader2, Plus } from "lucide-react";
 
 type QuickReviewIssue = NonNullable<QuickReviewResult["issues"]>[number];
-type ChapterTab = "annotation" | "diagnosis" | "rewrite" | "retest";
+type ChapterTab = "annotation" | "diagnosis" | "rewrite" | "retest" | "experiment";
 type IssueState = "pending" | "accepted" | "ignored" | "disputed";
 type IssueFilter = "all" | "must" | "accepted" | "disputed";
 type PreviewDecision = "accepted" | "rejected";
@@ -51,6 +52,7 @@ export function ProjectCurrentPage() {
 		runRevisionRetest,
 		saveRevisedChapterText,
 		saveQuickReviewIssueDecisions,
+		loadChapterExperimentDraft,
 	} = useWorkspaceHandlers("overview");
 
 	/* 所有 hooks 必须在 ?chapter= 提前返回之前调用——否则带参/无参两次渲染钩子数不一致，React 直接崩溃。 */
@@ -85,7 +87,11 @@ export function ProjectCurrentPage() {
 		const resolvedChapterText = chapterText.trim()
 			? chapterText
 			: routeExample?.chapterText || "";
-		const resolvedQuickReviewResult = quickReviewResult ?? routeExample?.result ?? null;
+		const resolvedQuickReviewResult =
+			quickReviewResult ??
+			(resolvedChapterText === routeExample?.chapterText
+				? (routeExample.result ?? null)
+				: null);
 		const pendingRetestSessionId = projectRevisionSessions.find(
 			(session) =>
 				session.retestStatus === "pending" &&
@@ -94,6 +100,14 @@ export function ProjectCurrentPage() {
 
 		return (
 			<ProjectChapterWorkspace
+				key={`${requestedProjectId}:${resolvedChapterTitle}`}
+				projectId={requestedProjectId}
+				initialContext={
+					projectEngineCard?.status === "confirmed"
+						? projectEngineCard.premiseSummary
+						: ""
+				}
+				onLoadExperimentDraft={loadChapterExperimentDraft}
 				projectName={activeProject?.name || "默认书籍"}
 				chapterTitle={resolvedChapterTitle}
 				chapterText={resolvedChapterText}
@@ -336,6 +350,9 @@ export function ProjectCurrentPage() {
 }
 
 function ProjectChapterWorkspace({
+	projectId,
+	initialContext,
+	onLoadExperimentDraft,
 	projectName,
 	chapterTitle,
 	chapterText,
@@ -354,6 +371,9 @@ function ProjectChapterWorkspace({
 	onSaveRevision,
 	onPersistIssueDecisions,
 }: {
+	projectId: string;
+	initialContext: string;
+	onLoadExperimentDraft: (text: string, goal: string, preserve: string) => void;
 	projectName: string;
 	chapterTitle: string;
 	chapterText: string;
@@ -609,7 +629,7 @@ function ProjectChapterWorkspace({
 			runDiagnosis();
 			return;
 		}
-		if (pendingRetestCount > 0) {
+		if (result && pendingRetestCount > 0) {
 			setChapterTab("diagnosis");
 			runDiagnosis();
 			return;
@@ -781,7 +801,7 @@ function ProjectChapterWorkspace({
 
 			<section
 				ref={workspaceGridRef}
-				className="relative grid min-h-0 grid-cols-[250px_minmax(560px,1fr)_390px] bg-[#f6f7f9] max-[1180px]:grid-cols-[220px_minmax(520px,1fr)_345px] max-lg:block max-lg:h-auto"
+				className={`relative grid min-h-0 bg-muted max-lg:block max-lg:h-auto ${chapterTab === "experiment" ? "grid-cols-[250px_minmax(0,1fr)] max-[1180px]:grid-cols-[220px_minmax(0,1fr)]" : "grid-cols-[250px_minmax(560px,1fr)_390px] max-[1180px]:grid-cols-[220px_minmax(520px,1fr)_345px]"}`}
 			>
 				{treeOpen || commentsOpen ? (
 					<button
@@ -881,7 +901,9 @@ function ProjectChapterWorkspace({
 							<span>/</span>
 							<span className="truncate">{chapterTitle}</span>
 							<span>/</span>
-							<strong className="truncate text-[#20242b]">正文批注</strong>
+							<strong className="truncate text-foreground">
+								{chapterTab === "experiment" ? "引导与对照" : "正文批注"}
+							</strong>
 						</div>
 						<div className="flex items-center gap-2">
 							<span className="hidden items-center gap-1.5 text-[9px] text-[#6f7782] md:inline-flex">
@@ -920,6 +942,7 @@ function ProjectChapterWorkspace({
 									{ id: "diagnosis", label: "诊断总览", count: result ? 1 : 0 },
 									{ id: "rewrite", label: "修改方案", count: acceptedCount },
 									{ id: "retest", label: "待复诊", count: pendingRetestCount },
+									{ id: "experiment", label: "引导与对照", count: null },
 								].map((tab) => (
 									<button
 										key={tab.id}
@@ -932,73 +955,81 @@ function ProjectChapterWorkspace({
 										}`}
 									>
 										{tab.label}
-										<span className="ml-2 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-[#69707d]">
-											{tab.count}
-										</span>
+										{tab.count !== null && (
+											<span className="ml-2 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-[#69707d]">
+												{tab.count}
+											</span>
+										)}
 									</button>
 								))}
 							</nav>
 
-							<section className="mb-3 grid gap-2.5 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(28,34,42,.05)]">
-								<div className="flex min-w-0 items-center justify-between gap-3 border-b border-[#edf0f3] pb-2">
-									<div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-										{["诊断", "改稿", "复诊", "完成"].map((label, index) => (
-											<div
-												key={label}
-												className="flex shrink-0 items-center gap-1.5"
+							{chapterTab !== "experiment" && (
+								<section className="mb-3 grid gap-2.5 rounded-[11px] border border-[#e6e8eb] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(28,34,42,.05)]">
+									<div className="flex min-w-0 items-center justify-between gap-3 border-b border-[#edf0f3] pb-2">
+										<div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+											{["诊断", "改稿", "复诊", "完成"].map(
+												(label, index) => (
+													<div
+														key={label}
+														className="flex shrink-0 items-center gap-1.5"
+													>
+														{index ? (
+															<span className="h-px w-4 bg-[#d8dbe0]" />
+														) : null}
+														<span
+															className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
+																index < workflow.stage
+																	? "border-[#c9e7d9] bg-[#eaf8f2] text-[#14764f]"
+																	: index === workflow.stage
+																		? "border-[#ffd1bd] bg-[#fff2ec] text-[#c94413]"
+																		: "border-[#e6e8eb] bg-[#fbfcfd] text-[#69707d]"
+															}`}
+														>
+															<i className="grid size-[18px] place-items-center rounded-full bg-white text-[9px] not-italic">
+																{index < workflow.stage
+																	? "✓"
+																	: index + 1}
+															</i>
+															{label}
+														</span>
+													</div>
+												),
+											)}
+										</div>
+										<strong className="shrink-0 rounded-full bg-[#f5f6f8] px-2.5 py-1 text-[10px] text-[#454b55]">
+											{workflow.title}
+										</strong>
+									</div>
+									<div className="grid items-center gap-3 [grid-template-columns:minmax(0,1fr)_minmax(246px,auto)] max-[1180px]:grid-cols-1">
+										<span className="block min-w-0 text-[10px] leading-4 text-[#69707d]">
+											{workflow.description}
+										</span>
+										<div className="grid grid-cols-3 gap-2 max-[620px]:grid-cols-1">
+											<Button
+												onClick={handlePrimaryChapterAction}
+												className="h-8 rounded-[9px] bg-[#ff5a1f] px-3 text-xs font-bold text-white hover:bg-[#e84b13]"
 											>
-												{index ? (
-													<span className="h-px w-4 bg-[#d8dbe0]" />
-												) : null}
-												<span
-													className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
-														index < workflow.stage
-															? "border-[#c9e7d9] bg-[#eaf8f2] text-[#14764f]"
-															: index === workflow.stage
-																? "border-[#ffd1bd] bg-[#fff2ec] text-[#c94413]"
-																: "border-[#e6e8eb] bg-[#fbfcfd] text-[#69707d]"
-													}`}
-												>
-													<i className="grid size-[18px] place-items-center rounded-full bg-white text-[9px] not-italic">
-														{index < workflow.stage ? "✓" : index + 1}
-													</i>
-													{label}
-												</span>
-											</div>
-										))}
+												{workflow.action}
+											</Button>
+											<Button
+												variant="outline"
+												onClick={() => openEditor("edit")}
+												className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
+											>
+												编辑正文
+											</Button>
+											<Button
+												variant="outline"
+												onClick={() => replacementInputRef.current?.click()}
+												className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
+											>
+												替换正文
+											</Button>
+										</div>
 									</div>
-									<strong className="shrink-0 rounded-full bg-[#f5f6f8] px-2.5 py-1 text-[10px] text-[#454b55]">
-										{workflow.title}
-									</strong>
-								</div>
-								<div className="grid items-center gap-3 [grid-template-columns:minmax(0,1fr)_minmax(246px,auto)] max-[1180px]:grid-cols-1">
-									<span className="block min-w-0 text-[10px] leading-4 text-[#69707d]">
-										{workflow.description}
-									</span>
-									<div className="grid grid-cols-3 gap-2 max-[620px]:grid-cols-1">
-										<Button
-											onClick={handlePrimaryChapterAction}
-											className="h-8 rounded-[9px] bg-[#ff5a1f] px-3 text-xs font-bold text-white hover:bg-[#e84b13]"
-										>
-											{workflow.action}
-										</Button>
-										<Button
-											variant="outline"
-											onClick={() => openEditor("edit")}
-											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
-										>
-											编辑正文
-										</Button>
-										<Button
-											variant="outline"
-											onClick={() => replacementInputRef.current?.click()}
-											className="h-8 rounded-[9px] border-[#d8dbe0] px-3 text-xs"
-										>
-											替换正文
-										</Button>
-									</div>
-								</div>
-							</section>
+								</section>
+							)}
 
 							{chapterTab === "annotation" ? (
 								<article className="mx-auto min-h-[calc(100vh-138px)] w-[min(860px,100%)] rounded-[16px] border border-[#e0e4e8] bg-white px-[50px] py-8 pb-14 shadow-[0_10px_28px_rgba(24,30,38,.065)] max-[1180px]:px-9 max-[620px]:px-5">
@@ -1069,201 +1100,241 @@ function ProjectChapterWorkspace({
 									onRunRetest={runDiagnosis}
 								/>
 							) : null}
+							{chapterTab === "experiment" && (
+								<ChapterExperimentPanel
+									projectId={projectId}
+									chapterTitle={chapterTitle}
+									chapterText={chapterText}
+									initialContext={initialContext}
+									initialDiagnosis={
+										result
+											? JSON.stringify({
+													mainProblem: result.mainProblem,
+													issues: result.issues,
+												}).slice(0, 8000)
+											: ""
+									}
+									provider={provider}
+									onLoad={(text, goal, preserve) => {
+										onLoadExperimentDraft(text, goal, preserve);
+										setIssueStates({});
+										setIssueFilter("all");
+										setSelectedIssueId(null);
+										setPreviewDecisions({});
+										setPreviewRewrites({});
+										setIsRetestRun(false);
+										setChapterTab("annotation");
+									}}
+								/>
+							)}
 						</div>
 					</div>
 				</main>
 
-				<aside
-					className={`flex min-h-0 flex-col border-l border-[#e4e7eb] bg-white max-lg:fixed max-lg:bottom-0 max-lg:right-0 max-lg:top-[62px] max-lg:z-40 max-lg:w-[min(330px,88vw)] max-lg:shadow-[0_14px_38px_rgba(28,34,42,.18)] max-lg:transition-transform ${
-						commentsOpen ? "max-lg:translate-x-0" : "max-lg:translate-x-[103%]"
-					}`}
-				>
-					<div className="flex h-12 items-center justify-between border-b border-[#e6e8eb] px-3">
-						<strong className="text-xs">诊断意见</strong>
-						<span className="text-[10px] text-[#69707d]">{issues.length}</span>
-					</div>
-					<div className="flex flex-wrap gap-1 border-b border-[#e6e8eb] bg-[#fafbfc] p-2">
-						{[
-							{ id: "all", label: "全部" },
-							{ id: "must", label: "必须先改" },
-							{ id: "accepted", label: "已加入计划" },
-							{ id: "disputed", label: "待人工判断" },
-						].map((filter) => (
-							<button
-								key={filter.id}
-								type="button"
-								onClick={() => setIssueFilter(filter.id as IssueFilter)}
-								className={`rounded-full border px-2 py-1 text-[9px] ${
-									issueFilter === filter.id
-										? "border-[#ffd0bd] bg-[#fff2ec] font-bold text-[#c74413]"
-										: "border-[#e6e8eb] bg-white text-[#6f7782]"
-								}`}
-							>
-								{filter.label}
-							</button>
-						))}
-					</div>
-					<div className="min-h-0 flex-1 overflow-auto p-2.5 pb-4">
-						<div className="mb-2.5 rounded-[12px] border border-[#f3dacd] bg-gradient-to-br from-[#fffaf7] to-white p-2.5">
-							<div className="flex items-start justify-between gap-2">
-								<div>
-									<h3 className="m-0 text-[13px] font-bold">本章状态</h3>
-									<p className="mt-1 line-clamp-3 text-[10px] leading-[18px] text-[#69707d]">
-										{result?.mainProblem || "诊断结果已经保存到章节工作区。"}
-									</p>
-								</div>
-								<span className="rounded-full bg-[#fff2ec] px-2 py-1 text-[10px] font-bold text-[#c94413]">
-									{score}
-								</span>
-							</div>
-							<div className="mt-2 grid grid-cols-3 gap-1.5">
-								<RightMetric label="问题" value={String(issues.length)} />
-								<RightMetric label="方案" value={String(fixes.length)} />
-								<RightMetric label="效果" value={String(revisionCount)} />
-							</div>
+				{chapterTab !== "experiment" && (
+					<aside
+						className={`flex min-h-0 flex-col border-l border-[#e4e7eb] bg-white max-lg:fixed max-lg:bottom-0 max-lg:right-0 max-lg:top-[62px] max-lg:z-40 max-lg:w-[min(330px,88vw)] max-lg:shadow-[0_14px_38px_rgba(28,34,42,.18)] max-lg:transition-transform ${
+							commentsOpen ? "max-lg:translate-x-0" : "max-lg:translate-x-[103%]"
+						}`}
+					>
+						<div className="flex h-12 items-center justify-between border-b border-[#e6e8eb] px-3">
+							<strong className="text-xs">诊断意见</strong>
+							<span className="text-[10px] text-[#69707d]">{issues.length}</span>
 						</div>
+						<div className="flex flex-wrap gap-1 border-b border-[#e6e8eb] bg-[#fafbfc] p-2">
+							{[
+								{ id: "all", label: "全部" },
+								{ id: "must", label: "必须先改" },
+								{ id: "accepted", label: "已加入计划" },
+								{ id: "disputed", label: "待人工判断" },
+							].map((filter) => (
+								<button
+									key={filter.id}
+									type="button"
+									onClick={() => setIssueFilter(filter.id as IssueFilter)}
+									className={`rounded-full border px-2 py-1 text-[9px] ${
+										issueFilter === filter.id
+											? "border-[#ffd0bd] bg-[#fff2ec] font-bold text-[#c74413]"
+											: "border-[#e6e8eb] bg-white text-[#6f7782]"
+									}`}
+								>
+									{filter.label}
+								</button>
+							))}
+						</div>
+						<div className="min-h-0 flex-1 overflow-auto p-2.5 pb-4">
+							<div className="mb-2.5 rounded-[12px] border border-[#f3dacd] bg-gradient-to-br from-[#fffaf7] to-white p-2.5">
+								<div className="flex items-start justify-between gap-2">
+									<div>
+										<h3 className="m-0 text-[13px] font-bold">本章状态</h3>
+										<p className="mt-1 line-clamp-3 text-[10px] leading-[18px] text-[#69707d]">
+											{result?.mainProblem ||
+												(result
+													? "诊断结果已经保存到章节工作区。"
+													: "当前正文尚未诊断，请开始新的诊断。")}
+										</p>
+									</div>
+									<span className="rounded-full bg-[#fff2ec] px-2 py-1 text-[10px] font-bold text-[#c94413]">
+										{score}
+									</span>
+								</div>
+								<div className="mt-2 grid grid-cols-3 gap-1.5">
+									<RightMetric label="问题" value={String(issues.length)} />
+									<RightMetric label="方案" value={String(fixes.length)} />
+									<RightMetric label="效果" value={String(revisionCount)} />
+								</div>
+							</div>
 
-						<div className="grid gap-2">
-							{visibleIssueEntries.length ? (
-								visibleIssueEntries.map(({ issue, index }) => {
-									const state = getIssueState(issue.id);
-									return (
-										<article
-											key={issue.id || issue.title}
-											onClick={() => selectIssueFromCard(issue.id)}
-											onKeyDown={(event) => {
-												if (event.key === "Enter" || event.key === " ") {
-													event.preventDefault();
-													selectIssueFromCard(issue.id);
-												}
-											}}
-											role="button"
-											tabIndex={0}
-											data-issue-card={issue.id}
-											className={`relative w-full rounded-[12px] border bg-white py-2.5 pl-4 pr-3 text-left transition before:absolute before:bottom-3 before:left-0 before:top-3 before:w-[3px] before:rounded-r ${
-												issue.id === activeIssueId
-													? "border-[#ffb493] shadow-[0_8px_20px_rgba(255,90,31,.09)]"
-													: "border-[#e6e8eb] hover:border-[#ffb493] hover:shadow-[0_8px_20px_rgba(255,90,31,.09)]"
-											} ${getIssueBeforeClass(issue.severity)}`}
-										>
-											<div className="flex items-center justify-between gap-2">
-												<div className="flex items-center gap-1.5 text-[9px] text-[#69707d]">
-													<i className="grid size-[19px] place-items-center rounded-full bg-[#ff5a1f] text-[8px] font-black not-italic text-white">
-														{index + 1}
-													</i>
-													{issue.severity || "suggest"}
-												</div>
-												<span className={getIssueStateBadgeClass(state)}>
-													{getIssueStateLabel(state)}
-												</span>
-											</div>
-											<h3 className="mb-1 mt-2 text-xs font-bold leading-snug">
-												{issue.title}
-											</h3>
-											<p className="whitespace-pre-wrap text-[10px] leading-[18px] text-[#606873]">
-												{issue.description || issue.readerImpact}
-											</p>
-											{issue.evidence?.[0]?.quote ? (
-												<div className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
-													证据：{issue.evidence[0].quote}
-												</div>
-											) : null}
-											{annotatedIssueIds.has(issue.id) ? null : (
-												<div className="mt-2 inline-flex rounded-full border border-[#e6e8eb] bg-[#f7f8fa] px-2 py-1 text-[9px] font-bold text-[#69707d]">
-													未定位到原文
-												</div>
-											)}
-											{issue.fixAction ? (
-												<div className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
-													{issue.fixAction}
-												</div>
-											) : null}
-											<div className="mt-2 grid grid-cols-[1.2fr_1fr_1fr] gap-1.5">
-												<button
-													type="button"
-													disabled={
-														state !== "accepted" && acceptedCount >= 3
+							<div className="grid gap-2">
+								{visibleIssueEntries.length ? (
+									visibleIssueEntries.map(({ issue, index }) => {
+										const state = getIssueState(issue.id);
+										return (
+											<article
+												key={issue.id || issue.title}
+												onClick={() => selectIssueFromCard(issue.id)}
+												onKeyDown={(event) => {
+													if (
+														event.key === "Enter" ||
+														event.key === " "
+													) {
+														event.preventDefault();
+														selectIssueFromCard(issue.id);
 													}
-													onClick={(event) => {
-														event.stopPropagation();
-														updateIssueState(issue.id, "accepted");
-													}}
-													className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
-														state === "accepted"
-															? "border-[#82d4a9] bg-[#dff7eb] text-[#176c4d]"
-															: "border-[#c9e7d9] bg-[#eaf8f2] text-[#176c4d] disabled:cursor-not-allowed disabled:opacity-45"
-													}`}
-												>
-													{state === "accepted" ? "移出计划" : "加入计划"}
-												</button>
-												<button
-													type="button"
-													onClick={(event) => {
-														event.stopPropagation();
-														updateIssueState(issue.id, "ignored");
-													}}
-													className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
-														state === "ignored"
-															? "border-[#d0d4da] bg-[#f2f3f5] text-[#555d68]"
-															: "border-[#e6e8eb] bg-white text-[#626a75]"
-													}`}
-												>
-													忽略
-												</button>
-												<button
-													type="button"
-													onClick={(event) => {
-														event.stopPropagation();
-														updateIssueState(issue.id, "disputed");
-													}}
-													className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
-														state === "disputed"
-															? "border-[#efc16a] bg-[#fff0c9] text-[#8d520a]"
-															: "border-[#f1d8a9] bg-[#fff7e8] text-[#8d520a]"
-													}`}
-												>
-													有误
-												</button>
-											</div>
-										</article>
-									);
-								})
-							) : (
-								<div className="rounded-xl border border-dashed border-[#d4d8de] bg-[#fbfcfd] p-5 text-center">
-									<p className="text-[11px] leading-5 text-[#69707d]">
-										当前筛选下暂无诊断意见。
-									</p>
-								</div>
-							)}
+												}}
+												role="button"
+												tabIndex={0}
+												data-issue-card={issue.id}
+												className={`relative w-full rounded-[12px] border bg-white py-2.5 pl-4 pr-3 text-left transition before:absolute before:bottom-3 before:left-0 before:top-3 before:w-[3px] before:rounded-r ${
+													issue.id === activeIssueId
+														? "border-[#ffb493] shadow-[0_8px_20px_rgba(255,90,31,.09)]"
+														: "border-[#e6e8eb] hover:border-[#ffb493] hover:shadow-[0_8px_20px_rgba(255,90,31,.09)]"
+												} ${getIssueBeforeClass(issue.severity)}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<div className="flex items-center gap-1.5 text-[9px] text-[#69707d]">
+														<i className="grid size-[19px] place-items-center rounded-full bg-[#ff5a1f] text-[8px] font-black not-italic text-white">
+															{index + 1}
+														</i>
+														{issue.severity || "suggest"}
+													</div>
+													<span
+														className={getIssueStateBadgeClass(state)}
+													>
+														{getIssueStateLabel(state)}
+													</span>
+												</div>
+												<h3 className="mb-1 mt-2 text-xs font-bold leading-snug">
+													{issue.title}
+												</h3>
+												<p className="whitespace-pre-wrap text-[10px] leading-[18px] text-[#606873]">
+													{issue.description || issue.readerImpact}
+												</p>
+												{issue.evidence?.[0]?.quote ? (
+													<div className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-[#eceef1] bg-[#f7f8fa] px-2 py-1.5 text-[9px] leading-4 text-[#505762]">
+														证据：{issue.evidence[0].quote}
+													</div>
+												) : null}
+												{annotatedIssueIds.has(issue.id) ? null : (
+													<div className="mt-2 inline-flex rounded-full border border-[#e6e8eb] bg-[#f7f8fa] px-2 py-1 text-[9px] font-bold text-[#69707d]">
+														未定位到原文
+													</div>
+												)}
+												{issue.fixAction ? (
+													<div className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-[#fff2ec] px-2 py-1.5 text-[9px] leading-4 text-[#773a20]">
+														{issue.fixAction}
+													</div>
+												) : null}
+												<div className="mt-2 grid grid-cols-[1.2fr_1fr_1fr] gap-1.5">
+													<button
+														type="button"
+														disabled={
+															state !== "accepted" &&
+															acceptedCount >= 3
+														}
+														onClick={(event) => {
+															event.stopPropagation();
+															updateIssueState(issue.id, "accepted");
+														}}
+														className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
+															state === "accepted"
+																? "border-[#82d4a9] bg-[#dff7eb] text-[#176c4d]"
+																: "border-[#c9e7d9] bg-[#eaf8f2] text-[#176c4d] disabled:cursor-not-allowed disabled:opacity-45"
+														}`}
+													>
+														{state === "accepted"
+															? "移出计划"
+															: "加入计划"}
+													</button>
+													<button
+														type="button"
+														onClick={(event) => {
+															event.stopPropagation();
+															updateIssueState(issue.id, "ignored");
+														}}
+														className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
+															state === "ignored"
+																? "border-[#d0d4da] bg-[#f2f3f5] text-[#555d68]"
+																: "border-[#e6e8eb] bg-white text-[#626a75]"
+														}`}
+													>
+														忽略
+													</button>
+													<button
+														type="button"
+														onClick={(event) => {
+															event.stopPropagation();
+															updateIssueState(issue.id, "disputed");
+														}}
+														className={`grid min-h-[27px] place-items-center rounded-[7px] border text-[8px] ${
+															state === "disputed"
+																? "border-[#efc16a] bg-[#fff0c9] text-[#8d520a]"
+																: "border-[#f1d8a9] bg-[#fff7e8] text-[#8d520a]"
+														}`}
+													>
+														有误
+													</button>
+												</div>
+											</article>
+										);
+									})
+								) : (
+									<div className="rounded-xl border border-dashed border-[#d4d8de] bg-[#fbfcfd] p-5 text-center">
+										<p className="text-[11px] leading-5 text-[#69707d]">
+											当前筛选下暂无诊断意见。
+										</p>
+									</div>
+								)}
+							</div>
 						</div>
-					</div>
-					<div className="border-t border-[#e6e8eb] bg-white p-2.5">
-						<div className="mb-2 rounded-lg border border-[#d8e2f6] bg-[#edf4ff] px-2.5 py-1.5 text-[9px] leading-4 text-[#405a85]">
-							接受意见后，系统先生成修改预览；只有你确认的修改才会保存为新版本。
+						<div className="border-t border-[#e6e8eb] bg-white p-2.5">
+							<div className="mb-2 rounded-lg border border-[#d8e2f6] bg-[#edf4ff] px-2.5 py-1.5 text-[9px] leading-4 text-[#405a85]">
+								接受意见后，系统先生成修改预览；只有你确认的修改才会保存为新版本。
+							</div>
+							<div className="mb-2 text-[9px] text-[#6f7782]">
+								当前已接受 {acceptedCount} 条意见。
+							</div>
+							<div className="grid grid-cols-[1fr_1.15fr] gap-2">
+								<button
+									type="button"
+									onClick={() => setChapterTab("rewrite")}
+									disabled={!acceptedCount}
+									className="min-h-9 rounded-[9px] border border-[#d4d8de] bg-white px-2 text-[11px] font-bold text-[#20242b] disabled:opacity-50"
+								>
+									查看修改指令
+								</button>
+								<button
+									type="button"
+									onClick={openRewritePreview}
+									disabled={!acceptedCount}
+									className="min-h-9 rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-2 text-[11px] font-bold text-white disabled:opacity-50"
+								>
+									预览一键改稿
+								</button>
+							</div>
 						</div>
-						<div className="mb-2 text-[9px] text-[#6f7782]">
-							当前已接受 {acceptedCount} 条意见。
-						</div>
-						<div className="grid grid-cols-[1fr_1.15fr] gap-2">
-							<button
-								type="button"
-								onClick={() => setChapterTab("rewrite")}
-								disabled={!acceptedCount}
-								className="min-h-9 rounded-[9px] border border-[#d4d8de] bg-white px-2 text-[11px] font-bold text-[#20242b] disabled:opacity-50"
-							>
-								查看修改指令
-							</button>
-							<button
-								type="button"
-								onClick={openRewritePreview}
-								disabled={!acceptedCount}
-								className="min-h-9 rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-2 text-[11px] font-bold text-white disabled:opacity-50"
-							>
-								预览一键改稿
-							</button>
-						</div>
-					</div>
-				</aside>
+					</aside>
+				)}
 				<svg
 					className="pointer-events-none absolute inset-0 z-[4] size-full max-lg:hidden"
 					aria-hidden="true"

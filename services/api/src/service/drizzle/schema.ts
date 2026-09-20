@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { ChapterExperiment } from "@ai-novel-diagnosis/ai-core";
 import {
   boolean,
   real,
@@ -27,6 +28,18 @@ export const users = pgTable("users", {
 // 推断类型
 export type UserSelect = typeof users.$inferSelect;
 export type UserInsert = typeof users.$inferInsert;
+
+export const chapterExperiments = pgTable(
+  "chapter_experiments",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    revision: integer("revision").notNull().default(0),
+    payload: jsonb("payload").$type<ChapterExperiment>().notNull(),
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
+  },
+  (table) => [index("chapter_experiments_project_idx").on(table.projectId)],
+);
 
 export const analysisUploads = pgTable("analysis_uploads", {
   id: text("id")

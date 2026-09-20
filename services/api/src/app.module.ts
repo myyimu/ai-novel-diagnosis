@@ -24,6 +24,7 @@ import { UserModule } from "@/modules/user/user.module";
 import { WorkspaceModule } from "@/modules/workspace/workspace.module";
 import { DrizzleModule } from "@/service/drizzle/drizzle.module";
 import { AppController } from "./app.controller";
+import { ChapterExperimentModule } from "./modules/chapter-experiment/chapter-experiment.module";
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { AppController } from "./app.controller";
     ModelUsageModule,
     PremiseModule,
     PremiseDialogueModule,
+    ChapterExperimentModule,
     ReportQaModule,
     ReportDivergenceModule,
   ],

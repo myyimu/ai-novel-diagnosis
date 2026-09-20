@@ -36,6 +36,13 @@
       "when": 1786943925510,
       "tag": "0004_wakeful_terror",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789882493732,
+      "tag": "0005_chapter-experiments",
+      "breakpoints": true
     }
   ]
 }

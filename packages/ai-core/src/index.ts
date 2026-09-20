@@ -1,4 +1,5 @@
 export * from "./dialogue-statistics";
+export * from "./chapter-experiment";
 export * from "./metrics";
 export * from "./preview";
 export * from "./prompt-attribution";

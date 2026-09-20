@@ -2622,6 +2622,18 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setChapterText(value);
 	}
 
+	function loadChapterExperimentDraft(value: string, goal: string, preserve: string) {
+		handleChapterTextChange(value);
+		setQuickReviewResult(null);
+		setQuickReviewPlatformFit(null);
+		setQuickReviewError(null);
+		setQuickReviewDiagnosticFocus(goal.slice(0, 200));
+		setQuickReviewPreviousPrompt("");
+		setQuickReviewCoreSellingPoint(goal);
+		setQuickReviewMustKeepMechanisms(preserve);
+		setStatus("对照版本已载入草稿，请重新诊断。原稿与所有候选版本保留在章节对照中。");
+	}
+
 	function handleBookTitleChange(value: string) {
 		setBookTitle(value);
 		if (value.trim()) {
@@ -2899,6 +2911,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		importReferenceFile,
 		inferReferenceProfileFromModel,
 		handleChapterTextChange,
+		loadChapterExperimentDraft,
 		saveRevisedChapterText,
 		runRevisionRetest,
 		saveQuickReviewIssueDecisions,
