@@ -36,6 +36,11 @@ export function ProjectCurrentPage() {
 	const {
 		activeProject,
 		activeProjectId,
+		projects,
+		switchProject,
+		newProjectName,
+		setNewProjectName,
+		createProject,
 		projectRevisionSessions,
 		projectMethodologyCards,
 		projectEngineCard,
@@ -51,9 +56,19 @@ export function ProjectCurrentPage() {
 		runQuickExperience,
 		runRevisionRetest,
 		saveRevisedChapterText,
+		handleChapterTextChange,
 		saveQuickReviewIssueDecisions,
 		loadChapterExperimentDraft,
 	} = useWorkspaceHandlers("overview");
+	const routeProjectId = searchParams.get("id");
+	useEffect(() => {
+		if (
+			routeProjectId &&
+			routeProjectId !== activeProjectId &&
+			projects.some((project) => project.id === routeProjectId)
+		)
+			switchProject(routeProjectId);
+	}, [routeProjectId, activeProjectId, projects, switchProject]);
 
 	/* 所有 hooks 必须在 ?chapter= 提前返回之前调用——否则带参/无参两次渲染钩子数不一致，React 直接崩溃。 */
 	const revisionCount = projectRevisionSessions.length;
@@ -70,6 +85,16 @@ export function ProjectCurrentPage() {
 	);
 
 	const chapterId = searchParams.get("chapter");
+	if (chapterId && routeProjectId && routeProjectId !== activeProjectId) {
+		return projects.some((project) => project.id === routeProjectId) ? (
+			<p role="status">正在载入书籍…</p>
+		) : (
+			<div className="p-6">
+				<p role="alert">找不到这本书籍，请从书籍列表重新选择。</p>
+				<Button onClick={() => router.push("/project/current")}>返回书籍列表</Button>
+			</div>
+		);
+	}
 	if (chapterId) {
 		const requestedProjectId =
 			searchParams.get("id") || activeProjectId || activeProject?.id || "default-project";
@@ -133,9 +158,11 @@ export function ProjectCurrentPage() {
 				methodologyCount={projectMethodologyCards.length}
 				provider={provider}
 				onBack={() => router.push("/project/current")}
+				onCreateProject={() => router.push("/project/current?create=1")}
 				onRerun={() => runQuickExperience(true)}
 				onRunServerRetest={() => runRevisionRetest(pendingRetestSessionId)}
 				onSaveRevision={saveRevisedChapterText}
+				onSaveDraft={handleChapterTextChange}
 				onPersistIssueDecisions={saveQuickReviewIssueDecisions}
 			/>
 		);
@@ -212,6 +239,46 @@ export function ProjectCurrentPage() {
 					</div>
 				</section>
 
+				<section className="mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
+					<label className="grid gap-2 text-sm">
+						选择书籍
+						<select
+							className="rounded-md border border-input bg-background p-2"
+							value={activeProjectId}
+							onChange={(event) => switchProject(event.target.value)}
+						>
+							{projects.map((project) => (
+								<option key={project.id} value={project.id}>
+									{project.name}
+								</option>
+							))}
+						</select>
+					</label>
+					<form
+						className="flex flex-wrap items-end gap-2"
+						onSubmit={(event) => {
+							event.preventDefault();
+							if (newProjectName.trim()) {
+								createProject();
+								router.push("/diagnose/quick");
+							}
+						}}
+					>
+						<label className="grid gap-2 text-sm">
+							新书籍名称
+							<input
+								className="rounded-md border border-input bg-background p-2"
+								value={newProjectName}
+								maxLength={200}
+								onChange={(event) => setNewProjectName(event.target.value)}
+								placeholder="输入名称，新建独立书籍"
+							/>
+						</label>
+						<Button type="submit" disabled={!newProjectName.trim()}>
+							创建书籍
+						</Button>
+					</form>
+				</section>
 				<section className="mb-4 rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 					<div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
 						<EntryCard
@@ -226,7 +293,7 @@ export function ProjectCurrentPage() {
 						/>
 						<EntryCard
 							title="整书拆解"
-							description="上传多章 TXT，先检查章节拆分，再创建完整小说目录。"
+							description="上传多章 TXT，先检查章节拆分，再生成整书分析。"
 							onClick={() => router.push("/research/book")}
 						/>
 					</div>
@@ -308,7 +375,7 @@ export function ProjectCurrentPage() {
 							</div>
 							<strong>导入一本完整书籍</strong>
 							<p className="mt-1 text-xs leading-5 text-[#69707d]">
-								上传多章 TXT，自动检查章节拆分并建立小说目录。
+								上传多章 TXT，检查章节拆分并生成整书分析。
 							</p>
 						</button>
 					</div>
@@ -340,7 +407,7 @@ export function ProjectCurrentPage() {
 						</div>
 
 						<div className="rounded-[11px] border border-[#f5d9a8] bg-[#fff7e6] px-3.5 py-[13px] text-xs leading-5 text-[#7f4a0c]">
-							入口页只展示书籍和资产概览。要复刻你给的快速诊断交互，请进入“快速诊断”。
+							选择已有书籍继续处理，或创建独立书籍后导入新稿件。
 						</div>
 					</aside>
 				</section>
@@ -366,9 +433,11 @@ function ProjectChapterWorkspace({
 	methodologyCount,
 	provider,
 	onBack,
+	onCreateProject,
 	onRerun,
 	onRunServerRetest,
 	onSaveRevision,
+	onSaveDraft,
 	onPersistIssueDecisions,
 }: {
 	projectId: string;
@@ -387,8 +456,10 @@ function ProjectChapterWorkspace({
 	methodologyCount: number;
 	provider: ProviderForm;
 	onBack: () => void;
+	onCreateProject: () => void;
 	onRerun: () => void;
 	onRunServerRetest: () => Promise<boolean>;
+	onSaveDraft: (text: string) => void;
 	onSaveRevision: (
 		revisedText: string,
 		result: QuickReviewResult,
@@ -643,10 +714,6 @@ function ProjectChapterWorkspace({
 	}
 
 	function openEditor(mode: "edit" | "replace") {
-		if (!result) {
-			runDiagnosis();
-			return;
-		}
 		setEditorMode(mode);
 		setEditorText(chapterText);
 		setEditorOpen(true);
@@ -682,8 +749,13 @@ function ProjectChapterWorkspace({
 	}, [loading]);
 
 	function saveEditedText() {
+		if (!result) {
+			onSaveDraft(editorText);
+			setEditorOpen(false);
+			setChapterTab("annotation");
+			return;
+		}
 		if (
-			!result ||
 			!onSaveRevision(
 				editorText,
 				result,
@@ -784,7 +856,7 @@ function ProjectChapterWorkspace({
 					</button>
 					<button
 						type="button"
-						onClick={onBack}
+						onClick={onCreateProject}
 						className="min-h-9 rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-[13px] text-sm font-bold text-white shadow-[0_6px_16px_rgba(255,90,31,.16)] transition hover:bg-[#e64b13] disabled:opacity-60"
 					>
 						＋ 新增书籍
@@ -880,9 +952,11 @@ function ProjectChapterWorkspace({
 					<div className="grid gap-1.5 border-t border-[#e6e8eb] p-2.5">
 						<button
 							type="button"
+							disabled
+							title="多章节管理暂未开放；可通过新增书籍隔离其他稿件。"
 							className="min-h-9 rounded-[9px] border border-[#ff5a1f] bg-[#ff5a1f] px-3 text-xs font-bold text-white shadow-[0_6px_16px_rgba(255,90,31,.16)]"
 						>
-							＋ 新增章节
+							多章节管理（暂未开放）
 						</button>
 						<button
 							type="button"
@@ -912,9 +986,10 @@ function ProjectChapterWorkspace({
 							</span>
 							<button
 								type="button"
+								onClick={() => setChapterTab("retest")}
 								className="min-h-[30px] rounded-lg border border-[#d4d8de] bg-white px-2.5 text-[11px] font-bold text-[#20242b]"
 							>
-								版本 1
+								版本与复诊
 							</button>
 							<button
 								type="button"
@@ -1377,6 +1452,7 @@ function ProjectChapterWorkspace({
 			{editorOpen ? (
 				<ChapterEditorModal
 					mode={editorMode}
+					hasDiagnosis={Boolean(result)}
 					value={editorText}
 					onChange={setEditorText}
 					onClose={() => setEditorOpen(false)}
@@ -1460,12 +1536,14 @@ function EntryCard({
 
 function ChapterEditorModal({
 	mode,
+	hasDiagnosis,
 	value,
 	onChange,
 	onClose,
 	onSave,
 }: {
 	mode: "edit" | "replace";
+	hasDiagnosis: boolean;
 	value: string;
 	onChange: (value: string) => void;
 	onClose: () => void;
@@ -1479,7 +1557,9 @@ function ChapterEditorModal({
 					<div>
 						<h2 className="text-lg font-bold">{title}</h2>
 						<p className="mt-1 text-xs leading-5 text-[#69707d]">
-							确认后会保存为新版本，当前版本保持可回退。
+							{hasDiagnosis
+								? "确认后会保存为新版本，当前版本保持可回退。"
+								: "保存后更新当前草稿，可继续编辑或开始诊断。"}
 						</p>
 					</div>
 					<button
@@ -1491,6 +1571,7 @@ function ChapterEditorModal({
 					</button>
 				</header>
 				<textarea
+					aria-label="章节正文"
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
 					className="m-5 min-h-[360px] resize-y rounded-xl border border-[#d8dbe0] p-4 text-sm leading-7 outline-none focus:border-[#ff8a61]"
@@ -1504,7 +1585,7 @@ function ChapterEditorModal({
 						disabled={!value.trim()}
 						className="bg-[#ff5a1f] text-white hover:bg-[#e84b13]"
 					>
-						保存为新版本
+						{hasDiagnosis ? "保存为新版本" : "保存草稿"}
 					</Button>
 				</footer>
 			</section>

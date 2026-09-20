@@ -20,7 +20,7 @@ const researchPages: Array<{
 	{
 		id: "book",
 		label: "整书拆解",
-		description: "上传正文并建立小说目录",
+		description: "上传正文并生成整书分析",
 		href: "/research/book",
 	},
 	{

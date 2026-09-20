@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { WorkspaceStore, WorkspaceStoreState } from "./workspace-store";
 import {
 	defaultProviderConnection,
 	mergeWorkspaceState,
 	partializeWorkspaceState,
+	useWorkspaceStore,
 } from "./workspace-store";
+import { switchWorkspaceProject } from "./workspace-project-drafts";
 
 function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceStoreState {
 	return {
@@ -104,6 +106,119 @@ function createState(overrides: Partial<WorkspaceStoreState> = {}): WorkspaceSto
 		...overrides,
 	};
 }
+
+describe("project draft isolation", () => {
+	it("restores each book's manuscript, diagnosis and creative constraints after switching and rehydration", () => {
+		const initial = createState();
+		const original = createState({
+			projects: [
+				...initial.projects,
+				{ ...initial.projects[0]!, id: "book-b", name: "第二本" },
+			],
+			chapterTitle: "喜剧单集",
+			chapterText: "剧本原稿 A",
+			bookText: "完整剧本 A",
+			quickReviewMustKeepMechanisms: "保留舞台说明",
+		});
+		const second = { ...original, ...switchWorkspaceProject(original, "book-b", initial) };
+		expect(second.chapterText).toBe("");
+		expect(second.bookText).toBe("");
+		expect(second.bookUpload).toBeNull();
+		expect(switchWorkspaceProject(second, "default-project", initial).bookText).toBe(
+			"完整剧本 A",
+		);
+		expect(second.quickReviewMustKeepMechanisms).toBe("");
+		expect(second.bookTitle).toBe("第二本");
+		second.chapterText = "剧本原稿 B";
+		const persisted = JSON.parse(JSON.stringify(partializeWorkspaceState(second)));
+		expect(persisted.projectDrafts["default-project"].bookText).toBe("");
+		expect(persisted.projectDrafts["default-project"].bookFile).toBeNull();
+		const restored = mergeWorkspaceState(persisted, useWorkspaceStore.getInitialState());
+		const firstAgain = {
+			...restored,
+			...switchWorkspaceProject(restored, "default-project", initial),
+		};
+		expect(firstAgain.chapterText).toBe("剧本原稿 A");
+		expect(firstAgain.chapterTitle).toBe("喜剧单集");
+		expect(firstAgain.quickReviewMustKeepMechanisms).toBe("保留舞台说明");
+		expect(switchWorkspaceProject(firstAgain, "book-b", initial).chapterText).toBe(
+			"剧本原稿 B",
+		);
+		expect(firstAgain.projectDrafts?.["book-b"]).not.toHaveProperty("provider");
+	});
+	it("does not discard drafts for unknown or already active books", () => {
+		const state = createState({ chapterText: "未保存草稿" });
+		expect(switchWorkspaceProject(state, "missing", createState())).toEqual({});
+		expect(switchWorkspaceProject(state, state.activeProjectId, createState())).toEqual({});
+	});
+});
+
+describe("manuscript edits", () => {
+	afterEach(() => useWorkspaceStore.setState(useWorkspaceStore.getInitialState(), true));
+	it("clears stale diagnosis only when the manuscript changes", () => {
+		const report = {
+			title: "旧报告",
+			genre: "其他",
+			positioning: "喜剧",
+			sellingPoints: [],
+			mainProblem: "旧问题",
+			actionableFixes: [],
+			recommendedPlatforms: [],
+			readyForFullReview: false,
+			readyReason: "待改",
+			quickScore: 5,
+			confidence: 0.7,
+		};
+		useWorkspaceStore.setState({ chapterText: "原稿", quickReviewResult: report });
+		useWorkspaceStore.getState().setChapterText("原稿");
+		expect(useWorkspaceStore.getState().quickReviewResult).toEqual(report);
+		useWorkspaceStore.getState().setChapterText((text) => `${text}新版`);
+		expect(useWorkspaceStore.getState().quickReviewResult).toBeNull();
+	});
+	it("invalidates the previous upload and job when a different book is pasted", () => {
+		const upload = {
+			id: "old-upload",
+			title: "旧书",
+			genre: "其他",
+			originalFilename: "old.txt",
+			rawLength: 100,
+			cleanedLength: 100,
+			chapterCount: 1,
+			createdAt: "",
+			updatedAt: "",
+			preprocessing: {
+				cleaning: {
+					rawLength: 100,
+					cleanedLength: 100,
+					paragraphCount: 1,
+					removedNoise: [],
+				},
+				chapters: [],
+			},
+		};
+		useWorkspaceStore.setState({
+			bookText: "旧正文",
+			bookUpload: upload,
+			bookJob: {
+				id: "old-job",
+				type: "book-map-reduce-analysis",
+				status: "failed",
+				inputSummary: { title: "旧书", genre: "其他", textLength: 100 },
+				progress: { stage: "failed", current: 0, total: 1, message: "失败" },
+			},
+		});
+		useWorkspaceStore.getState().setBookText("旧正文");
+		expect(useWorkspaceStore.getState().bookUpload?.id).toBe("old-upload");
+		useWorkspaceStore.getState().setBookText("新剧本");
+		expect(useWorkspaceStore.getState()).toMatchObject({
+			bookText: "新剧本",
+			bookFile: null,
+			bookUpload: null,
+			bookJob: null,
+			bookAnalysisResult: null,
+		});
+	});
+});
 
 describe("workspace store persistence", () => {
 	it("persists only lightweight book job data needed after refresh", () => {

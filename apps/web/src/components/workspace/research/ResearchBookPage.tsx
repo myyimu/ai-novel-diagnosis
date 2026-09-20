@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import type { ClipboardEvent } from "react";
 import { useRouter } from "next/navigation";
 
@@ -22,9 +22,14 @@ import { AlertCircle, BookOpen, CheckCircle2, Loader2, Upload } from "lucide-rea
 
 export function ResearchBookPage() {
 	const router = useRouter();
+	const fileInput = useRef<HTMLInputElement>(null);
+	const textInput = useRef<HTMLTextAreaElement>(null);
+	const [inputError, setInputError] = useState<string | null>(null);
 
 	const {
 		bookFile,
+		bookTitle,
+		setBookTitle,
 		bookText,
 		bookUpload,
 		uploadHistory,
@@ -42,11 +47,17 @@ export function ResearchBookPage() {
 	} = useWorkspaceHandlers("book");
 
 	const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
-		void readBookFile(event.target.files?.[0]);
+		setInputError(null);
+		void readBookFile(event.target.files?.[0]).catch((error: unknown) =>
+			setInputError(error instanceof Error ? error.message : "读取文件失败"),
+		);
 	};
 
 	const handlePreview = () => {
-		void uploadBookForPreview();
+		setInputError(null);
+		void uploadBookForPreview().catch((error: unknown) =>
+			setInputError(error instanceof Error ? error.message : "章节检查失败"),
+		);
 	};
 
 	const handleAnalyze = () => {
@@ -81,7 +92,7 @@ export function ResearchBookPage() {
 	const isJobRunning = bookJob?.status === "queued" || bookJob?.status === "running";
 	const lastCompletedLabel = getLastCompletedChapterLabel(bookJob);
 	const isPreviewing = loading === "upload";
-	const hasInput = Boolean(bookFile || bookText.trim());
+	const hasInput = Boolean(bookFile || bookText.trim() || bookUpload);
 	const hasJob = Boolean(bookJob?.id);
 	const hasResult = Boolean(bookAnalysisResult);
 	const detectedChapterHeadingCount = countLikelyChapterHeadings(bookText);
@@ -113,10 +124,10 @@ export function ResearchBookPage() {
 			<main className="mx-auto w-[min(1040px,calc(100%_-_48px))] py-[34px] pb-[70px] max-[780px]:w-[calc(100%_-_24px)] max-[780px]:py-[22px]">
 				<section className="mb-[22px]">
 					<h1 className="mb-1.5 text-[28px] font-bold leading-tight tracking-normal">
-						创建新书籍
+						整书拆解
 					</h1>
 					<p className="max-w-[720px] text-sm leading-6 text-[#6f7782]">
-						上传整本 TXT 或粘贴正文。系统会先检查章节拆分，再为每章建立独立诊断页。
+						上传 TXT 或粘贴正文，检查章节拆分后生成整书分析。单章改稿请进入快速诊断。
 					</p>
 				</section>
 
@@ -125,7 +136,7 @@ export function ResearchBookPage() {
 						<div>
 							<h2 className="text-base font-bold">书籍正文</h2>
 							<p className="mt-1 text-[11px] leading-5 text-[#6f7782]">
-								书籍和正文会进入当前本地工作区。确认章节拆分后再创建小说目录。
+								确认章节拆分后再开始分析，结果会关联当前书籍。
 							</p>
 						</div>
 						<span className="rounded-full bg-[#fff1eb] px-3 py-1 text-[10px] font-bold text-[#c74413]">
@@ -134,11 +145,33 @@ export function ResearchBookPage() {
 					</header>
 
 					<div className="p-5">
+						<label className="mb-4 grid gap-2 text-sm">
+							书籍名称
+							<input
+								className="rounded-md border border-input bg-background p-2"
+								value={bookTitle}
+								onChange={(event) => setBookTitle(event.target.value)}
+								disabled={isJobRunning}
+							/>
+						</label>
+						{inputError && (
+							<p role="alert" className="mb-4 text-sm text-destructive">
+								{inputError}
+							</p>
+						)}
 						<div className="mb-4 flex w-max gap-1 rounded-[11px] bg-[#f2f4f6] p-1">
-							<button className="min-h-[33px] rounded-lg bg-white px-3.5 text-[11px] font-bold text-[#c74413] shadow-[0_2px_7px_rgba(20,25,32,.08)]">
+							<button
+								onClick={() => fileInput.current?.click()}
+								disabled={isJobRunning}
+								className="min-h-[33px] rounded-lg bg-white px-3.5 text-[11px] font-bold text-[#c74413] shadow-[0_2px_7px_rgba(20,25,32,.08)]"
+							>
 								上传 TXT
 							</button>
-							<button className="min-h-[33px] rounded-lg px-3.5 text-[11px] font-bold text-[#6f7782]">
+							<button
+								onClick={() => textInput.current?.focus()}
+								disabled={isJobRunning}
+								className="min-h-[33px] rounded-lg px-3.5 text-[11px] font-bold text-[#6f7782]"
+							>
 								粘贴正文
 							</button>
 						</div>
@@ -151,6 +184,7 @@ export function ResearchBookPage() {
 								<label className="grid min-h-[230px] cursor-pointer place-items-center rounded-[13px] border border-dashed border-[#ccd2d9] bg-[#fbfcfd] p-6 text-center transition hover:border-[#ff8b5f] hover:bg-[#fff1eb]">
 									<input
 										type="file"
+										ref={fileInput}
 										accept=".txt"
 										onChange={handleFileSelect}
 										className="hidden"
@@ -191,6 +225,8 @@ export function ResearchBookPage() {
 									或粘贴整本正文
 								</label>
 								<textarea
+									ref={textInput}
+									aria-label="整书正文"
 									value={bookText}
 									onChange={(event) => setBookText(event.target.value)}
 									onPaste={handleBookTextPaste}
@@ -214,7 +250,7 @@ export function ResearchBookPage() {
 							<strong>章节拆分检查</strong>
 							<span className="ml-2">
 								{bookUpload
-									? `检测到 ${bookUpload.chapterCount} 个章节，将分别建立诊断页。`
+									? `检测到 ${bookUpload.chapterCount} 个章节片段，将用于整书分析。`
 									: "上传或粘贴后先检查章节拆分，避免错章影响后续分析。"}
 							</span>
 						</div>
@@ -228,8 +264,8 @@ export function ResearchBookPage() {
 								</strong>
 								<span className="ml-2">
 									{restoredPreview
-										? `${bookUpload?.originalFilename} · ${bookUpload?.chapterCount} 个章节片段，可直接继续创建书籍。`
-										: `本地服务中已保存 ${uploadHistory.length} 条上传记录，重开页面后会自动恢复最近一次预览。`}
+										? `${bookUpload?.originalFilename} · ${bookUpload?.chapterCount} 个章节片段，可继续分析。`
+										: `本地服务中已保存 ${uploadHistory.length} 条上传记录。当前正文变更后，请重新检查章节拆分。`}
 								</span>
 								<span className="ml-2 text-[#7a838f]">
 									最近更新：
@@ -244,7 +280,7 @@ export function ResearchBookPage() {
 									<h3 className="text-sm font-bold">章节拆分预览</h3>
 									<p className="mt-1 text-[11px] text-[#6f7782]">
 										已识别 {bookUpload.chapterCount}{" "}
-										个章节片段。确认无误后创建小说目录。
+										个章节片段。确认无误后开始整书分析。
 									</p>
 								</div>
 								<div className="max-h-72 overflow-auto text-sm">
@@ -267,13 +303,17 @@ export function ResearchBookPage() {
 
 						<div className="mt-5 flex flex-col gap-3 border-t border-[#e4e7eb] pt-4 sm:flex-row sm:items-center sm:justify-between">
 							<span className="text-[10px] text-[#6f7782]">
-								创建后进入小说目录，并自动打开第一章诊断页。
+								整书分析会调用当前模型；任务进度和结果保存在本地服务。
 							</span>
 							<div className="flex flex-wrap justify-end gap-2">
 								<Button
 									variant="outline"
 									onClick={handlePreview}
-									disabled={isJobRunning || isPreviewing || !hasInput}
+									disabled={
+										isJobRunning ||
+										isPreviewing ||
+										(!bookFile && !bookText.trim())
+									}
 								>
 									{isPreviewing ? (
 										<>
@@ -291,14 +331,14 @@ export function ResearchBookPage() {
 									{isJobRunning ? (
 										<>
 											<Loader2 className="mr-2 size-4 animate-spin" />
-											正在创建书籍
+											正在分析整书
 										</>
 									) : bookAnalysisResult ? (
 										"重新分析"
 									) : (
 										<>
 											<BookOpen className="mr-2 size-4" />
-											创建书籍并开始首章诊断
+											开始整书分析
 										</>
 									)}
 								</Button>
@@ -320,9 +360,9 @@ export function ResearchBookPage() {
 							<div className="min-w-0 flex-1">
 								<p className="font-bold">
 									{isJobRunning
-										? "正在创建书籍"
+										? "正在分析整书"
 										: bookJob?.status === "succeeded"
-											? "小说目录已创建"
+											? "整书分析已完成"
 											: "任务失败"}
 								</p>
 								<p className="text-sm text-[#6f7782]">{bookStatusText}</p>
@@ -401,10 +441,16 @@ export function ResearchBookPage() {
 					<section className="mt-4 rounded-[14px] border border-[#ffd0bd] bg-[#fff1eb] p-5">
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="size-5 text-[#ff5a1f]" />
-							<h3 className="text-sm font-bold">整本分析完成</h3>
+							<h3 className="text-sm font-bold">
+								{bookJob?.status === "succeeded"
+									? "整本分析完成"
+									: "已保留的部分分析结果"}
+							</h3>
 						</div>
 						<p className="mt-2 text-sm leading-6 text-[#6f7782]">
-							整本分析已完成，可以查看人物关系、情节模式和研究结果。
+							{bookJob?.status === "succeeded"
+								? "可以查看本次生成的人物关系、情节模式和研究结果。"
+								: "任务尚未成功完成，以下内容可能不完整，不代表整书分析完成。"}
 						</p>
 						<div className="mt-3 flex gap-2">
 							<Button

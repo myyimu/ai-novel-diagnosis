@@ -16,6 +16,7 @@ const PROVIDER_CONFIG_HISTORY_MAX_ENTRIES = 10;
 const persistableWorkspaceKeys = [
 	"projects",
 	"activeProjectId",
+	"projectDrafts",
 	"provider",
 	"providerConnection",
 	"referenceTitle",
@@ -145,6 +146,21 @@ function pruneProviderConfigHistory(rawHistory: unknown): ProviderConfigHistoryE
 
 export function partializeWorkspaceState(state: WorkspaceStoreState): PersistedWorkspaceState {
 	return persistableWorkspaceKeys.reduce((result, key) => {
+		if (key === "projectDrafts") {
+			result.projectDrafts = Object.fromEntries(
+				Object.entries(state.projectDrafts ?? {}).map(([id, draft]) => [
+					id,
+					{
+						...draft,
+						bookText: "",
+						bookFile: null,
+						bookAnalysisResult: null,
+						bookJob: toPersistedBookJob(draft.bookJob),
+					},
+				]),
+			);
+			return result;
+		}
 		if (key === "bookJob") {
 			result.bookJob = toPersistedBookJob(
 				state.bookJob,

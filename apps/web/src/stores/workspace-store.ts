@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { switchWorkspaceProject, type ProjectChapterDraft } from "./workspace-project-drafts";
 import {
 	aiSelfTests,
 	defaultWorkspaceProject,
@@ -57,6 +58,7 @@ function resolveStoreValue<T>(value: T | ((current: T) => T), current: T): T {
 export interface WorkspaceStoreState {
 	projects: WorkspaceProject[];
 	activeProjectId: string;
+	projectDrafts?: Record<string, ProjectChapterDraft>;
 	provider: ProviderForm;
 	providerConnection: ProviderConnectionState;
 	providerConfigHistory: ProviderConfigHistoryEntry[];
@@ -318,7 +320,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 				return {
 					...initialWorkspaceState,
 					setProjects: makeSetter("projects"),
-					setActiveProjectId: makeSetter("activeProjectId"),
+					setActiveProjectId: (value) =>
+						set((current) =>
+							switchWorkspaceProject(
+								current,
+								resolveStoreValue(value, current.activeProjectId),
+								initialWorkspaceState,
+							),
+						),
 					setProvider: makeSetter("provider"),
 					setProviderConnection: makeSetter("providerConnection"),
 					setProviderConfigHistory: makeSetter("providerConfigHistory"),
@@ -356,7 +365,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 					setReferenceText: makeSetter("referenceText"),
 					setReferenceFileName: makeSetter("referenceFileName"),
 					setChapterTitle: makeSetter("chapterTitle"),
-					setChapterText: makeSetter("chapterText"),
+					setChapterText: (value) =>
+						set((current) => {
+							const chapterText = resolveStoreValue(value, current.chapterText);
+							return chapterText === current.chapterText
+								? {}
+								: { chapterText, quickReviewResult: null, scoreResult: null };
+						}),
 					setQuickReviewGenre: makeSetter("quickReviewGenre"),
 					setQuickReviewInputKind: makeSetter("quickReviewInputKind"),
 					setQuickReviewChapterPosition: makeSetter("quickReviewChapterPosition"),
@@ -378,7 +393,19 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 					setScoreProgress: makeSetter("scoreProgress"),
 					setBookTitle: makeSetter("bookTitle"),
 					setBookGenre: makeSetter("bookGenre"),
-					setBookText: makeSetter("bookText"),
+					setBookText: (value) =>
+						set((current) => {
+							const bookText = resolveStoreValue(value, current.bookText);
+							return bookText === current.bookText
+								? {}
+								: {
+										bookText,
+										bookFile: null,
+										bookUpload: null,
+										bookJob: null,
+										bookAnalysisResult: null,
+									};
+						}),
 					setBookFile: makeSetter("bookFile"),
 					setBookUpload: makeSetter("bookUpload"),
 					setBookHistory: makeSetter("bookHistory"),

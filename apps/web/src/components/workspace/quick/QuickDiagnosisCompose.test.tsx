@@ -130,6 +130,48 @@ const platformFit: PlatformFitResult = {
 };
 
 describe("QuickDiagnosisCompose", () => {
+	it("does not invent evidence, advice or confidence for an incomplete report", () => {
+		const html = renderToStaticMarkup(
+			<QuickDiagnosisCompose
+				handlers={{
+					...baseHandlers,
+					// Older persisted reports may omit confidence despite the current API contract.
+					quickReviewResult: {
+						...quickReviewResult,
+						issues: [],
+						actionableFixes: [],
+						revisionPlan: undefined,
+						nextPrompt: undefined,
+						confidence: undefined,
+					} as unknown as QuickReviewResult,
+				}}
+			/>,
+		);
+		expect(html).toContain("0 个问题");
+		expect(html).toContain("本次报告未提供具体问题");
+		expect(html).toContain("本次报告未提供修改指令");
+		expect(html).not.toContain("82%");
+		expect(html).not.toContain("主角如果不反击");
+	});
+	it("renders every reported issue with its actual severity and checkpoints", () => {
+		const issues = Array.from({ length: 5 }, (_, index) => ({
+			...quickReviewResult.issues[0]!,
+			id: `issue-${index}`,
+			title: `剧本问题${index}`,
+			severity: "low" as const,
+			evidence: [],
+		}));
+		const html = renderToStaticMarkup(
+			<QuickDiagnosisCompose
+				handlers={{ ...baseHandlers, quickReviewResult: { ...quickReviewResult, issues } }}
+			/>,
+		);
+		expect(html).toContain("5 个问题");
+		expect(html).toContain("剧本问题4");
+		expect(html).toContain("未提供原文引文，需人工核实。");
+		expect(html).toContain("首屏出现明确压力");
+		expect(html).not.toContain(">严重<");
+	});
 	it("renders the quick diagnosis input state inside the new task frame", () => {
 		const html = renderToStaticMarkup(<QuickDiagnosisCompose handlers={baseHandlers} />);
 

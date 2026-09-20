@@ -3,11 +3,12 @@ import Link from "next/link";
 const firstUseItems = [
 	{
 		title: "快速诊断一章",
-		description: "适合刚写完一章，快速查看问题。系统会自动创建一本小说和第一章。",
+		description:
+			"适合刚写完一章，快速查看问题。结果保存到当前书籍；处理其他作品前可先在书籍列表新建书籍。",
 	},
 	{
 		title: "导入整本小说",
-		description: "适合长期管理作品，TXT 会自动拆分章节。",
+		description: "上传 TXT 并检查章节拆分，再生成整书分析。逐章编辑目录尚未开放。",
 	},
 ];
 
@@ -52,7 +53,7 @@ const faqItems = [
 	},
 	{
 		title: "整本小说如何分析？",
-		description: "建议导入整本后逐章诊断。",
+		description: "在整书拆解页上传 TXT，确认章节预览后开始分析；单章改稿请进入快速诊断。",
 	},
 ];
 

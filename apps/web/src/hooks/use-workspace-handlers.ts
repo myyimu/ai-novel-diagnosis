@@ -501,7 +501,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		const project = projects.find((item) => item.id === projectId);
 		setActiveProjectId(projectId);
 		setPreviousQuickReviewResult(null);
-		setQuickReviewResult(null);
 		setStatus(`已切换到书籍：${project?.name || "未命名书籍"}`);
 	}
 
@@ -1923,9 +1922,18 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				quickReviewTargetReaderPleasures,
 				includeMethodologyCards: false,
 			});
+			const current = useWorkspaceStore.getState();
+			rememberQuickReview(cacheKey, result);
+			if (
+				current.activeProjectId !== activeProjectId ||
+				current.chapterText !== chapterText ||
+				current.chapterTitle !== chapterTitle
+			) {
+				setStatus("诊断已完成，但当前稿件已切换。结果已缓存，返回原稿后可重新打开。");
+				return;
+			}
 			setQuickReviewResult(result);
 			setQuickReviewPlatformFit(null);
-			rememberQuickReview(cacheKey, result);
 			rememberQuickReviewIteration(result);
 			setStatus(
 				typeof result.quickScore === "number"
@@ -2128,7 +2136,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		setBookJob(null);
 		setStatus("正在准备上传文本并创建整本异步分析任务...");
 		try {
-			const upload = bookUpload ?? (await uploadBookForPreview(false));
+			const upload =
+				bookFile || bookText.trim() ? await uploadBookForPreview(false) : bookUpload;
 			if (!upload) {
 				return;
 			}
@@ -2340,6 +2349,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	async function uploadBookForPreview(manageLoading = true) {
+		const sourceText = bookText;
+		const sourceFile = bookFile;
 		const hasBookFile = Boolean(bookFile);
 		const hasBookText = Boolean(bookText.trim());
 		if (!hasBookFile && !hasBookText) {
@@ -2363,6 +2374,14 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				bookTitle,
 				bookGenre,
 			});
+			const current = useWorkspaceStore.getState();
+			if (
+				current.activeProjectId !== activeProjectId ||
+				current.bookText !== sourceText ||
+				current.bookFile !== sourceFile ||
+				current.bookTitle !== bookTitle
+			)
+				return null;
 			setBookUpload(upload);
 			syncActiveBookName(upload.title);
 			setStatus(`章节预览完成：${upload.chapterCount} 个章节片段`);
@@ -2386,17 +2405,14 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			const { jobs, uploads } = await listBookHistory(10);
 			setBookHistory(jobs);
 			setUploadHistory(uploads);
-			const shouldRestoreLatestUpload = !bookFile && !bookText.trim() && !bookJob?.id;
-			const currentUpload = bookUpload?.id
-				? uploads.find((upload) => upload.id === bookUpload.id)
+			const current = useWorkspaceStore.getState();
+			const currentUpload = current.bookUpload?.id
+				? uploads.find((upload) => upload.id === current.bookUpload?.id)
 				: undefined;
-			const fallbackUpload = shouldRestoreLatestUpload ? uploads[0] : undefined;
 
 			if (currentUpload) {
 				setBookUpload(currentUpload);
-			} else if (fallbackUpload) {
-				setBookUpload(fallbackUpload);
-			} else if (bookUpload?.id) {
+			} else if (current.bookUpload?.id) {
 				setBookUpload(null);
 			}
 			if (!options?.silent) {
@@ -2536,11 +2552,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		}
 		try {
 			const job = await readBookAnalysisJob(jobId, true);
+			if (options?.silent && useWorkspaceStore.getState().bookJob?.id !== jobId) return;
 			setBookJob(job);
-			syncActiveBookName(job.result?.book.title || job.inputSummary.title);
+			if (!options?.silent)
+				syncActiveBookName(job.result?.book.title || job.inputSummary.title);
 			if (job.result) {
 				setBookAnalysisResult(job.result);
-				syncActiveProjectBookJob(job);
+				if (!options?.silent) syncActiveProjectBookJob(job);
 			}
 			if (bookText.trim() || bookFile) {
 				rememberBookAnalysis(buildBookAnalysisCacheKey(), job, job.result ?? null);
@@ -2595,7 +2613,6 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			return;
 		}
 
-		setBookFile(file);
 		const title = file.name.replace(/\.[^.]+$/, "");
 		setBookTitle(title);
 		syncActiveBookName(title);
@@ -2605,6 +2622,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		if (file.size > LARGE_BOOK_INLINE_BYTES) {
 			setBookText("");
+			setBookFile(file);
 			setStatus(
 				`已选择大文件 ${file.name}（${formatFileSize(file.size)}）。为避免浏览器卡顿，不再展开全文，后续会直接上传并分析章节。`,
 			);
@@ -2613,6 +2631,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 		const text = await readTextFileWithAutoEncoding(file);
 		setBookText(text);
+		setBookFile(file);
 	}
 
 	/* ──────────── inline handler wrappers ──────────── */

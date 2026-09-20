@@ -5,6 +5,9 @@ import type { ClipboardEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { downloadExperimentFile } from "@/lib/chapter-experiments";
+import { hashString } from "@/lib/workspace-cache";
+import { toast } from "sonner";
 import {
 	RedesignTopButton,
 	RedesignWorkspaceShell,
@@ -129,7 +132,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 	const confidence =
 		typeof handlers.quickReviewResult?.confidence === "number"
 			? `${Math.round(handlers.quickReviewResult.confidence * 100)}%`
-			: "82%";
+			: "未提供";
 	const rewritePrompt = buildRewritePrompt(handlers.quickReviewResult);
 
 	const chooseFocus = (focus: string) => {
@@ -201,7 +204,7 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 						查看使用说明
 					</RedesignTopButton>
 					<RedesignTopButton onClick={loadFirstExample}>载入示例</RedesignTopButton>
-					<RedesignTopButton onClick={() => handlers.openView("book")}>
+					<RedesignTopButton onClick={() => router.push("/project/current")}>
 						书籍列表
 					</RedesignTopButton>
 				</>
@@ -648,6 +651,13 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 							onAnalyzePlatformFit={handlers.analyzeQuickReviewPlatformFit}
 							isGeneratingMethodology={handlers.loading === "methodology"}
 							onGenerateMethodology={handlers.generateQuickReviewMethodology}
+							onOpenChapter={() => {
+								const projectId = handlers.activeProject?.id || "default-project";
+								const chapterId = `chapter-${hashString([projectId, handlers.chapterTitle.trim() || "第一章", handlers.chapterText.trim()].join("|"))}`;
+								router.push(
+									`/project/current?id=${encodeURIComponent(projectId)}&chapter=${encodeURIComponent(chapterId)}`,
+								);
+							}}
 						/>
 						{handlers.projectStoryAuditResult ? (
 							<ReportDivergencePanel
@@ -708,6 +718,7 @@ function ResultSection({
 	onAnalyzePlatformFit,
 	isGeneratingMethodology,
 	onGenerateMethodology,
+	onOpenChapter,
 }: {
 	result: QuickReviewResult;
 	issues: QuickIssue[];
@@ -723,13 +734,19 @@ function ResultSection({
 	onAnalyzePlatformFit: () => void;
 	isGeneratingMethodology: boolean;
 	onGenerateMethodology: () => void;
+	onOpenChapter: () => void;
 }) {
 	return (
 		<section className="mt-[22px]">
 			<div className="grid items-start gap-5 [grid-template-columns:minmax(0,1fr)_340px] max-[1100px]:grid-cols-1">
 				<div className="grid gap-3.5">
 					<div className="grid grid-cols-[104px_minmax(0,1fr)] gap-5 rounded-[14px] border border-[#e6e8eb] bg-[radial-gradient(circle_at_top_right,rgba(255,90,31,.09),transparent_36%),#fff] p-5 shadow-[0_4px_18px_rgba(22,27,34,.06)] max-[780px]:grid-cols-1">
-						<div className="grid size-24 place-items-center rounded-full bg-[conic-gradient(#ff5a1f_0_58%,#eceef1_58%_100%)] p-2">
+						<div
+							className="grid size-24 place-items-center rounded-full bg-muted p-2"
+							style={{
+								background: `conic-gradient(var(--primary) 0 ${Math.max(0, Math.min(100, (result.quickScore || 0) * 10))}%, var(--muted) 0)`,
+							}}
+						>
 							<div className="grid size-20 place-items-center rounded-full bg-white text-center leading-none">
 								<strong className="block text-[25px]">{quickScore}</strong>
 								<span className="text-[11px] text-[#69707d]">
@@ -744,11 +761,10 @@ function ResultSection({
 										诊断结论：
 										{result.oneLineDiagnosis ||
 											result.mainProblem ||
-											"开局冲突存在，但读者还不知道为什么必须继续看"}
+											"本次报告未提供诊断结论。"}
 									</h2>
 									<p className="mt-1.5 text-sm leading-6 text-[#4f5661]">
-										{result.positioning ||
-											"当前稿件并非没有事件，而是卖点、损失与主角下一步目标没有形成同一条追读链。"}
+										{result.positioning || "本次报告未提供作品定位。"}
 									</p>
 									<div className="mt-2.5">
 										<span className="rounded-full bg-[#eef4ff] px-[9px] py-1 text-[11px] font-bold text-[#295ec2]">
@@ -757,15 +773,20 @@ function ResultSection({
 									</div>
 								</div>
 								<span className="shrink-0 rounded-full bg-[#fff7e6] px-[9px] py-1 text-[11px] font-bold text-[#955208]">
-									建议修改后继续
+									{formatGateLabel(result.gateDecision)}
 								</span>
 							</div>
 							<div className="mt-[17px] grid grid-cols-4 gap-2 max-[780px]:grid-cols-2">
 								{[
-									["最大问题", result.mainProblem || "开局承诺不清"],
+									["最大问题", result.mainProblem || "未提供明确问题"],
 									["置信度", confidence],
 									["Gate", formatGateLabel(result.gateDecision)],
-									["优点", result.sellingPoints?.[0] || "冲突进入较快"],
+									[
+										"优点",
+										result.strengths?.[0]?.title ||
+											result.sellingPoints?.[0] ||
+											"未提供",
+									],
 								].map(([label, value]) => (
 									<div
 										key={label}
@@ -793,65 +814,72 @@ function ResultSection({
 					<SectionCard
 						title="关键问题"
 						subtitle="只展示会直接影响追读的高优先级问题。"
-						badge={`${issues.length || 2} 个高优先级`}
+						badge={`${issues.length} 个问题`}
 					>
 						<div className="grid gap-3">
-							{(issues.length ? issues : fallbackIssues)
-								.slice(0, 3)
-								.map((issue, index) => (
-									<article
-										key={issue.id || issue.title}
-										className={`rounded-xl border border-[#e6e8eb] p-4 ${
-											index === 0
-												? "border-l-4 border-l-[#d33b39]"
-												: "border-l-4 border-l-[#c46a06]"
-										}`}
-									>
-										<div className="flex items-start justify-between gap-3.5">
-											<div>
-												<h3 className="m-0 text-[15px] font-bold">
-													{String(index + 1).padStart(2, "0")}.{" "}
-													{issue.title}
-												</h3>
-												<p className="mt-1.5 text-sm leading-6 text-[#545b66]">
-													{issue.description || issue.readerImpact}
-												</p>
-											</div>
-											<span
-												className={`rounded-full px-[9px] py-1 text-[11px] font-bold ${
-													index === 0
-														? "bg-[#fff0f0] text-[#a82f2d]"
-														: "bg-[#fff7e6] text-[#955208]"
-												}`}
-											>
-												{index === 0 ? "严重" : "高"}
-											</span>
+							{!issues.length && (
+								<p className="text-sm text-muted-foreground">
+									本次报告未提供具体问题，请结合原稿核实。
+								</p>
+							)}
+							{issues.map((issue, index) => (
+								<article
+									key={issue.id || issue.title}
+									className={`rounded-xl border border-[#e6e8eb] p-4 ${
+										issue.severity === "critical" || issue.severity === "high"
+											? "border-l-4 border-l-destructive"
+											: "border-l-4 border-l-muted-foreground"
+									}`}
+								>
+									<div className="flex items-start justify-between gap-3.5">
+										<div>
+											<h3 className="m-0 text-[15px] font-bold">
+												{String(index + 1).padStart(2, "0")}. {issue.title}
+											</h3>
+											<p className="mt-1.5 text-sm leading-6 text-[#545b66]">
+												{issue.description || issue.readerImpact}
+											</p>
 										</div>
-										<div className="mt-3 rounded-[10px] border border-[#eceef1] bg-[#f7f8fa] px-3.5 py-3 text-[13px] leading-6 text-[#464d57]">
-											<b className="mb-1 block text-xs text-[#303640]">
-												正文证据
+										<span
+											className={`rounded-full px-[9px] py-1 text-[11px] font-bold ${
+												issue.severity === "critical" ||
+												issue.severity === "high"
+													? "bg-destructive/10 text-destructive"
+													: "bg-muted text-muted-foreground"
+											}`}
+										>
+											{{
+												critical: "严重",
+												high: "高",
+												medium: "中",
+												low: "低",
+											}[issue.severity] || "待确认"}
+										</span>
+									</div>
+									<div className="mt-3 rounded-[10px] border border-[#eceef1] bg-[#f7f8fa] px-3.5 py-3 text-[13px] leading-6 text-[#464d57]">
+										<b className="mb-1 block text-xs text-[#303640]">
+											正文证据
+										</b>
+										{issue.evidence?.[0]?.quote ||
+											"未提供原文引文，需人工核实。"}
+									</div>
+									<div className="mt-3 grid grid-cols-2 gap-2.5 max-[780px]:grid-cols-1">
+										<div className="rounded-[10px] bg-[#fff2ec] px-3 py-[11px] text-xs leading-5 text-[#7a381c]">
+											<b className="mb-0.5 block text-[#b63f12]">修改动作</b>
+											{issue.fixAction ||
+												fixes[index] ||
+												"未提供具体修改动作。"}
+										</div>
+										<div className="rounded-[10px] bg-[#eef4ff] px-3 py-[11px] text-xs leading-5 text-[#354d78]">
+											<b className="mb-0.5 block text-[#2e5ca8]">
+												复诊检查点
 											</b>
-											{issue.evidence?.[0]?.quote ||
-												"信息明确，但没有立即给出失去后的具体代价。"}
+											{result.revisionPlan?.checkpoints?.[index] ||
+												"核实上述问题是否改善，并检查保留项是否受损。"}
 										</div>
-										<div className="mt-3 grid grid-cols-2 gap-2.5 max-[780px]:grid-cols-1">
-											<div className="rounded-[10px] bg-[#fff2ec] px-3 py-[11px] text-xs leading-5 text-[#7a381c]">
-												<b className="mb-0.5 block text-[#b63f12]">
-													修改动作
-												</b>
-												{issue.fixAction ||
-													fixes[index] ||
-													"补出会失去的资源、身份或重要关系。"}
-											</div>
-											<div className="rounded-[10px] bg-[#eef4ff] px-3 py-[11px] text-xs leading-5 text-[#354d78]">
-												<b className="mb-0.5 block text-[#2e5ca8]">
-													复诊检查点
-												</b>
-												读者能否用一句话说清：主角若不反击，会永久失去什么？
-											</div>
-										</div>
-									</article>
-								))}
+									</div>
+								</article>
+							))}
 						</div>
 					</SectionCard>
 
@@ -860,7 +888,12 @@ function ResultSection({
 						subtitle="按顺序执行，不建议同时重写所有内容。"
 					>
 						<div className="grid gap-2.5 [counter-reset:plan]">
-							{(fixes.length ? fixes : fallbackFixes).slice(0, 3).map((fix) => (
+							{!fixes.length && (
+								<p className="text-sm text-muted-foreground">
+									未提供具体修改方案。
+								</p>
+							)}
+							{fixes.slice(0, 3).map((fix) => (
 								<div
 									key={fix}
 									className="relative rounded-[11px] border border-[#e6e8eb] bg-white py-[13px] pl-[46px] pr-3.5 before:absolute before:left-[13px] before:top-[13px] before:grid before:size-[22px] before:place-items-center before:rounded-full before:bg-[#ff5a1f] before:text-[11px] before:font-extrabold before:text-white before:[content:counter(plan)] [counter-increment:plan]"
@@ -881,8 +914,16 @@ function ResultSection({
 							<Button
 								variant="outline"
 								className="rounded-[9px] border-[#d8dbe0]"
+								disabled={!rewritePrompt}
 								onClick={() => {
-									void navigator.clipboard?.writeText(rewritePrompt);
+									if (!navigator.clipboard) {
+										toast.error("复制不可用，请手动选择并复制修改指令。");
+										return;
+									}
+									void navigator.clipboard.writeText(rewritePrompt).then(
+										() => toast.success("修改指令已复制"),
+										() => toast.error("复制失败，请手动选择并复制修改指令。"),
+									);
 								}}
 							>
 								<Clipboard className="mr-2 size-4" />
@@ -891,7 +932,7 @@ function ResultSection({
 						}
 					>
 						<div className="whitespace-pre-wrap rounded-xl border border-[#d7e3fb] bg-[#f7faff] p-[15px] text-xs leading-7 text-[#35435b]">
-							{rewritePrompt}
+							{rewritePrompt || "本次报告未提供修改指令。"}
 						</div>
 					</SectionCard>
 				</div>
@@ -906,10 +947,14 @@ function ResultSection({
 						</header>
 						<div className="grid gap-3 p-5">
 							{[
-								["建议动作", "修改开局承诺"],
-								["不建议", "整章推倒重写"],
-								["预计工作量", "30-60 分钟"],
-								["下次复诊重点", result.mainProblem || "代价与行动链"],
+								["建议动作", fixes[0] || "先核实诊断依据"],
+								["保留项", result.revisionPlan?.keep?.join("；") || "请由作者确认"],
+								[
+									"下次复诊重点",
+									result.revisionPlan?.checkpoints?.join("；") ||
+										result.mainProblem ||
+										"待确认",
+								],
 							].map(([label, value]) => (
 								<div
 									key={label}
@@ -923,7 +968,10 @@ function ResultSection({
 					</div>
 					<div className="rounded-[14px] border border-[#e6e8eb] bg-white p-5 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 						<div className="grid gap-[9px]">
-							<Button className="w-full rounded-[9px] bg-[#ff5a1f] font-bold text-white hover:bg-[#e84b13]">
+							<Button
+								onClick={onOpenChapter}
+								className="w-full rounded-[9px] bg-[#ff5a1f] font-bold text-white hover:bg-[#e84b13]"
+							>
 								<CheckCircle2 className="mr-2 size-4" />
 								开始改稿复诊
 							</Button>
@@ -952,6 +1000,13 @@ function ResultSection({
 							<Button
 								variant="outline"
 								className="w-full rounded-[9px] border-[#d8dbe0]"
+								onClick={() =>
+									downloadExperimentFile(
+										`${result.title || "章节诊断"}.md`,
+										buildQuickReviewQaReport(result),
+										"text/markdown;charset=utf-8",
+									)
+								}
 							>
 								导出 Markdown
 							</Button>
@@ -1042,7 +1097,7 @@ function formatGateLabel(gate: string | undefined) {
 		insufficient: "Insufficient",
 	};
 
-	return map[gate || ""] || "Revise";
+	return map[gate || ""] || "未提供";
 }
 
 function formatPlatformFitLevel(level: string) {
@@ -1057,69 +1112,16 @@ function formatPlatformFitLevel(level: string) {
 }
 
 function buildRewritePrompt(result: QuickReviewResult | null) {
-	if (result?.nextPrompt?.prompt) {
-		return result.nextPrompt.prompt;
-	}
-
-	const fixes = Array.isArray(result?.actionableFixes)
-		? result.actionableFixes.filter(Boolean)
-		: [];
-
+	if (result?.nextPrompt?.prompt) return result.nextPrompt.prompt;
+	const changes = result?.revisionPlan?.change?.length
+		? result.revisionPlan.change
+		: (result?.actionableFixes ?? []);
+	if (!changes.length) return "";
 	return [
-		"请在不改变人物姓名、核心事件顺序和叙事视角的前提下，重写本章开头。",
-		"",
-		"目标：",
-		`1. ${fixes[0] || "在宣布主角失去资格后的 100-200 字内，明确一个具体且不可逆的损失；"}`,
-		`2. ${fixes[1] || "在前 20% 的正文中埋入隐藏能力的异常信号，但不要解释完整设定；"}`,
-		`3. ${fixes[2] || "让隐藏能力与当前冲突发生因果关系，推动主角做出一个明确选择；"}`,
-		"4. 章末钩子必须包含“新信息 + 下一步行动”，避免只停留在异象展示。",
-		"",
-		"禁止：",
-		"- 不新增新的主要人物；",
-		"- 不用旁白直接说明“读者会期待”；",
-		"- 不用空泛排比和总结性升华；",
-		"- 不把所有设定一次解释完。",
+		"请根据以下已给出的诊断建议修改原稿，保留原有创作形式与风格；不确定的意见先与作者核实。",
+		...changes,
+		...(result?.revisionPlan?.keep ?? []).map((item) => "保留：" + item),
+		...(result?.revisionPlan?.avoid ?? []).map((item) => "避免：" + item),
+		...(result?.revisionPlan?.checkpoints ?? []).map((item) => "复诊：" + item),
 	].join("\n");
 }
-
-const fallbackIssues: QuickIssue[] = [
-	{
-		id: "fallback-1",
-		title: "主角失去资格，但“失去什么”仍然抽象",
-		description:
-			"读者知道主角遭遇了失败，却不清楚这会导致怎样的现实后果，因此情绪债没有真正建立。",
-		severity: "critical",
-		category: "opening",
-		evidence: [
-			{
-				quote: "长老宣布，林澈失去本次内门选拔资格。",
-				locationHint: "开篇冲突",
-				confidence: 0.82,
-			},
-		],
-		readerImpact: "读者无法判断主角不反击会付出什么代价。",
-		fixAction: "在宣布结果后的 100-200 字内，补出会失去的资源、身份或重要关系。",
-		promptConstraint: "不要只用旁白解释代价，要让代价在场景里可见。",
-		blocksNextStep: true,
-	},
-	{
-		id: "fallback-2",
-		title: "隐藏能力出现得太晚，卖点没有参与当前冲突",
-		description: "能力设定在结尾才被提及，前面的冲突与核心卖点处于分离状态。",
-		severity: "high",
-		category: "hook",
-		evidence: [
-			{
-				quote: "他掌心那道沉寂三年的纹路，忽然亮了一瞬。",
-				locationHint: "章末钩子",
-				confidence: 0.78,
-			},
-		],
-		readerImpact: "读者看到钩子时，已经错过了前文的情绪投入点。",
-		fixAction: "在前 20% 埋入一次异常感受，让能力线从开篇就参与主角困境。",
-		promptConstraint: "提前埋异常信号，但不要一次解释完整能力设定。",
-		blocksNextStep: true,
-	},
-];
-
-const fallbackFixes = ["把失败代价具体化", "让核心能力提前参与冲突", "重写章末钩子的行动指向"];
