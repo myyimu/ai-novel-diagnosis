@@ -1,5 +1,9 @@
 import { Type } from "class-transformer";
 import {
+  chapterGuidanceModes,
+  type ChapterGuidanceMode,
+} from "@ai-novel-diagnosis/ai-core";
+import {
   IsIn,
   IsInt,
   IsOptional,
@@ -30,6 +34,9 @@ export class ListChapterExperimentsDto {
 }
 
 export class ChapterExperimentActionDto {
+  @IsOptional()
+  @IsIn(Object.keys(chapterGuidanceModes))
+  mode?: ChapterGuidanceMode;
   @IsInt() @Min(0) revision!: number;
   @IsIn(["ask", "confirm-plan", "generate", "evaluate"]) action!:
     | "ask"

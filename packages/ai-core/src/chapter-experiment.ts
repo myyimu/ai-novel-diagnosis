@@ -1,3 +1,5 @@
+import type { ChapterGuidanceMode } from "./chapter-guidance";
+
 /** A revision route in a chapter comparison. */
 export type ChapterRevisionRoute = "baseline" | "guided";
 
@@ -14,9 +16,12 @@ export interface ChapterExperimentBrief {
 
 /** One persisted exchange; quotations are checked against the original chapter. */
 export interface ChapterGuidanceTurn {
+  /** Requested mode; absent on legacy exchanges, which used automatic guidance. */
+  mode?: ChapterGuidanceMode;
   message: string;
   reply: string;
   quote: string;
+  /** May be empty while the author is still exploring their intent. */
   suggestedPlan: string;
   elapsedMs: number;
 }

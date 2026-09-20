@@ -114,10 +114,21 @@ describe("ChapterExperimentController", () => {
         revision: 0,
         action: "ask",
         message: "先澄清我的意图",
+        mode: "empathic",
         provider: { kind: "openai-compatible" },
       })
       .expect(200);
     expect(response.body.turns).toHaveLength(1);
+    expect(response.body.turns[0].mode).toBe("empathic");
+    await request(app.getHttpServer())
+      .post(url)
+      .send({
+        revision: 1,
+        action: "ask",
+        message: "检查",
+        mode: "unsupported-mode",
+      })
+      .expect(400);
     await request(app.getHttpServer())
       .post(url)
       .send({ revision: 1, action: "generate", route: "wrong" })

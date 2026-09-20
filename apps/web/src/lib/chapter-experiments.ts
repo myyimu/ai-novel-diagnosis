@@ -2,6 +2,7 @@ import type {
 	ChapterExperiment,
 	ChapterExperimentBrief,
 	ChapterExperimentSummary,
+	ChapterGuidanceMode,
 	ChapterReadingDecision,
 	ChapterRevisionRoute,
 } from "@ai-novel-diagnosis/ai-core";
@@ -17,7 +18,7 @@ export const createChapterExperiment = (brief: ChapterExperimentBrief & { projec
 	postJson<ChapterExperiment>(path, brief);
 
 export type ExperimentAction =
-	| { action: "ask"; message: string }
+	| { action: "ask"; message: string; mode?: ChapterGuidanceMode }
 	| { action: "confirm-plan"; plan: string }
 	| { action: "generate"; route: ChapterRevisionRoute }
 	| ({ action: "evaluate" } & Omit<ChapterReadingDecision, "createdAt">);

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chapterExperimentText, nextChapterRevision, type ChapterExperiment } from "./index";
+import {
+  chapterExperimentText,
+  nextChapterRevision,
+  chapterGuidanceModes,
+  type ChapterGuidanceTurn,
+  type ChapterExperiment,
+} from "./index";
 
 const experiment: ChapterExperiment = {
   id: "trial",
@@ -19,6 +25,21 @@ const experiment: ChapterExperiment = {
 };
 
 describe("chapter revision lineage", () => {
+  it("should support legacy and mode-tagged exchanges without changing manuscript lineage", () => {
+    const legacy: ChapterGuidanceTurn = {
+      message: "旧对话",
+      reply: "澄清",
+      quote: "",
+      suggestedPlan: "",
+      elapsedMs: 1,
+    };
+    expect(chapterGuidanceModes[legacy.mode ?? "auto"].label).toBe("自动选择");
+    const turns: ChapterGuidanceTurn[] = [legacy, { ...legacy, mode: "socratic" }];
+    expect(nextChapterRevision({ ...experiment, turns }, "baseline")).toEqual(
+      nextChapterRevision(experiment, "baseline"),
+    );
+    expect(JSON.parse(JSON.stringify(turns))[1].mode).toBe("socratic");
+  });
   it("should start both routes from the same original when no versions exist", () => {
     expect(nextChapterRevision(experiment, "baseline")).toEqual(
       nextChapterRevision(experiment, "guided"),

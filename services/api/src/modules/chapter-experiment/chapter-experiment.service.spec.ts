@@ -4,7 +4,11 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
-import type { ChapterExperiment } from "@ai-novel-diagnosis/ai-core";
+import {
+  chapterGuidanceModes,
+  type ChapterGuidanceMode,
+  type ChapterExperiment,
+} from "@ai-novel-diagnosis/ai-core";
 import { ChapterExperimentsRepository } from "@/dao/repositories/chapter-experiments.repository";
 import { ModelProviderService } from "@/modules/ai-provider/model-provider.service";
 import { ChapterExperimentService } from "./chapter-experiment.service";
@@ -85,6 +89,51 @@ describe("ChapterExperimentService", () => {
     });
   }
 
+  it.each(Object.keys(chapterGuidanceModes) as ChapterGuidanceMode[])(
+    "should persist and forward the selected %s mode when asking a question",
+    async (mode) => {
+      chat.mockResolvedValueOnce(
+        JSON.stringify({
+          reply: "你想让读者注意到什么？",
+          quote: "",
+          suggestedPlan: "",
+        }),
+      );
+      await act({ action: "ask", message: "先帮我澄清", mode, provider });
+      const messages = chat.mock.calls[0][1];
+      expect(messages[0].content).toContain(chapterGuidanceModes[mode].label);
+      expect(JSON.parse(messages[1].content).mode).toBe(mode);
+      expect((await service.get(trial.id)).turns[0]).toMatchObject({
+        mode,
+        suggestedPlan: "",
+      });
+      expect(trial.plan).toBeNull();
+    },
+  );
+
+  it("should preserve earlier modes when the author changes guidance style", async () => {
+    chat.mockResolvedValue(
+      JSON.stringify({
+        reply: "先核对作者意图。",
+        quote: "",
+        suggestedPlan: "",
+      }),
+    );
+    await act({ action: "ask", message: "先提问", mode: "socratic", provider });
+    await act({
+      action: "ask",
+      message: "现在给一点提示",
+      mode: "scaffold",
+      provider,
+    });
+    expect(
+      (await service.get(trial.id)).turns.map((turn) => turn.mode),
+    ).toEqual(["socratic", "scaffold"]);
+    const secondInput = JSON.parse(chat.mock.calls[1][1][1].content);
+    expect(secondInput.mode).toBe("scaffold");
+    expect(secondInput.conversation[0].mode).toBe("socratic");
+  });
+
   it("should preserve original and author decisions when both routes are revised", async () => {
     await confirm();
     chat.mockResolvedValueOnce(
@@ -98,6 +147,9 @@ describe("ChapterExperimentService", () => {
     const normalPrompt = chat.mock.calls[1][1][1].content as string;
     const guidedPrompt = chat.mock.calls[2][1][1].content as string;
     expect(chat.mock.calls[0][1][1].content).toContain(trial.diagnosis);
+    expect(trial.turns[0]?.mode).toBe("auto");
+    expect(JSON.parse(normalPrompt)).not.toHaveProperty("mode");
+    expect(JSON.parse(guidedPrompt)).not.toHaveProperty("mode");
     expect(normalPrompt).not.toContain(trial.diagnosis);
     expect(guidedPrompt).not.toContain(trial.diagnosis);
     expect(JSON.parse(normalPrompt).text).toBe(original);

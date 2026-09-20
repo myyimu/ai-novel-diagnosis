@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
 	nextChapterRevision,
+	chapterGuidanceModes,
+	type ChapterGuidanceMode,
 	type ChapterExperiment,
 	type ChapterExperimentSummary,
 } from "@ai-novel-diagnosis/ai-core";
@@ -17,6 +19,7 @@ import {
 	type ExperimentAction,
 } from "@/lib/chapter-experiments";
 import { ChapterExperimentComparison } from "./ChapterExperimentComparison";
+import { ChapterGuidanceModeSelect } from "./ChapterGuidanceModeSelect";
 
 const fieldClass =
 	"min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm leading-6";
@@ -46,6 +49,7 @@ export function ChapterExperimentPanel({
 	const [context, setContext] = useState(initialContext);
 	const [useDiagnosis, setUseDiagnosis] = useState(true);
 	const [message, setMessage] = useState("");
+	const [mode, setMode] = useState<ChapterGuidanceMode>("auto");
 	const [plan, setPlan] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [loading, setLoading] = useState(true);
@@ -63,6 +67,7 @@ export function ChapterExperimentPanel({
 				if (!cancelled) {
 					setHistory(matching);
 					setExperiment(latest);
+					setMode(latest?.turns.at(-1)?.mode ?? "auto");
 					setPlan(latest?.plan ?? latest?.turns.at(-1)?.suggestedPlan ?? "");
 				}
 			})
@@ -88,6 +93,7 @@ export function ChapterExperimentPanel({
 			const saved = await task();
 			if (mounted.current) {
 				setExperiment(saved);
+				setMode(saved.turns.at(-1)?.mode ?? "auto");
 				setPlan(saved.plan ?? saved.turns.at(-1)?.suggestedPlan ?? "");
 				setHistory((items) => [
 					{
@@ -153,6 +159,7 @@ export function ChapterExperimentPanel({
 						disabled={busy || loading}
 						onClick={() => {
 							setExperiment(null);
+							setMode("auto");
 							setSourceText(chapterText);
 							setMessage("");
 							setPlan("");
@@ -319,6 +326,10 @@ export function ChapterExperimentPanel({
 								key={index}
 								className="space-y-3 rounded-lg border border-border p-4 text-sm leading-6"
 							>
+								<p className="text-xs font-medium text-muted-foreground">
+									第 {index + 1} 轮 ·{" "}
+									{chapterGuidanceModes[turn.mode ?? "auto"].label}
+								</p>
 								<p className="whitespace-pre-wrap">
 									<strong>你：</strong>
 									{turn.message}
@@ -336,6 +347,11 @@ export function ChapterExperimentPanel({
 						))}
 						{!experiment.plan && (
 							<>
+								<ChapterGuidanceModeSelect
+									value={mode}
+									onChange={setMode}
+									disabled={busy || experiment.turns.length >= 6}
+								/>
 								<label className="grid gap-2 text-sm">
 									你的想法或问题
 									<textarea
@@ -344,7 +360,7 @@ export function ChapterExperimentPanel({
 										maxLength={2000}
 										disabled={busy}
 										onChange={(e) => setMessage(e.target.value)}
-										placeholder="例如：先帮我判断问题是否真的存在；我不想增加激烈冲突。"
+										placeholder={chapterGuidanceModes[mode].example}
 									/>
 								</label>
 								<Button
@@ -355,7 +371,7 @@ export function ChapterExperimentPanel({
 										experiment.turns.length >= 6
 									}
 									onClick={() =>
-										void act({ action: "ask", message }).then((ok) => {
+										void act({ action: "ask", message, mode }).then((ok) => {
 											if (ok) setMessage("");
 										})
 									}
@@ -375,6 +391,8 @@ export function ChapterExperimentPanel({
 											/>
 										</label>
 										<p className="text-xs text-muted-foreground">
+											{!plan.trim() &&
+												"目前还没有具体方案，可以继续交流或自行填写。"}
 											请改成你真正同意的方案。确认后固定，用于引导改稿；普通改稿只使用开始时的目标、保留项和设定。
 										</p>
 										<Button

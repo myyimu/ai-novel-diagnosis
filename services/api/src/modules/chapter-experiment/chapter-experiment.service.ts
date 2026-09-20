@@ -144,22 +144,24 @@ export class ChapterExperimentService {
       throw new BadRequestException("已完成六轮交流，请整理并确认本轮计划。");
     if (!input.message?.trim())
       throw new BadRequestException("请写下你的想法或问题。");
+    const mode = input.mode ?? "auto";
     const started = Date.now();
     const output = await this.call(
       this.provider(input.provider),
-      guidanceMessages(next, input.message),
+      guidanceMessages(next, input.message, mode),
       ["reply", "quote", "suggestedPlan"],
       2000,
       "chapter-guidance",
     );
     const reply = this.text(output, "reply", 1, 4000);
     const quote = this.text(output, "quote", 0, 2000);
-    const suggestedPlan = this.text(output, "suggestedPlan", 1, 2000);
+    const suggestedPlan = this.text(output, "suggestedPlan", 0, 2000);
     if (quote && !next.originalText.includes(quote))
       throw new BadGatewayException(
         "模型引用未出现在原稿中，本次回答未保存，请重试。",
       );
     next.turns.push({
+      mode,
       message: input.message,
       reply,
       quote,
