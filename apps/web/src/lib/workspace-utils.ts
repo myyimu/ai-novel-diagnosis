@@ -369,8 +369,10 @@ export function getBookJobProgressDetail(
 	}
 
 	const totalChapters =
-		job.partialResult?.totalChapters ??
 		job.preprocessing?.chapters.length ??
+		job.result?.preprocessing?.chapters.length ??
+		(job.status === "succeeded" ? job.result?.mapReduce?.outlineCount : undefined) ??
+		job.partialResult?.totalChapters ??
 		job.result?.mapReduce?.chunkCount ??
 		job.result?.mapReduce?.mapCount ??
 		0;

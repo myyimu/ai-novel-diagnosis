@@ -12,7 +12,7 @@ import { ResearchWorkspaceShell } from "./ResearchWorkspaceShell";
 export function ResearchMaterialsPage() {
 	const router = useRouter();
 
-	const { bookAnalysisResult, exportBookResult } = useWorkspaceHandlers("book");
+	const { bookAnalysisResult, exportBookResult, status, loading } = useWorkspaceHandlers("book");
 
 	const handleBackToBook = () => {
 		router.push("/research/book");
@@ -31,6 +31,14 @@ export function ResearchMaterialsPage() {
 			description="查看和管理整书拆解的研究结果和分析资料"
 			status={hasResults ? "有资料" : "等待分析"}
 		>
+			{status ? (
+				<p
+					role="status"
+					className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm"
+				>
+					{status}
+				</p>
+			) : null}
 			<div className="space-y-4 [&>div]:rounded-[14px] [&>div]:border-[#e6e8eb] [&>div]:bg-white [&>div]:shadow-[0_6px_20px_rgba(22,27,34,.055)]">
 				{!hasResults ? (
 					<Card>
@@ -65,7 +73,10 @@ export function ResearchMaterialsPage() {
 											章节结构
 										</div>
 										<p className="text-xs text-muted-foreground">
-											{bookAnalysisResult?.characters.length || 0} 个人物
+											约{" "}
+											{bookAnalysisResult?.book.chapterCountEstimate ??
+												"未知"}{" "}
+											章
 										</p>
 									</div>
 
@@ -75,7 +86,7 @@ export function ResearchMaterialsPage() {
 											人物关系
 										</div>
 										<p className="text-xs text-muted-foreground">
-											结构化人物数据
+											{bookAnalysisResult?.characters.length ?? 0} 个人物
 										</p>
 									</div>
 
@@ -85,7 +96,7 @@ export function ResearchMaterialsPage() {
 											情节模式
 										</div>
 										<p className="text-xs text-muted-foreground">
-											情节发展分析
+											{bookAnalysisResult?.plotlines.length ?? 0} 条情节线
 										</p>
 									</div>
 								</div>
@@ -97,7 +108,12 @@ export function ResearchMaterialsPage() {
 											将分析结果导出为文件
 										</p>
 									</div>
-									<Button variant="outline" size="sm" onClick={handleExport}>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={loading === "export"}
+										onClick={handleExport}
+									>
 										<Download className="w-4 h-4 mr-2" />
 										导出结果
 									</Button>
@@ -182,7 +198,9 @@ export function ResearchMaterialsPage() {
 						<p>• 整书拆解后会生成结构化的分析结果</p>
 						<p>• 包含章节结构、人物关系和情节模式</p>
 						<p>• 可以导出结果用于进一步分析和参考</p>
-						<p>• 支持查看人物图谱和情节发展分析</p>
+						<p>
+							• 支持查看人物图谱和{bookAnalysisResult?.plotlines.length ?? 0} 条情节线
+						</p>
 					</CardContent>
 				</Card>
 			</div>

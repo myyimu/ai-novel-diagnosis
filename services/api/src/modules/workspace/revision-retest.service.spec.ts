@@ -172,6 +172,8 @@ describe("RevisionRetestService", () => {
     );
     expect(repository.upsertRevisionTextVersion).not.toHaveBeenCalled();
     expect(response.session.retestStatus).toBe("completed");
+    expect(response.diagnosis).toEqual(buildResult());
+    expect(analysis.quickReview).toHaveBeenCalledTimes(1);
     expect(response.previousSession).toEqual(session);
     expect(response.comparison?.scoreDelta).toBe(0.8);
     expect(response.comparison?.promptOutcome.status).toBe("effective");

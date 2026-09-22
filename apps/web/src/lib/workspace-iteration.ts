@@ -637,6 +637,7 @@ export function buildProjectExportJson({
 	revisionVersions = [],
 	methodologyCards,
 	storyAudit,
+	engineCard = null,
 	storyAuditFindingReviews = [],
 	generatedAt = new Date().toISOString(),
 }: {
@@ -645,6 +646,7 @@ export function buildProjectExportJson({
 	revisionVersions?: RevisionTextVersion[];
 	methodologyCards: ProjectMethodologyCard[];
 	storyAudit?: StoryAuditResult | null;
+	engineCard?: PremiseEngineCard | null;
 	storyAuditFindingReviews?: StoryAuditFindingReview[];
 	generatedAt?: string;
 }) {
@@ -665,6 +667,7 @@ export function buildProjectExportJson({
 			revisionSessions,
 			revisionVersions: revisionVersionSummaries,
 			methodologyCards,
+			engineCard,
 			storyAudit: storyAuditExport,
 		},
 		null,

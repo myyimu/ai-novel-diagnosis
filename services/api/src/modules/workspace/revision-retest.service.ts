@@ -22,6 +22,7 @@ import type { QuickReviewDto } from "@/modules/analysis/dto/quick-review.dto";
 import type { RevisionRetestDto } from "./dto/revision-retest.dto";
 
 export interface RevisionRetestResponse {
+  diagnosis: Awaited<ReturnType<AnalysisService["quickReview"]>>;
   session: RevisionSessionSnapshot;
   previousSession: RevisionSessionSnapshot;
   comparison: RevisionComparison | null;
@@ -153,6 +154,7 @@ export class RevisionRetestService {
     ]);
 
     return {
+      diagnosis: result,
       session: updated,
       previousSession: session,
       comparison,

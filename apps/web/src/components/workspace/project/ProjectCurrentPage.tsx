@@ -44,6 +44,7 @@ export function ProjectCurrentPage() {
 		projectRevisionSessions,
 		projectMethodologyCards,
 		projectEngineCard,
+		projectStoryAuditResult,
 		exportProjectMarkdown,
 		providerLabel,
 		provider,
@@ -168,7 +169,11 @@ export function ProjectCurrentPage() {
 		);
 	}
 
-	const totalAssets = revisionCount + methodologyCount;
+	const totalAssets =
+		revisionCount +
+		methodologyCount +
+		Number(Boolean(projectEngineCard)) +
+		Number(Boolean(projectStoryAuditResult));
 	const activeProjectRouteId = activeProjectId || activeProject?.id || "default-project";
 	const activeChapterSeed = [
 		activeProjectRouteId,
@@ -331,7 +336,16 @@ export function ProjectCurrentPage() {
 							</p>
 							<BookStageRail summary={stageSummary} onNavigate={router.push} />
 							<div className="mt-3 grid grid-cols-3 gap-2">
-								<MiniStat label="章节" value="1" />
+								<MiniStat
+									label="已诊断章节"
+									value={String(
+										new Set(
+											projectRevisionSessions.map((session) =>
+												session.chapterTitle.trim(),
+											),
+										).size,
+									)}
+								/>
 								<MiniStat label="修改效果" value={String(revisionCount)} />
 								<MiniStat label="方法论" value={String(methodologyCount)} />
 							</div>
@@ -478,7 +492,6 @@ function ProjectChapterWorkspace({
 		? result.actionableFixes.filter(Boolean)
 		: [];
 	const score = typeof result?.quickScore === "number" ? `${result.quickScore}/10` : "待诊断";
-	const rewritePrompt = result?.nextPrompt?.prompt || buildFallbackPrompt(result, fixes);
 	const statusLabel = result ? "诊断完成" : "待诊断";
 	const [chapterTab, setChapterTab] = useState<ChapterTab>("annotation");
 	const [issueFilter, setIssueFilter] = useState<IssueFilter>("all");
@@ -496,6 +509,12 @@ function ProjectChapterWorkspace({
 	const [editorText, setEditorText] = useState(chapterText);
 	const [isRetestRun, setIsRetestRun] = useState(false);
 	const replacementInputRef = useRef<HTMLInputElement | null>(null);
+	useEffect(() => {
+		setIssueStates({});
+		setSelectedIssueId(null);
+		setPreviewDecisions({});
+		setPreviewRewrites({});
+	}, [result]);
 	const getIssueState = useCallback(
 		(issueId: string): IssueState => issueStates[issueId] ?? "pending",
 		[issueStates],
@@ -504,6 +523,7 @@ function ProjectChapterWorkspace({
 	const disputedCount = issues.filter((issue) => getIssueState(issue.id) === "disputed").length;
 	const pendingCount = issues.filter((issue) => getIssueState(issue.id) === "pending").length;
 	const acceptedIssues = issues.filter((issue) => getIssueState(issue.id) === "accepted");
+	const rewritePrompt = buildSelectedRewritePrompt(acceptedIssues);
 	const previewAcceptedCount = acceptedIssues.filter(
 		(issue) => previewDecisions[issue.id] !== "rejected",
 	).length;
@@ -822,9 +842,9 @@ function ProjectChapterWorkspace({
 	}, [activeIssueId, chapterTab, scrollIssueTextIntoView, updateConnector]);
 
 	return (
-		<div className="grid h-screen grid-rows-[62px_minmax(0,1fr)] overflow-hidden bg-[#f5f6f8] text-[#20242b]">
-			<header className="sticky top-0 z-50 flex h-[62px] items-center justify-between gap-[18px] border-b border-[#e4e7eb] bg-white/95 px-[22px] backdrop-blur">
-				<div className="flex min-w-[220px] items-center gap-2.5">
+		<div className="grid h-screen grid-cols-1 grid-rows-[62px_minmax(0,1fr)] overflow-hidden bg-[#f5f6f8] text-[#20242b]">
+			<header className="sticky top-0 z-50 flex h-[62px] items-center justify-between gap-[18px] border-b border-[#e4e7eb] bg-white/95 px-[22px] backdrop-blur max-[620px]:gap-2 max-[620px]:px-3">
+				<div className="flex min-w-[220px] items-center gap-2.5 max-lg:min-w-0">
 					<button
 						type="button"
 						onClick={() => setTreeOpen((open) => !open)}
@@ -842,7 +862,7 @@ function ProjectChapterWorkspace({
 						</span>
 					</div>
 				</div>
-				<div className="min-w-0 flex-1 text-center">
+				<div className="min-w-0 flex-1 text-center max-[620px]:hidden">
 					<strong className="block truncate text-[13px]">{projectName}</strong>
 					<span className="block text-[11px] text-[#6f7782]">每章一张独立诊断页</span>
 				</div>
@@ -969,7 +989,7 @@ function ProjectChapterWorkspace({
 				</aside>
 
 				<main className="flex min-h-0 min-w-0 flex-col bg-[#f6f7f9]">
-					<div className="flex h-[52px] shrink-0 items-center justify-between gap-3 border-b border-[#e4e7eb] bg-white/95 px-[17px]">
+					<div className="flex min-h-[52px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e4e7eb] bg-white/95 px-[17px] py-2">
 						<div className="flex min-w-0 items-center gap-1.5 text-[10px] text-[#6f7782]">
 							<span className="truncate">{projectName}</span>
 							<span>/</span>
@@ -1023,7 +1043,7 @@ function ProjectChapterWorkspace({
 										key={tab.id}
 										type="button"
 										onClick={() => setChapterTab(tab.id as ChapterTab)}
-										className={`min-h-8 rounded-[9px] px-3 text-xs font-bold ${
+										className={`min-h-8 shrink-0 whitespace-nowrap rounded-[9px] px-3 text-xs font-bold ${
 											chapterTab === tab.id
 												? "bg-[#fff2ec] text-[#c94413] shadow-[inset_0_0_0_1px_rgba(255,90,31,.12)]"
 												: "text-[#69707d] hover:bg-[#f5f6f8]"
@@ -1911,8 +1931,7 @@ function RewritePlanPanel({
 				</span>
 				<h1 className="mt-3 text-[21px] font-bold">只处理已加入计划的问题</h1>
 				<p className="mt-2 text-xs leading-6 text-[#69707d]">
-					参考页的逻辑是先选 1-3
-					条关键问题，再生成修改指令；未加入计划的问题不会进入本轮改稿。
+					先选 1–3 条关键问题，再生成修改指令；未加入计划的问题不会进入本轮改稿。
 				</p>
 			</div>
 
@@ -1979,11 +1998,11 @@ function RetestPanel({
 		<section className="mx-auto grid w-[min(900px,100%)] gap-4">
 			<div className="rounded-[18px] border border-[#e6e8eb] bg-white p-5 shadow-[0_4px_18px_rgba(22,27,34,.06)]">
 				<span className="rounded-full bg-[#edf4ff] px-2 py-1 text-[10px] font-bold text-[#2e5cb9]">
-					{completedRetestCount > 0 ? "复诊已生成" : "待复诊"}
+					{pendingRetestCount === 0 && completedRetestCount > 0 ? "复诊已生成" : "待复诊"}
 				</span>
 				<h1 className="mt-3 text-[21px] font-bold">{chapterTitle}</h1>
 				<p className="mt-2 text-xs leading-6 text-[#69707d]">
-					{completedRetestCount > 0
+					{pendingRetestCount === 0 && completedRetestCount > 0
 						? "新的诊断已经生成，但系统尚未把原问题自动判为解决；请结合证据和人工判断确认变化。"
 						: "新版本已保存，但保存改稿不等于问题已解决。请运行新的诊断，并结合人工判断确认旧问题的变化。"}
 				</p>
@@ -1998,6 +2017,7 @@ function RetestPanel({
 				<Button
 					className="mt-4 rounded-[9px] bg-[#ff5a1f] text-white hover:bg-[#e84b13]"
 					onClick={onRunRetest}
+					disabled={pendingRetestCount === 0}
 				>
 					运行复诊
 				</Button>
@@ -2398,7 +2418,7 @@ function matchesIssueFilter(issue: QuickReviewIssue, state: IssueState, filter: 
 	return state === filter;
 }
 
-function buildChapterWorkflow({
+export function buildChapterWorkflow({
 	hasResult,
 	acceptedCount,
 	pendingRetestCount,
@@ -2407,20 +2427,20 @@ function buildChapterWorkflow({
 	acceptedCount: number;
 	pendingRetestCount: number;
 }) {
-	if (!hasResult) {
-		return {
-			stage: 0,
-			title: "本章尚未诊断",
-			description: "先生成诊断意见，再进入改稿和复诊。",
-			action: "开始诊断",
-		};
-	}
 	if (pendingRetestCount > 0) {
 		return {
 			stage: 2,
 			title: "新版本待复诊",
 			description: "请运行新的诊断；在独立复核或人工确认前，系统不会将问题标记为已解决。",
 			action: "运行复诊",
+		};
+	}
+	if (!hasResult) {
+		return {
+			stage: 0,
+			title: "本章尚未诊断",
+			description: "先生成诊断意见，再进入改稿和复诊。",
+			action: "开始诊断",
 		};
 	}
 	if (acceptedCount > 0) {
@@ -2505,18 +2525,18 @@ function RightMetric({ label, value }: { label: string; value: string }) {
 	);
 }
 
-function buildFallbackPrompt(result: QuickReviewResult | null, fixes: string[]) {
+export function buildSelectedRewritePrompt(issues: NonNullable<QuickReviewResult["issues"]>) {
+	if (!issues.length) return "请先把需要修改的问题加入计划。";
 	return [
-		"请在不改变人物姓名、核心事件顺序和叙事视角的前提下，重写本章开头。",
-		"",
-		"目标：",
-		`1. ${fixes[0] || result?.mainProblem || "明确当前版本最大的追读流失点"}；`,
-		`2. ${fixes[1] || "补强主角目标、损失代价和下一步行动"}；`,
-		`3. ${fixes[2] || "让章末钩子包含新信息和明确行动指向"}。`,
-		"",
-		"禁止：",
-		"- 不新增新的主要人物；",
-		"- 不用旁白直接说明“读者会期待”；",
-		"- 不把所有设定一次解释完。",
-	].join("\n");
+		"请保留人物姓名、核心事件顺序和叙事视角，只修改以下已确认的问题。",
+		...issues.map((issue, index) =>
+			[
+				`${index + 1}. ${issue.title}`,
+				`修改动作：${issue.fixAction}`,
+				`约束：${issue.promptConstraint}`,
+				...issue.evidence.map((item) => `原文依据：${item.quote}`),
+			].join("\n"),
+		),
+		"未列入计划的段落与设定保持原样，不新增主要人物；输出修改后的正文。",
+	].join("\n\n");
 }

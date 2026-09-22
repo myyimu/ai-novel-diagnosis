@@ -751,7 +751,12 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 
 	async function exportProjectJson() {
 		const storyAudit = resolveProjectStoryAuditResult();
-		if (!projectRevisionSessions.length && !projectMethodologyCards.length && !storyAudit) {
+		if (
+			!projectRevisionSessions.length &&
+			!projectMethodologyCards.length &&
+			!storyAudit &&
+			!projectEngineCard
+		) {
 			setStatus("当前书籍还没有可导出的修改效果、方法论卡或故事体检摘要。");
 			return;
 		}
@@ -764,6 +769,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 			revisionVersions: projectRevisionVersions,
 			methodologyCards: projectMethodologyCards,
 			storyAudit,
+			engineCard: projectEngineCard,
 			storyAuditFindingReviews,
 		});
 		const filename = `ai-novel-diagnosis-${toSafeFilename(project.name)}-${new Date()
@@ -1330,6 +1336,16 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				);
 			}
 			const delta = response.comparison?.scoreDelta;
+			const current = useWorkspaceStore.getState();
+			if (
+				current.activeProjectId === activeProjectId &&
+				current.chapterText === chapterText &&
+				current.chapterTitle === chapterTitle
+			) {
+				setQuickReviewResult(response.diagnosis);
+				setQuickReviewPlatformFit(null);
+				setQuickReviewError(null);
+			}
 			const scoreText =
 				response.session.quickScore === null
 					? "未出分"
@@ -1729,6 +1745,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	async function buildRubric(force = false) {
+		if (referenceText.trim().length < 80) {
+			setStatus("请先提供至少 80 字参考正文。");
+			return;
+		}
 		const cacheKey = buildRubricCacheKey();
 		if (!force) {
 			const cached = rubricCache.find((item) => item.key === cacheKey);
@@ -1753,7 +1773,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		try {
 			const result = await requestRubric({
 				provider: providerPayload,
-				referenceTitle,
+				referenceTitle: referenceTitle.trim() || "参考样本",
 				genre,
 				platform,
 				audience,
@@ -1771,6 +1791,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				trafficEntry,
 				referenceText: rubricReferenceText,
 			});
+			const current = useWorkspaceStore.getState();
+			if (
+				current.activeProjectId !== activeProjectId ||
+				current.referenceText !== referenceText ||
+				current.referenceTitle !== referenceTitle
+			)
+				return;
 			setRubricResult(result);
 			rememberRubric(cacheKey, result);
 			setStatus(`评分标准已生成：${result.rubric.metrics.length} 个指标`);
@@ -1782,6 +1809,10 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	async function scoreChapter(force = false) {
+		if (chapterText.trim().length < 80 || chapterText.trim().length > 30000) {
+			setStatus("待评分正文需为 80–30000 字，请先编辑正文。");
+			return;
+		}
 		if (!rubricResult) {
 			setStatus("请先生成评分标准。");
 			return;
@@ -1820,7 +1851,7 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				competitionNotes,
 				pushStage,
 				trafficEntry,
-				chapterTitle,
+				chapterTitle: chapterTitle.trim() || "未命名章节",
 				chapterText,
 				aiSelfTestEnabled,
 				enabledAiSelfTests,
@@ -1840,6 +1871,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 				avgReadProgressRate,
 				paidUnlockRate,
 			});
+			const current = useWorkspaceStore.getState();
+			if (
+				current.activeProjectId !== activeProjectId ||
+				current.chapterText !== chapterText ||
+				current.rubricResult !== rubricResult
+			)
+				return;
 			setScoreResult(result);
 			rememberScore(cacheKey, result);
 			revealScoreProgress(result);
@@ -2460,6 +2498,8 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	async function loadResearchLibrary() {
+		setResearchComparison(null);
+		setResearchQaResult(null);
 		setLoading("research");
 		setStatus("正在读取本地研究库资产...");
 		try {
@@ -2487,10 +2527,13 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 	}
 
 	function toggleResearchSample(jobId: string) {
+		if (loading) return;
 		if (!selectedResearchJobIds.includes(jobId) && selectedResearchJobIds.length >= 8) {
 			setStatus("最多选择 8 本样本进行对比。");
 			return;
 		}
+		setResearchComparison(null);
+		setResearchQaResult(null);
 		setSelectedResearchJobIds((current) =>
 			current.includes(jobId)
 				? current.filter((item) => item !== jobId)
@@ -2887,9 +2930,15 @@ export function useWorkspaceHandlers(activeView: WorkspaceView) {
 		persistedResearchLibrary,
 		selectedResearchJobIds,
 		comparisonFocus,
-		setComparisonFocus,
+		setComparisonFocus: (value: string) => {
+			setComparisonFocus(value);
+			setResearchComparison(null);
+		},
 		researchQuestion,
-		setResearchQuestion,
+		setResearchQuestion: (value: string) => {
+			setResearchQuestion(value);
+			setResearchQaResult(null);
+		},
 		researchComparison,
 		researchQaResult,
 		beginnerLearningDigest,

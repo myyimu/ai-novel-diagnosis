@@ -15,3 +15,14 @@ describe("getExportAvailability", () => {
 		).toEqual({ assetCount: 0, canExport: false });
 	});
 });
+
+it("should allow export when only an engine card exists", () => {
+	expect(
+		getExportAvailability({
+			revisionCount: 0,
+			methodologyCount: 0,
+			hasStoryAudit: false,
+			hasEngineCard: true,
+		}),
+	).toEqual({ assetCount: 1, canExport: true });
+});

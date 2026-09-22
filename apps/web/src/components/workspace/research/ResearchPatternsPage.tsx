@@ -96,21 +96,27 @@ export function ResearchPatternsPage() {
 								<div className="p-6 rounded-lg border bg-card">
 									<div className="space-y-3">
 										<div className="flex items-center justify-between">
-											<span className="text-sm">章节总数</span>
+											<span className="text-sm">章节数量（估计）</span>
 											<Badge variant="secondary">
-												{bookAnalysisResult?.characters?.length || 0} 人
+												{bookAnalysisResult?.book.chapterCountEstimate ??
+													"未知"}{" "}
+												章
 											</Badge>
 										</div>
 										<div className="flex items-center justify-between">
 											<span className="text-sm">情节结构</span>
 											<span className="text-xs text-muted-foreground">
-												线性发展 / 分支叙事
+												{bookAnalysisResult?.plotlines
+													.map((plotline) => plotline.reusablePattern)
+													.filter(Boolean)
+													.join("；") || "暂无情节模式结论"}
 											</span>
 										</div>
 										<div className="flex items-center justify-between">
 											<span className="text-sm">节奏分析</span>
 											<span className="text-xs text-muted-foreground">
-												基于章节长度和内容密度
+												{bookAnalysisResult?.transferableStyleCard
+													?.sentenceRhythm || "暂无节奏分析结论"}
 											</span>
 										</div>
 									</div>

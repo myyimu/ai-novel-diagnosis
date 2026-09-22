@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getLastCompletedChapterLabel } from "./workspace-utils";
+import { getBookJobProgressDetail, getLastCompletedChapterLabel } from "./workspace-utils";
 import type { BookAnalysisJob } from "@/stores/workspace-types";
 
 function jobWithPartial(partial: BookAnalysisJob["partialResult"]): BookAnalysisJob {
@@ -77,5 +77,34 @@ describe("getLastCompletedChapterLabel", () => {
 				}),
 			),
 		).toBeNull();
+	});
+});
+
+it("should not count outline and deep analysis chunks as separate chapters", () => {
+	const job = jobWithPartial({
+		partial: true,
+		type: "book-map-reduce-partial",
+		stage: "map",
+		savedAt: "2026-09-20",
+		mapCount: 4,
+		totalChapters: 4,
+		artifactDir: "test",
+		notice: "Deep analysis 2/2 completed.",
+		outlineCount: 2,
+	});
+	job.status = "succeeded";
+	job.result = {
+		mapReduce: {
+			strategy: "hierarchical",
+			mapCount: 4,
+			chunkCount: 4,
+			outlineCount: 2,
+			deepCount: 2,
+			deepTargetOrders: [1, 2],
+		},
+	} as NonNullable<BookAnalysisJob["result"]>;
+	expect(getBookJobProgressDetail(job)).toMatchObject({
+		outline: { current: 2, total: 2, percent: 100 },
+		deep: { current: 2, total: 2, percent: 100 },
 	});
 });

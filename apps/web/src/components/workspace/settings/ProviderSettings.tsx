@@ -535,7 +535,7 @@ export function ProviderSettings({
 					<CardTitle className="text-sm">隐私与安全说明</CardTitle>
 				</CardHeader>
 				<CardContent className="text-xs leading-5 text-muted-foreground space-y-2">
-					<p>• 所有设置保存在浏览器本地，不会上传到后端</p>
+					<p>• 设置保存在当前浏览器；调用模型时，必要配置会随请求发送至本应用后端</p>
 					<p>• AI 设置历史只在当前浏览器和当前地址可见，切换浏览器、域名或端口不会同步</p>
 					<p>• API Key 仅随当前会话请求发送，界面默认以密码框隐藏显示</p>
 					<p>• 测试连接仅验证模型服务可用性，不发送敏感内容</p>

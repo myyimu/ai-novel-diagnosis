@@ -104,6 +104,41 @@ describe("DeepDiagnosisStepper", () => {
 
 		expect(html).toContain("已导入参考资料");
 		expect(html).toContain("生成评分标准");
-		expect(html).toContain("评分必须在 rubric 完成后进行");
+		expect(html).toContain("评分必须在评分标准完成后进行");
 	});
+});
+
+it("should enable rubric generation from reference text without a quick review", () => {
+	const html = renderToStaticMarkup(
+		<DeepDiagnosisStepper
+			loading={false}
+			quickReviewResult={null}
+			referenceText={"参考正文".repeat(25)}
+			referenceTitle=""
+			chapterTitle="第一章"
+			chapterText=""
+			rubricResult={null}
+			scoreResult={null}
+			scoreEvidenceChain={{ items: [], summary: "", weakest: undefined }}
+			hasRubricCache={false}
+			hasScoreCache={false}
+			onReferenceTextChange={vi.fn()}
+			onImportReferenceFile={vi.fn()}
+			onBuildRubric={vi.fn()}
+			onScoreChapter={vi.fn()}
+			onRebuildRubric={vi.fn()}
+			onRescoreChapter={vi.fn()}
+			diagnosisExampleOptions={[]}
+			onUseExampleChapter={vi.fn()}
+			status="服务暂时不可用，请重试"
+		/>,
+	);
+	const buttons = html.match(/<button[^>]*>生成评分标准<\/button>/g) ?? [];
+	expect(buttons).toHaveLength(2);
+	expect(buttons.every((button) => !/\sdisabled(?:=|\s|>)/.test(button))).toBe(true);
+	expect(html).toContain('href="#deep-findings"');
+	expect(html).toContain('id="deep-findings"');
+	expect(html).toContain('role="status"');
+	expect(html).toContain("服务暂时不可用，请重试");
+	expect(html).toMatch(/<button[^>]*disabled[^>]*>开始评分<\/button>/);
 });

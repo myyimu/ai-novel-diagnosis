@@ -597,7 +597,7 @@ describe("workspace iteration assets", () => {
 			createdAt: "2026-08-18T00:00:00.000Z",
 			updatedAt: "2026-08-18T02:00:00.000Z",
 		};
-		const markdown = buildProjectExportMarkdown({
+		const input: Parameters<typeof buildProjectExportMarkdown>[0] = {
 			project,
 			revisionSessions: [],
 			methodologyCards: [],
@@ -616,7 +616,9 @@ describe("workspace iteration assets", () => {
 				updatedAt: "2026-08-18T02:00:00.000Z",
 			},
 			generatedAt: "2026-08-18T03:00:00.000Z",
-		});
+		};
+		const markdown = buildProjectExportMarkdown(input);
+		expect(JSON.parse(buildProjectExportJson(input)).engineCard).toEqual(input.engineCard);
 
 		expect(markdown).toContain("- 故事发动机：已确认");
 		expect(markdown).toContain("## 故事发动机");

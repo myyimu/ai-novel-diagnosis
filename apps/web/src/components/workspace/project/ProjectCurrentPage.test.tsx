@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { QuickReviewResult } from "@/stores/workspace-store";
 import {
 	AnnotatedParagraph,
+	buildSelectedRewritePrompt,
+	buildChapterWorkflow,
 	buildAnnotatedParagraphs,
 	buildRevisionIssueDecisions,
 	buildVisibleIssueEntries,
@@ -157,4 +159,28 @@ describe("TreeAssetRow", () => {
 		expect(html).toContain("修改效果");
 		expect(html).toContain(">20<");
 	});
+});
+
+describe("buildSelectedRewritePrompt", () => {
+	it("should include only selected issues and their constraints", () => {
+		const selected = buildIssue("chosen", "玉简上的刻痕", {
+			title: "明确离宗代价",
+			fixAction: "留下师父的线索",
+		});
+		const excluded = buildIssue("excluded", "雨夜藏书阁", { title: "补强章末钩子" });
+		const prompt = buildSelectedRewritePrompt([selected]);
+		expect(prompt).toContain(selected.title);
+		expect(prompt).toContain(selected.fixAction);
+		expect(prompt).toContain(selected.promptConstraint);
+		expect(prompt).toContain(selected.evidence[0].quote);
+		expect(prompt).not.toContain(excluded.title);
+		expect(prompt).not.toContain(excluded.evidence[0].quote);
+		expect(buildSelectedRewritePrompt([])).toBe("请先把需要修改的问题加入计划。");
+	});
+});
+
+it("should prioritize a pending revision over the cleared previous report", () => {
+	expect(
+		buildChapterWorkflow({ hasResult: false, acceptedCount: 0, pendingRetestCount: 1 }),
+	).toMatchObject({ stage: 2, title: "新版本待复诊", action: "运行复诊" });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
@@ -18,6 +20,8 @@ type ScoreEvidenceChain = ReturnType<typeof buildScoreEvidenceChain>;
 export interface DeepDiagnosisStepperProps {
 	entryView?: "deep" | "score" | "evidence";
 	loading: boolean;
+	status?: string;
+	onReferenceTitleChange?: (value: string) => void;
 	quickReviewResult: QuickReviewResult | null;
 	referenceText: string;
 	referenceTitle: string;
@@ -39,12 +43,13 @@ export interface DeepDiagnosisStepperProps {
 }
 
 export function DeepDiagnosisStepper({
-	entryView = "deep",
+	status,
+	onReferenceTitleChange,
 	loading,
-	quickReviewResult,
 	referenceText,
 	referenceTitle,
 	chapterTitle,
+	chapterText,
 	rubricResult,
 	scoreResult,
 	scoreEvidenceChain,
@@ -59,7 +64,11 @@ export function DeepDiagnosisStepper({
 	diagnosisExampleOptions,
 	onUseExampleChapter,
 }: DeepDiagnosisStepperProps) {
-	const hasQuickResult = Boolean(quickReviewResult);
+	const canBuildRubric = referenceText.trim().length >= 80;
+	const canScore =
+		Boolean(rubricResult) &&
+		chapterText.trim().length >= 80 &&
+		chapterText.trim().length <= 30000;
 	const hasReference = referenceText.trim().length > 0;
 	const hasRubric = Boolean(rubricResult);
 	const hasScore = Boolean(scoreResult);
@@ -101,22 +110,7 @@ export function DeepDiagnosisStepper({
 		],
 	);
 
-	const currentStep =
-		entryView === "score"
-			? hasScore
-				? 2
-				: hasRubric
-					? 1
-					: 0
-			: entryView === "evidence"
-				? hasScore
-					? 2
-					: 0
-				: hasScore
-					? 2
-					: hasRubric
-						? 1
-						: 0;
+	const currentStep = hasScore ? 3 : hasRubric ? 2 : canBuildRubric ? 1 : 0;
 	const hasScoreEvidenceChain = scoreEvidenceChain.items.length > 0;
 	const workflowSteps = [
 		{
@@ -149,7 +143,7 @@ export function DeepDiagnosisStepper({
 					"评分完成后，优先把最低分指标转成下一轮修改指令。",
 				action: "重新深度质检",
 				onClick: onRescoreChapter,
-				disabled: loading,
+				disabled: loading || !canScore,
 			}
 		: hasRubric
 			? {
@@ -158,15 +152,15 @@ export function DeepDiagnosisStepper({
 					hint: "按评分标准检查当前章节，输出弱项、正文证据和下一步改稿动作。",
 					action: "开始深度质检",
 					onClick: onScoreChapter,
-					disabled: loading || !rubricResult,
+					disabled: loading || !canScore,
 				}
 			: {
-					label: "当前阶段 1/4",
+					label: canBuildRubric ? "当前阶段 2/4" : "当前阶段 1/4",
 					title: "选参考样本并拆出标准信号",
 					hint: "先选择题材接近的参考样本，再把优秀作品的规律转成当前书可执行的评价标准。",
 					action: "生成评分标准",
 					onClick: onBuildRubric,
-					disabled: loading || !hasQuickResult,
+					disabled: loading || !canBuildRubric,
 				};
 
 	return (
@@ -182,7 +176,7 @@ export function DeepDiagnosisStepper({
 					</p>
 				</div>
 				<Badge className="max-[820px]:mt-4" variant="secondary">
-					当前步骤：{steps[currentStep]?.label ?? "参考资料"}
+					当前步骤：{workflowSteps[currentStep]?.label ?? "参考资料"}
 				</Badge>
 			</section>
 
@@ -205,12 +199,24 @@ export function DeepDiagnosisStepper({
 						{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 						{command.action}
 					</Button>
-					<Button variant="outline" className="rounded-[9px] border-[#d8dbe0] font-bold">
-						查看质检发现
+					<Button
+						asChild
+						variant="outline"
+						className="rounded-[9px] border-[#d8dbe0] font-bold"
+					>
+						<a href="#deep-findings">查看质检发现</a>
 					</Button>
 				</div>
 			</section>
 
+			{status ? (
+				<p
+					role="status"
+					className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm"
+				>
+					{status}
+				</p>
+			) : null}
 			<div className="grid items-start gap-3.5 [grid-template-columns:250px_minmax(0,1fr)_320px] max-[1180px]:grid-cols-[220px_minmax(0,1fr)] max-[820px]:block">
 				<aside className="sticky top-4 overflow-hidden rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)] max-[1180px]:static max-[820px]:mb-3">
 					<div className="border-b border-[#e6e8eb] p-3.5">
@@ -226,7 +232,7 @@ export function DeepDiagnosisStepper({
 							<div
 								key={step.label}
 								className={`grid min-h-[66px] grid-cols-[30px_1fr] items-center gap-2.5 rounded-[10px] border px-2.5 py-2 text-left ${
-									index === Math.min(currentStep, 2)
+									index === currentStep
 										? "border-[#ffd2c0] bg-[#fff2ec] text-[#bd4214]"
 										: "border-transparent text-[#555f6d]"
 								}`}
@@ -288,7 +294,8 @@ export function DeepDiagnosisStepper({
 												尚未提供参考资料
 											</p>
 											<p className="text-sm leading-6 text-warning-foreground/90">
-												可以先用现有章节直接生成评分标准，但参考资料越完整，评分标准越稳定。
+												请先粘贴至少 80
+												字参考正文，再生成评分标准。无需先运行快速诊断。
 											</p>
 										</div>
 									</div>
@@ -303,6 +310,16 @@ export function DeepDiagnosisStepper({
 								)}
 								<div className="space-y-2">
 									<Input
+										aria-label="参考作品标题"
+										placeholder="参考作品标题（可选）"
+										value={referenceTitle}
+										maxLength={120}
+										onChange={(event) =>
+											onReferenceTitleChange?.(event.target.value)
+										}
+									/>
+									<Input
+										aria-label="导入参考正文"
 										type="file"
 										accept=".txt,.md,text/plain,text/markdown"
 										onChange={onImportReferenceFile}
@@ -313,13 +330,14 @@ export function DeepDiagnosisStepper({
 										onChange={(event) =>
 											onReferenceTextChange(event.target.value)
 										}
+										aria-label="参考正文"
 										placeholder="粘贴成熟章节作为参考..."
 									/>
 								</div>
 								{diagnosisExampleOptions.length ? (
 									<div className="space-y-2">
 										<p className="text-xs font-medium text-muted-foreground">
-											快速示例
+											待评分章节示例
 										</p>
 										<div className="flex flex-wrap gap-2">
 											{diagnosisExampleOptions.slice(0, 3).map((example) => (
@@ -348,7 +366,7 @@ export function DeepDiagnosisStepper({
 								<Button
 									className="w-full"
 									onClick={onBuildRubric}
-									disabled={loading || !hasQuickResult}
+									disabled={loading || !canBuildRubric}
 								>
 									{loading ? (
 										<Loader2 className="mr-2 size-4 animate-spin" />
@@ -388,14 +406,21 @@ export function DeepDiagnosisStepper({
 						<CardHeader>
 							<CardTitle className="text-base">检测自己的章节</CardTitle>
 							<CardDescription>
-								评分必须在 rubric 完成后进行；结果证据跟随评分结论展示。
+								评分必须在评分标准完成后进行；待评分正文需为 80–30000 字。
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4">
+							<p className="text-sm text-muted-foreground">
+								当前正文：{chapterTitle || "未命名章节"} ·{" "}
+								{chapterText.trim().length} 字。
+								<Link href="/diagnose/quick" className="underline">
+									编辑正文
+								</Link>
+							</p>
 							<Button
 								className="w-full"
 								onClick={onScoreChapter}
-								disabled={loading || !rubricResult}
+								disabled={loading || !canScore}
 							>
 								{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 								开始评分
@@ -437,27 +462,25 @@ export function DeepDiagnosisStepper({
 												{scoreEvidenceChain.summary}
 											</p>
 											<div className="mt-3 space-y-2">
-												{scoreEvidenceChain.items
-													.slice(0, 4)
-													.map((item) => (
-														<div
-															key={item.id}
-															className="rounded-[10px] border border-border bg-card p-3 text-xs leading-5"
-														>
-															<p className="font-medium">
-																{item.metricName}
-															</p>
-															<p className="mt-1 text-muted-foreground">
-																{item.score}/10 · {item.reason}
-															</p>
-															<p className="mt-1 text-muted-foreground">
-																证据：{item.evidence}
-															</p>
-															<p className="mt-1 text-muted-foreground">
-																改法：{item.fix}
-															</p>
-														</div>
-													))}
+												{scoreEvidenceChain.items.map((item) => (
+													<div
+														key={item.id}
+														className="rounded-[10px] border border-border bg-card p-3 text-xs leading-5"
+													>
+														<p className="font-medium">
+															{item.metricName}
+														</p>
+														<p className="mt-1 text-muted-foreground">
+															{item.score}/10 · {item.reason}
+														</p>
+														<p className="mt-1 text-muted-foreground">
+															证据：{item.evidence}
+														</p>
+														<p className="mt-1 text-muted-foreground">
+															改法：{item.fix}
+														</p>
+													</div>
+												))}
 											</div>
 										</div>
 									) : null}
@@ -471,14 +494,18 @@ export function DeepDiagnosisStepper({
 					</Card>
 				</section>
 
-				<aside className="sticky top-4 overflow-hidden rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)] max-[1180px]:static max-[1180px]:col-span-2 max-[820px]:mt-3">
+				<aside
+					id="deep-findings"
+					tabIndex={-1}
+					className="sticky top-4 overflow-hidden rounded-[14px] border border-[#e6e8eb] bg-white shadow-[0_4px_18px_rgba(22,27,34,.06)] max-[1180px]:static max-[1180px]:col-span-2 max-[820px]:mt-3"
+				>
 					<div className="flex items-center justify-between border-b border-[#e6e8eb] px-4 py-3">
 						<strong className="text-sm">质检发现</strong>
 						<Badge variant="secondary">{scoreEvidenceChain.items.length} 条</Badge>
 					</div>
 					<div className="grid gap-2.5 p-3">
 						{scoreEvidenceChain.items.length ? (
-							scoreEvidenceChain.items.slice(0, 5).map((item) => (
+							scoreEvidenceChain.items.map((item) => (
 								<article
 									key={item.id}
 									className="rounded-[10px] border border-[#e6e8eb] bg-white p-3 text-xs leading-5"

@@ -197,8 +197,8 @@ export function requestRubric({
 		platform,
 		audience,
 		readingMode,
-		category,
-		theme,
+		category: category.trim() || "未指定",
+		theme: theme.trim() || "未指定",
 		tags: parseList(tags),
 		explicitKeywords: parseList(explicitKeywords),
 		implicitExpectations: parseList(implicitExpectations),
@@ -293,8 +293,8 @@ export function requestScoreChapter({
 		platform,
 		audience,
 		readingMode,
-		category,
-		theme,
+		category: category.trim() || "未指定",
+		theme: theme.trim() || "未指定",
 		tags: parseList(tags),
 		explicitKeywords: parseList(explicitKeywords),
 		implicitExpectations: parseList(implicitExpectations),
@@ -659,6 +659,7 @@ export function updateRevisionSessionNote({
 }
 
 export interface RevisionRetestResponse {
+	diagnosis: QuickReviewResult;
 	session: RevisionSession;
 	previousSession: RevisionSession;
 	comparison: import("@ai-novel-diagnosis/ai-core").RevisionComparison | null;

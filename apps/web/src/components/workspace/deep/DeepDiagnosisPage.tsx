@@ -41,6 +41,8 @@ export function DeepDiagnosisPage({ entryView = "deep" }: DeepDiagnosisPageProps
 		>
 			<DeepDiagnosisStepper
 				entryView={entryView}
+				status={handlers.status}
+				onReferenceTitleChange={handlers.setReferenceTitle}
 				loading={handlers.loading === "rubric" || handlers.loading === "score"}
 				quickReviewResult={handlers.quickReviewResult}
 				referenceText={handlers.referenceText}

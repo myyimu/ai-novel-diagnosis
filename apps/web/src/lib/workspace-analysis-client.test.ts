@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
 	requestMethodologyCards,
+	requestRubric,
 	requestPlatformFit,
 	requestQuickReview,
 	readStoryAuditFindingReviews,
@@ -35,6 +36,35 @@ function readJsonBody(init: RequestInit | undefined): Record<string, unknown> {
 describe("workspace analysis client", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
+	});
+
+	it("should allow a reference rubric without optional market positioning", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(okJson({}));
+		vi.stubGlobal("fetch", fetchMock);
+		await requestRubric({
+			provider,
+			referenceTitle: "参考样本",
+			genre: "xuanhuan",
+			platform: "qidian",
+			audience: "male-fast-paced",
+			readingMode: "long-serialization",
+			category: "",
+			theme: "  ",
+			tags: "",
+			explicitKeywords: "",
+			implicitExpectations: "",
+			positioningPromise: "",
+			recommendationSignals: "",
+			competitionLevel: "medium",
+			competitionNotes: "",
+			pushStage: "",
+			trafficEntry: "",
+			referenceText: "参考正文".repeat(25),
+		});
+		expect(readJsonBody(fetchMock.mock.calls[0]?.[1])).toMatchObject({
+			category: "未指定",
+			theme: "未指定",
+		});
 	});
 
 	it("sends quick review with deprecated methodology generation disabled", async () => {

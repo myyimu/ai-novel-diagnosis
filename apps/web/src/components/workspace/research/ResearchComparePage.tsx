@@ -28,6 +28,7 @@ export function ResearchComparePage() {
 		researchQaResult,
 		loadResearchLibrary,
 		loading,
+		status,
 	} = useWorkspaceHandlers("library");
 
 	const samples = persistedResearchLibrary?.comparisonSamples ?? [];
@@ -36,7 +37,7 @@ export function ResearchComparePage() {
 	const isComparing = loading === "compare";
 	const isAsking = loading === "ask";
 	const isLoadingLibrary = loading === "research";
-	const canCompare = selectedCount >= 2 && !isComparing;
+	const canCompare = selectedCount >= 2 && !loading;
 
 	const statusChip = isComparing
 		? "对比中…"
@@ -63,6 +64,14 @@ export function ResearchComparePage() {
 			description="从研究库选择已完成的整书样本，做多书横向对比与资料问答"
 			status={statusChip}
 		>
+			{status ? (
+				<p
+					role="status"
+					className="mb-4 rounded-lg border border-border bg-muted p-3 text-sm"
+				>
+					{status}
+				</p>
+			) : null}
 			<div className="space-y-4 [&>div]:rounded-[14px] [&>div]:border-[#e6e8eb] [&>div]:bg-white [&>div]:shadow-[0_6px_20px_rgba(22,27,34,.055)]">
 				{!hasSamples ? (
 					<Card>
@@ -89,6 +98,7 @@ export function ResearchComparePage() {
 										</Button>
 										<Button
 											variant="outline"
+											disabled={Boolean(loading)}
 											onClick={() => void loadResearchLibrary()}
 										>
 											<RefreshCw className="w-4 h-4 mr-2" />
@@ -122,7 +132,8 @@ export function ResearchComparePage() {
 										const checked = selectedResearchJobIds.includes(
 											sample.jobId,
 										);
-										const disabled = !checked && selectedCount >= 8;
+										const disabled =
+											Boolean(loading) || (!checked && selectedCount >= 8);
 										return (
 											<label
 												key={sample.jobId}
@@ -184,6 +195,7 @@ export function ResearchComparePage() {
 										<input
 											value={comparisonFocus}
 											maxLength={FOCUS_MAX_LENGTH}
+											disabled={Boolean(loading)}
 											onChange={(event) =>
 												setComparisonFocus(event.target.value)
 											}
@@ -194,6 +206,7 @@ export function ResearchComparePage() {
 									<div className="flex items-center gap-2">
 										<Button
 											variant="outline"
+											disabled={Boolean(loading)}
 											onClick={() => void loadResearchLibrary()}
 										>
 											<RefreshCw className="w-4 h-4 mr-2" />
@@ -404,6 +417,7 @@ export function ResearchComparePage() {
 							<CardContent className="space-y-4">
 								<textarea
 									value={researchQuestion}
+									disabled={Boolean(loading)}
 									onChange={(event) => setResearchQuestion(event.target.value)}
 									placeholder="例如：这三本书的开局如何在前三段立住期待感？"
 									className="w-full min-h-[90px] px-3 py-2 text-sm border rounded-md bg-background"
@@ -415,7 +429,7 @@ export function ResearchComparePage() {
 											: ""}
 									</span>
 									<Button
-										disabled={!researchQuestion.trim() || isAsking}
+										disabled={!researchQuestion.trim() || Boolean(loading)}
 										onClick={handleAsk}
 									>
 										{isAsking ? (
@@ -464,15 +478,20 @@ export function ResearchComparePage() {
 													引用资料
 												</h4>
 												<ul className="space-y-1 text-xs text-muted-foreground">
-													{researchQaResult.citations.map((citation) => (
-														<li key={citation.sourceId}>
-															<span className="font-medium text-foreground">
-																[{citation.sourceId}]{" "}
-																{citation.title}
-															</span>
-															（{citation.field}）：{citation.snippet}
-														</li>
-													))}
+													{researchQaResult.citations.map(
+														(citation, index) => (
+															<li
+																key={`${citation.sourceId}:${index}`}
+															>
+																<span className="font-medium text-foreground">
+																	[{citation.sourceId}]{" "}
+																	{citation.title}
+																</span>
+																（{citation.field}）：
+																{citation.snippet}
+															</li>
+														),
+													)}
 												</ul>
 											</div>
 										)}

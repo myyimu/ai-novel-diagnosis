@@ -30,6 +30,7 @@ export function ProjectExportPage() {
 		projectRevisionSessions,
 		projectMethodologyCards,
 		projectStoryAuditResult,
+		projectEngineCard,
 		providerLabel,
 		exportProjectMarkdown,
 		exportProjectJson,
@@ -38,6 +39,7 @@ export function ProjectExportPage() {
 		revisionCount: projectRevisionSessions.length,
 		methodologyCount: projectMethodologyCards.length,
 		hasStoryAudit: Boolean(projectStoryAuditResult),
+		hasEngineCard: Boolean(projectEngineCard),
 	});
 
 	async function exportMarkdown() {
@@ -108,7 +110,7 @@ export function ProjectExportPage() {
 							导出资产
 						</h1>
 						<p className="max-w-[720px] text-sm leading-6 text-[#69707d]">
-							将这本书的修改效果、故事体检摘要和方法论卡整理为可备份、分享或继续编辑的资产包。
+							将这本书的故事发动机、修改效果、故事体检摘要和方法论卡整理为可备份、分享或继续编辑的资产包。
 						</p>
 					</div>
 					<div className="rounded-full border border-[#ffd6c4] bg-[#fff2ec] px-3 py-1 text-xs font-bold text-[#c94413] max-[720px]:mt-4 max-[720px]:inline-flex">
@@ -116,7 +118,7 @@ export function ProjectExportPage() {
 					</div>
 				</section>
 
-				<section className="mb-4 grid gap-3 md:grid-cols-5">
+				<section className="mb-4 grid gap-3 md:grid-cols-3">
 					<SummaryCard label="当前书籍" value={activeProject?.name || "默认书籍"} />
 					<SummaryCard label="修改记录" value={`${projectRevisionSessions.length} 条`} />
 					<SummaryCard label="方法论卡" value={`${projectMethodologyCards.length} 张`} />
@@ -124,6 +126,7 @@ export function ProjectExportPage() {
 						label="故事体检"
 						value={projectStoryAuditResult ? "已生成" : "暂无"}
 					/>
+					<SummaryCard label="故事发动机" value={projectEngineCard ? "已保存" : "暂无"} />
 					<SummaryCard label="导出格式" value="Markdown / JSON" />
 				</section>
 
@@ -135,8 +138,8 @@ export function ProjectExportPage() {
 
 				<section className="mt-4">
 					{availability.canExport ? (
-						<div className="grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
-							<article className="rounded-[16px] border border-[#e6e8eb] bg-white p-5 shadow-[0_8px_24px_rgba(22,27,34,.055)]">
+						<div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[1.05fr_.95fr]">
+							<article className="min-w-0 rounded-[16px] border border-[#e6e8eb] bg-white p-5 shadow-[0_8px_24px_rgba(22,27,34,.055)]">
 								<div className="flex items-start gap-3">
 									<div className="grid size-11 shrink-0 place-items-center rounded-[13px] bg-[#fff2ec] text-[#ff5a1f]">
 										<Download className="size-5" />
@@ -148,7 +151,13 @@ export function ProjectExportPage() {
 										</p>
 									</div>
 								</div>
-								<div className="mt-5 grid gap-2">
+								<div className="mt-5 grid min-w-0 grid-cols-1 gap-2">
+									<ExportAssetRow
+										icon={<Lightbulb className="size-4" />}
+										label="故事发动机"
+										description="已保存的故事概述、核心冲突和创作契约"
+										value={projectEngineCard ? "已保存" : "暂无"}
+									/>
 									<ExportAssetRow
 										icon={<FileText className="size-4" />}
 										label="修改效果"
@@ -170,7 +179,7 @@ export function ProjectExportPage() {
 								</div>
 							</article>
 
-							<div className="grid gap-4">
+							<div className="grid min-w-0 grid-cols-1 gap-4">
 								<ExportFormatCard
 									icon={<FileText className="size-5" />}
 									title="导出 Markdown"
@@ -217,7 +226,7 @@ export function ProjectExportPage() {
 						导出说明
 					</h2>
 					<ul className="mt-2 grid gap-1.5 text-xs leading-5 text-[#405a85]">
-						<li>包含书籍信息、修改效果、体检摘要和方法论资产。</li>
+						<li>包含书籍信息、故事发动机、修改效果、体检摘要和方法论资产。</li>
 						<li>不包含正文全文，仅保留定位和复核所需的短引文、版本元数据。</li>
 						<li>Markdown 适合阅读和编辑；JSON 适合归档、迁移或二次处理。</li>
 					</ul>
@@ -231,12 +240,15 @@ export function getExportAvailability({
 	revisionCount,
 	methodologyCount,
 	hasStoryAudit,
+	hasEngineCard = false,
 }: {
 	revisionCount: number;
 	methodologyCount: number;
 	hasStoryAudit: boolean;
+	hasEngineCard?: boolean;
 }) {
-	const assetCount = revisionCount + methodologyCount + (hasStoryAudit ? 1 : 0);
+	const assetCount =
+		revisionCount + methodologyCount + (hasStoryAudit ? 1 : 0) + (hasEngineCard ? 1 : 0);
 	return { assetCount, canExport: assetCount > 0 };
 }
 
@@ -261,7 +273,7 @@ function ExportAssetRow({
 	value: string;
 }) {
 	return (
-		<div className="flex items-center gap-3 rounded-[11px] border border-[#eceef1] bg-[#fafbfc] px-3 py-2.5">
+		<div className="flex min-w-0 items-center gap-3 rounded-[11px] border border-[#eceef1] bg-[#fafbfc] px-3 py-2.5">
 			<span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-[#fff2ec] text-[#ff5a1f]">
 				{icon}
 			</span>
@@ -299,7 +311,7 @@ function ExportFormatCard({
 }) {
 	const isPrimary = variant === "primary";
 	return (
-		<article className="rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_6px_20px_rgba(22,27,34,.055)]">
+		<article className="min-w-0 rounded-[14px] border border-[#e6e8eb] bg-white p-4 shadow-[0_6px_20px_rgba(22,27,34,.055)]">
 			<div className="flex items-start gap-3">
 				<span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#fff2ec] text-[#ff5a1f]">
 					{icon}

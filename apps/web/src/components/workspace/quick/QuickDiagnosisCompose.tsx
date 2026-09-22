@@ -535,7 +535,8 @@ export function QuickDiagnosisCompose({ handlers }: QuickDiagnosisComposeProps) 
 							<div className="flex items-center justify-between gap-3.5 pt-[18px] max-[780px]:flex-col max-[780px]:items-stretch">
 								<div className="flex items-center gap-2 text-xs text-[#69707d]">
 									<ShieldCheck className="size-4" />
-									生成后接入“书籍 &gt; 章节”，数据仅保存在当前浏览器。
+									生成后接入“书籍 &gt;
+									章节”；草稿保存在当前浏览器，修改记录同步至本应用后端。
 								</div>
 								<Button
 									onClick={handlers.runQuickExperience}
