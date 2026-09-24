@@ -360,11 +360,11 @@ function PlotHoleCandidateView({
 
 			{candidates.length ? (
 				<div className="grid gap-3 md:grid-cols-3">
-					{candidates.map((finding) => {
+					{candidates.map((finding, findingIndex) => {
 						const evidenceStatus = evidenceQualificationLabel(finding);
 						return (
 							<article
-								key={finding.id}
+								key={`${finding.id}-${findingIndex}`}
 								className="rounded-md border border-border bg-background p-3"
 							>
 								<div className="flex flex-wrap items-center gap-2">
@@ -398,8 +398,8 @@ function PlotHoleCandidateView({
 										<ul className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
 											{finding.alternativeExplanations
 												.slice(0, 2)
-												.map((item) => (
-													<li key={item}>{item}</li>
+												.map((item, itemIndex) => (
+													<li key={`${itemIndex}-${item}`}>{item}</li>
 												))}
 										</ul>
 									</div>
@@ -469,9 +469,9 @@ function CharacterArcView({
 
 			{visibleRows.length ? (
 				<div className="grid gap-4">
-					{visibleRows.map((row) => (
+					{visibleRows.map((row, rowIndex) => (
 						<div
-							key={row.characterId}
+							key={`${row.characterId}-${rowIndex}`}
 							className="rounded-md border border-border bg-background p-3"
 						>
 							<div className="flex flex-wrap items-start justify-between gap-3">
@@ -489,9 +489,9 @@ function CharacterArcView({
 								</span>
 							</div>
 							<div className="mt-3 grid gap-3 md:grid-cols-2">
-								{row.points.map(({ state, scene }) => (
+								{row.points.map(({ state, scene }, pointIndex) => (
 									<div
-										key={`${state.characterId}-${state.sceneId}-${state.evidence[0]?.anchorId}`}
+										key={`${state.characterId}-${state.sceneId}-${state.evidence[0]?.anchorId ?? "no-anchor"}-${pointIndex}`}
 										className="rounded-md border border-border bg-card p-3"
 									>
 										<div className="flex flex-wrap items-center justify-between gap-2">
@@ -719,7 +719,7 @@ function PlotlineMatrix({
 						const evidence = scenes.flatMap((scene) => scene.evidence).slice(0, 2);
 						return (
 							<div
-								key={row.plotlineId}
+								key={`${row.plotlineId}-${index}`}
 								className="rounded-md border border-border bg-card p-3"
 							>
 								<div className="flex flex-wrap items-center justify-between gap-2">
@@ -732,9 +732,9 @@ function PlotlineMatrix({
 								</div>
 								<div className="mt-2 flex flex-wrap gap-1.5">
 									{scenes.length ? (
-										scenes.slice(0, 8).map((scene) => (
+										scenes.slice(0, 8).map((scene, sceneIndex) => (
 											<a
-												key={scene.id}
+												key={`${scene.id}-${sceneIndex}`}
 												href={evidenceHref(
 													projectId,
 													scene.chapterId,
@@ -767,9 +767,9 @@ function PlotlineMatrix({
 					<div className="text-xs font-semibold text-muted-foreground">
 						旧拆书剧情线参考
 					</div>
-					{result.plotlines.slice(0, 3).map((line) => (
+					{result.plotlines.slice(0, 3).map((line, lineIndex) => (
 						<div
-							key={line.name}
+							key={`${line.name}-${lineIndex}`}
 							className="rounded-md bg-muted px-3 py-2 text-xs leading-5"
 						>
 							<span className="font-semibold text-foreground">{line.name}</span>
@@ -834,8 +834,11 @@ function TimelinePanel({
 			</p>
 			{timelineEvents.length ? (
 				<div className="grid gap-2">
-					{timelineEvents.slice(0, 8).map((event) => (
-						<div key={event.id} className="rounded-md border border-border bg-card p-3">
+					{timelineEvents.slice(0, 8).map((event, eventIndex) => (
+						<div
+							key={`${event.id}-${eventIndex}`}
+							className="rounded-md border border-border bg-card p-3"
+						>
 							<div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
 								<span>
 									{event.absoluteTime || event.relativeTimeText || "unknown"}
@@ -1197,9 +1200,9 @@ function EvidenceList({
 }) {
 	return (
 		<div className="mt-3 grid gap-2">
-			{evidence.slice(0, 3).map((anchor) => (
+			{evidence.slice(0, 3).map((anchor, anchorIndex) => (
 				<a
-					key={anchor.anchorId}
+					key={`${anchor.anchorId}-${anchorIndex}`}
 					href={evidenceHref(projectId, anchor.chapterId, anchor.anchorId)}
 					className="block rounded-md border border-border bg-card px-3 py-2 text-xs leading-5 text-card-foreground hover:bg-muted"
 				>

@@ -264,25 +264,77 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     return [];
   }
 
+  /**
+   * rebuildPglite recovers from an unusable PGlite data directory (e.g.
+   * corrupted by a crash mid-write, such as an ENOSPC failure). The old
+   * directory is never deleted: it is renamed to `<dir>-broken-<ts>` when
+   * possible; when the rename keeps failing (Windows can hold directory
+   * handles open for a while after close, making renameSync fail with
+   * EPERM), fall back to a fresh sibling directory instead of crashing.
+   */
   private async rebuildPglite(): Promise<void> {
     const dir = this.pgliteDataDir!;
-    try {
-      await this.pglite!.close();
-    } catch {
-      /* already broken — ignore close errors */
-    }
+    await this.closeBrokenPglite();
 
     const backupDir = `${dir}-broken-${Date.now()}`;
-    renameSync(dir, backupDir);
-    this.logger.warn(`旧数据已备份到 ${backupDir}`);
+    const renamed = this.renameWithRetry(dir, backupDir);
+    const targetDir = renamed ? dir : `${dir}-fresh-${Date.now()}`;
 
-    mkdirSync(dir, { recursive: true });
-    this.pglite = new PGlite(dir);
+    if (renamed) {
+      this.logger.warn(`旧数据已备份到 ${backupDir}`);
+    } else {
+      this.logger.warn(
+        `旧数据目录 ${dir} 重命名失败（可能仍被其他进程占用）；` +
+          `改为使用新目录 ${targetDir}，请稍后手动检查旧目录`,
+      );
+    }
+
+    this.pgliteDataDir = targetDir;
+    mkdirSync(targetDir, { recursive: true });
+    this.pglite = new PGlite(targetDir);
     this.db = drizzlePglite(this.pglite, {
       schema,
     }) as unknown as NodePgDatabase<typeof schema>;
 
     await this.bootstrapPgliteSchema();
-    this.logger.log("已用空白数据库重建 PGlite，旧数据保留在备份目录中");
+    this.logger.log(
+      renamed
+        ? "已用空白数据库重建 PGlite，旧数据保留在备份目录中"
+        : `已在新目录 ${targetDir} 用空白数据库重建 PGlite`,
+    );
+  }
+
+  /** Close a possibly-broken PGlite; log and continue when close itself fails. */
+  private async closeBrokenPglite(): Promise<void> {
+    try {
+      await this.pglite!.close();
+    } catch (error) {
+      this.logger.warn(
+        `损坏的 PGlite 实例关闭失败（${(error as Error).message}），继续尝试恢复`,
+      );
+    }
+  }
+
+  /**
+   * renameWithRetry retries a directory rename a few times: Windows
+   * releases handles asynchronously, so a rename that fails immediately
+   * after close often succeeds moments later. Returns whether it
+   * eventually succeeded.
+   */
+  private renameWithRetry(from: string, to: string, attempts = 3): boolean {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        renameSync(from, to);
+        return true;
+      } catch (error) {
+        this.logger.warn(
+          `重命名 ${from} 失败（第 ${attempt}/${attempts} 次）：${(error as Error).message}`,
+        );
+        // Windows releases directory handles asynchronously after close;
+        // give it a moment before retrying.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 750);
+      }
+    }
+    return false;
   }
 }

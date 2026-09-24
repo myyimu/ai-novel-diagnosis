@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsNumber,
   IsOptional,
@@ -220,16 +221,19 @@ export class ProjectMethodologyCardDto {
 }
 
 export class UpsertWorkspaceProjectDto {
+  @IsDefined()
   @ValidateNested()
   @Type(() => WorkspaceProjectDto)
   project!: WorkspaceProjectDto;
 }
 
 export class UpsertRevisionAssetsDto {
+  @IsDefined()
   @ValidateNested()
   @Type(() => WorkspaceProjectDto)
   project!: WorkspaceProjectDto;
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => RevisionSessionDto)
   session!: RevisionSessionDto;

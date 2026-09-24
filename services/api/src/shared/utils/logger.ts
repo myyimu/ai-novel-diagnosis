@@ -85,6 +85,15 @@ const transport = pino.transport({
   ],
 });
 
+// thread-stream 在底层写日志失败（如磁盘满 ENOSPC）时会 emit 'error'。
+// 不注册监听器的话，这个 'error' 事件会作为 unhandled event 直接杀死整个进程；
+// 注册后降级为仅向 stderr 报警，进程继续运行。
+transport.on("error", (error: Error) => {
+  process.stderr.write(
+    `[logger] 日志写入失败，已忽略并继续运行：${error.message}\n`,
+  );
+});
+
 /** Whether logger has been initialized with production settings */
 let isProductionMode = false;
 

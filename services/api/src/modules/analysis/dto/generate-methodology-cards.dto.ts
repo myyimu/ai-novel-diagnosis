@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsOptional,
   IsString,
@@ -183,11 +184,13 @@ export class GenerateMethodologyCardsDto {
   issues!: MethodologyIssueDto[];
 
   @ApiProperty({ type: MethodologyRevisionPlanDto })
+  @IsDefined()
   @ValidateNested()
   @Type(() => MethodologyRevisionPlanDto)
   revisionPlan!: MethodologyRevisionPlanDto;
 
   @ApiProperty({ type: MethodologyNextPromptDto })
+  @IsDefined()
   @ValidateNested()
   @Type(() => MethodologyNextPromptDto)
   nextPrompt!: MethodologyNextPromptDto;

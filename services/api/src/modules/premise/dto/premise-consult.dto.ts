@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsDefined,
   IsIn,
   IsNumber,
   IsOptional,
@@ -107,6 +108,7 @@ export class PremiseConsultDto {
     description:
       "Snapshot of the first review this consultation is presented against.",
   })
+  @IsDefined()
   @ValidateNested()
   @Type(() => PremiseConsultOriginalDto)
   original!: PremiseConsultOriginalDto;
